@@ -5,74 +5,128 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\Evidence;
 use App\Models\ProjectAssignment;
+use App\Models\EvidenceRevisionHistory;
 
 class DashboardController extends Controller
 {
     public function index(Request $request)
-{
-    $role = auth()->user()->role;
+    {
+        $role = auth()->user()->role;
 
-    if ($role == 'admin') {
+        if ($role == 'admin') {
 
-        $query = Project::with([
-            'boqItems',
-            'assignments.waspang',
-            'evidences'
-        ]);
+            $query = Project::with([
+                'boqItems',
+                'assignments.waspang',
+                'evidences'
+            ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | SEARCH
-        |--------------------------------------------------------------------------
-        */
+            /*
+            |--------------------------------------------------------------------------
+            | SEARCH
+            |--------------------------------------------------------------------------
+            */
 
-        if ($request->search) {
+            if ($request->search) {
 
-            $query->where(function ($q) use ($request) {
+                $query->where(function ($q) use ($request) {
 
-                $q->where('project_name', 'like', '%' . $request->search . '%')
-                  ->orWhere('sto', 'like', '%' . $request->search . '%')
-                  ->orWhere('branch', 'like', '%' . $request->search . '%')
-                  ->orWhere('mitra_name', 'like', '%' . $request->search . '%');
+                    $q->where('project_name', 'like', '%' . $request->search . '%')
+                    ->orWhere('sto', 'like', '%' . $request->search . '%')
+                    ->orWhere('branch', 'like', '%' . $request->search . '%')
+                    ->orWhere('mitra_name', 'like', '%' . $request->search . '%');
 
-            });
+                });
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | FILTER STATUS
+            |--------------------------------------------------------------------------
+            */
+
+            if ($request->status) {
+
+                $query->where('status', $request->status);
+            }
+
+            $projects = $query->latest()->get();
+
+            $totalProject = Project::count();
+
+            $activeProject = Project::where('status', 'active')->count();
+
+            $waitingUt = Project::where('status', 'waiting_ut')->count();
+
+            $completedProject = Project::where('status', 'completed')->count();
+
+            $waspangs = User::with('assignments')
+                ->where('role', 'waspang')
+                ->get();
+
+            $allProjectsForAnalytics = Project::with(['boqItems', 'evidences'])->get();
+
+            $analyticsBySto = $allProjectsForAnalytics->groupBy('sto')->map(function ($items, $sto) {
+                $total = $items->count();
+
+                $ready = $items->filter(function ($project) {
+                    return $project->evidences
+                        ->where('stage', 'finishing')
+                        ->where('status', 'approved')
+                        ->count() > 0;
+                })->count();
+
+                return [
+                    'label' => $sto ?: '-',
+                    'total' => $total,
+                    'ready' => $ready,
+                    'ongoing' => $total - $ready,
+                    'percent' => $total > 0 ? round(($ready / $total) * 100) : 0,
+                ];
+            })->values();
+
+           $analyticsByBranch = $allProjectsForAnalytics->groupBy('branch')->map(function ($items, $branch) {
+                $total = $items->count();
+
+                $ready = $items->filter(function ($project) {
+                    return $project->evidences
+                        ->where('stage', 'finishing')
+                        ->where('status', 'approved')
+                        ->count() > 0;
+                })->count();
+
+                return [
+                    'label' => $branch ?: '-',
+                    'total' => $total,
+                    'ready' => $ready,
+                    'ongoing' => $total - $ready,
+                    'percent' => $total > 0 ? round(($ready / $total) * 100) : 0,
+                ];
+            })->values();
+
+            $totalApprovedEvidence = \App\Models\Evidence::where('status', 'approved')->count();
+
+            $totalPendingEvidence = \App\Models\Evidence::where('status', 'pending')->count();
+
+            $totalRejectedEvidence = \App\Models\Evidence::where('status', 'rejected')->count();    
+
+            return view('admin.dashboard', compact(
+                'projects',
+                'waspangs',
+                'totalProject',
+                'activeProject',
+                'waitingUt',
+                'completedProject',
+                'analyticsBySto',
+                'analyticsByBranch',
+                'totalApprovedEvidence',
+                'totalPendingEvidence',
+                'totalRejectedEvidence',
+                
+            ));
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | FILTER STATUS
-        |--------------------------------------------------------------------------
-        */
-
-        if ($request->status) {
-
-            $query->where('status', $request->status);
-        }
-
-        $projects = $query->latest()->get();
-
-        $totalProject = Project::count();
-
-        $activeProject = Project::where('status', 'active')->count();
-
-        $waitingUt = Project::where('status', 'waiting_ut')->count();
-
-        $completedProject = Project::where('status', 'completed')->count();
-
-        $waspangs = User::with('assignments')
-            ->where('role', 'waspang')
-            ->get();
-
-        return view('admin.dashboard', compact(
-            'projects',
-            'waspangs',
-            'totalProject',
-            'activeProject',
-            'waitingUt',
-            'completedProject'
-        ));
-    }
 
     if ($role == 'waspang') {
     return redirect()->route('waspang.dashboard');
@@ -169,4 +223,33 @@ class DashboardController extends Controller
 
         return back()->with('success', 'Assignment waspang berhasil dihapus');
     }
+    
+
+    /*
+        |--------------------------------------------------------------------------
+        | MAP MONITORING
+        |--------------------------------------------------------------------------
+        */
+
+    public function mapMonitoring()
+        {
+            $projects = Project::with([
+                'evidences',
+                'assignments.waspang'
+            ])
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->get();
+
+            $evidences = Evidence::with(['project', 'uploader'])
+                ->whereNotNull('latitude')
+                ->whereNotNull('longitude')
+                ->latest()
+                ->get();
+
+            return view('admin.map-monitoring', compact(
+                'projects',
+                'evidences'
+            ));
+        }
 }

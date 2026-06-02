@@ -69,7 +69,7 @@
                     <div class="w-8 h-8 rounded-full border border-red-500 bg-red-50 text-red-600 flex items-center justify-center text-xs font-bold">
                         2
                     </div>
-                    <p class="mt-1 text-[11px] font-bold text-red-600">
+                    <p class="mt-1 text-[11px] font-semibold text-red-600">
                         Instalasi
                     </p>
                 </a>

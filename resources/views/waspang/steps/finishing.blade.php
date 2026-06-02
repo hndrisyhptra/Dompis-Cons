@@ -42,9 +42,9 @@
 @endphp
 
 {{-- HEADER --}}
-<div class="bg-blue-700 text-white px-5 pt-7 pb-6">
+<div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
 
-    <div class="flex items-center gap-3 mb-7">
+    <div class="flex items-center gap-3">
         <a href="{{ route('waspang.projects.pengukuran', $project->id_project) }}"
            class="text-3xl leading-none">
             ‹
@@ -243,7 +243,7 @@
 
     </div>
 
-    <div x-data="{ open: true }"
+    <div x-data="{ open: false }"
          class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
 
         <button type="button"

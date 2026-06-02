@@ -96,7 +96,7 @@
                 <div class="w-8 h-8 rounded-full bg-green-100 text-green-700 border border-green-500 flex items-center justify-center text-xs font-bold">
                     ✓
                 </div>
-                <p class="mt-1 text-[11px] font-semibold">Ukur</p>
+                <p class="mt-1 text-[11px] font-semibold">Pengukuran</p>
             </a>
 
             <div class="flex-1 h-0.5 bg-gray-200 mx-1"></div>
@@ -213,7 +213,7 @@
     </div>
 
     {{-- FINISHING EVIDEN --}}
-    <div x-data="{ open: true }"
+    <div x-data="{ open: false }"
          class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
 
         <button type="button"

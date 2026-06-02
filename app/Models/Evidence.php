@@ -10,7 +10,7 @@ class Evidence extends Model
 
     protected $primaryKey = 'id_evidence';
 
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
         'project_id',
@@ -39,6 +39,11 @@ class Evidence extends Model
     public function uploader()
     {
         return $this->belongsTo(User::class, 'uploaded_by', 'id_user');
+    }
+
+    public function revisionHistories()
+    {
+        return $this->hasMany(EvidenceRevisionHistory::class, 'evidence_id', 'id_evidence');
     }
 
 

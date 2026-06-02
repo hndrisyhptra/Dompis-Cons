@@ -81,7 +81,7 @@
         $evidences = $project->evidences ?? collect();
         $boqItems = $project->boqItems ?? collect();
 
-        $waspang = optional($project->assignments->first())->waspang;
+        $waspang = optional($project->assignment)->waspang;
 
         $barangTibaDone = $evidences
             ->where('stage', 'persiapan')
@@ -408,10 +408,11 @@
                         Item BOQ Awal
                     </h3>
 
-                    <a href="{{ route('projects.show', $project->id_project) }}"
-                       class="h-10 px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold">
-                        + Tambah Item
-                    </a>
+                    <button type="button"
+                            onclick="openBoqModal('{{ $project->id_project }}', @js($project->project_name))"
+                            class="h-10 px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold">
+                        + Item Designator
+                    </button>
 
                 </div>
 
@@ -497,11 +498,11 @@
 
             <div class="flex flex-col sm:flex-row justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
 
-                <button type="button"
+                <!-- <button type="button"
                         onclick="closeDetailModal('detail-modal-{{ $project->id_project }}')"
                         class="h-11 px-6 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold hover:bg-gray-100 dark:hover:bg-gray-800">
                     Tutup
-                </button>
+                </button> -->
 
                 <button type="button"
                         onclick="openAssignModal('{{ $project->id_project }}', @js($project->project_name))"
@@ -509,7 +510,7 @@
                     👷 {{ $waspang ? 'Reassign Waspang' : 'Assign Waspang' }}
                 </button>
 
-                <button type="button"
+               <button type="button"
                         onclick="openEditProjectModal({
                             id: '{{ $project->id_project }}',
                             project_name: @js($project->project_name),
@@ -517,7 +518,19 @@
                             sto: @js($project->sto),
                             mitra_name: @js($project->mitra_name),
                             jenis_eksekusi: '{{ $project->jenis_eksekusi }}',
-                            status: '{{ $project->status }}'
+                            status: '{{ $project->status }}',
+                            latitude: @js($project->latitude),
+                            longitude: @js($project->longitude),
+                            location_address: @js($project->location_address)
+                            boq_items: @js($project->boqItems->map(function($boq) {
+                                return [
+                                    'id_boq' => $boq->id_boq,
+                                    'designator' => $boq->designator,
+                                    'item_name' => $boq->item_name,
+                                    'unit' => $boq->unit,
+                                    'quantity_plan' => $boq->quantity_plan,
+                                ];
+                            }))
                         })"
                         class="h-11 px-6 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold hover:bg-gray-100 dark:hover:bg-gray-800">
                     Edit
@@ -593,7 +606,9 @@
                     @foreach($waspangs as $waspangUser)
 
                         @php
-                            $activeCount = $waspangUser->assignments->count();
+                            $activeCount = $waspangUser->assignments
+                            ->unique('project_id')
+                            ->count();
                             $isBusy = $activeCount >= 3;
 
                             $initials = strtoupper(
@@ -836,6 +851,68 @@
                            class="w-full h-11 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
                 </div>
 
+                {{-- Lokasi Project --}}
+                <div class="pt-2">
+
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-900 dark:text-white">
+                                Lokasi Project
+                            </h3>
+                            <p class="text-xs text-gray-500">
+                                Isi manual atau ambil otomatis dari GPS browser
+                            </p>
+                        </div>
+
+                        <button type="button"
+                                onclick="getProjectLocation()"
+                                class="h-9 px-3 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700">
+                            Gunakan Lokasi Saat Ini
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                Latitude
+                            </label>
+
+                            <input type="text"
+                                name="latitude"
+                                id="latitude"
+                                placeholder="-7.257472"
+                                class="w-full h-11 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                Longitude
+                            </label>
+
+                            <input type="text"
+                                name="longitude"
+                                id="longitude"
+                                placeholder="112.752088"
+                                class="w-full h-11 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+                        </div>
+
+                    </div>
+
+                    <div class="mt-4">
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                            Alamat / Keterangan Lokasi
+                        </label>
+
+                        <input type="text"
+                            name="location_address"
+                            id="location_address"
+                            placeholder="contoh: Jl. Raya Darmo, Surabaya"
+                            class="w-full h-11 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+                    </div>
+
+                </div>
+
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
                         Jenis Eksekusi <span class="text-red-500">*</span>
@@ -1023,7 +1100,7 @@ function openEditProjectModal(project)
     document.getElementById('projectModal').classList.remove('hidden');
     document.getElementById('projectModal').classList.add('flex');
 
-    document.getElementById('projectModalTitle').innerText = 'Edit Project';
+    document.getElementById('projectModalTitle').innerText = 'Edit Project & BOQ';
     document.getElementById('projectForm').action = `/projects/update/${project.id}`;
     document.getElementById('projectMethod').value = 'PUT';
 
@@ -1032,10 +1109,71 @@ function openEditProjectModal(project)
     document.getElementById('sto').value = project.sto ?? '';
     document.getElementById('mitra_name').value = project.mitra_name ?? '';
     document.getElementById('jenis_eksekusi').value = project.jenis_eksekusi ?? 'plan';
+    document.getElementById('latitude').value = project.latitude ?? '';
+    document.getElementById('longitude').value = project.longitude ?? '';
+    document.getElementById('location_address').value = project.location_address ?? '';
 
     if (document.getElementById('status')) {
         document.getElementById('status').value = project.status ?? 'active';
     }
+
+    renderEditBoqItems(project.boq_items ?? []);
+}
+
+function renderEditBoqItems(items)
+{
+    const container = document.getElementById('designatorContainer');
+
+    container.innerHTML = '';
+
+    if (items.length === 0) {
+        addDesignatorRow();
+        return;
+    }
+
+    items.forEach((item) => {
+        const row = `
+            <div class="grid grid-cols-12 gap-2 designator-row">
+
+                <input type="hidden" name="existing_boq_id[]" value="${item.id_boq ?? ''}">
+
+                <input type="text"
+                       name="existing_designator[]"
+                       value="${item.designator ?? ''}"
+                       readonly
+                       class="col-span-12 sm:col-span-3 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
+
+                <input type="text"
+                       name="existing_item_name[]"
+                       value="${item.item_name ?? ''}"
+                       readonly
+                       class="col-span-12 sm:col-span-4 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
+
+                <input type="text"
+                       name="existing_unit[]"
+                       value="${item.unit ?? ''}"
+                       readonly
+                       class="col-span-5 sm:col-span-2 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
+
+                <input type="number"
+                       step="0.01"
+                       name="existing_qty[]"
+                       value="${item.quantity_plan ?? 0}"
+                       class="col-span-5 sm:col-span-2 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+
+                <button type="button"
+                        onclick="removeDesignatorRow(this)"
+                        class="col-span-2 sm:col-span-1 h-10 rounded-xl text-gray-400 hover:text-red-500 text-xl">
+                    ×
+                </button>
+
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', row);
+    });
+
+    addDesignatorRow();
 }
 
 function closeProjectModal()
@@ -1427,4 +1565,28 @@ function removeBoqRow(button)
             initSingleBoqDesignatorSearch(select);
         });
     }
+
+    function getProjectLocation()
+    {
+        if (!navigator.geolocation) {
+            alert('Browser tidak mendukung GPS / Geolocation');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                document.getElementById('latitude').value = position.coords.latitude.toFixed(8);
+                document.getElementById('longitude').value = position.coords.longitude.toFixed(8);
+            },
+            function(error) {
+                alert('Gagal mengambil lokasi. Pastikan izin lokasi browser aktif.');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    }
 </script>
+

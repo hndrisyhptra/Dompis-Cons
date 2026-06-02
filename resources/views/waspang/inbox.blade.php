@@ -11,14 +11,16 @@
 
 <div class="min-h-screen max-w-md mx-auto bg-[#f7f6f2] pb-24">
 
-    <div class="bg-blue-700 text-white px-6 pt-8 pb-7">
-        <div class="flex items-center gap-4">
+    <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
+
+        <div class="flex items-center gap-3">
+
             <a href="{{ route('waspang.dashboard') }}" class="text-3xl leading-none">
                 ‹
             </a>
 
             <div>
-                <h1 class="text-2xl font-bold">
+                <h1 class="text-1xl font-bold">
                     Inbox LOP
                 </h1>
                 <p class="text-sm opacity-90">

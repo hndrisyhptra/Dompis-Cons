@@ -59,10 +59,16 @@
             Assign Waspang
         </a>
 
+        <a href="{{ route('admin.map.monitoring') }}"
+            class="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold
+            {{ request()->routeIs('admin.map.monitoring') ? 'bg-blue-700 text-white' : 'text-gray-600 hover:bg-gray-100' }}">
+             🗺️ Map Monitoring
+        </a>
+
         <a href="{{ route('admin.evidences.approval') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm 
-        font-semibold transition {{ request()->routeIs('admin.evidences.*') ? text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
-         @if(request()->routeIs('admin.evidences.*'))
-        <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+            font-semibold transition {{ request()->routeIs('admin.evidences.*') ? text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
+            @if(request()->routeIs('admin.evidences.*'))
+            <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
         @endif
             <span>✅</span>
             Approval Eviden

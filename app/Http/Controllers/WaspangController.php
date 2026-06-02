@@ -4,53 +4,99 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\ProjectAssignment;
+use App\Models\Notification;
 use App\Models\Evidence;
+use App\Models\EvidenceRevisionHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+
 class WaspangController extends Controller
 {
     public function dashboard()
-{
-    $userId = auth()->user()->id_user;
+    {
+        $userId = auth()->user()->id_user;
 
-    $assignedProjectIds = ProjectAssignment::where('waspang_id', $userId)
-        ->pluck('project_id');
+        $assignedProjectIds = ProjectAssignment::where('waspang_id', $userId)
+            ->pluck('project_id');
 
-    $projects = Project::with(['boqItems'])
-        ->whereIn('id_project', $assignedProjectIds)
-        ->latest()
-        ->get();
+        $projects = Project::with(['boqItems', 'evidences'])
+            ->whereIn('id_project', $assignedProjectIds)
+            ->latest()
+            ->get();
 
-    // TOTAL
-    $totalAssigned = $projects->count();
+        $totalAssigned = $projects->count();
 
-    // PREPARATION
-    $preparation = $projects
-        ->where('jenis_eksekusi', 'plan')
-        ->count();
+        $readyProjects = $projects->filter(function ($project) {
+            return $this->isProjectReadyUt($project);
+        });
 
-    // INSTALLATION
-    $installation = $projects
-        ->where('jenis_eksekusi', 'ogp')
-        ->count();
+        $ongoingProjects = $projects->filter(function ($project) {
+            return !$this->isProjectReadyUt($project);
+        });
 
-    // FINISH
-    $finish = $projects
-        ->where('status', 'completed')
-        ->count();
+        $activeProjectsCount = $ongoingProjects->count();
+        $readyUtCount = $readyProjects->count();
 
-    // LATEST PROJECT
-    $latestProjects = $projects->take(3);
+        $latestProjects = $ongoingProjects->take(3);
 
-    return view('waspang.dashboard', [
-        'projects' => $projects,
-        'totalAssigned' => $totalAssigned,
-        'preparation' => $preparation,
-        'installation' => $installation,
-        'finish' => $finish,
-        'latestProjects' => $latestProjects,
+       $preparation = 0;
+        $installation = 0;
+        $finish = 0;
+
+        foreach ($projects as $project) {
+
+            $evidences = $project->evidences ?? collect();
+            $boqItems = $project->boqItems ?? collect();
+
+            $persiapanApproved =
+                $evidences->where('stage', 'persiapan')
+                    ->where('evidence_type', 'barang_tiba')
+                    ->where('status', 'approved')
+                    ->count() > 0
+                &&
+                $evidences->where('stage', 'persiapan')
+                    ->where('evidence_type', 'perizinan')
+                    ->where('status', 'approved')
+                    ->count() > 0;
+
+            $boqTotal = $boqItems->count();
+
+            $boqApproved = $boqItems->filter(function ($boq) use ($evidences) {
+                return $evidences
+                    ->where('stage', 'instalasi')
+                    ->where('evidence_type', 'progress_boq')
+                    ->where('boq_item_id', $boq->id_boq)
+                    ->where('status', 'approved')
+                    ->count() > 0;
+            })->count();
+
+            $instalasiApproved =
+                $boqTotal > 0 &&
+                $boqApproved == $boqTotal;
+
+            if ($this->isProjectReadyUt($project)) {
+                $finish++;
+            } elseif ($instalasiApproved) {
+                $installation++;
+            } elseif ($persiapanApproved) {
+                $preparation++;
+            } else {
+                $preparation++;
+            }
+        }
+        
+
+        return view('waspang.dashboard', [
+            'projects' => $projects,
+            'totalAssigned' => $totalAssigned,
+            'preparation' => $preparation,
+            'installation' => $installation,
+            'finish' => $finish,
+            'latestProjects' => $latestProjects,
+            'activeProjectsCount' => $activeProjectsCount,
+            'readyUtCount' => $readyUtCount,
         ]);
     }
 
@@ -58,96 +104,7 @@ class WaspangController extends Controller
     //WASPANG MOBILE
     public function show($id)
     {
-        $userId = auth()->user()->id_user;
-
-        $isAssigned = ProjectAssignment::where('project_id', $id)
-            ->where('waspang_id', $userId)
-            ->exists();
-
-        abort_if(!$isAssigned, 403);
-
-        $project = Project::with(['boqItems', 'evidences'])
-            ->findOrFail($id);
-
-        $barangTibaApproved = Evidence::where('project_id', $id)
-            ->where('stage', 'persiapan')
-            ->where('evidence_type', 'barang_tiba')
-            ->where('status', 'approved')
-            ->exists();
-
-        $perizinanApproved = Evidence::where('project_id', $id)
-            ->where('stage', 'persiapan')
-            ->where('evidence_type', 'perizinan')
-            ->where('status', 'approved')
-            ->exists();
-
-        $persiapanComplete = $barangTibaApproved && $perizinanApproved;
-
-        $boqTotal = $project->boqItems->count();
-
-        $boqUploaded = Evidence::where('project_id', $id)
-            ->where('stage', 'instalasi')
-            ->where('evidence_type', 'progress_boq')
-            ->whereNotNull('boq_item_id')
-            ->distinct('boq_item_id')
-            ->count('boq_item_id');
-
-        $boqApproved = Evidence::where('project_id', $id)
-            ->where('stage', 'instalasi')
-            ->where('evidence_type', 'progress_boq')
-            ->where('status', 'approved')
-            ->whereNotNull('boq_item_id')
-            ->distinct('boq_item_id')
-            ->count('boq_item_id');
-
-        $instalasiComplete = $boqTotal > 0 && $boqApproved >= $boqTotal;
-
-        $opmApproved = Evidence::where('project_id', $id)
-            ->where('stage', 'pengukuran')
-            ->where('evidence_type', 'opm')
-            ->where('status', 'approved')
-            ->exists();
-
-        $otdrApproved = Evidence::where('project_id', $id)
-            ->where('stage', 'pengukuran')
-            ->where('evidence_type', 'otdr')
-            ->where('status', 'approved')
-            ->exists();
-
-        $pengukuranComplete = $opmApproved && $otdrApproved;
-
-        $finishingComplete = Evidence::where('project_id', $id)
-            ->where('stage', 'finishing')
-            ->where('status', 'approved')
-            ->exists();
-
-        if (!$persiapanComplete) {
-            $currentStage = 'persiapan';
-        } elseif (!$instalasiComplete) {
-            $currentStage = 'instalasi';
-        } elseif (!$pengukuranComplete) {
-            $currentStage = 'pengukuran';
-        } elseif (!$finishingComplete) {
-            $currentStage = 'finishing';
-        } else {
-            $currentStage = 'selesai';
-        }
-
-        return view('waspang.show', compact(
-            'project',
-            'barangTibaApproved',
-            'perizinanApproved',
-            'persiapanComplete',
-            'boqTotal',
-            'boqUploaded',
-            'boqApproved',
-            'instalasiComplete',
-            'opmApproved',
-            'otdrApproved',
-            'pengukuranComplete',
-            'finishingComplete',
-            'currentStage'
-        ));
+        return redirect()->route('waspang.projects.persiapan', $id);
     }
 
     //AKSI CEPAT WASPANG MOBILE
@@ -253,10 +210,9 @@ class WaspangController extends Controller
                 ->count() > 0;
 
         $finishingDone =
-            $evidences->where('stage', 'finishing')
-                ->where('evidence_type', 'final_site')
-                ->where('status', 'approved')
-                ->count() > 0;
+        $evidences->where('stage', 'finishing')
+            ->where('status', 'approved')
+            ->count() > 0;
 
         return $persiapanDone &&
             $instalasiDone &&
@@ -267,25 +223,111 @@ class WaspangController extends Controller
     //WASPANG STAGE PERSIAPAN, INSTALASI, PENGUKURAN, FINISHING
     public function persiapan($id)
     {
-        $project = $this->getAssignedProject($id);
+        $userId = auth()->user()->id_user;
 
-        $barangTiba = $project->evidences
+        $isAssigned = ProjectAssignment::where('project_id', $id)
+            ->where('waspang_id', $userId)
+            ->exists();
+
+        abort_if(!$isAssigned, 403);
+
+        $project = Project::with(['boqItems', 'evidences'])
+            ->findOrFail($id);
+
+        $barangTibaApproved = Evidence::where('project_id', $id)
             ->where('stage', 'persiapan')
             ->where('evidence_type', 'barang_tiba')
-            ->sortByDesc('created_at')
-            ->first();
+            ->where('status', 'approved')
+            ->exists();
 
-        $perizinan = $project->evidences
+        $perizinanApproved = Evidence::where('project_id', $id)
             ->where('stage', 'persiapan')
             ->where('evidence_type', 'perizinan')
-            ->sortByDesc('created_at')
-            ->first();
+            ->where('status', 'approved')
+            ->exists();
 
-        return view('waspang.steps.persiapan', compact(
+        $persiapanComplete = $barangTibaApproved && $perizinanApproved;
+
+        $boqTotal = $project->boqItems->count();
+
+        $boqUploaded = Evidence::where('project_id', $id)
+            ->where('stage', 'instalasi')
+            ->where('evidence_type', 'progress_boq')
+            ->whereNotNull('boq_item_id')
+            ->distinct('boq_item_id')
+            ->count('boq_item_id');
+
+        $boqApproved = Evidence::where('project_id', $id)
+            ->where('stage', 'instalasi')
+            ->where('evidence_type', 'progress_boq')
+            ->where('status', 'approved')
+            ->whereNotNull('boq_item_id')
+            ->distinct('boq_item_id')
+            ->count('boq_item_id');
+
+        $instalasiComplete = $boqTotal > 0 && $boqApproved >= $boqTotal;
+
+        $opmApproved = Evidence::where('project_id', $id)
+            ->where('stage', 'pengukuran')
+            ->where('evidence_type', 'opm')
+            ->where('status', 'approved')
+            ->exists();
+
+        $otdrApproved = Evidence::where('project_id', $id)
+            ->where('stage', 'pengukuran')
+            ->where('evidence_type', 'otdr')
+            ->where('status', 'approved')
+            ->exists();
+
+        $pengukuranComplete = $opmApproved && $otdrApproved;
+
+        $finishingComplete = Evidence::where('project_id', $id)
+            ->where('stage', 'finishing')
+            ->where('status', 'approved')
+            ->exists();
+
+        if (!$persiapanComplete) {
+            $currentStage = 'persiapan';
+        } elseif (!$instalasiComplete) {
+            $currentStage = 'instalasi';
+        } elseif (!$pengukuranComplete) {
+            $currentStage = 'pengukuran';
+        } elseif (!$finishingComplete) {
+            $currentStage = 'finishing';
+        } else {
+            $currentStage = 'selesai';
+        }
+
+        $barangTibaHistories = EvidenceRevisionHistory::where('project_id', $project->id_project)
+            ->where('stage', 'persiapan')
+            ->where('evidence_type', 'barang_tiba')
+            ->latest()
+            ->get();
+
+        $perizinanHistories = EvidenceRevisionHistory::where('project_id', $project->id_project)
+            ->where('stage', 'persiapan')
+            ->where('evidence_type', 'perizinan')
+            ->latest()
+            ->get();
+
+        return view('waspang.show', compact(
             'project',
-            'barangTiba',
-            'perizinan'
+            'barangTibaApproved',
+            'perizinanApproved',
+            'persiapanComplete',
+            'boqTotal',
+            'boqUploaded',
+            'boqApproved',
+            'instalasiComplete',
+            'opmApproved',
+            'otdrApproved',
+            'pengukuranComplete',
+            'finishingComplete',
+            'currentStage',
+            'barangTibaHistories',
+            'perizinanHistories'
         ));
+    
     }
 
     public function instalasi($id)
@@ -301,6 +343,7 @@ class WaspangController extends Controller
         $boqUploaded = 0;
 
         foreach ($project->boqItems as $boq) {
+
             $hasEvidence = $project->evidences
                 ->where('stage', 'instalasi')
                 ->where('evidence_type', 'progress_boq')
@@ -312,20 +355,37 @@ class WaspangController extends Controller
             }
         }
 
-        $instalasiComplete = $boqTotal > 0 && $boqUploaded >= $boqTotal;
+        $instalasiComplete =
+            $boqTotal > 0 &&
+            $boqUploaded >= $boqTotal;
 
-        // Sementara dibuat false dulu sampai step 3 & 4 dibuat
-        $pengukuranComplete = false;
-        $finishingComplete = false;
+        $pengukuranComplete = $this->isPengukuranUploaded($id);
+
+        $finishingComplete = $this->isFinishingUploaded($id);
+
+        $revisionHistories = [];
+
+        foreach ($project->boqItems as $boq) {
+
+            $revisionHistories[$boq->id_boq] = EvidenceRevisionHistory::where('project_id', $project->id_project)
+                ->where('stage', 'instalasi')
+                ->where('evidence_type', 'progress_boq')
+                ->whereHas('evidence', function ($q) use ($boq) {
+                    $q->where('boq_item_id', $boq->id_boq);
+                })
+                ->latest()
+                ->get();
+        }
 
         return view('waspang.steps.instalasi', compact(
             'project',
-            'persiapanComplete',
             'boqTotal',
             'boqUploaded',
+            'persiapanComplete',
             'instalasiComplete',
             'pengukuranComplete',
-            'finishingComplete'
+            'finishingComplete',
+            'revisionHistories'
         ));
     }
 
@@ -336,7 +396,30 @@ class WaspangController extends Controller
             'boqItems',
         ])->findOrFail($id);
 
-        return view('waspang.steps.pengukuran', compact('project'));
+        $revisionHistories = [
+            'otdr' => EvidenceRevisionHistory::where('project_id', $project->id_project)
+                ->where('stage', 'pengukuran')
+                ->where('evidence_type', 'otdr')
+                ->latest()
+                ->get(),
+
+            'opm' => EvidenceRevisionHistory::where('project_id', $project->id_project)
+                ->where('stage', 'pengukuran')
+                ->where('evidence_type', 'opm')
+                ->latest()
+                ->get(),
+
+            'kedalaman' => EvidenceRevisionHistory::where('project_id', $project->id_project)
+                ->where('stage', 'pengukuran')
+                ->where('evidence_type', 'kedalaman')
+                ->latest()
+                ->get(),
+        ];
+
+        return view('waspang.steps.pengukuran', compact(
+            'project',
+            'revisionHistories'
+            ));
     }
 
     public function finishing($id)
@@ -421,6 +504,71 @@ class WaspangController extends Controller
         return $uploaded >= $boqTotal;
     }
 
+    private function isPengukuranUploaded($projectId)
+    {
+        $otdr = Evidence::where('project_id', $projectId)
+            ->where('stage', 'pengukuran')
+            ->where('evidence_type', 'otdr')
+            ->exists();
+
+        $opm = Evidence::where('project_id', $projectId)
+            ->where('stage', 'pengukuran')
+            ->where('evidence_type', 'opm')
+            ->exists();
+
+        $kedalaman = Evidence::where('project_id', $projectId)
+            ->where('stage', 'pengukuran')
+            ->where('evidence_type', 'kedalaman')
+            ->exists();
+
+        return $otdr && $opm && $kedalaman;
+    }
+
+    private function isFinishingUploaded($projectId)
+    {
+        return Evidence::where('project_id', $projectId)
+            ->where('stage', 'finishing')
+            ->exists();
+    }
+
+    private function isPersiapanApproved($project)
+    {
+        $evidences = $project->evidences ?? collect();
+
+        return $evidences->where('stage', 'persiapan')
+                ->where('evidence_type', 'barang_tiba')
+                ->where('status', 'approved')
+                ->count() > 0
+            &&
+            $evidences->where('stage', 'persiapan')
+                ->where('evidence_type', 'perizinan')
+                ->where('status', 'approved')
+                ->count() > 0;
+    }
+
+    private function isInstalasiApproved($project)
+    {
+        $evidences = $project->evidences ?? collect();
+        $boqItems = $project->boqItems ?? collect();
+
+        $boqTotal = $boqItems->count();
+
+        if ($boqTotal == 0) {
+            return false;
+        }
+
+        $boqApproved = $boqItems->filter(function ($boq) use ($evidences) {
+            return $evidences
+                ->where('stage', 'instalasi')
+                ->where('evidence_type', 'progress_boq')
+                ->where('boq_item_id', $boq->id_boq)
+                ->where('status', 'approved')
+                ->count() > 0;
+        })->count();
+
+        return $boqApproved == $boqTotal;
+    }
+
     //UPLOAD FOTO di FOLDER 
     public function uploadEvidence(Request $request, $id)
     {
@@ -461,7 +609,6 @@ class WaspangController extends Controller
                 'longitude' => $request->longitude,
                 'description' => $request->description,
                 'status' => 'pending',
-                'created_at' => now(),
             ]);
         }
 
@@ -494,6 +641,32 @@ class WaspangController extends Controller
         return back()->with('success', 'Eviden berhasil dihapus');
     }
 
+    //NOTIFICATION
+    public function notifications()
+    {
+        $notifications = Notification::where('user_id', auth()->user()->id_user)
+            ->latest()
+            ->limit(15)
+            ->get();
+
+        return view('waspang.notifications', compact('notifications'));
+    }
+
+    public function clearNotifications()
+    {
+        Notification::where('user_id', auth()->user()->id_user)->delete();
+
+        return back()->with('success', 'Semua notifikasi berhasil dibersihkan');
+    }
+
+    public function deleteNotification($id)
+    {
+        Notification::where('id_notification', $id)
+            ->where('user_id', auth()->user()->id_user)
+            ->delete();
+
+        return back()->with('success', 'Notifikasi berhasil di besihkan');
+    }
 
     public function profile()
     {

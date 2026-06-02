@@ -16,7 +16,11 @@ class Project extends Model
         'sto',
         'mitra_name',
         'jenis_eksekusi',
-        'status'
+        'status',
+        'latitude',
+        'longitude',
+        'location_address',
+        'map_note'
     ];
 
     /*

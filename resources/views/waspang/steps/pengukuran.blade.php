@@ -53,9 +53,10 @@
     @endphp
 
     {{-- HEADER --}}
-    <div class="bg-blue-700 text-white px-5 pt-7 pb-6">
+    <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
 
-        <div class="flex items-center gap-3 mb-7">
+        <div class="flex items-center gap-3">
+
             <a href="{{ route('waspang.projects.instalasi', $project->id_project) }}"
                class="text-3xl leading-none">
                 ‹
@@ -168,7 +169,7 @@
                 </h2>
 
                 <p class="text-xs text-gray-500">
-                    Upload eviden OTDR, OPM, dan kedalaman galian
+                    Upload eviden OTDR, OPM & Kedalaman Galian
                 </p>
             </div>
 
@@ -288,6 +289,10 @@
 
                         @endif
 
+                        @include('waspang.partials.revision-history', [
+                            'histories' => $revisionHistories[$item['type']] ?? collect()
+                        ])
+
                         @if($photos->count() > 0)
 
                             <div class="grid grid-cols-3 gap-2 mb-3">
@@ -345,7 +350,6 @@
                 <p class="text-xs text-yellow-800 leading-relaxed">
                     Upload semua eviden <strong>OTDR</strong>, <strong>OPM</strong>, dan
                     <strong>Kedalaman Galian</strong> untuk lanjut ke tahap Finishing.
-                    Approval admin dilakukan terpisah.
                 </p>
             </div>
         @endif

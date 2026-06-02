@@ -36,6 +36,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
 
+    Route::get('/admin/map-monitoring', [DashboardController::class, 'mapMonitoring'])
+        ->middleware(['auth'])
+        ->name('admin.map.monitoring');
     /*
     |--------------------------------------------------------------------------
     | PROJECT / LOP & BOQ
@@ -157,6 +160,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/waspang/profile', [WaspangController::class, 'profile'])
         ->name('waspang.profile');
 
+    Route::get('/waspang/notifications', [WaspangController::class, 'notifications'])
+        ->name('waspang.notifications');
+
     /*
     |--------------------------------------------------------------------------
     | WASPANG STAGE UPLOAD
@@ -235,6 +241,12 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/waspang/ready-ut', [WaspangController::class, 'readyUt'])
     ->name('waspang.ready-ut');
+
+    Route::delete('/waspang/notifications/clear', [WaspangController::class, 'clearNotifications'])
+    ->name('waspang.notifications.clear');
+
+    Route::delete('/waspang/notifications/{id}', [WaspangController::class, 'deleteNotification'])
+        ->name('waspang.notifications.delete');
 
     });
 

@@ -73,6 +73,12 @@
             Monitoring
         </p>
 
+        <a href="{{ route('admin.map.monitoring') }}"
+            class="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold
+            {{ request()->routeIs('admin.map.monitoring') ? 'bg-blue-700 text-white' : 'text-gray-600 hover:bg-gray-100' }}">
+                🗺️ Map Monitoring
+        </a>
+
         <a href="{{ route('admin.evidences.approval') }}"
             class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
             {{ request()->routeIs('admin.evidences.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">

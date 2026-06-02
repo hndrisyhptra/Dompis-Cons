@@ -83,11 +83,11 @@
                 <div class="flex-1 h-0.5 bg-gray-200 mx-1"></div>
 
                 <a href="{{ route('admin.evidences.review.instalasi', $project->id_project) }}"
-                    class="flex flex-col items-center w-16">
-                    <div class="w-8 h-8 rounded-full border border-red-500 bg-red-50 text-red-600 flex items-center justify-center text-xs font-bold">
-                        2
+                    class="flex flex-col items-center w-16 opacity-70">
+                    <div class="w-8 h-8 rounded-full bg-green-100 text-green-700 border border-green-500 flex items-center justify-center text-xs font-bold">
+                        ✓
                     </div>
-                    <p class="mt-1 text-[11px] font-bold text-red-600">
+                    <p class="mt-1 text-[11px] font-bold">
                         Instalasi
                     </p>
                 </a>
@@ -95,11 +95,11 @@
                 <div class="flex-1 h-0.5 bg-gray-200 mx-1"></div>
 
                 <a href="{{ route('admin.evidences.review.pengukuran', $project->id_project) }}"
-                    class="flex flex-col items-center w-16 opacity-50">
-                    <div class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-xs font-bold">
+                    class="flex flex-col items-center w-16">
+                    <div class="w-8 h-8 rounded-full border border-red-500 bg-red-50 text-red-600 flex items-center justify-center text-xs font-bold">
                         3
                     </div>
-                    <p class="mt-1 text-[11px] font-semibold">
+                    <p class="mt-1 text-[11px] font-semibold text-red-600">
                         Pengukuran
                     </p>
                 </a>

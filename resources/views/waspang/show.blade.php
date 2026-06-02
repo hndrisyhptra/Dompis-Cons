@@ -12,9 +12,9 @@
     <div class="min-h-screen max-w-md mx-auto bg-[#f7f6f2] pb-24">
 
     {{-- Header --}}
-    <div class="bg-blue-700 text-white px-5 pt-7 pb-6">
+    <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
 
-        <div class="flex items-center gap-3 mb-7">
+        <div class="flex items-center gap-3">
 
             <a href="{{ route('waspang.inbox') }}"
                class="text-3xl leading-none">
@@ -311,6 +311,10 @@
 
                     @endif
 
+                    @include('waspang.partials.revision-history', [
+                        'histories' => $barangTibaHistories ?? collect()
+                    ])
+
                     @if($barangTibaPhotos->count() > 0)
 
                         <div class="grid grid-cols-3 gap-2 mb-3">
@@ -438,6 +442,11 @@
                         </div>
 
                     @endif
+
+
+                    @include('waspang.partials.revision-history', [
+                        'histories' => $perizinanHistories ?? collect()
+                    ])
 
                     @if($perizinanPhotos->count() > 0)
 

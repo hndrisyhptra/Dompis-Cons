@@ -305,7 +305,7 @@
                     <button
                         class="h-10 w-full inline-flex items-center justify-center rounded-xl bg-green-700 text-white text-sm font-bold">
 
-                        List LOP
+                       Siap Generate Berkas Uji Terima
 
                     </button>
 

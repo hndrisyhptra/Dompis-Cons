@@ -29,9 +29,9 @@
     @endphp
 
     {{-- HEADER --}}
-    <div class="bg-blue-700 text-white px-5 pt-7 pb-6">
+    <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
 
-        <div class="flex items-center gap-3 mb-7">
+        <div class="flex items-center gap-3">
 
             <a href="{{ route('waspang.projects.show', $project->id_project) }}"
             class="text-3xl leading-none">
@@ -302,6 +302,10 @@
                         </div>
 
                     @endif
+
+                    @include('waspang.partials.revision-history', [
+                        'histories' => $revisionHistories[$boq->id_boq] ?? collect()
+                    ])
 
                     @if($photos->count() > 0)
 

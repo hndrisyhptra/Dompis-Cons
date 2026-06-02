@@ -24,104 +24,16 @@
                 </p>
             </div>
 
-            <div class="relative">
-                <span class="text-2xl">🔔</span>
-                <span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full"></span>
-            </div>
+            <div class="relative inline-block">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-7 h-7 text-white-600">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+    </svg>
+
+    <span class="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white"></span>
+</div>
         </div>
     </div>
 
-    {{-- Statistic --}}
-        @php
-        $projects = $latestProjects ?? collect();
-
-        $totalAssigned = $projects->count();
-
-        $activeProjectsCount = 0;
-        $readyUtCount = 0;
-
-        $preparation = 0;
-        $installation = 0;
-        $finish = 0;
-
-        foreach ($projects as $project) {
-
-            $evidences = $project->evidences ?? collect();
-            $boqItems = $project->boqItems ?? collect();
-
-            $barangTibaApproved = $evidences
-                ->where('stage', 'persiapan')
-                ->where('evidence_type', 'barang_tiba')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-            $perizinanApproved = $evidences
-                ->where('stage', 'persiapan')
-                ->where('evidence_type', 'perizinan')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-            $persiapanApproved = $barangTibaApproved && $perizinanApproved;
-
-            $boqTotal = $boqItems->count();
-
-            $boqApproved = $boqItems->filter(function ($boq) use ($evidences) {
-                return $evidences
-                    ->where('stage', 'instalasi')
-                    ->where('evidence_type', 'progress_boq')
-                    ->where('boq_item_id', $boq->id_boq)
-                    ->where('status', 'approved')
-                    ->count() > 0;
-            })->count();
-
-            $instalasiApproved = $boqTotal > 0 && $boqApproved == $boqTotal;
-
-            $otdrApproved = $evidences
-                ->where('stage', 'pengukuran')
-                ->where('evidence_type', 'otdr')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-            $opmApproved = $evidences
-                ->where('stage', 'pengukuran')
-                ->where('evidence_type', 'opm')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-            $kedalamanApproved = $evidences
-                ->where('stage', 'pengukuran')
-                ->where('evidence_type', 'kedalaman')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-            $pengukuranApproved = $otdrApproved && $opmApproved && $kedalamanApproved;
-
-            $finishingApproved = $evidences
-                ->where('stage', 'finishing')
-                ->where('evidence_type', 'final_site')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-            $isReadyUt =
-                $persiapanApproved &&
-                $instalasiApproved &&
-                $pengukuranApproved &&
-                $finishingApproved;
-
-            if ($isReadyUt) {
-                $readyUtCount++;
-                $finish++;
-            } else {
-                $activeProjectsCount++;
-            }
-
-            if (!$persiapanApproved) {
-                $preparation++;
-            } elseif (!$instalasiApproved) {
-                $installation++;
-            }
-        }
-    @endphp
 
          {{-- STATISTIK CARD--}}
         <div class="grid grid-cols-2 gap-3 px-5 -mt-4">
@@ -170,7 +82,9 @@
 
             <a href="{{ route('waspang.inbox') }}"
                class="bg-white rounded-2xl border border-gray-200 p-3 shadow-sm">
-                <div class="text-blue-700 text-xl mb-2">▣</div>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5l3 3 3-3m-3 3v-6m10.125-3H17.25m3 0v1.125c0 .621-.504 1.125-1.125 1.125H3.75A1.125 1.125 0 012.625 11.25V5.25m17.625 0A1.125 1.125 0 0019.125 4.125H4.875A1.125 1.125 0 003.75 5.25m17.625 0v11.25c0 .621-.504 1.125-1.125 1.125H3.75a1.125 1.125 0 01-1.125-1.125V5.25t" />
+                    </svg>
                 <h3 class="font-semibold text-[15px]">Inbox LOP</h3>
                 <p class="text-sm text-gray-500">
                     {{ $activeProjectsCount }} Project Aktif
@@ -178,8 +92,13 @@
             </a>
 
             <a href="{{ route('waspang.ready-ut') }}"
-            class="bg-blue-700 rounded-2xl p-3 text-white shadow-sm">
-                <div class="text-xl mb-2">✓</div>
+            class="block bg-blue-700 rounded-2xl p-3 text-white shadow-sm hover:bg-blue-800 transition-colors">
+                
+                <!-- Heroicons: Check Badge (Outline) -->
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
+                </svg>
+
                 <h3 class="font-semibold text-[15px]">List LOP</h3>
                 <p class="text-sm opacity-90">
                     {{ $readyUtCount ?? 0 }} LOP Finish
@@ -198,7 +117,7 @@
 
         @php
 
-            $allProjects = $latestProjects ?? collect();
+            $allProjects = $projects ?? collect();
 
             $persiapanCount = 0;
             $instalasiCount = 0;
@@ -308,134 +227,82 @@
 
         {{-- GLOBAL PROGRESS --}}
         @php
-            $totalLop = $allProjects->count();
 
-            $lopSelesai = 0;
+        $totalLop = $allProjects->count();
 
-            foreach ($allProjects as $project) {
+        $lopSelesai = $allProjects->filter(function ($project) {
 
-        $evidences = $project->evidences ?? collect();
-        $boqItems = $project->boqItems ?? collect();
+            $evidences = $project->evidences ?? collect();
+            $boqItems = $project->boqItems ?? collect();
 
-        /*
-        |--------------------------------------------------------------------------
-        | STEP PERSIAPAN
-        |--------------------------------------------------------------------------
-        */
+            $persiapan =
+                $evidences->where('stage', 'persiapan')
+                    ->where('evidence_type', 'barang_tiba')
+                    ->where('status', 'approved')
+                    ->count() > 0
+                &&
+                $evidences->where('stage', 'persiapan')
+                    ->where('evidence_type', 'perizinan')
+                    ->where('status', 'approved')
+                    ->count() > 0;
 
-        $barangTibaApproved =
-            $evidences
-                ->where('stage', 'persiapan')
-                ->where('evidence_type', 'barang_tiba')
-                ->where('status', 'approved')
-                ->count() > 0;
+            $boqTotal = $boqItems->count();
 
-        $perizinanApproved =
-            $evidences
-                ->where('stage', 'persiapan')
-                ->where('evidence_type', 'perizinan')
-                ->where('status', 'approved')
-                ->count() > 0;
+            $boqApproved = $boqItems->filter(function ($boq) use ($evidences) {
 
-        $persiapanDone =
-            $barangTibaApproved &&
-            $perizinanApproved;
+                return $evidences
+                    ->where('stage', 'instalasi')
+                    ->where('evidence_type', 'progress_boq')
+                    ->where('boq_item_id', $boq->id_boq)
+                    ->where('status', 'approved')
+                    ->count() > 0;
 
-        /*
-        |--------------------------------------------------------------------------
-        | STEP INSTALASI
-        |--------------------------------------------------------------------------
-        */
+            })->count();
 
-        $boqTotal = $boqItems->count();
+            $instalasi =
+                $boqTotal > 0 &&
+                $boqApproved == $boqTotal;
 
-        $boqApproved = $boqItems->filter(function ($boq) use ($evidences) {
+            $pengukuran =
+                $evidences->where('stage', 'pengukuran')
+                    ->where('evidence_type', 'otdr')
+                    ->where('status', 'approved')
+                    ->count() > 0
+                &&
+                $evidences->where('stage', 'pengukuran')
+                    ->where('evidence_type', 'opm')
+                    ->where('status', 'approved')
+                    ->count() > 0
+                &&
+                $evidences->where('stage', 'pengukuran')
+                    ->where('evidence_type', 'kedalaman')
+                    ->where('status', 'approved')
+                    ->count() > 0;
 
-            return $evidences
-                ->where('stage', 'instalasi')
-                ->where('evidence_type', 'progress_boq')
-                ->where('boq_item_id', $boq->id_boq)
-                ->where('status', 'approved')
-                ->count() > 0;
+            $finishing =
+                $evidences->where('stage', 'finishing')
+                    ->where('status', 'approved')
+                    ->count() > 0;
+
+            return
+                $persiapan &&
+                $instalasi &&
+                $pengukuran &&
+                $finishing;
 
         })->count();
 
-        $instalasiDone =
-            $boqTotal > 0 &&
-            $boqApproved == $boqTotal;
-
-        /*
-        |--------------------------------------------------------------------------
-        | STEP PENGUKURAN
-        |--------------------------------------------------------------------------
-        */
-
-        $otdrApproved =
-            $evidences
-                ->where('stage', 'pengukuran')
-                ->where('evidence_type', 'otdr')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-        $opmApproved =
-            $evidences
-                ->where('stage', 'pengukuran')
-                ->where('evidence_type', 'opm')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-        $kedalamanApproved =
-            $evidences
-                ->where('stage', 'pengukuran')
-                ->where('evidence_type', 'kedalaman')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-        $pengukuranDone =
-            $otdrApproved &&
-            $opmApproved &&
-            $kedalamanApproved;
-
-        /*
-        |--------------------------------------------------------------------------
-        | STEP FINISHING
-        |--------------------------------------------------------------------------
-        */
-
-        $finishingDone =
-            $evidences
-                ->where('stage', 'finishing')
-                ->where('evidence_type', 'final_site')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-        /*
-        |--------------------------------------------------------------------------
-        | READY UT
-        |--------------------------------------------------------------------------
-        */
-
-        $isReadyUt =
-            $persiapanDone &&
-            $instalasiDone &&
-            $pengukuranDone &&
-            $finishingDone;
-
-        if ($isReadyUt) {
-            $lopSelesai++;
-        }
-    }
-
-        $lopProgressPercent = $totalLop > 0
-        ? round(($lopSelesai / $totalLop) * 100)
-        : 0;
+        $lopProgressPercent =
+            $totalLop > 0
+                ? round(($lopSelesai / $totalLop) * 100)
+                : 0;
 
         $lastUpdate = optional(
-        $allProjects
-            ->flatMap(fn ($project) => $project->evidences ?? collect())
-            ->sortByDesc('updated_at')
-            ->first()
-            )->updated_at;
+            $allProjects
+                ->flatMap(fn($project) => $project->evidences ?? collect())
+                ->sortByDesc('updated_at')
+                ->first()
+        )->updated_at;
 
         @endphp
 
