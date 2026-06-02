@@ -2,6 +2,19 @@
 
 @section('content')
 
+<style>
+    .leaflet-container {
+        z-index: 1 !important;
+    }
+
+    .leaflet-pane,
+    .leaflet-top,
+    .leaflet-bottom,
+    .leaflet-control {
+        z-index: 1 !important;
+    }
+</style>
+
 <div class="space-y-5">
 
     <div class="flex items-center justify-between">

@@ -33,50 +33,105 @@
             Main Menu
         </p>
 
-        <a href="{{ route('dashboard') }}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold
-           {{ request()->routeIs('dashboard') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-            <span>📊</span>
-            Dashboard
+         <a href="{{ route('dashboard') }}"
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            {{ request()->routeIs('dashboard') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                @if(request()->routeIs('dashboard'))
+                    <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+                @endif
+
+                <!-- Lucide: Layout Dashboard -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard">
+                    <rect width="7" height="9" x="3" y="3" rx="1"/>
+                    <rect width="7" height="5" x="14" y="3" rx="1"/>
+                    <rect width="7" height="9" x="14" y="12" rx="1"/>
+                    <rect width="7" height="5" x="3" y="16" rx="1"/>
+                </svg>
+
+                <span>Dashboard</span>
         </a>
 
         <a href="{{ route('projects.index') }}"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold
-           {{ request()->routeIs('projects.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-            <span>📁</span>
-            LOP & BOQ
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            {{ request()->routeIs('projects.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                
+                @if(request()->routeIs('projects.index'))
+                    <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+                @endif
+
+            <!-- Lucide: Book Open Check -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open-text-icon lucide-book-open-text">
+                <path d="M12 7v14"/><path d="M16 12h2"/><path d="M16 8h2"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/><path d="M6 12h2"/><path d="M6 8h2"/></svg>
+
+            <span>LOP & BOQ</span>
         </a>
 
         <a href="{{ route('designators.index') }}"
-            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
             {{ request()->routeIs('designators.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                <span>🏷️</span>
-                Master Designator
+            
+                @if(request()->routeIs('designators.index'))
+                    <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+                @endif  
+
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-database-zap-icon lucide-database-zap"><ellipse cx="12" cy="5" rx="9" ry="3"/>
+                <path d="M3 5V19A9 3 0 0 0 15 21.84"/><path d="M21 5V8"/><path d="M21 12L18 17H22L19 22"/><path d="M3 12A9 3 0 0 0 14.59 14.87"/>
+            </svg>
+            <span>Master Designator</span>
+
         </a>
 
         <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
-            <span>👷</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-star-icon lucide-user-star">
+            <path d="M16.051 12.616a1 1 0 0 1 1.909.024l.737 1.452a1 1 0 0 0 .737.535l1.634.256a1 1 0 0 1 .588 1.806l-1.172 1.168a1 1 0 0 0-.282.866l.259 1.613a1 1 0 0 1-1.541 1.134l-1.465-.75a1 1 0 0 0-.912 0l-1.465.75a1 1 0 0 1-1.539-1.133l.258-1.613a1 1 0 0 0-.282-.866l-1.156-1.153a1 1 0 0 1 .572-1.822l1.633-.256a1 1 0 0 0 .737-.535z"/><path d="M8 15H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/></svg>    
+        <span>
             Assign Waspang
+        </span>
         </a>
+
+        <p class="px-3 pt-5 mb-2 text-xs font-bold uppercase text-gray-400">
+            Monitoring
+        </p>
 
         <a href="{{ route('admin.map.monitoring') }}"
-            class="flex items-center gap-3 px-4 py-2 rounded-xl text-sm font-semibold
-            {{ request()->routeIs('admin.map.monitoring') ? 'bg-blue-700 text-white' : 'text-gray-600 hover:bg-gray-100' }}">
-             🗺️ Map Monitoring
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            {{ request()->routeIs('admin.map.monitoring') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+            
+             @if(request()->routeIs('admin.map.*'))
+                    <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+                @endif  
+            
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pinned-icon lucide-map-pinned">
+                <path d="M18 8c0 3.613-3.869 7.429-5.393 8.795a1 1 0 0 1-1.214 0C9.87 15.429 6 11.613 6 8a6 6 0 0 1 12 0"/><circle cx="12" cy="8" r="2"/><path d="M8.714 14h-3.71a1 1 0 0 0-.948.683l-2.004 6A1 1 0 0 0 3 22h18a1 1 0 0 0 .948-1.316l-2-6a1 1 0 0 0-.949-.684h-3.712"/>
+            </svg> 
+            <span>
+                Map Monitoring
+            </span>
         </a>
 
-        <a href="{{ route('admin.evidences.approval') }}" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm 
+        <a href="{{ route('admin.evidences.approval') }}" 
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm 
             font-semibold transition {{ request()->routeIs('admin.evidences.*') ? text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
-            @if(request()->routeIs('admin.evidences.*'))
-            <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
-        @endif
-            <span>✅</span>
-            Approval Eviden
+                @if(request()->routeIs('admin.evidences.*'))
+                    <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+                @endif
+
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-badge-check-icon lucide-badge-check">
+                    <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span>
+                Approval Eviden   
+            </span>
         </a>
 
         <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
-            <span>📄</span>
+        
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-handshake-icon lucide-handshake">
+                <path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>
+            </svg>
+        <span>
             Uji Terima
+        </span>
         </a>
 
         {{-- Report --}}
@@ -87,9 +142,14 @@
         <a href="#"
            class="flex items-center gap-3 px-3 py-2.5 rounded-xl
                   hover:bg-gray-100 transition">
-
-            <span>📈</span>
-            Rekap Progress
+            
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-no-axes-combined-icon lucide-chart-no-axes-combined">
+                <path d="M12 16v5"/><path d="M16 14.639V21"/><path d="M20 10.656V21"/><path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15"/><path d="M4 18.463V21"/><path d="M8 14.656V21"/>
+            </svg>
+            <span>
+                Rekap Progress
+            </span>
+            
 
         </a>
 
@@ -97,8 +157,14 @@
            class="flex items-center gap-3 px-3 py-2.5 rounded-xl
                   hover:bg-gray-100 transition">
 
-            <span>👤</span>
-            User Management
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-user-icon lucide-shield-user">
+                <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M6.376 18.91a6 6 0 0 1 11.249.003"/><circle cx="12" cy="11" r="4"/>
+            </svg>
+
+            <span>
+                Management User
+            </span>
+            
 
         </a>
 
