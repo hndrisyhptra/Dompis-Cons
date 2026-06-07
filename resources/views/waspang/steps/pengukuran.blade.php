@@ -33,6 +33,12 @@
                 'title' => 'Pengukuran Kedalaman Galian',
                 'desc' => 'Upload foto pengukuran kedalaman galian.',
             ],
+            [
+                'number' => 4,
+                'title' => 'Eviden Pengukuran Lainnya',
+                'type' => 'lainnya',
+                'desc' => 'Review foto hasil pengukuran lainnya.',
+            ],
         ];
 
         $pengukuranUploaded = 0;
@@ -117,45 +123,45 @@
 
     </div>
 
-    {{-- PROJECT INFO --}}
-    <div class="px-4 mt-4">
+    {{-- Project Info --}}
+        <div class="px-2 mt-2">
+            <div class="bg-white rounded-2xl border border-gray-200 p-4">
 
-        <div class="bg-white rounded-2xl border border-gray-200 p-4">
+            {{-- Nama LOP --}}
+            <div class="mb-4">
+                <p class="text-xs text-gray-500">Nama LOP</p>
+                <p class="text-sm font-bold leading-snug break-words">
+                    {{ $project->project_name }}
+                </p>
+            </div>
 
-            <div class="grid grid-cols-2 gap-y-4 gap-x-4">
+                {{-- Info lainnya --}}
+                <div class="grid grid-cols-2 gap-y-4 gap-x-4">
 
-                <div>
-                    <p class="text-xs text-gray-500">Nama LOP</p>
-                    <p class="text-sm font-bold leading-snug">
-                        {{ $project->project_name }}
-                    </p>
-                </div>
+                        <div>
+                            <p class="text-xs text-gray-500">STO</p>
+                            <p class="text-sm font-bold">
+                                {{ $project->lop?->sto ?? '-' }}
+                            </p>
+                        </div>
 
-                <div>
-                    <p class="text-xs text-gray-500">STO</p>
-                    <p class="text-sm font-bold">
-                        {{ $project->sto }}
-                    </p>
-                </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Branch</p>
+                            <p class="text-sm font-bold">
+                                {{ $project->lop?->branch ?? '-' }}
+                            </p>
+                        </div>
 
-                <div>
-                    <p class="text-xs text-gray-500">Branch</p>
-                    <p class="text-sm font-bold">
-                        {{ $project->branch }}
-                    </p>
-                </div>
+                        <div class="col-span-2">
+                            <p class="text-xs text-gray-500">Mitra</p>
+                            <p class="text-sm font-bold leading-snug break-words">
+                                {{ $project->lop?->mitra_name ?? '-' }}
+                            </p>
+                        </div>
 
-                <div>
-                    <p class="text-xs text-gray-500">Mitra</p>
-                    <p class="text-sm font-bold leading-snug">
-                        {{ $project->mitra_name }}
-                    </p>
                 </div>
 
             </div>
-
-        </div>
-
     </div>
 
     {{-- STEP 3 LIST --}}
@@ -348,8 +354,8 @@
         @if(!$pengukuranUploadedComplete)
             <div class="mt-3 rounded-2xl bg-yellow-50 border border-yellow-200 p-3">
                 <p class="text-xs text-yellow-800 leading-relaxed">
-                    Upload semua eviden <strong>OTDR</strong>, <strong>OPM</strong>, dan
-                    <strong>Kedalaman Galian</strong> untuk lanjut ke tahap Finishing.
+                    Upload eviden <strong>OTDR</strong>, <strong>OPM</strong>,
+                    <strong>Kedalaman Galian</strong> dan <strong>Pengukuran Lainnya</strong> jika ada.
                 </p>
             </div>
         @endif
@@ -359,21 +365,10 @@
     {{-- NEXT BUTTON --}}
     <div class="px-4 mt-5">
 
-        @if($pengukuranUploadedComplete)
-
             <a href="{{ route('waspang.projects.finishing', $project->id_project) }}"
                class="h-11 w-full rounded-2xl bg-blue-700 text-white inline-flex items-center justify-center text-sm font-bold">
                 Next Step 4 - Finishing
             </a>
-
-        @else
-
-            <button disabled
-                    class="h-11 w-full rounded-2xl bg-gray-300 text-gray-500 inline-flex items-center justify-center text-sm font-bold">
-                Lengkapi Eviden Pengukuran
-            </button>
-
-        @endif
 
     </div>
 

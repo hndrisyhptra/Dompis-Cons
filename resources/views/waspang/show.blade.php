@@ -165,46 +165,46 @@
 
     </div>
 
-    {{-- Project Info --}}
-    <div class="px-4 mt-4">
-
+        {{-- Project Info --}}
+        <div class="px-2 mt-2">
         <div class="bg-white rounded-2xl border border-gray-200 p-4">
 
-            <div class="grid grid-cols-2 gap-y-4 gap-x-4">
+        {{-- Nama LOP --}}
+        <div class="mb-4">
+            <p class="text-xs text-gray-500">Nama LOP</p>
+            <p class="text-sm font-bold leading-snug break-words">
+                {{ $project->project_name }}
+            </p>
+        </div>
 
-                <div>
-                    <p class="text-xs text-gray-500">Nama LOP</p>
-                    <p class="text-sm font-bold leading-snug">
-                        {{ $project->project_name }}
-                    </p>
-                </div>
+        {{-- Info lainnya --}}
+        <div class="grid grid-cols-2 gap-y-4 gap-x-4">
 
                 <div>
                     <p class="text-xs text-gray-500">STO</p>
                     <p class="text-sm font-bold">
-                        {{ $project->sto }}
+                        {{ $project->lop?->sto ?? '-' }}
                     </p>
                 </div>
 
                 <div>
                     <p class="text-xs text-gray-500">Branch</p>
                     <p class="text-sm font-bold">
-                        {{ $project->branch }}
+                        {{ $project->lop?->branch ?? '-' }}
                     </p>
                 </div>
 
-                <div>
+                <div class="col-span-2">
                     <p class="text-xs text-gray-500">Mitra</p>
-                    <p class="text-sm font-bold leading-snug">
-                        {{ $project->mitra_name }}
+                    <p class="text-sm font-bold leading-snug break-words">
+                        {{ $project->lop?->mitra_name ?? '-' }}
                     </p>
                 </div>
 
             </div>
 
         </div>
-
-    </div>
+        </div>
 
     
     {{-- STEP 1: PERSIAPAN --}}

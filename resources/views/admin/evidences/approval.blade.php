@@ -139,9 +139,9 @@
                                 </h2>
 
                                 <p class="text-[11px] text-gray-500 mt-0.5 truncate">
-                                    {{ $project->branch ?? '-' }}
+                                    {{ $project->lop?->branch ?? '-' }}
                                     ·
-                                    {{ $project->sto ?? '-' }}
+                                    {{ $project->lop?->sto ?? '-' }}
                                     ·
                                     {{ $project->mitra_name ?? '-' }}
                                 </p>

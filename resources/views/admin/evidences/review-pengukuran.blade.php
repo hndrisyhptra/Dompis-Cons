@@ -22,6 +22,12 @@
             'type' => 'kedalaman',
             'description' => 'Review foto kedalaman galian jika pekerjaan menggunakan jalur tanam.',
         ],
+        [
+            'number' => 4,
+            'title' => 'Eviden Pengukuran Lainnya',
+            'type' => 'lainnya',
+            'description' => 'Review foto hasil pengukuran lainnya.',
+        ],
     ];
 
     $approvedCount = 0;
@@ -52,7 +58,7 @@
                 </h1>
 
                 <p class="text-xs text-gray-500 mt-1">
-                    {{ $project->sto }} · {{ $project->branch }} ·
+                    {{ $project->lop?->branch }} · {{ $project->lop?->sto }} ·
                     Waspang:
                     <span class="font-semibold">
                         {{ optional($project->assignment)->waspang->name ?? '-' }}

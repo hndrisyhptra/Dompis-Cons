@@ -113,25 +113,28 @@ class WaspangController extends Controller
         $search = request('search');
 
         $projects = Project::with([
-            'evidences',
-            'boqItems',
-        ])
-        ->whereHas('assignments', function ($q) {
-            $q->where('waspang_id', auth()->user()->id_user);
-        })
-        ->when($search, function ($query) use ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('project_name', 'like', "%{$search}%")
-                ->orWhere('sto', 'like', "%{$search}%")
-                ->orWhere('branch', 'like', "%{$search}%")
-                ->orWhere('mitra_name', 'like', "%{$search}%");
+                'lop',
+                'evidences',
+                'boqItems',
+            ])
+            ->whereHas('assignments', function ($q) {
+                $q->where('waspang_id', auth()->user()->id_user);
+            })
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('project_name', 'like', "%{$search}%")
+                        ->orWhereHas('lop', function ($lop) use ($search) {
+                            $lop->where('sto', 'like', "%{$search}%")
+                                ->orWhere('branch', 'like', "%{$search}%")
+                                ->orWhere('mitra_name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->latest('updated_at')
+            ->get()
+            ->filter(function ($project) {
+                return !$this->isProjectReadyUt($project);
             });
-        })
-        ->latest('updated_at')
-        ->get()
-        ->filter(function ($project) {
-            return !$this->isProjectReadyUt($project);
-        });
 
         return view('waspang.inbox', compact('projects', 'search'));
     }
@@ -334,16 +337,19 @@ class WaspangController extends Controller
     {
         $project = $this->getAssignedProject($id);
 
+        $materialBoqItems = $project->boqItems->filter(function ($boq) {
+            return str_starts_with($boq->designator, 'M-');
+        })->values();
+
         $persiapanComplete = $this->isPersiapanUploaded($id);
 
         abort_if(!$persiapanComplete, 403);
 
-        $boqTotal = $project->boqItems->count();
+        $boqTotal = $materialBoqItems->count();
 
         $boqUploaded = 0;
 
-        foreach ($project->boqItems as $boq) {
-
+        foreach ($materialBoqItems as $boq) {
             $hasEvidence = $project->evidences
                 ->where('stage', 'instalasi')
                 ->where('evidence_type', 'progress_boq')
@@ -360,13 +366,11 @@ class WaspangController extends Controller
             $boqUploaded >= $boqTotal;
 
         $pengukuranComplete = $this->isPengukuranUploaded($id);
-
         $finishingComplete = $this->isFinishingUploaded($id);
 
         $revisionHistories = [];
 
-        foreach ($project->boqItems as $boq) {
-
+        foreach ($materialBoqItems as $boq) {
             $revisionHistories[$boq->id_boq] = EvidenceRevisionHistory::where('project_id', $project->id_project)
                 ->where('stage', 'instalasi')
                 ->where('evidence_type', 'progress_boq')
@@ -376,6 +380,8 @@ class WaspangController extends Controller
                 ->latest()
                 ->get();
         }
+
+        $project->setRelation('boqItems', $materialBoqItems);
 
         return view('waspang.steps.instalasi', compact(
             'project',

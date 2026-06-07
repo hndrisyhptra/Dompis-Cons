@@ -3,11 +3,16 @@
 @section('content')
 
 @php
-    $boqTotal = $project->boqItems->count();
+    $materialBoqItems = $project->boqItems->filter(function ($boq) {
+    return optional($boq->designatorData)->type === 'material'
+        || optional($boq->designatorDataByCode)->type === 'material';
+    });
+
+    $boqTotal = $materialBoqItems->count();
 
     $boqApproved = 0;
 
-    foreach ($project->boqItems as $boq) {
+    foreach ($materialBoqItems as $boq) {
         $photos = $project->evidences
             ->where('stage', 'instalasi')
             ->where('evidence_type', 'progress_boq')
@@ -34,7 +39,7 @@
                     </h1>
 
                     <p class="text-xs text-gray-500 mt-1">
-                        {{ $project->sto }} · {{ $project->branch }} ·
+                        {{ $project->lop?->branch }} · {{ $project->lop?->sto }} ·
                         Waspang:
                         <span class="font-semibold">
                             {{ optional($project->assignment)->waspang->name ?? '-' }}
@@ -131,7 +136,7 @@
     {{-- BOQ REVIEW LIST --}}
     <div class="space-y-3">
 
-        @forelse($project->boqItems as $boq)
+        @forelse($materialBoqItems as $boq)
 
             @php
                 $items = $project->evidences

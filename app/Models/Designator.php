@@ -14,5 +14,13 @@ class Designator extends Model
         'designator',
         'item_name',
         'unit',
+        'type',
+        'pair_code',
     ];
+
+    public function prices()
+    {
+        return $this->hasMany(DesignatorPackagePrice::class, 'designator_id', 'id_designator');
+    }
 }
+

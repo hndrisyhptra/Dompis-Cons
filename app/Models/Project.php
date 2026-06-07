@@ -11,12 +11,18 @@ class Project extends Model
     protected $primaryKey = 'id_project';
 
     protected $fillable = [
+        'pid',
+        'pid_sap',
         'project_name',
+        'program',
         'branch',
         'sto',
         'mitra_name',
+        'kml_file',
         'jenis_eksekusi',
+        'execution_type',
         'status',
+        'status_project',
         'latitude',
         'longitude',
         'location_address',
@@ -55,5 +61,10 @@ class Project extends Model
     public function evidences()
     {
         return $this->hasMany(Evidence::class, 'project_id', 'id_project');
+    }
+
+    public function lop()
+    {
+        return $this->hasOne(Lop::class, 'project_id', 'id_project');
     }
 }

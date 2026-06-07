@@ -10,10 +10,11 @@
                 {{-- HEADER --}}
                 <div class="bg-blue-700 px-5 py-5 text-white text-center">
 
-                    <div class="mx-auto w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center mb-3">
-                        <span class="text-xl font-black">
-                            D
-                        </span>
+                    <div class="mx-auto w-14 h-14 rounded-2xl bg-white overflow-hidden flex items-center justify-center mb-3">
+                        <img
+                            src="{{ asset('images/logo-dompis-cons.png') }}"
+                            alt="DOMPIS CONS"
+                            class="w-full h-full object-cover">
                     </div>
 
                     <h1 class="text-2xl font-black leading-tight">

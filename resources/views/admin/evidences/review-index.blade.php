@@ -37,9 +37,9 @@
                             </h2>
 
                             <p class="text-lg text-gray-600 mt-1">
-                                {{ $project->sto }}
+                                {{ $project->lop?->sto }}
                                 ·
-                                {{ $project->branch }}
+                                {{ $project->lop?->branch }}
                                 ·
                                 Waspang:
                                 <span class="font-bold text-gray-900">

@@ -20,10 +20,10 @@
             </a>
 
             <div>
-                <h1 class="text-1xl font-bold">
+                <h1 class="text-xl font-bold">
                     Inbox LOP
                 </h1>
-                <p class="text-sm opacity-90">
+                <p class="text-xs opacity-90">
                     {{ $projects->count() }} Order di Assign
                 </p>
             </div>
@@ -220,7 +220,7 @@
                         </h2>
 
                         <p class="text-xs text-gray-500 mt-1">
-                            {{ $project->branch }} · {{ $project->sto }} · {{ strtoupper($project->jenis_eksekusi) }}
+                            {{ $project->lop?->branch }} · {{ $project->lop?->sto }} · {{ strtoupper($project->execution_type) }}
                         </p>
                     </div>
 

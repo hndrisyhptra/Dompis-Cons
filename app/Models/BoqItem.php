@@ -26,4 +26,14 @@ class BoqItem extends Model
     {
         return $this->hasMany(EvidenceFile::class, 'boq_item_id', 'id_boq');
     }
+
+    public function designatorData()
+    {
+        return $this->belongsTo(Designator::class, 'designator_id', 'id_designator');
+    }
+
+    public function designatorDataByCode()
+    {
+        return $this->belongsTo(Designator::class, 'designator', 'designator');
+    }
 }

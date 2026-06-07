@@ -7,6 +7,12 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\DesignatorController;
 use App\Http\Controllers\WaspangController;
+use App\Http\Controllers\UserManagementController;
+use App\Http\Controllers\ImportController;
+use App\Http\Controllers\PackageController;
+use App\Http\Controllers\DesignatorPriceController;
+use App\Http\Controllers\AssignWaspangController;
+
 
 
 /*
@@ -48,6 +54,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/projects', [ProjectController::class, 'index'])
         ->name('projects.index');
 
+    Route::post('/projects/{project}/upload-kml', [ProjectController::class, 'uploadKml'])
+        ->name('projects.upload-kml');
+
+    Route::get('/projects/{project}/view-kml', [ProjectController::class, 'viewKml'])
+        ->name('projects.view-kml');
+
     /*
     |--------------------------------------------------------------------------
     | DETAIL PROJECT
@@ -83,6 +95,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/projects/assign/remove/{project}', [ProjectController::class, 'removeAssign'])
         ->name('projects.assign.remove');
+
+    //MENU ASSIGN WASPANG
+    Route::get('/assign-waspang', [AssignWaspangController::class, 'index'])
+        ->name('assign-waspang.index');
 
     /*
     |--------------------------------------------------------------------------
@@ -122,12 +138,12 @@ Route::middleware(['auth'])->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | DESIGNATOR
+    | DESIGNATOR | PACKAGE | PRICE
     |--------------------------------------------------------------------------
     */
 
     Route::get('/designators', [DesignatorController::class, 'index'])
-    ->name('designators.index');
+        ->name('designators.index');
 
     Route::post('/designators/store', [DesignatorController::class, 'store'])
         ->name('designators.store');
@@ -139,8 +155,47 @@ Route::middleware(['auth'])->group(function () {
         ->name('designators.destroy');
 
     Route::post('/projects/boq/store', [ProjectController::class, 'storeBoq'])
-    ->name('projects.boq.store');
+        ->name('projects.boq.store');
 
+    Route::post('/designators/import', [DesignatorController::class, 'import'])
+        ->name('designators.import');
+
+    Route::get('/packages', [PackageController::class, 'index'])
+        ->name('packages.index');
+
+    Route::post('/packages', [PackageController::class, 'store'])
+        ->name('packages.store');
+
+    Route::put('/packages/update/{id}', [PackageController::class, 'update'])
+        ->name('packages.update');
+
+    Route::delete('/packages/{id}', [PackageController::class, 'destroy'])
+        ->name('packages.destroy');
+
+    Route::post('/packages/import', [PackageController::class, 'import'])
+        ->name('packages.import');
+
+    Route::get('/designator-prices', [DesignatorPriceController::class, 'index'])
+        ->name('designator-prices.index');
+
+    Route::post('/designator-prices', [DesignatorPriceController::class, 'store'])
+        ->name('designator-prices.store');
+
+    Route::put('/designator-prices/update/{id}', [DesignatorPriceController::class, 'update'])
+        ->name('designator-prices.update');
+
+    Route::delete('/designator-prices/{id}', [DesignatorPriceController::class, 'destroy'])
+        ->name('designator-prices.destroy');
+
+    Route::post('/designator-prices/import', [DesignatorPriceController::class, 'import'])
+        ->name('designator-prices.import');
+
+    Route::get('/admin/import/boq', [ImportController::class, 'boqIndex'])
+        ->name('admin.import.boq');
+
+    Route::post('/admin/import/boq', [ImportController::class, 'importBoq'])
+        ->name('admin.import.boq.upload');
+    
 
     /*
     |--------------------------------------------------------------------------
@@ -249,6 +304,57 @@ Route::middleware(['auth'])->group(function () {
         ->name('waspang.notifications.delete');
 
     });
+
+    Route::middleware(['auth'])->group(function () {
+    Route::get('/admin/users', [UserManagementController::class, 'index'])
+        ->name('admin.users.index');
+
+    Route::post('/admin/users', [UserManagementController::class, 'store'])
+        ->name('admin.users.store');
+
+    Route::put('/admin/users/{id}', [UserManagementController::class, 'update'])
+        ->name('admin.users.update');
+
+    Route::delete('/admin/users/{id}', [UserManagementController::class, 'destroy'])
+        ->name('admin.users.destroy');
+});
+
+
+/*
+|--------------------------------------------------------------------------
+| IMPORT PID
+|--------------------------------------------------------------------------
+*/
+        Route::prefix('admin/import')
+            ->middleware(['auth'])
+            ->group(function () {
+
+        Route::get('/pid', [ImportController::class, 'pidIndex'])
+            ->name('admin.import.pid');
+
+        Route::post('/pid', [ImportController::class, 'importPid'])
+            ->name('admin.import.pid.upload');
+
+        Route::get('/admin/import/lop', [ImportController::class, 'lopIndex'])
+            ->name('admin.import.lop');
+
+        Route::post('/admin/import/lop', [ImportController::class, 'importLop'])
+            ->name('admin.import.lop.upload');
+        
+        Route::get('/admin/import/lop/mapping', [ImportController::class, 'mappingIndex'])
+            ->name('admin.import.lop.mapping');
+
+        Route::post('/admin/import/lop/mapping/{id}', [ImportController::class, 'saveMapping'])
+            ->name('admin.import.lop.mapping.save');
+        
+        Route::post('/admin/import/lop/mapping/{id}/reset', [ImportController::class, 'resetMapping'])
+            ->name('admin.import.lop.mapping.reset');
+
+    });
+
+    
+
+
 
 /*
 |--------------------------------------------------------------------------

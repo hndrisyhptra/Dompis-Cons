@@ -128,45 +128,45 @@
         </div>
 
         {{-- Project Info --}}
-        <div class="px-4 mt-4">
-
+        <div class="px-2 mt-2">
             <div class="bg-white rounded-2xl border border-gray-200 p-4">
 
+            {{-- Nama LOP --}}
+            <div class="mb-4">
+                <p class="text-xs text-gray-500">Nama LOP</p>
+                <p class="text-sm font-bold leading-snug break-words">
+                    {{ $project->project_name }}
+                </p>
+            </div>
+
+                {{-- Info lainnya --}}
                 <div class="grid grid-cols-2 gap-y-4 gap-x-4">
 
-                    <div>
-                        <p class="text-xs text-gray-500">Nama LOP</p>
-                        <p class="text-sm font-bold leading-snug">
-                            {{ $project->project_name }}
-                        </p>
-                    </div>
+                        <div>
+                            <p class="text-xs text-gray-500">STO</p>
+                            <p class="text-sm font-bold">
+                                {{ $project->lop?->sto ?? '-' }}
+                            </p>
+                        </div>
 
-                    <div>
-                        <p class="text-xs text-gray-500">STO</p>
-                        <p class="text-sm font-bold">
-                            {{ $project->sto }}
-                        </p>
-                    </div>
+                        <div>
+                            <p class="text-xs text-gray-500">Branch</p>
+                            <p class="text-sm font-bold">
+                                {{ $project->lop?->branch ?? '-' }}
+                            </p>
+                        </div>
 
-                    <div>
-                        <p class="text-xs text-gray-500">Branch</p>
-                        <p class="text-sm font-bold">
-                            {{ $project->branch }}
-                        </p>
-                    </div>
-
-                    <div>
-                        <p class="text-xs text-gray-500">Mitra</p>
-                        <p class="text-sm font-bold leading-snug">
-                            {{ $project->mitra_name }}
-                        </p>
-                    </div>
+                        <div class="col-span-2">
+                            <p class="text-xs text-gray-500">Mitra</p>
+                            <p class="text-sm font-bold leading-snug break-words">
+                                {{ $project->lop?->mitra_name ?? '-' }}
+                            </p>
+                        </div>
 
                 </div>
 
             </div>
-
-        </div>
+    </div>
 
     {{-- STEP 2 LIST --}}
     <div class="px-4 mt-5">
@@ -237,13 +237,13 @@
 
                         <div class="text-left min-w-0">
 
-                            <h3 class="text-sm font-bold truncate">
-                                {{ $boq->item_name }}
+                            <h3 class="text-sm font-bold">
+                                {{ $boq->designator }}
                             </h3>
 
                             <p class="text-xs text-gray-500 truncate">
-                                {{ $boq->designator ?? '-' }}
-                                · Plan {{ $boq->quantity_plan }} {{ $boq->unit }}
+                               
+                                Plan {{ $boq->quantity_plan }} {{ $boq->unit }}
                             </p>
 
                             <p class="text-xs text-gray-500 truncate mt-0.5">
@@ -346,7 +346,12 @@
                     @endif
 
                     <button type="button"
-                            onclick="openUploadModal('{{ $boq->id_boq }}', '{{ addslashes($boq->item_name) }}')"
+                            onclick="openUploadModal(
+                            '{{ $boq->id_boq }}',
+                            @js($boq->item_name),
+                            '{{ $boq->quantity_plan }}',
+                            '{{ $boq->unit }}'
+                        )"
                             class="h-9 w-full rounded-xl bg-blue-700 text-white text-xs font-bold">
 
                         Upload / Update Eviden
@@ -443,8 +448,24 @@
                          class="grid grid-cols-3 gap-3">
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="rounded-xl bg-green-50 border border-green-100 p-3">
 
+                        <p class="text-xs font-semibold text-green-700">
+                            Quantity Plan
+                        </p>
+
+                        <p class="mt-1 text-lg font-bold text-green-800">
+                            <span id="planQuantity">0</span>
+                            <span id="planUnit"></span>
+                        </p>
+
+                        <p class="text-[11px] text-green-600 mt-1">
+                            Gunakan sebagai acuan pengisian Quantity Actual
+                        </p>
+
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                            
                         <div>
                             <label class="text-xs font-semibold text-gray-600">
                                 Quantity Actual
@@ -498,13 +519,17 @@
 <script>
 let selectedFiles = [];
 
-function openUploadModal(boqId, boqName)
+function openUploadModal(boqId, boqName,quantityPlan,
+    unit)
 {
     document.getElementById('uploadModal').classList.remove('hidden');
     document.getElementById('uploadModal').classList.add('flex');
 
     document.getElementById('boq_item_id').value = boqId;
     document.getElementById('selectedBoqName').innerText = boqName;
+
+    document.getElementById('planQuantity').innerText = quantityPlan;
+    document.getElementById('planUnit').innerText = unit;
 
     selectedFiles = [];
     document.getElementById('photoInput').value = '';

@@ -13,21 +13,12 @@
 
 @php
     $evidences = $project->evidences ?? collect();
+    $finishingBoqItems = $project->boqItems ?? collect();
 
-    $finishingPhotos = $evidences
-        ->where('stage', 'finishing')
-        ->where('evidence_type', 'final_site')
-        ->sortByDesc('created_at');
-
-    $finishingStatus = optional($finishingPhotos->first())->status;
-    $finishingUploaded = $finishingPhotos->count() > 0;
-
-    $finishingRejected = $finishingPhotos
-        ->where('status', 'rejected')
-        ->sortByDesc('created_at')
-        ->first();
-
-    $finishingReviewNote = optional($finishingRejected)->review_note;
+    $materialBoqItems = ($project->boqItems ?? collect())->filter(function ($boq) {
+    return optional($boq->designatorData)->type === 'material'
+        || optional($boq->designatorDataByCode)->type === 'material';
+        });
 
     $totalEvidence = $evidences->count();
     $approvedEvidence = $evidences->where('status', 'approved')->count();
@@ -96,46 +87,46 @@
 
 </div>
 
-{{-- PROJECT INFO --}}
-<div class="px-4 mt-4">
+{{-- Project Info --}}
+        <div class="px-2 mt-2">
+            <div class="bg-white rounded-2xl border border-gray-200 p-4">
 
-    <div class="bg-white rounded-2xl border border-gray-200 p-4">
-
-        <div class="grid grid-cols-2 gap-y-4 gap-x-4">
-
-            <div>
+            {{-- Nama LOP --}}
+            <div class="mb-4">
                 <p class="text-xs text-gray-500">Nama LOP</p>
-                <p class="text-sm font-bold leading-snug">
+                <p class="text-sm font-bold leading-snug break-words">
                     {{ $project->project_name }}
                 </p>
             </div>
 
-            <div>
-                <p class="text-xs text-gray-500">STO</p>
-                <p class="text-sm font-bold">
-                    {{ $project->sto }}
-                </p>
+                {{-- Info lainnya --}}
+                <div class="grid grid-cols-2 gap-y-4 gap-x-4">
+
+                        <div>
+                            <p class="text-xs text-gray-500">STO</p>
+                            <p class="text-sm font-bold">
+                                {{ $project->lop?->sto ?? '-' }}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p class="text-xs text-gray-500">Branch</p>
+                            <p class="text-sm font-bold">
+                                {{ $project->lop?->branch ?? '-' }}
+                            </p>
+                        </div>
+
+                        <div class="col-span-2">
+                            <p class="text-xs text-gray-500">Mitra</p>
+                            <p class="text-sm font-bold leading-snug break-words">
+                                {{ $project->lop?->mitra_name ?? '-' }}
+                            </p>
+                        </div>
+
+                </div>
+
             </div>
-
-            <div>
-                <p class="text-xs text-gray-500">Branch</p>
-                <p class="text-sm font-bold">
-                    {{ $project->branch }}
-                </p>
-            </div>
-
-            <div>
-                <p class="text-xs text-gray-500">Mitra</p>
-                <p class="text-sm font-bold leading-snug">
-                    {{ $project->mitra_name }}
-                </p>
-            </div>
-
-        </div>
-
     </div>
-
-</div>
 
 {{-- UT STATUS --}}
 <div class="px-4 mt-5">
@@ -216,160 +207,162 @@
 
 </div>
 
-{{-- CARD FINISHING --}}
+
+{{-- FINAL EVIDENCE PER MATERIAL ITEM --}}
 <div class="px-4 mt-5">
 
-    <div class="flex items-center justify-between mb-3">
-
-        <div>
-            <h2 class="text-sm font-bold text-gray-500 uppercase">
-                Step 4 - Finishing
-            </h2>
-
-            <p class="text-xs text-gray-500">
-                Upload dokumentasi kondisi akhir pekerjaan
-            </p>
-        </div>
-
-        @if($finishingUploaded)
-            <span class="px-2.5 py-1 rounded-lg bg-green-100 text-green-700 text-[11px] font-bold">
-                Uploaded
-            </span>
-        @else
-            <span class="px-2.5 py-1 rounded-lg bg-yellow-100 text-yellow-700 text-[11px] font-bold">
-                Belum
-            </span>
-        @endif
-
+    <div class="mb-3">
+        <h2 class="text-sm font-bold text-gray-500 uppercase">
+            Eviden Final Material
+        </h2>
+        <p class="text-xs text-gray-500">
+            Upload eviden final hanya untuk item designator material
+        </p>
     </div>
 
-    <div x-data="{ open: false }"
-         class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+    <div class="space-y-3">
 
-        <button type="button"
-                @click="open = !open"
-                class="w-full p-4 flex items-center justify-between gap-3">
+        @forelse($materialBoqItems as $boq)
 
-            <div class="flex items-center gap-3 min-w-0">
+            @php
+                $instalasiPhotos = $evidences
+                    ->where('stage', 'instalasi')
+                    ->where('evidence_type', 'progress_boq')
+                    ->where('boq_item_id', $boq->id_boq)
+                    ->sortByDesc('created_at');
 
-                <div class="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0
-                    {{ $finishingUploaded ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">
-                    {{ $finishingUploaded ? '✓' : '4' }}
-                </div>
+                $finalBoqPhotos = $evidences
+                    ->where('stage', 'finishing')
+                    ->where('evidence_type', 'final_boq')
+                    ->where('boq_item_id', $boq->id_boq)
+                    ->sortByDesc('created_at');
 
-                <div class="text-left min-w-0">
-                    <h3 class="text-sm font-bold truncate">
-                        Eviden Finishing / Final Site
-                    </h3>
+                $finalStatus = optional($finalBoqPhotos->first())->status;
+            @endphp
 
-                    <p class="text-xs text-gray-500 truncate">
-                        {{ $finishingPhotos->count() }} foto
-                        ·
-                        {{ $finishingStatus ?? 'Belum upload' }}
-                    </p>
+            <div x-data="{ open: false }"
+                 class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+
+                <button type="button"
+                        @click="open = !open"
+                        class="w-full p-4 flex items-center justify-between gap-3">
+
+                    <div class="text-left min-w-0">
+                        <h3 class="text-sm font-bold truncate">
+                            {{ $boq->item_name }}
+                        </h3>
+
+                        <p class="text-xs text-gray-500 truncate">
+                            {{ $boq->designator ?? '-' }}
+                            · Plan {{ $boq->quantity_plan }} {{ $boq->unit }}
+                        </p>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0">
+                        @if($finalBoqPhotos->count() > 0)
+                            <span class="px-2.5 py-1 rounded-lg bg-green-100 text-green-700 text-[11px] font-bold">
+                                Final {{ $finalBoqPhotos->count() }}
+                            </span>
+                        @else
+                            <span class="px-2.5 py-1 rounded-lg bg-yellow-100 text-yellow-700 text-[11px] font-bold">
+                                Belum
+                            </span>
+                        @endif
+
+                        <span class="text-xs text-gray-400" x-text="open ? '▲' : '▼'"></span>
+                    </div>
+
+                </button>
+
+                <div x-show="open"
+                     x-transition
+                     class="border-t border-gray-100 p-4 space-y-4">
+
+                    <div>
+                        <p class="text-xs font-bold text-gray-700 mb-2">
+                            Eviden Instalasi Existing
+                        </p>
+
+                        @if($instalasiPhotos->count() > 0)
+                            <div class="grid grid-cols-3 gap-2">
+                                @foreach($instalasiPhotos as $photo)
+                                    <a href="{{ asset('storage/' . $photo->file_path) }}"
+                                       target="_blank"
+                                       class="aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
+                                        <img src="{{ asset('storage/' . $photo->file_path) }}"
+                                             class="w-full h-full object-cover">
+                                    </a>
+                                @endforeach
+                            </div>
+                        @else
+                            <p class="text-xs text-gray-500">
+                                Belum ada eviden instalasi untuk item ini.
+                            </p>
+                        @endif
+                    </div>
+
+                    <div>
+                        <p class="text-xs font-bold text-gray-700 mb-2">
+                            Eviden Final
+                        </p>
+
+                        @if($finalBoqPhotos->count() > 0)
+                            <div class="grid grid-cols-3 gap-2 mb-3">
+                                @foreach($finalBoqPhotos as $photo)
+                                    <div class="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
+                                        <img src="{{ asset('storage/' . $photo->file_path) }}"
+                                             class="w-full h-full object-cover">
+
+                                        @if($photo->status != 'approved')
+                                            <form method="POST"
+                                                  action="{{ route('waspang.evidence.delete', $photo->id_evidence) }}"
+                                                  class="absolute top-1 right-1">
+                                                @csrf
+                                                @method('DELETE')
+
+                                                <button class="w-6 h-6 rounded-full bg-black/70 text-white text-xs">
+                                                    ×
+                                                </button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <p class="text-xs text-gray-500 mb-3">
+                                Belum ada eviden final.
+                            </p>
+                        @endif
+
+                        <button type="button"
+                                onclick="openUploadModal(
+                                    '{{ $boq->id_boq }}',
+                                    @js($boq->item_name),
+                                    @js($boq->designator),
+                                    '{{ $boq->quantity_plan }}',
+                                    @js($boq->unit)
+                                )"
+                                class="h-9 w-full rounded-xl bg-blue-700 text-white text-xs font-bold">
+                            + Upload Eviden Final
+                        </button>
+                    </div>
+
                 </div>
 
             </div>
 
-            <div class="flex items-center gap-2 shrink-0">
+        @empty
 
-                @if(!$finishingStatus)
-                    <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 text-[11px] font-bold">
-                        Belum
-                    </span>
-                @elseif($finishingStatus == 'approved')
-                    <span class="px-2.5 py-1 rounded-lg bg-green-100 text-green-700 text-[11px] font-bold">
-                        Approved
-                    </span>
-                @elseif($finishingStatus == 'pending')
-                    <span class="px-2.5 py-1 rounded-lg bg-yellow-100 text-yellow-700 text-[11px] font-bold">
-                        Pending
-                    </span>
-                @else
-                    <span class="px-2.5 py-1 rounded-lg bg-red-100 text-red-700 text-[11px] font-bold">
-                        Rejected
-                    </span>
-                @endif
-
-                <span class="text-xs text-gray-400" x-text="open ? '▲' : '▼'"></span>
-
+            <div class="bg-white rounded-2xl border border-gray-200 p-4 text-center text-xs text-gray-500">
+                Tidak ada item material pada BOQ.
             </div>
 
-        </button>
-
-        <div x-show="open"
-             x-transition
-             class="border-t border-gray-100 p-4">
-
-            <p class="text-xs text-gray-500 mb-3">
-                Upload foto kondisi akhir lokasi, labeling, marking, atau dokumentasi final pekerjaan.
-            </p>
-
-            @if($finishingReviewNote)
-
-                <div class="mb-3 rounded-xl border border-red-200 bg-red-50 p-3">
-
-                    <p class="text-[11px] font-bold text-red-700 mb-1">
-                        Catatan Revisi Admin
-                    </p>
-
-                    <p class="text-xs text-red-700 leading-relaxed">
-                        {{ $finishingReviewNote }}
-                    </p>
-
-                </div>
-
-            @endif
-
-            @if($finishingPhotos->count() > 0)
-
-                <div class="grid grid-cols-3 gap-2 mb-3">
-
-                    @foreach($finishingPhotos as $photo)
-
-                        <div class="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
-
-                            <img src="{{ asset('storage/' . $photo->file_path) }}"
-                                 class="w-full h-full object-cover">
-
-                            @if($photo->status != 'approved')
-                                <form method="POST"
-                                      action="{{ route('waspang.evidence.delete', $photo->id_evidence) }}"
-                                      class="absolute top-1 right-1">
-                                    @csrf
-                                    @method('DELETE')
-
-                                    <button class="w-6 h-6 rounded-full bg-black/70 text-white text-xs">
-                                        ×
-                                    </button>
-                                </form>
-                            @endif
-
-                        </div>
-
-                    @endforeach
-
-                </div>
-
-            @else
-
-                <p class="text-xs text-gray-500 mb-3">
-                    Belum ada foto finishing.
-                </p>
-
-            @endif
-
-            <button type="button"
-                    onclick="openUploadModal()"
-                    class="h-9 w-full rounded-xl bg-blue-700 text-white text-xs font-bold">
-                Upload / Update Eviden
-            </button>
-
-        </div>
+        @endforelse
 
     </div>
 
 </div>
+
 
 {{-- FINAL ACTION --}}
 <div class="px-4 mt-5">
@@ -417,6 +410,14 @@
 
         </div>
 
+        <div id="selectedBoqBox" class="hidden rounded-xl bg-green-50 text-green-700 text-xs p-3">
+            <p>Item BOQ:</p>
+            <p class="font-bold" id="selectedBoqName"></p>
+            <p class="mt-1">
+                Plan <span id="selectedBoqPlan"></span> <span id="selectedBoqUnit"></span>
+            </p>
+        </div>
+
         <form id="uploadForm"
               method="POST"
               action="{{ route('waspang.evidence.upload', $project->id_project) }}"
@@ -425,7 +426,8 @@
             @csrf
 
             <input type="hidden" name="stage" value="finishing">
-            <input type="hidden" name="evidence_type" value="final_site">
+            <input type="hidden" name="evidence_type" id="evidence_type" value="final_boq">
+            <input type="hidden" name="boq_item_id" id="boq_item_id">
             <input type="hidden" name="latitude" id="latitude">
             <input type="hidden" name="longitude" id="longitude">
 
@@ -480,7 +482,7 @@
 <script>
 let selectedFiles = [];
 
-function openUploadModal()
+function openUploadModal(boqId, boqName, designator, quantityPlan, unit)
 {
     document.getElementById('uploadModal').classList.remove('hidden');
     document.getElementById('uploadModal').classList.add('flex');
@@ -488,6 +490,9 @@ function openUploadModal()
     selectedFiles = [];
     document.getElementById('photoInput').value = '';
     document.getElementById('previewContainer').innerHTML = '';
+
+    document.getElementById('boq_item_id').value = boqId;
+    document.getElementById('evidence_type').value = 'final_boq';
 
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function(position) {

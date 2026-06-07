@@ -15,62 +15,138 @@
     </div>
 
     <div class="flex gap-2">
-        <button type="button"
+        <!-- <button type="button"
                 onclick="openImportModal()"
                 class="h-10 px-4 inline-flex items-center justify-center rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800">
             Import CSV
-        </button>
+        </button> -->
 
         <button type="button"
                 onclick="openProjectModal()"
                 class="h-10 px-4 inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
-            + Input LOP Baru
+            + Input Manual LOP Baru
         </button>
     </div>
 
 </div>
 
-{{-- Search & Filter --}}
-<div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-4 mb-6">
+        {{-- Search & Filter --}}
+        <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-4 mb-6 shadow-sm">
 
-    <form method="GET" action="{{ route('projects.index') }}">
+            <form method="GET" action="{{ route('projects.index') }}" class="space-y-4">
 
-        <div class="flex flex-col lg:flex-row gap-3">
+                {{-- Search --}}
+                <div class="flex flex-col lg:flex-row gap-3">
+                    <input type="text"
+                        name="search"
+                        value="{{ request('search') }}"
+                        placeholder="Cari project, STO, branch, mitra..."
+                        class="flex-1 h-11 rounded-2xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-blue-500 focus:border-blue-500">
 
-            <input type="text"
-                   name="search"
-                   value="{{ request('search') }}"
-                   placeholder="Cari project, STO, branch, mitra..."
-                   class="flex-1 rounded-2xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 focus:ring-blue-500 focus:border-blue-500">
+                    <button class="h-11 px-6 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold">
+                        Cari
+                    </button>
 
-            <select name="status"
-                    class="rounded-2xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 focus:ring-blue-500 focus:border-blue-500">
+                    <a href="{{ route('projects.index') }}"
+                    class="h-11 px-5 inline-flex items-center justify-center rounded-2xl border border-gray-300 dark:border-gray-700 text-sm font-bold hover:bg-gray-100 dark:hover:bg-gray-800">
+                        Reset
+                    </a>
+                </div>
 
-                <option value="">Semua Status</option>
+                {{-- Filter Chips --}}
+                <div class="space-y-3">
 
-                <option value="active" {{ request('status') == 'active' ? 'selected' : '' }}>
-                    Active
-                </option>
+                    {{-- Program --}}
+                    <div class="flex flex-col lg:flex-row lg:items-center gap-2">
+                        <div class="w-18 shrink-0 text-xs font-black uppercase tracking-wide text-gray-400">
+                            Program
+                        </div>
 
-                <option value="waiting_ut" {{ request('status') == 'waiting_ut' ? 'selected' : '' }}>
-                    Waiting UT
-                </option>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ request()->fullUrlWithQuery(['program' => null]) }}"
+                            class="px-4 py-2 rounded-full text-xs font-bold border transition
+                            {{ !request('program') ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                Semua Program
+                            </a>
 
-                <option value="completed" {{ request('status') == 'completed' ? 'selected' : '' }}>
-                    Completed
-                </option>
+                            @foreach($programs as $program)
+                                <a href="{{ request()->fullUrlWithQuery(['program' => $program]) }}"
+                                class="px-4 py-2 rounded-full text-xs font-bold border transition
+                                {{ request('program') == $program ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                    {{ $program }}
+                                </a>
+                            @endforeach
+                        </div>
+                    
 
-            </select>
+                    {{-- Branch --}}
+                    <div class="flex flex-col lg:flex-row lg:items-center gap-2">
+                        <div class="w-18 shrink-0 text-xs font-black uppercase tracking-wide text-gray-400">
+                            Branch
+                        </div>
 
-            <button class="bg-blue-700 hover:bg-blue-800 text-white px-6 py-3 rounded-2xl font-semibold">
-                Filter
-            </button>
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ request()->fullUrlWithQuery(['branch' => null]) }}"
+                            class="px-4 py-2 rounded-full text-xs font-bold border transition
+                            {{ !request('branch') ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                Semua Branch
+                            </a>
+
+                            @foreach($branches as $branch)
+                                <a href="{{ request()->fullUrlWithQuery(['branch' => $branch]) }}"
+                                class="px-4 py-2 rounded-full text-xs font-bold border transition
+                                {{ request('branch') == $branch ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                    {{ $branch }}
+                                </a>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+
+                    {{-- Tahapan --}}
+                    <!-- <div class="flex flex-col lg:flex-row lg:items-center gap-2">
+                        <div class="w-24 shrink-0 text-xs font-black uppercase tracking-wide text-gray-400">
+                            Tahapan
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                            <a href="{{ request()->fullUrlWithQuery(['stage' => null]) }}"
+                            class="px-4 py-2 rounded-full text-xs font-bold border transition
+                            {{ !request('stage') ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                Semua
+                            </a>
+
+                            <a href="{{ request()->fullUrlWithQuery(['stage' => 'preparation']) }}"
+                            class="px-4 py-2 rounded-full text-xs font-bold border transition
+                            {{ request('stage') == 'preparation' ? 'bg-red-600 text-white border-red-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                Preparation
+                            </a>
+
+                            <a href="{{ request()->fullUrlWithQuery(['stage' => 'instalasi']) }}"
+                            class="px-4 py-2 rounded-full text-xs font-bold border transition
+                            {{ request('stage') == 'instalasi' ? 'bg-yellow-600 text-white border-yellow-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                Instalasi
+                            </a>
+
+                            <a href="{{ request()->fullUrlWithQuery(['stage' => 'pengukuran']) }}"
+                            class="px-4 py-2 rounded-full text-xs font-bold border transition
+                            {{ request('stage') == 'pengukuran' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                Pengukuran
+                            </a>
+
+                            <a href="{{ request()->fullUrlWithQuery(['stage' => 'finishing']) }}"
+                            class="px-4 py-2 rounded-full text-xs font-bold border transition
+                            {{ request('stage') == 'finishing' ? 'bg-green-600 text-white border-green-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                Finishing
+                            </a>
+                        </div>
+                    </div> -->
+
+                </div>
+
+            </form>
 
         </div>
-
-    </form>
-
-</div>
 
 {{-- Project Cards --}}
 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -208,7 +284,7 @@
                     </h2>
 
                     <p class="text-[11px] text-gray-500 mt-1 truncate">
-                        {{ $project->branch }} · {{ $project->sto }} · {{ $project->mitra_name }}
+                        {{ $project->lop?->branch }} · {{ $project->lop?->sto }} · {{ $project->execution_type }}
                     </p>
 
                 </div>
@@ -299,11 +375,30 @@
             {{-- Actions --}}
             <div class="grid grid-cols-2 gap-2 mt-3">
 
+              <button type="button"
+                        onclick="openKmlModal('{{ $project->id_project }}', @js($project->project_name))"
+                        class="h-9 inline-flex items-center justify-center rounded-xl border border-blue-300 text-blue-600 text-xs font-bold hover:bg-blue-50 transition">
+                    Upload KML
+                </button>
+
+                @if($project->kml_file)
+                    <a href="{{ route('projects.view-kml', $project->id_project) }}"
+                    class="h-9 inline-flex items-center justify-center rounded-xl border border-green-300 text-green-600 text-xs font-bold hover:bg-green-50 transition">
+                        View KML
+                    </a>
+                @else
+                    <button type="button"
+                            disabled
+                            class="h-9 inline-flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 text-xs font-bold cursor-not-allowed">
+                        View KML
+                    </button>
+                @endif
+
                 @if($progress == 100)
 
                     <a href="#"
                        class="h-9 col-span-2 inline-flex items-center justify-center rounded-xl bg-green-700 text-white text-xs font-bold hover:bg-green-800 transition">
-                        Proses Uji Terima
+                        Berkas Siap Uji Terima
                     </a>
 
                 @else
@@ -361,14 +456,14 @@
                     <div>
                         <p class="text-xs uppercase text-gray-400 font-semibold">Branch</p>
                         <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">
-                            {{ $project->branch }}
+                            {{ $project->lop?->branch }}
                         </p>
                     </div>
 
                     <div>
                         <p class="text-xs uppercase text-gray-400 font-semibold">STO</p>
                         <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">
-                            {{ $project->sto }}
+                            {{ $project->lop?->sto }}
                         </p>
                     </div>
 
@@ -382,7 +477,7 @@
                     <div>
                         <p class="text-xs uppercase text-gray-400 font-semibold">Jenis Eksekusi</p>
                         <span class="inline-flex mt-1 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
-                            {{ strtoupper($project->jenis_eksekusi) }}
+                            {{ strtoupper($project->execution_type) }}
                         </span>
                     </div>
 
@@ -1026,6 +1121,73 @@
 
 </div>
 
+    {{-- KML MODAL --}}
+    <div id="kmlModal"
+        class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+
+        <div class="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl overflow-hidden">
+
+            <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900 dark:text-white">
+                        Upload KML
+                    </h2>
+                    <p id="kmlProjectName" class="text-sm text-gray-500 truncate">
+                        Upload file peta project
+                    </p>
+                </div>
+
+                <button type="button"
+                        onclick="closeKmlModal()"
+                        class="w-10 h-10 rounded-xl border border-gray-300 dark:border-gray-700 text-xl hover:bg-gray-100 dark:hover:bg-gray-800">
+                    ×
+                </button>
+            </div>
+
+            <form id="kmlForm"
+                method="POST"
+                enctype="multipart/form-data">
+                @csrf
+
+                <div class="p-5 space-y-4">
+
+                    <input type="file"
+                        name="kml_file"
+                        accept=".kml,.xml"
+                        required
+                        class="block w-full text-sm border border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer bg-white dark:bg-gray-950 dark:text-gray-300
+                                file:mr-3 file:py-2.5 file:px-4 file:rounded-l-xl file:border-0 file:text-sm file:font-bold
+                                file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+
+                    <div class="rounded-xl bg-gray-50 dark:bg-gray-950 border border-gray-100 dark:border-gray-800 p-3">
+                        <p class="text-xs text-gray-500 leading-relaxed">
+                            Format file: <b>.kml</b> atau <b>.xml</b>, maksimal 5MB.
+                            Jika upload ulang, file lama akan diganti.
+                        </p>
+                    </div>
+
+                </div>
+
+                <div class="flex justify-end gap-3 px-5 py-4 border-t border-gray-200 dark:border-gray-800">
+
+                    <button type="button"
+                            onclick="closeKmlModal()"
+                            class="h-10 px-4 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold">
+                        Batal
+                    </button>
+
+                    <button class="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
+                        Upload
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
 @include('admin.projects.modals.boq-modal')
 
 @endsection
@@ -1587,6 +1749,25 @@ function removeBoqRow(button)
                 maximumAge: 0
             }
         );
+    }
+
+    function openKmlModal(projectId, projectName)
+    {
+        const modal = document.getElementById('kmlModal');
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        document.getElementById('kmlForm').action = `/projects/${projectId}/upload-kml`;
+        document.getElementById('kmlProjectName').innerText = projectName;
+    }
+
+    function closeKmlModal()
+    {
+        const modal = document.getElementById('kmlModal');
+
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
     }
 </script>
 

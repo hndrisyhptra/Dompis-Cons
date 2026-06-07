@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Project;
+
 
 class ProjectAssignment extends Model
 {
@@ -20,5 +22,10 @@ class ProjectAssignment extends Model
     public function waspang()
     {
         return $this->belongsTo(User::class, 'waspang_id', 'id_user');
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class, 'project_id', 'id_project');
     }
 }

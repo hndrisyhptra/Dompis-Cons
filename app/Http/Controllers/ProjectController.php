@@ -12,32 +12,57 @@ use App\Models\Notification;
 use App\Models\EvidenceRevisionHistory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 
 class ProjectController extends Controller
 {
-    public function index(Request $request)
+   public function index(Request $request)
     {
         $query = Project::with([
             'boqItems',
             'assignments.waspang',
-            'evidences'
+            'evidences',
+            'lop'
         ]);
 
-        if ($request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('project_name', 'like', '%' . $request->search . '%')
-                  ->orWhere('sto', 'like', '%' . $request->search . '%')
-                  ->orWhere('branch', 'like', '%' . $request->search . '%')
-                  ->orWhere('mitra_name', 'like', '%' . $request->search . '%');
+        if ($request->filled('search')) {
+            $search = $request->search;
+
+            $query->where(function ($q) use ($search) {
+                $q->where('project_name', 'like', "%{$search}%")
+                ->orWhere('sto', 'like', "%{$search}%")
+                ->orWhere('branch', 'like', "%{$search}%");
             });
         }
 
-        if ($request->status) {
-            $query->where('status', $request->status);
+        if ($request->filled('program')) {
+            $query->where('program', $request->program);
+        }
+
+        if ($request->filled('branch')) {
+            $query->where('branch', $request->branch);
+        }
+
+        if ($request->filled('stage')) {
+            $query->whereHas('lop', function ($q) use ($request) {
+                $q->where('stage', $request->stage);
+            });
         }
 
         $projects = $query->latest()->get();
+
+        $programs = Project::whereNotNull('program')
+            ->where('program', '!=', '')
+            ->distinct()
+            ->orderBy('program')
+            ->pluck('program');
+
+        $branches = Project::whereNotNull('branch')
+            ->where('branch', '!=', '')
+            ->distinct()
+            ->orderBy('branch')
+            ->pluck('branch');
 
         $waspangs = User::with('assignments')
             ->where('role', 'waspang')
@@ -52,6 +77,8 @@ class ProjectController extends Controller
 
         return view('admin.projects.index', compact(
             'projects',
+            'programs',
+            'branches',
             'waspangs',
             'designators',
             'totalProject',
@@ -60,7 +87,6 @@ class ProjectController extends Controller
             'completedProject'
         ));
     }
-
     public function assignWaspang(Request $request)
     {
         $request->validate([
@@ -532,13 +558,15 @@ public function importCsv(Request $request)
     }
 
     //STEP 2 - REVIEW INSTALASI
-    public function reviewInstalasi($id)
+   public function reviewInstalasi($id)
     {
         $project = Project::with([
+            'boqItems.designatorData',
+            'boqItems.designatorDataByCode',
             'evidences',
-            'boqItems',
             'assignment.waspang',
-        ])->findOrFail($id);
+            'lop',
+        ])->where('id_project', $id)->firstOrFail();
 
         return view('admin.evidences.review-instalasi', compact('project'));
     }
@@ -555,14 +583,16 @@ public function importCsv(Request $request)
         return view('admin.evidences.review-pengukuran', compact('project'));
     }
 
-    //STEP 4 - REVIEW PENGUKURAN
+    //STEP 4 - REVIEW FINISHING
     public function reviewFinishing($id)
     {
         $project = Project::with([
+            'boqItems.designatorData',
+            'boqItems.designatorDataByCode',
             'evidences',
-            'boqItems',
             'assignment.waspang',
-        ])->findOrFail($id);
+            'lop',
+        ])->where('id_project', $id)->firstOrFail();
 
         return view('admin.evidences.review-finishing', compact('project'));
     }
@@ -598,6 +628,53 @@ public function importCsv(Request $request)
         }
 
         return back()->with('success', 'Item BOQ berhasil ditambahkan.');
+    }
+
+    //RELASI DENGAN LOP
+    public function lops()
+    {
+        return $this->hasMany(Lop::class, 'project_id', 'id_project');
+    }
+
+    //UPLOAD FILE KML
+    public function uploadKml(Request $request, $id)
+    {
+        $request->validate([
+            'kml_file' => 'required|file|mimes:kml,xml|max:5120',
+        ]);
+
+        $project = Project::where('id_project', $id)->firstOrFail();
+
+        if ($project->kml_file && Storage::disk('public')->exists($project->kml_file)) {
+            Storage::disk('public')->delete($project->kml_file);
+        }
+
+        $file = $request->file('kml_file');
+
+        $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = str_replace([' ', '/', '\\'], '-', strtolower($originalName));
+
+        $fileName = $safeName . '-' . time() . '.kml';
+
+        $path = $file->storeAs('kml', $fileName, 'public');
+
+        $project->kml_file = $path;
+        $project->save();
+
+        return back()->with('success', 'File KML berhasil diupload');
+    }
+
+    public function viewKml($id)
+    {
+        $project = Project::where('id_project', $id)->firstOrFail();
+
+        if (!$project->kml_file) {
+            return back()->withErrors('File KML belum tersedia.');
+        }
+
+        $kmlUrl = asset('storage/' . $project->kml_file);
+
+        return view('admin.projects.kml-map', compact('project', 'kmlUrl'));
     }
 
 }

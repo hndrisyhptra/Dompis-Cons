@@ -55,7 +55,7 @@
                 </h2>
 
                 <p class="text-sm text-gray-500">
-                    {{ $project->branch }} · {{ $project->sto }}
+                    {{ $project->lop?->branch }} · {{ $project->lop?->sto }}
                 </p>
             </div>
 
