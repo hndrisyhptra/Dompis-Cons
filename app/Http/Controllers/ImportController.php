@@ -6,6 +6,8 @@ use App\Models\Project;
 use App\Models\Lop;
 use App\Models\BoqItem;
 use App\Models\Designator;
+use App\Models\Evidence;
+use App\Models\ProjectAssignment;
 use App\Models\Package as PackageModel;
 use App\Models\DesignatorPackagePrice;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -18,7 +20,7 @@ class ImportController extends Controller
     {
         $search = $request->search;
 
-        $projects = Project::query()
+        $projects = Project::with('lop')
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('pid', 'like', "%{$search}%")
@@ -39,336 +41,489 @@ class ImportController extends Controller
     public function importPid(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:csv,txt',
+            'file' => 'required|mimes:xlsx,xls',
         ]);
 
-        $file = fopen($request->file('file')->getRealPath(), 'r');
+        $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
+        $sheet = $spreadsheet->getActiveSheet();
 
-        $header = fgetcsv($file);
-        $header = array_map('trim', $header);
+        $highestRow = $sheet->getHighestRow();
+        $highestColumn = $sheet->getHighestColumn();
+        $highestColumnIndex = Coordinate::columnIndexFromString($highestColumn);
 
-        $imported = 0;
-        $updated = 0;
+        $headers = [];
+
+        for ($col = 1; $col <= $highestColumnIndex; $col++) {
+            $columnLetter = Coordinate::stringFromColumnIndex($col);
+
+            $header = strtolower(
+                trim((string) $sheet->getCell($columnLetter . '1')->getValue())
+            );
+
+            $headers[$col] = $header;
+        }
+
+        $projectImported = 0;
+        $projectUpdated = 0;
+        $lopImported = 0;
+        $lopUpdated = 0;
         $skipped = 0;
 
-        $lineNumber = 1; // baris header
+        for ($row = 2; $row <= $highestRow; $row++) {
 
-        while (($row = fgetcsv($file, 10000, ",")) !== false) {
+            $data = [];
 
-            $lineNumber++;
+            for ($col = 1; $col <= $highestColumnIndex; $col++) {
+                $columnLetter = Coordinate::stringFromColumnIndex($col);
+                $headerName = $headers[$col] ?? null;
 
-            // Abaikan baris kosong di akhir CSV
-            if (
-                count($row) === 1 &&
-                (
-                    $row[0] === null ||
-                    trim($row[0]) === ''
-                )
-            ) {
-                continue;
+                if (!$headerName) {
+                    continue;
+                }
+
+                $data[$headerName] = $sheet->getCell($columnLetter . $row)->getValue();
             }
-
-            $data = array_combine($header, $row);
 
             $pid = $this->cleanValue($data['pid'] ?? null);
             $pidSap = $this->cleanValue($data['pid_sap'] ?? null);
+            $namaLop = $this->cleanValue($data['nama_lop'] ?? null);
+            $idIhld = $this->cleanValue($data['id_ihld'] ?? null);
 
-            // DEBUG jika PID dan PID SAP kosong
-            if (!$pid && !$pidSap) {
-                dd([
-                    'message' => 'PID dan PID SAP kosong',
-                    'line' => $lineNumber,
-                    'row_data' => $data,
-                ]);
+            if (!$pid || !$namaLop) {
+                $skipped++;
+                continue;
             }
 
-            $latitude = $this->cleanDecimal($data['latitude'] ?? null);
-            $longitude = $this->cleanDecimal($data['longitude'] ?? null);
+            $executionType = $this->cleanValue($data['execution_type'] ?? 'kemitraan') ?: 'kemitraan';
+            $statusProject = $this->cleanValue($data['status_project'] ?? 'active') ?: 'active';
 
-            $payload = [
-                'project_name' => $this->cleanValue($data['project_name'] ?? null),
+            if (!in_array($executionType, ['kemitraan', 'swakelola', 'turnkey'])) {
+                $executionType = 'kemitraan';
+            }
+
+            if (!in_array($statusProject, ['init', 'active', 'close', 'bast'])) {
+                $statusProject = 'active';
+            }
+
+            $projectPayload = [
+                'pid' => $pid,
+                'pid_sap' => $pidSap,
+                'project_name' => $namaLop,
                 'program' => $this->cleanValue($data['program'] ?? null),
-                'execution_type' => $this->cleanValue($data['execution_type'] ?? null),
-                'status_project' => $this->cleanValue($data['status_project'] ?? 'active') ?: 'active',
-                'latitude' => $latitude,
-                'longitude' => $longitude,
-                'location_address' => $this->cleanValue($data['location_address'] ?? null),
-                'map_note' => $this->cleanValue($data['map_note'] ?? null),
+                'execution_type' => $executionType,
+                'status_project' => $statusProject,
             ];
 
-            $project = Project::query()
-                ->when($pid, fn ($q) => $q->orWhere('pid', $pid))
-                ->when($pidSap, fn ($q) => $q->orWhere('pid_sap', $pidSap))
+            $project = Project::where('pid', $pid)
+                ->orWhere('pid_sap', $pidSap)
                 ->first();
 
             if ($project) {
-
-                $project->update($payload);
-
-                $updated++;
-
+                $project->update($projectPayload);
+                $projectUpdated++;
             } else {
+                $project = Project::create($projectPayload);
+                $projectImported++;
+            }
 
-                Project::create(array_merge($payload, [
-                    'pid' => $pid,
-                    'pid_sap' => $pidSap,
-                    'jenis_eksekusi' => 'plan',
-                ]));
+            $lopPayload = [
+                'project_id' => $project->id_project,
+                'id_ihld' => $idIhld,
+                'lop_name' => $namaLop,
+                'pid_sap' => $pidSap,
+                'program_sap' => $this->cleanValue($data['program'] ?? null),
+                'tematik' => $this->cleanValue($data['tematik'] ?? null),
+                'sto' => $this->cleanValue($data['sto'] ?? null),
+                'branch' => $this->cleanValue($data['branch'] ?? null),
+                'batch' => $this->cleanValue($data['batch'] ?? null),
+                'no_sp' => $this->cleanValue($data['no_sp'] ?? null),
+                'tgl_sp' => $this->cleanDate($data['tgl_sp'] ?? null),
+                'tgl_toc' => $this->cleanDate($data['tgl_toc'] ?? null),
+                'mitra_name' => $this->cleanValue($data['mitra_name'] ?? null),
+                'mapping_status' => 'auto_matched',
+                'status_progress' => 'preparation',
+            ];
 
-                $imported++;
+            $lop = null;
+
+            if ($idIhld) {
+                $lop = Lop::where('id_ihld', $idIhld)->first();
+            }
+
+            if (!$lop) {
+                $lop = Lop::where('project_id', $project->id_project)
+                    ->whereRaw('LOWER(TRIM(lop_name)) = ?', [
+                        strtolower(trim($namaLop))
+                    ])
+                    ->first();
+            }
+
+            if ($lop) {
+                $lop->update($lopPayload);
+                $lopUpdated++;
+            } else {
+                Lop::create($lopPayload);
+                $lopImported++;
             }
         }
 
-        fclose($file);
+        return back()->with(
+            'success',
+            "Import PID selesai. Project Baru {$projectImported}, Update Project {$projectUpdated}, LOP Baru {$lopImported}, Update LOP {$lopUpdated}, Data di Skip {$skipped}."
+        );
+    }
+
+    public function updatePid(Request $request, Project $project)
+    {
+        $request->validate([
+            'pid' => 'required|string|max:100',
+            'pid_sap' => 'nullable|string|max:100',
+            'nama_lop' => 'required|string|max:255',
+            'program' => 'nullable|string|max:150',
+            'execution_type' => 'required|in:kemitraan,swakelola,turnkey',
+            'status_project' => 'required|in:init,active,close,bast',
+
+            'id_ihld' => 'nullable|string|max:100',
+            'tematik' => 'nullable|string|max:150',
+            'sto' => 'nullable|string|max:50',
+            'branch' => 'nullable|string|max:100',
+            'batch' => 'nullable|string|max:100',
+            'no_sp' => 'nullable|string|max:100',
+            'tgl_sp' => 'nullable|date',
+            'tgl_toc' => 'nullable|date',
+            'mitra_name' => 'nullable|string|max:150',
+        ]);
+
+        $project->update([
+            'pid' => $request->pid,
+            'pid_sap' => $request->pid_sap,
+            'project_name' => $request->nama_lop,
+            'program' => $request->program,
+            'execution_type' => $request->execution_type,
+            'status_project' => $request->status_project,
+        ]);
+
+        $lop = $project->lop;
+
+        if ($lop) {
+            $lop->update([
+                'id_ihld' => $request->id_ihld,
+                'lop_name' => $request->nama_lop,
+                'pid_sap' => $request->pid_sap,
+                'program_sap' => $request->program,
+                'tematik' => $request->tematik,
+                'sto' => $request->sto,
+                'branch' => $request->branch,
+                'batch' => $request->batch,
+                'no_sp' => $request->no_sp,
+                'tgl_sp' => $request->tgl_sp,
+                'tgl_toc' => $request->tgl_toc,
+                'mitra_name' => $request->mitra_name,
+                'mapping_status' => 'auto_matched',
+            ]);
+        } else {
+            Lop::create([
+                'project_id' => $project->id_project,
+                'id_ihld' => $request->id_ihld,
+                'lop_name' => $request->nama_lop,
+                'pid_sap' => $request->pid_sap,
+                'program_sap' => $request->program,
+                'tematik' => $request->tematik,
+                'sto' => $request->sto,
+                'branch' => $request->branch,
+                'batch' => $request->batch,
+                'no_sp' => $request->no_sp,
+                'tgl_sp' => $request->tgl_sp,
+                'tgl_toc' => $request->tgl_toc,
+                'mitra_name' => $request->mitra_name,
+                'mapping_status' => 'auto_matched',
+                'status_progress' => 'preparation',
+            ]);
+        }
+
+        return back()->with('success', 'Data PID dan LOP berhasil diperbarui.');
+    }
+
+    public function destroyPid(Project $project)
+    {
+        $evidenceCount = Evidence::where(
+            'project_id',
+            $project->id_project
+        )->count();
+
+        if ($evidenceCount > 0) {
+
+            return back()->with(
+                'error',
+                'Project tidak dapat dihapus karena sudah memiliki evidence.'
+            );
+        }
+
+        BoqItem::where(
+            'project_id',
+            $project->id_project
+        )->delete();
+
+        ProjectAssignment::where(
+            'project_id',
+            $project->id_project
+        )->delete();
+
+        Lop::where(
+            'project_id',
+            $project->id_project
+        )->delete();
+
+        $project->delete();
 
         return back()->with(
             'success',
-            "Import selesai. {$imported} Data Baru, {$updated} Data Diperbarui, {$skipped} Data Dilewati."
+            'Project berhasil dihapus.'
         );
     }
 
     //IMPORT LOP
-    public function lopIndex(Request $request)
-    {
-        $search = $request->search;
+    // public function lopIndex(Request $request)
+    // {
+    //     $search = $request->search;
 
-        $lops = Lop::with('project')
-            ->when($search, function ($query) use ($search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('lop_name', 'like', "%{$search}%")
-                    ->orWhere('pid_sap', 'like', "%{$search}%")
-                    ->orWhere('program_sap', 'like', "%{$search}%")
-                    ->orWhere('sto', 'like', "%{$search}%")
-                    ->orWhere('branch', 'like', "%{$search}%")
-                    ->orWhere('wo_smile', 'like', "%{$search}%")
-                    ->orWhere('mitra_name', 'like', "%{$search}%")
-                    ->orWhere('mapping_status', 'like', "%{$search}%");
-                });
-            })
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
+    //     $lops = Lop::with('project')
+    //         ->when($search, function ($query) use ($search) {
+    //             $query->where(function ($q) use ($search) {
+    //                 $q->where('lop_name', 'like', "%{$search}%")
+    //                 ->orWhere('pid_sap', 'like', "%{$search}%")
+    //                 ->orWhere('program_sap', 'like', "%{$search}%")
+    //                 ->orWhere('sto', 'like', "%{$search}%")
+    //                 ->orWhere('branch', 'like', "%{$search}%")
+    //                 ->orWhere('wo_smile', 'like', "%{$search}%")
+    //                 ->orWhere('mitra_name', 'like', "%{$search}%")
+    //                 ->orWhere('mapping_status', 'like', "%{$search}%");
+    //             });
+    //         })
+    //         ->latest()
+    //         ->paginate(10)
+    //         ->withQueryString();
 
-        return view('admin.import.lop', compact('lops', 'search'));
-    }
+    //     return view('admin.import.lop', compact('lops', 'search'));
+    // }
 
-    public function importLop(Request $request)
-    {
-        $request->validate([
-            'file' => 'required|mimes:csv,txt',
-        ]);
+    // public function importLop(Request $request)
+    // {
+    //     $request->validate([
+    //         'file' => 'required|mimes:csv,txt',
+    //     ]);
 
-        $file = fopen($request->file('file')->getRealPath(), 'r');
+    //     $file = fopen($request->file('file')->getRealPath(), 'r');
 
-        $header = fgetcsv($file);
-        $header = array_map('trim', $header);
+    //     $header = fgetcsv($file);
+    //     $header = array_map('trim', $header);
 
-        $imported = 0;
-        $updated = 0;
-        $mapped = 0;
-        $unmapped = 0;
+    //     $imported = 0;
+    //     $updated = 0;
+    //     $mapped = 0;
+    //     $unmapped = 0;
 
-        while (($row = fgetcsv($file, 10000, ",")) !== false) {
+    //     while (($row = fgetcsv($file, 10000, ",")) !== false) {
 
-            if (
-                count($row) === 1 &&
-                (
-                    $row[0] === null ||
-                    trim($row[0]) === ''
-                )
-            ) {
-                continue;
-            }
+    //         if (
+    //             count($row) === 1 &&
+    //             (
+    //                 $row[0] === null ||
+    //                 trim($row[0]) === ''
+    //             )
+    //         ) {
+    //             continue;
+    //         }
 
-            if (count($row) !== count($header)) {
-                continue;
-            }
+    //         if (count($row) !== count($header)) {
+    //             continue;
+    //         }
 
-            $data = array_combine($header, $row);
+    //         $data = array_combine($header, $row);
 
-            $lopName = $this->cleanValue($data['lop_name'] ?? null);
-            $pidSap = $this->cleanValue($data['pid_sap'] ?? null);
-            $woSmile = $this->cleanValue($data['wo_smile'] ?? null);
+    //         $lopName = $this->cleanValue($data['lop_name'] ?? null);
+    //         $pidSap = $this->cleanValue($data['pid_sap'] ?? null);
+    //         $woSmile = $this->cleanValue($data['wo_smile'] ?? null);
 
-            if (!$lopName && !$pidSap && !$woSmile) {
-                continue;
-            }
+    //         if (!$lopName && !$pidSap && !$woSmile) {
+    //             continue;
+    //         }
 
-            /*
-            |--------------------------------------------------------------------------
-            | AUTO MATCHING PROJECT
-            |--------------------------------------------------------------------------
-            */
+    //         /*
+    //         |--------------------------------------------------------------------------
+    //         | AUTO MATCHING PROJECT
+    //         |--------------------------------------------------------------------------
+    //         */
 
-            $lopNameNormalized = strtolower(trim($lopName));
+    //         $lopNameNormalized = strtolower(trim($lopName));
 
-            $programNormalized = strtolower(
-                trim(
-                    $this->cleanValue($data['program_sap'] ?? null)
-                )
-            );
+    //         $programNormalized = strtolower(
+    //             trim(
+    //                 $this->cleanValue($data['program_sap'] ?? null)
+    //             )
+    //         );
 
-            $project = Project::all()->first(function ($project) use (
-                $lopNameNormalized,
-                $programNormalized
-            ) {
-                return strtolower(trim($project->project_name)) === $lopNameNormalized
-                    && strtolower(trim($project->program)) === $programNormalized;
-            });
+    //         $project = Project::all()->first(function ($project) use (
+    //             $lopNameNormalized,
+    //             $programNormalized
+    //         ) {
+    //             return strtolower(trim($project->project_name)) === $lopNameNormalized
+    //                 && strtolower(trim($project->program)) === $programNormalized;
+    //         });
 
-            $mappingStatus = $project
-                ? 'auto_matched'
-                : 'unmapped';
+    //         $mappingStatus = $project
+    //             ? 'auto_matched'
+    //             : 'unmapped';
 
-            if ($project) {
-                $mapped++;
-            } else {
-                $unmapped++;
-            }
+    //         if ($project) {
+    //             $mapped++;
+    //         } else {
+    //             $unmapped++;
+    //         }
 
-            $matchedPidSap = $project?->pid_sap;
+    //         $matchedPidSap = $project?->pid_sap;
 
-            $payload = [
-                'project_id' => $project?->id_project,
+    //         $payload = [
+    //             'project_id' => $project?->id_project,
 
-                'id_ihld' => $this->cleanValue($data['id_ihld'] ?? null),
-                'lop_name' => $lopName,
-                'pid_sap' => $matchedPidSap ?? $pidSap,
-                'program_sap' => $this->cleanValue($data['program_sap'] ?? null),
-                'tematik' => $this->cleanValue($data['tematik'] ?? null),
+    //             'id_ihld' => $this->cleanValue($data['id_ihld'] ?? null),
+    //             'lop_name' => $lopName,
+    //             'pid_sap' => $matchedPidSap ?? $pidSap,
+    //             'program_sap' => $this->cleanValue($data['program_sap'] ?? null),
+    //             'tematik' => $this->cleanValue($data['tematik'] ?? null),
 
-                'sto' => $this->cleanValue($data['sto'] ?? null),
-                'branch' => $this->cleanValue($data['branch'] ?? null),
-                'tahun_order' => $this->cleanValue($data['tahun_order'] ?? null),
-                'start_tgl' => $this->cleanDate($data['start_tgl'] ?? null),
-                'wo_smile' => $woSmile,
+    //             'sto' => $this->cleanValue($data['sto'] ?? null),
+    //             'branch' => $this->cleanValue($data['branch'] ?? null),
+    //             'tahun_order' => $this->cleanValue($data['tahun_order'] ?? null),
+    //             'start_tgl' => $this->cleanDate($data['start_tgl'] ?? null),
+    //             'wo_smile' => $woSmile,
 
-                'nilai_material' => $this->cleanNumber($data['nilai_material'] ?? 0),
-                'nilai_jasa' => $this->cleanNumber($data['nilai_jasa'] ?? 0),
-                'nilai_total' => $this->cleanNumber($data['nilai_total'] ?? 0),
+    //             'nilai_material' => $this->cleanNumber($data['nilai_material'] ?? 0),
+    //             'nilai_jasa' => $this->cleanNumber($data['nilai_jasa'] ?? 0),
+    //             'nilai_total' => $this->cleanNumber($data['nilai_total'] ?? 0),
 
-                'odp_8' => $this->cleanNumber($data['odp_8'] ?? 0),
-                'odp_16' => $this->cleanNumber($data['odp_16'] ?? 0),
-                'total_port' => $this->cleanNumber($data['total_port'] ?? 0),
+    //             'odp_8' => $this->cleanNumber($data['odp_8'] ?? 0),
+    //             'odp_16' => $this->cleanNumber($data['odp_16'] ?? 0),
+    //             'total_port' => $this->cleanNumber($data['total_port'] ?? 0),
 
-                'plan_tiang' => $this->cleanNumber($data['plan_tiang'] ?? 0),
-                'realisasi_tiang' => $this->cleanNumber($data['realisasi_tiang'] ?? 0),
-                'plan_kabel' => $this->cleanNumber($data['plan_kabel'] ?? 0),
-                'realisasi_kabel' => $this->cleanNumber($data['realisasi_kabel'] ?? 0),
-                'plan_galian' => $this->cleanNumber($data['plan_galian'] ?? 0),
-                'real_galian' => $this->cleanNumber($data['real_galian'] ?? 0),
+    //             'plan_tiang' => $this->cleanNumber($data['plan_tiang'] ?? 0),
+    //             'realisasi_tiang' => $this->cleanNumber($data['realisasi_tiang'] ?? 0),
+    //             'plan_kabel' => $this->cleanNumber($data['plan_kabel'] ?? 0),
+    //             'realisasi_kabel' => $this->cleanNumber($data['realisasi_kabel'] ?? 0),
+    //             'plan_galian' => $this->cleanNumber($data['plan_galian'] ?? 0),
+    //             'real_galian' => $this->cleanNumber($data['real_galian'] ?? 0),
 
-                'status_progress' => $this->cleanValue($data['status_progress'] ?? 'preparation') ?: 'preparation',
+    //             'status_progress' => $this->cleanValue($data['status_progress'] ?? 'preparation') ?: 'preparation',
 
-                'nama_waspang' => $this->cleanValue($data['nama_waspang'] ?? null),
-                'nik_waspang' => $this->cleanValue($data['nik_waspang'] ?? null),
-                'nama_admin' => $this->cleanValue($data['nama_admin'] ?? null),
-                'nik_admin' => $this->cleanValue($data['nik_admin'] ?? null),
-                'mitra_name' => $this->cleanValue($data['mitra_name'] ?? null),
+    //             'nama_waspang' => $this->cleanValue($data['nama_waspang'] ?? null),
+    //             'nik_waspang' => $this->cleanValue($data['nik_waspang'] ?? null),
+    //             'nama_admin' => $this->cleanValue($data['nama_admin'] ?? null),
+    //             'nik_admin' => $this->cleanValue($data['nik_admin'] ?? null),
+    //             'mitra_name' => $this->cleanValue($data['mitra_name'] ?? null),
 
-                'est_prep' => $this->cleanDate($data['est_prep'] ?? null),
-                'est_izin' => $this->cleanDate($data['est_izin'] ?? null),
-                'est_delivery' => $this->cleanDate($data['est_delivery'] ?? null),
-                'est_instalasi' => $this->cleanDate($data['est_instalasi'] ?? null),
-                'est_golive' => $this->cleanDate($data['est_golive'] ?? null),
+    //             'est_prep' => $this->cleanDate($data['est_prep'] ?? null),
+    //             'est_izin' => $this->cleanDate($data['est_izin'] ?? null),
+    //             'est_delivery' => $this->cleanDate($data['est_delivery'] ?? null),
+    //             'est_instalasi' => $this->cleanDate($data['est_instalasi'] ?? null),
+    //             'est_golive' => $this->cleanDate($data['est_golive'] ?? null),
 
-                'mapping_status' => $mappingStatus,
-            ];
+    //             'mapping_status' => $mappingStatus,
+    //         ];
 
-            $lop = Lop::query()
-                ->when($woSmile, fn ($q) => $q->orWhere('wo_smile', $woSmile))
-                ->when($lopName, fn ($q) => $q->orWhere('lop_name', $lopName))
-                ->first();
+    //         $lop = Lop::query()
+    //             ->when($woSmile, fn ($q) => $q->orWhere('wo_smile', $woSmile))
+    //             ->when($lopName, fn ($q) => $q->orWhere('lop_name', $lopName))
+    //             ->first();
 
-            if ($lop) {
-                $lop->update($payload);
-                $updated++;
-            } else {
-                Lop::create($payload);
-                $imported++;
-            }
-        }
+    //         if ($lop) {
+    //             $lop->update($payload);
+    //             $updated++;
+    //         } else {
+    //             Lop::create($payload);
+    //             $imported++;
+    //         }
+    //     }
 
-        fclose($file);
+    //     fclose($file);
 
-        return back()->with(
-            'success',
-            "Import LOP selesai. {$imported} data baru, {$updated} diperbarui, {$mapped} auto matched, {$unmapped} unmapped."
-        );
-    }
+    //     return back()->with(
+    //         'success',
+    //         "Import LOP selesai. {$imported} data baru, {$updated} diperbarui, {$mapped} auto matched, {$unmapped} unmapped."
+    //     );
+    // }
 
-    public function mappingIndex(Request $request)
-    {
-        $search = $request->search;
+    // public function mappingIndex(Request $request)
+    // {
+    //     $search = $request->search;
 
-        $unmappedLops = Lop::where('mapping_status', 'unmapped')
-            ->when($search, function ($query) use ($search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('lop_name', 'like', "%{$search}%")
-                    ->orWhere('pid_sap', 'like', "%{$search}%")
-                    ->orWhere('program_sap', 'like', "%{$search}%")
-                    ->orWhere('sto', 'like', "%{$search}%")
-                    ->orWhere('branch', 'like', "%{$search}%")
-                    ->orWhere('wo_smile', 'like', "%{$search}%");
-                });
-            })
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
+    //     $unmappedLops = Lop::where('mapping_status', 'unmapped')
+    //         ->when($search, function ($query) use ($search) {
+    //             $query->where(function ($q) use ($search) {
+    //                 $q->where('lop_name', 'like', "%{$search}%")
+    //                 ->orWhere('pid_sap', 'like', "%{$search}%")
+    //                 ->orWhere('program_sap', 'like', "%{$search}%")
+    //                 ->orWhere('sto', 'like', "%{$search}%")
+    //                 ->orWhere('branch', 'like', "%{$search}%")
+    //                 ->orWhere('wo_smile', 'like', "%{$search}%");
+    //             });
+    //         })
+    //         ->latest()
+    //         ->paginate(10)
+    //         ->withQueryString();
 
-        $projects = Project::orderBy('project_name')->get();
+    //     $projects = Project::orderBy('project_name')->get();
 
-        return view('admin.import.mapping', compact(
-            'unmappedLops',
-            'projects',
-            'search'
-        ));
-    }
+    //     return view('admin.import.mapping', compact(
+    //         'unmappedLops',
+    //         'projects',
+    //         'search'
+    //     ));
+    // }
 
-    public function saveMapping(Request $request, $id)
-    {
-        $request->validate([
-            'project_id' => 'required|exists:projects,id_project',
-        ]);
+    // public function saveMapping(Request $request, $id)
+    // {
+    //     $request->validate([
+    //         'project_id' => 'required|exists:projects,id_project',
+    //     ]);
 
-        $lop = Lop::findOrFail($id);
+    //     $lop = Lop::findOrFail($id);
 
-        $project = Project::findOrFail(
-            $request->project_id
-        );
+    //     $project = Project::findOrFail(
+    //         $request->project_id
+    //     );
 
-        $lop->update([
+    //     $lop->update([
 
-            'project_id' => $project->id_project,
+    //         'project_id' => $project->id_project,
 
-            'pid_sap' => $project->pid_sap,
+    //         'pid_sap' => $project->pid_sap,
 
-            'mapping_status' => 'manual_mapped',
+    //         'mapping_status' => 'manual_mapped',
 
-        ]);
+    //     ]);
 
-        return back()->with(
-            'success',
-            'Mapping berhasil disimpan'
-        );
-    }
+    //     return back()->with(
+    //         'success',
+    //         'Mapping berhasil disimpan'
+    //     );
+    // }
 
-    public function resetMapping($id)
-    {
-        $lop = Lop::findOrFail($id);
+    // public function resetMapping($id)
+    // {
+    //     $lop = Lop::findOrFail($id);
 
-        if ($lop->mapping_status !== 'manual_mapped') {
-            return back()->with('error', 'Hanya mapping manual yang bisa direset');
-        }
+    //     if ($lop->mapping_status !== 'manual_mapped') {
+    //         return back()->with('error', 'Hanya mapping manual yang bisa direset');
+    //     }
 
-        $lop->update([
-            'project_id' => null,
-            'pid_sap' => null,
-            'mapping_status' => 'unmapped',
-        ]);
+    //     $lop->update([
+    //         'project_id' => null,
+    //         'pid_sap' => null,
+    //         'mapping_status' => 'unmapped',
+    //     ]);
 
-        return back()->with('success', 'Mapping manual berhasil direset. Silakan mapping ulang.');
-    }
+    //     return back()->with('success', 'Mapping manual berhasil direset. Silakan mapping ulang.');
+    // }
 
     public function boqIndex()
     {
@@ -379,7 +534,7 @@ class ImportController extends Controller
     {
         $request->validate([
             'file' => 'required|mimes:xlsx,xls',
-            'mapping_by' => 'required|in:id_ihld,lop_name',
+            'mapping_by' => 'required|in:pid,lop_name',
         ]);
 
         $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
@@ -422,12 +577,22 @@ class ImportController extends Controller
                 continue;
             }
 
-            if ($request->mapping_by === 'id_ihld') {
-                $lop = Lop::where('id_ihld', $headerValue)->first();
+            if ($request->mapping_by === 'pid') {
+
+                $project = Project::where('pid', $headerValue)
+                    ->orWhere('pid_sap', $headerValue)
+                    ->first();
+
+                $lop = $project
+                    ? Lop::where('project_id', $project->id_project)->first()
+                    : null;
+
             } else {
+
                 $lop = Lop::whereRaw('LOWER(TRIM(lop_name)) = ?', [
                     strtolower(trim($headerValue))
                 ])->first();
+
             }
 
             if (!$lop) {

@@ -64,7 +64,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open-text-icon lucide-book-open-text">
                 <path d="M12 7v14"/><path d="M16 12h2"/><path d="M16 8h2"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/><path d="M6 12h2"/><path d="M6 8h2"/></svg>
 
-            <span>LOP & BOQ</span>
+            <span>Project ID</span>
         </a>
 
         @php
@@ -163,7 +163,7 @@
                         <path d="M5 21h14"/>
                     </svg>
 
-                    <span>Import Data</span>
+                    <span>Bulk Import Data</span>
                 </div>
 
                 <svg :class="open ? 'rotate-180' : ''"
@@ -183,10 +183,10 @@
                 <a href="{{ route('admin.import.pid') }}"
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('admin.import.pid*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                    Import PID
+                    Bulk Import PID
                 </a>
 
-                <a href="{{ route('admin.import.lop') }}"
+                <!-- <a href="{{ route('admin.import.lop') }}"
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('admin.import.lop') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     Import LOP
@@ -196,12 +196,12 @@
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('admin.import.lop.mapping*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     Mapping PID - LOP
-                </a>
+                </a> -->
 
                 <a href="{{ route('admin.import.boq') }}"
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('admin.import.boq*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                    Import BOQ
+                    Bulk Import BOQ
                 </a>
 
             </div>
@@ -255,7 +255,7 @@
             </span>
         </a>
 
-        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
+        <!-- <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
         
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-handshake-icon lucide-handshake">
                 <path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>
@@ -263,7 +263,7 @@
         <span>
             Uji Terima
         </span>
-        </a>
+        </a> -->
 
         {{-- Report --}}
         <p class="text-xs uppercase text-gray-400 font-semibold px-3 mt-6 mb-2">

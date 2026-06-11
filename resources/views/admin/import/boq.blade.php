@@ -6,10 +6,10 @@
 
     <div>
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">
-            Import BOQ
+            Bulk Import BOQ
         </h1>
         <p class="text-sm text-gray-500">
-            Upload BOQ matrix berdasarkan ID IHLD. Sheet aktif harus sesuai nama package, contoh: PAKET 5.
+            Upload BOQ matrix berdasarkan PID atau Nama LOP. Sheet aktif harus sesuai nama package, contoh: PAKET 5.
         </p>
     </div>
 
@@ -62,7 +62,7 @@
                 <select name="mapping_by"
                         required
                         class="block w-full h-10 text-sm border border-gray-300 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-950 dark:text-gray-300">
-                    <option value="id_ihld">Berdasarkan ID IHLD</option>
+                    <option value="pid">Berdasarkan PID</option>
                     <option value="lop_name">Berdasarkan Nama LOP</option>
                 </select>
             </div>
@@ -77,7 +77,7 @@
             <p class="text-xs text-gray-500 leading-relaxed">
                 Format:
                 <span class="font-mono text-gray-700 dark:text-gray-300">
-                    A1 = DESIGNATOR, B1 dst = ID IHLD, A2 dst = Designator, isi cell = volume.
+                    A1 = DESIGNATOR, B1 dst = PID, A2 dst = Designator, isi cell = volume.
                 </span>
             </p>
         </div>

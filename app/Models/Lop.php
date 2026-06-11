@@ -18,6 +18,10 @@ class Lop extends Model
         'tematik',
         'sto',
         'branch',
+        'batch',
+        'no_sp',
+        'tgl_sp',
+        'tgl_toc',
         'tahun_order',
         'start_tgl',
         'wo_smile',
@@ -45,6 +49,7 @@ class Lop extends Model
         'est_instalasi',
         'est_golive',
         'mapping_status',
+        'package_id',
     ];
 
     public function project()

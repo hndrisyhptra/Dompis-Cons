@@ -350,6 +350,12 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/admin/import/lop/mapping/{id}/reset', [ImportController::class, 'resetMapping'])
             ->name('admin.import.lop.mapping.reset');
 
+        Route::put('/admin/import/pid/{project}/update', [ImportController::class, 'updatePid'])
+            ->name('admin.import.pid.update');
+
+        Route::delete('/admin/import/pid/{project}/delete', [ImportController::class, 'destroyPid'])
+            ->name('admin.import.pid.delete');
+
     });
 
     

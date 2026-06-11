@@ -7,7 +7,7 @@
 
     <div>
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">
-            LOP & BOQ
+            Project ID
         </h1>
         <p class="text-sm text-gray-500 dark:text-gray-400">
             List Project Konstruksi
@@ -21,11 +21,11 @@
             Import CSV
         </button> -->
 
-        <button type="button"
+        <!-- <button type="button"
                 onclick="openProjectModal()"
                 class="h-10 px-4 inline-flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
             + Input Manual LOP Baru
-        </button>
+        </button> -->
     </div>
 
 </div>
@@ -423,6 +423,7 @@
 
     </div>
 
+
     {{-- DETAIL MODAL --}}
     <div id="detail-modal-{{ $project->id_project }}"
          class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
@@ -786,6 +787,11 @@
     </div>
 
 </div>
+ @if($projects->hasPages())
+        <div class="mt-6">
+            {{ $projects->links() }}
+        </div>
+    @endif
 
 {{-- IMPORT CSV MODAL --}}
 <div id="importModal"

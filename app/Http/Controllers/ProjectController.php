@@ -9,6 +9,7 @@ use App\Models\Designator;
 use App\Models\BoqItem;
 use App\Models\Evidence;
 use App\Models\Notification;
+use App\Models\Lop;
 use App\Models\EvidenceRevisionHistory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -22,6 +23,7 @@ class ProjectController extends Controller
         $query = Project::with([
             'boqItems',
             'assignments.waspang',
+            'assignment.waspang',
             'evidences',
             'lop'
         ]);
@@ -31,8 +33,13 @@ class ProjectController extends Controller
 
             $query->where(function ($q) use ($search) {
                 $q->where('project_name', 'like', "%{$search}%")
-                ->orWhere('sto', 'like', "%{$search}%")
-                ->orWhere('branch', 'like', "%{$search}%");
+                    ->orWhere('pid', 'like', "%{$search}%")
+                    ->orWhere('pid_sap', 'like', "%{$search}%")
+                    ->orWhereHas('lop', function ($lop) use ($search) {
+                        $lop->where('sto', 'like', "%{$search}%")
+                            ->orWhere('branch', 'like', "%{$search}%")
+                            ->orWhere('mitra_name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -41,16 +48,15 @@ class ProjectController extends Controller
         }
 
         if ($request->filled('branch')) {
-            $query->where('branch', $request->branch);
-        }
-
-        if ($request->filled('stage')) {
-            $query->whereHas('lop', function ($q) use ($request) {
-                $q->where('stage', $request->stage);
+            $query->whereHas('lop', function ($lop) use ($request) {
+                $lop->where('branch', $request->branch);
             });
         }
 
-        $projects = $query->latest()->get();
+        $projects = $query
+            ->latest('updated_at')
+            ->paginate(6)
+            ->withQueryString();
 
         $programs = Project::whereNotNull('program')
             ->where('program', '!=', '')
@@ -58,7 +64,7 @@ class ProjectController extends Controller
             ->orderBy('program')
             ->pluck('program');
 
-        $branches = Project::whereNotNull('branch')
+        $branches = Lop::whereNotNull('branch')
             ->where('branch', '!=', '')
             ->distinct()
             ->orderBy('branch')
