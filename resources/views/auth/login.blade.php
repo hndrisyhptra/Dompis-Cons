@@ -95,12 +95,12 @@
                                 </span>
                             </label>
 
-                            @if (Route::has('password.request'))
-                                <a href="{{ route('password.request') }}"
-                                   class="text-xs font-bold text-blue-700">
-                                    Lupa password?
-                                </a>
-                            @endif
+                            <!--@if (Route::has('password.request'))-->
+                            <!--    <a href="{{ route('password.request') }}"-->
+                            <!--       class="text-xs font-bold text-blue-700">-->
+                            <!--        Lupa password?-->
+                            <!--    </a>-->
+                            <!--@endif-->
 
                         </div>
 

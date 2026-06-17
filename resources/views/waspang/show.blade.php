@@ -91,6 +91,45 @@
             $persiapanUploadedComplete =
                 $barangTibaUploaded &&
                 $perizinanUploaded;
+
+            $boqItems = $project->boqItems ?? collect();
+
+            $materialBoqItems = $boqItems->filter(function ($boq) {
+                return str_starts_with($boq->designator, 'M-');
+            });
+
+            $boqTotal = $materialBoqItems->count();
+
+            $boqUploaded = $materialBoqItems->filter(function ($boq) use ($evidences) {
+                return $evidences
+                    ->where('stage', 'instalasi')
+                    ->where('evidence_type', 'progress_boq')
+                    ->where('boq_item_id', $boq->id_boq)
+                    ->count() > 0;
+            })->count();
+
+            $instalasiComplete =
+                $boqTotal > 0 &&
+                $boqUploaded >= $boqTotal;
+
+            /*
+            |--------------------------------------------------------------------------
+            | STEP 3 - PENGUKURAN
+            |--------------------------------------------------------------------------
+            | Pengukuran tidak wajib upload, jadi centang jika instalasi selesai
+            */
+            $pengukuranComplete = $instalasiComplete;
+
+            $finishingUploaded = $materialBoqItems->filter(function ($boq) use ($evidences) {
+                return $evidences
+                    ->where('stage', 'finishing')
+                    ->where('boq_item_id', $boq->id_boq)
+                    ->count() > 0;
+            })->count();
+
+            $finishingComplete =
+                $boqTotal > 0 &&
+                $finishingUploaded >= $boqTotal;
         @endphp
 
         {{-- Stepper --}}

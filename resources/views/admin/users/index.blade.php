@@ -21,6 +21,33 @@
         </button>
     </div>
 
+    <form method="GET" action="{{ route('admin.users.index') }}"
+      class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
+
+        <div class="flex flex-col sm:flex-row gap-3">
+
+            <input type="text"
+                name="search"
+                value="{{ $search ?? '' }}"
+                placeholder="Cari NIK, nama, username, atau role..."
+                class="flex-1 h-11 rounded-xl border-gray-300 text-sm">
+
+            <div class="flex gap-2">
+                <button class="h-11 px-5 rounded-xl bg-blue-600 text-white text-sm font-bold">
+                    Cari
+                </button>
+
+                @if (!empty($search))
+                    <a href="{{ route('admin.users.index') }}"
+                    class="h-11 px-5 rounded-xl border border-gray-300 text-sm font-bold flex items-center">
+                        Reset
+                    </a>
+                @endif
+            </div>
+
+        </div>
+    </form>
+
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
 
         <div class="overflow-x-auto">
@@ -105,6 +132,68 @@
                 </tbody>
             </table>
         </div>
+
+        @if ($users->hasPages())
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-gray-200 dark:border-gray-800">
+
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                Menampilkan
+                <span class="font-semibold">{{ $users->firstItem() }}</span>
+                -
+                <span class="font-semibold">{{ $users->lastItem() }}</span>
+                dari
+                <span class="font-semibold">{{ $users->total() }}</span>
+                data
+            </div>
+
+            <div class="flex items-center gap-1">
+
+                {{-- Previous --}}
+                @if ($users->onFirstPage())
+                    <span class="px-3 py-2 rounded-lg border text-gray-400 cursor-not-allowed">
+                        ←
+                    </span>
+                @else
+                    <a href="{{ $users->previousPageUrl() }}"
+                    class="px-3 py-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800">
+                        ←
+                    </a>
+                @endif
+
+                {{-- Page Numbers --}}
+                @foreach ($users->getUrlRange(
+                    max(1, $users->currentPage() - 2),
+                    min($users->lastPage(), $users->currentPage() + 2)
+                ) as $page => $url)
+
+                    @if ($page == $users->currentPage())
+                        <span class="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold">
+                            {{ $page }}
+                        </span>
+                    @else
+                        <a href="{{ $url }}"
+                        class="px-4 py-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800">
+                            {{ $page }}
+                        </a>
+                    @endif
+
+                @endforeach
+
+                {{-- Next --}}
+                @if ($users->hasMorePages())
+                    <a href="{{ $users->nextPageUrl() }}"
+                    class="px-3 py-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800">
+                        →
+                    </a>
+                @else
+                    <span class="px-3 py-2 rounded-lg border text-gray-400 cursor-not-allowed">
+                        →
+                    </span>
+                @endif
+
+            </div>
+        </div>
+    @endif
 
     </div>
 

@@ -571,9 +571,67 @@
         </div>
 
         {{-- PAGINATION --}}
-        <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-800">
-            {{ $projects->links() }}
+        @if ($projects->hasPages())
+        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-gray-200 dark:border-gray-800">
+
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+                Menampilkan
+                <span class="font-semibold">{{ $projects->firstItem() }}</span>
+                -
+                <span class="font-semibold">{{ $projects->lastItem() }}</span>
+                dari
+                <span class="font-semibold">{{ $projects->total() }}</span>
+                data
+            </div>
+
+            <div class="flex items-center gap-1">
+
+                {{-- Previous --}}
+                @if ($projects->onFirstPage())
+                    <span class="px-3 py-2 rounded-lg border text-gray-400 cursor-not-allowed">
+                        ←
+                    </span>
+                @else
+                    <a href="{{ $projects->previousPageUrl() }}"
+                    class="px-3 py-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800">
+                        ←
+                    </a>
+                @endif
+
+                {{-- Page Numbers --}}
+                @foreach ($projects->getUrlRange(
+                    max(1, $projects->currentPage() - 2),
+                    min($projects->lastPage(), $projects->currentPage() + 2)
+                ) as $page => $url)
+
+                    @if ($page == $projects->currentPage())
+                        <span class="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold">
+                            {{ $page }}
+                        </span>
+                    @else
+                        <a href="{{ $url }}"
+                        class="px-4 py-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800">
+                            {{ $page }}
+                        </a>
+                    @endif
+
+                @endforeach
+
+                {{-- Next --}}
+                @if ($projects->hasMorePages())
+                    <a href="{{ $projects->nextPageUrl() }}"
+                    class="px-3 py-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800">
+                        →
+                    </a>
+                @else
+                    <span class="px-3 py-2 rounded-lg border text-gray-400 cursor-not-allowed">
+                        →
+                    </span>
+                @endif
+
+            </div>
         </div>
+    @endif
 
     </div>
 

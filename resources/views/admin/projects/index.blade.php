@@ -153,110 +153,56 @@
 
 @forelse($projects as $project)
 
-    @php
-        $evidences = $project->evidences ?? collect();
-        $boqItems = $project->boqItems ?? collect();
+   @php
+    $summary = $project->progressSummary();
 
-        $waspang = optional($project->assignment)->waspang;
+    $persiapanDone = $summary['persiapanDone'];
+    $instalasiDone = $summary['instalasiDone'];
+    $pengukuranDone = $summary['pengukuranDone'];
+    $finishingDone = $summary['finishingDone'];
 
-        $barangTibaDone = $evidences
-            ->where('stage', 'persiapan')
-            ->where('evidence_type', 'barang_tiba')
-            ->where('status', 'approved')
-            ->count() > 0;
+    $boqTotal = $summary['materialTotal'];
+    $boqApproved = $summary['instalasiApproved'];
+    $finishingApproved = $summary['finishingApproved'];
+    $finishingTotal = $summary['finishingTotal'] ?? 0;
 
-        $perizinanDone = $evidences
-            ->where('stage', 'persiapan')
-            ->where('evidence_type', 'perizinan')
-            ->where('status', 'approved')
-            ->count() > 0;
+    $progress = $summary['progress'];
+    $stageLabel = $summary['stageLabel'];
 
-        $persiapanDone = $barangTibaDone && $perizinanDone;
+    $evidences = $project->evidences ?? collect();
+    $waspang = optional($project->assignment)->waspang;
 
-        $boqTotal = $boqItems->count();
+    $pendingCount = $evidences->where('status', 'pending')->count();
+    $approvedCount = $evidences->where('status', 'approved')->count();
+    $rejectedCount = $evidences->where('status', 'rejected')->count();
 
-        $boqApproved = $boqItems->filter(function ($boq) use ($evidences) {
-            return $evidences
-                ->where('stage', 'instalasi')
-                ->where('evidence_type', 'progress_boq')
-                ->where('boq_item_id', $boq->id_boq)
-                ->where('status', 'approved')
-                ->count() > 0;
-        })->count();
-
-        $instalasiDone = $boqTotal > 0 && $boqApproved == $boqTotal;
-
-        $otdrDone = $evidences
-            ->where('stage', 'pengukuran')
-            ->where('evidence_type', 'otdr')
-            ->where('status', 'approved')
-            ->count() > 0;
-
-        $opmDone = $evidences
-            ->where('stage', 'pengukuran')
-            ->where('evidence_type', 'opm')
-            ->where('status', 'approved')
-            ->count() > 0;
-
-        $kedalamanDone = $evidences
-            ->where('stage', 'pengukuran')
-            ->where('evidence_type', 'kedalaman')
-            ->where('status', 'approved')
-            ->count() > 0;
-
-        $pengukuranDone = $otdrDone && $opmDone && $kedalamanDone;
-
-        $finishingDone = $evidences
-            ->where('stage', 'finishing')
-            ->where('evidence_type', 'final_site')
-            ->where('status', 'approved')
-            ->count() > 0;
-
-        $doneStep = 0;
-
-        if ($persiapanDone) $doneStep++;
-        if ($instalasiDone) $doneStep++;
-        if ($pengukuranDone) $doneStep++;
-        if ($finishingDone) $doneStep++;
-
-        $progress = round(($doneStep / 4) * 100);
-
-        if ($progress == 100) {
-            $accentColor = 'bg-green-600';
-            $borderColor = 'border-l-green-600';
-            $progressColor = 'bg-green-600';
-            $badgeClass = 'bg-green-100 text-green-700';
-            $stageLabel = 'Ready UT';
-        } elseif ($pengukuranDone || $finishingDone) {
-            $accentColor = 'bg-purple-600';
-            $borderColor = 'border-l-purple-600';
-            $progressColor = 'bg-purple-600';
-            $badgeClass = 'bg-purple-100 text-purple-700';
-            $stageLabel = 'Finishing';
-        } elseif ($instalasiDone) {
-            $accentColor = 'bg-blue-500';
-            $borderColor = 'border-l-blue-500';
-            $progressColor = 'bg-blue-500';
-            $badgeClass = 'bg-blue-100 text-blue-700';
-            $stageLabel = 'Pengukuran';
-        } elseif ($persiapanDone) {
-            $accentColor = 'bg-yellow-600';
-            $borderColor = 'border-l-yellow-600';
-            $progressColor = 'bg-yellow-600';
-            $badgeClass = 'bg-yellow-100 text-yellow-700';
-            $stageLabel = 'Instalasi';
-        } else {
-            $accentColor = 'bg-red-500';
-            $borderColor = 'border-l-red-500';
-            $progressColor = 'bg-red-500';
-            $badgeClass = 'bg-red-100 text-red-700';
-            $stageLabel = 'Persiapan';
-        }
-
-        $pendingCount = $evidences->where('status', 'pending')->count();
-        $approvedCount = $evidences->where('status', 'approved')->count();
-        $rejectedCount = $evidences->where('status', 'rejected')->count();
-    @endphp
+    if ($progress == 100) {
+        $accentColor = 'bg-green-600';
+        $borderColor = 'border-l-green-600';
+        $progressColor = 'bg-green-600';
+        $badgeClass = 'bg-green-100 text-green-700';
+    } elseif ($stageLabel === 'Finishing') {
+        $accentColor = 'bg-blue-600';
+        $borderColor = 'border-l-blue-600';
+        $progressColor = 'bg-blue-600';
+        $badgeClass = 'bg-purple-100 text-blue-700';
+    } elseif ($stageLabel === 'Pengukuran') {
+        $accentColor = 'bg-blue-500';
+        $borderColor = 'border-l-blue-500';
+        $progressColor = 'bg-blue-500';
+        $badgeClass = 'bg-blue-100 text-blue-700';
+    } elseif ($stageLabel === 'Instalasi') {
+        $accentColor = 'bg-yellow-600';
+        $borderColor = 'border-l-yellow-600';
+        $progressColor = 'bg-yellow-600';
+        $badgeClass = 'bg-yellow-100 text-yellow-700';
+    } else {
+        $accentColor = 'bg-red-500';
+        $borderColor = 'border-l-red-500';
+        $progressColor = 'bg-red-500';
+        $badgeClass = 'bg-red-100 text-red-700';
+    }
+@endphp
 
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-4 {{ $borderColor }} rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition">
 
@@ -311,8 +257,11 @@
                 <div class="rounded-xl bg-gray-50 dark:bg-gray-800 p-2">
                     <p class="text-[10px] text-gray-500">BOQ Approved</p>
                     <p class="text-[11px] font-bold text-gray-900 dark:text-white">
-                        {{ $boqApproved }}/{{ $boqTotal }} item
+                        Instalasi {{ $boqApproved }}/{{ $boqTotal }} Item Designators
                     </p>
+                    <!-- <p class="text-[10px] text-red-600">
+                        Debug Finish: {{ $finishingApproved }}/{{ $finishingTotal }}
+                    </p> -->
                 </div>
 
             </div>
@@ -697,6 +646,17 @@
                     Pilih waspang yang akan ditugaskan untuk proyek ini:
                 </p>
 
+                <div class="relative mb-4">
+                    <input type="text"
+                        id="searchWaspangAssign"
+                        placeholder="Cari nama waspang..."
+                        class="w-full h-11 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 pl-10 pr-4 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none">
+
+                    <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        🔍
+                    </div>
+                </div>
+
                 <div class="space-y-3">
 
                     @foreach($waspangs as $waspangUser)
@@ -715,7 +675,9 @@
                             );
                         @endphp
 
-                        <label class="block cursor-pointer">
+                        <label class="block cursor-pointer assign-waspang-item"
+                            data-name="{{ strtolower($waspangUser->name) }}"
+                            data-project-count="{{ $activeCount }}">
 
                             <input type="radio"
                                    name="waspang_id"
@@ -758,6 +720,11 @@
                         </label>
 
                     @endforeach
+
+                    <div id="emptyWaspangSearch"
+                        class="hidden rounded-xl border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500">
+                        Waspang tidak ditemukan.
+                    </div>
 
                 </div>
 
@@ -1200,23 +1167,76 @@
 
 <script>
 function openAssignModal(projectId, projectName)
-{
-    const modal = document.getElementById('assignModal');
+    {
+        const modal = document.getElementById('assignModal');
 
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
 
-    document.getElementById('project_id').value = projectId;
-    document.getElementById('assignProjectName').innerText = projectName;
-}
+        document.getElementById('project_id').value = projectId;
+        document.getElementById('assignProjectName').innerText = projectName;
+
+        // RESET SEARCH
+        const searchInput = document.getElementById('searchWaspangAssign');
+        const items = document.querySelectorAll('.assign-waspang-item');
+        const emptyState = document.getElementById('emptyWaspangSearch');
+
+        if (searchInput) {
+            searchInput.value = '';
+        }
+
+        items.forEach(item => {
+            item.classList.remove('hidden');
+        });
+
+        if (emptyState) {
+            emptyState.classList.add('hidden');
+        }
+    }
 
 function closeAssignModal()
-{
-    const modal = document.getElementById('assignModal');
+    {
+        const modal = document.getElementById('assignModal');
 
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-}
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+
+    const searchInput = document.getElementById('searchWaspangAssign');
+
+    if (!searchInput) return;
+
+    searchInput.addEventListener('keyup', function () {
+
+        const keyword = this.value.toLowerCase().trim();
+
+        const items = document.querySelectorAll('.assign-waspang-item');
+        const emptyState = document.getElementById('emptyWaspangSearch');
+
+        let visibleCount = 0;
+
+        items.forEach(item => {
+
+            const name = item.dataset.name || '';
+
+            if (name.includes(keyword)) {
+                item.classList.remove('hidden');
+                visibleCount++;
+            } else {
+                item.classList.add('hidden');
+            }
+
+        });
+
+        if (emptyState) {
+            emptyState.classList.toggle('hidden', visibleCount > 0);
+        }
+
+    });
+
+});
 
 function openDetailModal(id)
 {

@@ -67,4 +67,95 @@ class Project extends Model
     {
         return $this->hasOne(Lop::class, 'project_id', 'id_project');
     }
+
+    public function progressSummary(): array
+    {
+        $evidences = $this->evidences ?? collect();
+        $boqItems = $this->boqItems ?? collect();
+
+        $materialBoqItems = $boqItems->filter(fn ($boq) =>
+            str_starts_with($boq->designator, 'M-')
+        );
+
+        $materialTotal = $materialBoqItems->count();
+
+        $persiapanDone =
+            $evidences->where('stage', 'persiapan')
+                ->where('evidence_type', 'barang_tiba')
+                ->where('status', 'approved')
+                ->count() > 0
+            &&
+            $evidences->where('stage', 'persiapan')
+                ->where('evidence_type', 'perizinan')
+                ->where('status', 'approved')
+                ->count() > 0;
+
+        $instalasiApproved = $materialBoqItems->filter(function ($boq) use ($evidences) {
+            $items = $evidences
+                ->where('stage', 'instalasi')
+                ->where('evidence_type', 'progress_boq')
+                ->where('boq_item_id', $boq->id_boq);
+
+            return $items->count() > 0
+                && $items->where('status', 'pending')->count() == 0
+                && $items->where('status', 'rejected')->count() == 0
+                && $items->where('status', 'approved')->count() == $items->count();
+        })->count();
+
+        $instalasiDone = $materialTotal > 0 && $instalasiApproved >= $materialTotal;
+
+        // Step 3 tidak wajib upload
+        $pengukuranDone = $instalasiDone;
+
+        $finishingRequiredItems = $materialBoqItems->filter(function ($boq) {
+            return optional($boq->designatorData)->requires_finishing_evidence == 1
+                || optional($boq->designatorDataByCode)->requires_finishing_evidence == 1;
+        });
+
+        $finishingTotal = $finishingRequiredItems->count();
+
+        $finishingApproved = $finishingRequiredItems->filter(function ($boq) use ($evidences) {
+            $items = $evidences
+                ->where('stage', 'finishing')
+                ->where('boq_item_id', $boq->id_boq);
+
+            return $items->count() > 0
+                && $items->where('status', 'pending')->count() == 0
+                && $items->where('status', 'rejected')->count() == 0
+                && $items->where('status', 'approved')->count() == $items->count();
+        })->count();
+
+        $finishingDone = $finishingTotal == 0
+            ? true
+            : $finishingApproved >= $finishingTotal;
+
+        $doneStep = collect([
+            $persiapanDone,
+            $instalasiDone,
+            $pengukuranDone,
+            $finishingDone,
+        ])->filter()->count();
+
+        $progress = round(($doneStep / 4) * 100);
+        
+        $stageLabel = match (true) {
+            $finishingDone => 'Ready UT',
+            $pengukuranDone => 'Pengukuran',
+            $instalasiDone => 'Instalasi',
+            $persiapanDone => 'Persiapan',
+            default => 'Persiapan',
+        };
+        return compact(
+            'persiapanDone',
+            'instalasiDone',
+            'pengukuranDone',
+            'finishingDone',
+            'materialTotal',
+            'instalasiApproved',
+            'finishingApproved',
+            'finishingTotal',
+            'progress',
+            'stageLabel'
+        );
+    }
 }

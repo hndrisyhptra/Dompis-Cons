@@ -697,7 +697,7 @@ class ImportController extends Controller
 
         return back()->with(
             'success',
-            "Import BOQ selesai. {$imported} Data baru, {$updated} diperbarui, {$unmappedLop} LOP tidak ketemu, {$unmappedDesignator} designator tidak ketemu, {$priceMissing} harga kosong."
+            "Import BOQ selesai. ({$imported}) Data baru, ({$updated}) diperbarui, ({$unmappedLop}) PID/Nama LOP tidak ketemu, ({$unmappedDesignator})designator tidak ketemu."
         );
     }
 

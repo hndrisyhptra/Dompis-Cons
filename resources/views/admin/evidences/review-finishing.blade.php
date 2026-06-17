@@ -6,10 +6,11 @@
     $evidences = $project->evidences ?? collect();
 
     $materialBoqItems = ($project->boqItems ?? collect())->filter(function ($boq) {
-        return optional($boq->designatorData)->type === 'material'
-            || optional($boq->designatorDataByCode)->type === 'material';
-    });
+        $designator = $boq->designatorData ?? $boq->designatorDataByCode;
 
+        return optional($designator)->type === 'material'
+            && optional($designator)->requires_finishing_evidence == 1;
+    });
     $finalTotal = $materialBoqItems->count();
     $finalUploaded = 0;
     $finalApproved = 0;
@@ -29,7 +30,7 @@
         }
     }
 
-    $finishingApproved = $finalTotal > 0 && $finalApproved == $finalTotal;
+    $finishingApproved = $finalTotal == 0 || $finalApproved == $finalTotal;
 
     $status = $finishingApproved ? 'approved' : 'pending';
 
@@ -139,11 +140,11 @@
 
             <div>
                 <h2 class="text-base font-bold text-gray-900 dark:text-white">
-                    Step 4 — Finishing / Siap Uji Terima
+                    Step 4 — Finishing
                 </h2>
 
                 <p class="text-xs text-gray-500 mt-1">
-                    Review eviden akhir sebelum project dinyatakan siap UT.
+                    Review hanya item material yang diwajibkan memiliki Eviden Final.
                 </p>
             </div>
 

@@ -16,7 +16,9 @@ class Designator extends Model
         'unit',
         'type',
         'pair_code',
+        'requires_finishing_evidence',
     ];
+    
 
     public function prices()
     {

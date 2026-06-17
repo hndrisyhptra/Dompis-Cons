@@ -185,6 +185,17 @@ class DesignatorController extends Controller
         return null;
     }
 
+    public function toggleFinishing($id)
+    {
+        $designator = Designator::findOrFail($id);
+
+        $designator->update([
+            'requires_finishing_evidence' => !$designator->requires_finishing_evidence,
+        ]);
+
+        return back()->with('success', 'Status Eviden Final berhasil diubah');
+    }
+
     private function guessPairCode($designator)
     {
         return preg_replace('/^[MJ]-/i', '', strtoupper($designator));

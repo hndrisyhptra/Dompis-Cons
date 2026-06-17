@@ -100,6 +100,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/assign-waspang', [AssignWaspangController::class, 'index'])
         ->name('assign-waspang.index');
 
+    Route::get('/assign-waspang/{id}/history', [AssignWaspangController::class, 'history'])
+        ->name('admin.assign-waspang.history');
+
     /*
     |--------------------------------------------------------------------------
     | EXPORT & IMPORT
@@ -195,6 +198,12 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('/admin/import/boq', [ImportController::class, 'importBoq'])
         ->name('admin.import.boq.upload');
+
+    Route::post('/users/import', [UserManagementController::class, 'import'])
+        ->name('admin.users.import');
+
+    Route::patch('/designators/{id}/toggle-finishing', [DesignatorController::class, 'toggleFinishing'])
+        ->name('designators.toggle-finishing');
     
 
     /*

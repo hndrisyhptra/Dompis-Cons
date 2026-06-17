@@ -228,8 +228,8 @@
                 @endif
 
                 @foreach ($prices->getUrlRange(
-                    max(1, $prices->currentPage() - 2),
-                    min($prices->lastPage(), $prices->currentPage() + 2)
+                    max(1, $prices->currentPage() - 1),
+                    min($prices->lastPage(), $prices->currentPage() + 1)
                 ) as $page => $url)
 
                     @if ($page == $prices->currentPage())

@@ -39,6 +39,13 @@ class WaspangController extends Controller
         $activeProjectsCount = $ongoingProjects->count();
         $readyUtCount = $readyProjects->count();
 
+        $progressDone = $readyUtCount;
+        $progressTotal = $totalAssigned;
+
+        $progressPercent = $progressTotal > 0
+            ? round(($progressDone / $progressTotal) * 100)
+            : 0;
+
         $latestProjects = $ongoingProjects->take(3);
 
        $preparation = 0;
@@ -61,9 +68,13 @@ class WaspangController extends Controller
                     ->where('status', 'approved')
                     ->count() > 0;
 
-            $boqTotal = $boqItems->count();
+            $materialBoqItems = $boqItems->filter(function ($boq) {
+                return str_starts_with($boq->designator, 'M-');
+            });
 
-            $boqApproved = $boqItems->filter(function ($boq) use ($evidences) {
+            $boqTotal = $materialBoqItems->count();$boqTotal = $boqItems->count();
+
+            $boqApproved = $materialBoqItems->filter(function ($boq) use ($evidences) {
                 return $evidences
                     ->where('stage', 'instalasi')
                     ->where('evidence_type', 'progress_boq')
@@ -97,6 +108,9 @@ class WaspangController extends Controller
             'latestProjects' => $latestProjects,
             'activeProjectsCount' => $activeProjectsCount,
             'readyUtCount' => $readyUtCount,
+            'progressDone' => $progressDone,
+            'progressTotal' => $progressTotal,
+            'progressPercent' => $progressPercent,
         ]);
     }
 
@@ -183,9 +197,14 @@ class WaspangController extends Controller
                 ->where('status', 'approved')
                 ->count() > 0;
 
-        $boqTotal = $boqItems->count();
+        // HANYA MATERIAL
+        $materialBoqItems = $boqItems->filter(function ($boq) {
+            return str_starts_with($boq->designator, 'M-');
+        });
 
-        $boqApproved = $boqItems->filter(function ($boq) use ($evidences) {
+        $boqTotal = $materialBoqItems->count();
+
+        $boqApproved = $materialBoqItems->filter(function ($boq) use ($evidences) {
             return $evidences
                 ->where('stage', 'instalasi')
                 ->where('evidence_type', 'progress_boq')
@@ -194,7 +213,7 @@ class WaspangController extends Controller
                 ->count() > 0;
         })->count();
 
-        $instalasiDone = $boqTotal > 0 && $boqApproved == $boqTotal;
+        $instalasiDone = $boqTotal > 0 && $boqApproved >= $boqTotal;
 
         $pengukuranDone =
             $evidences->where('stage', 'pengukuran')
@@ -213,9 +232,9 @@ class WaspangController extends Controller
                 ->count() > 0;
 
         $finishingDone =
-        $evidences->where('stage', 'finishing')
-            ->where('status', 'approved')
-            ->count() > 0;
+            $evidences->where('stage', 'finishing')
+                ->where('status', 'approved')
+                ->count() > 0;
 
         return $persiapanDone &&
             $instalasiDone &&
@@ -563,7 +582,7 @@ class WaspangController extends Controller
             return false;
         }
 
-        $boqApproved = $boqItems->filter(function ($boq) use ($evidences) {
+        $boqApproved = $materialBoqItems->filter(function ($boq) use ($evidences) {
             return $evidences
                 ->where('stage', 'instalasi')
                 ->where('evidence_type', 'progress_boq')

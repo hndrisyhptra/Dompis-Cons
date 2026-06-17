@@ -71,12 +71,14 @@
                     $evidences
                         ->where('stage', 'persiapan')
                         ->where('evidence_type', 'barang_tiba')
+                        ->where('status', 'approved')
                         ->count() > 0;
 
                 $perizinanUploaded =
                     $evidences
                         ->where('stage', 'persiapan')
                         ->where('evidence_type', 'perizinan')
+                        ->where('status', 'approved')
                         ->count() > 0;
 
                 $persiapanDone =
@@ -89,14 +91,19 @@
                 |--------------------------------------------------------------------------
                 */
 
-                $boqTotal = $boqItems->count();
+                $materialBoqItems = $boqItems->filter(function ($boq) {
+                    return str_starts_with($boq->designator, 'M-');
+                });
 
-                $boqDone = $boqItems->filter(function ($boq) use ($evidences) {
+                $boqTotal = $materialBoqItems->count();
+
+                $boqDone = $materialBoqItems->filter(function ($boq) use ($evidences) {
 
                     return $evidences
                         ->where('stage', 'instalasi')
                         ->where('evidence_type', 'progress_boq')
                         ->where('boq_item_id', $boq->id_boq)
+                        ->where('status', 'approved')
                         ->count() > 0;
 
                 })->count();
@@ -115,18 +122,21 @@
                     $evidences
                         ->where('stage', 'pengukuran')
                         ->where('evidence_type', 'otdr')
+                        ->where('status','approved')
                         ->count() > 0;
 
                 $opmUploaded =
                     $evidences
                         ->where('stage', 'pengukuran')
                         ->where('evidence_type', 'opm')
+                        ->where('status','approved')
                         ->count() > 0;
 
                 $kedalamanUploaded =
                     $evidences
                         ->where('stage', 'pengukuran')
                         ->where('evidence_type', 'kedalaman')
+                        ->where('status','approved')
                         ->count() > 0;
 
                 $pengukuranDone =
@@ -141,10 +151,10 @@
                 */
 
                 $finishingDone =
-                    $evidences
-                        ->where('stage', 'finishing')
-                        ->where('evidence_type', 'final_site')
-                        ->count() > 0;
+                $evidences
+                    ->where('stage', 'finishing')
+                    ->where('status', 'approved')
+                    ->count() > 0;
 
                 /*
                 |--------------------------------------------------------------------------
@@ -283,7 +293,7 @@
                     </p>
                 </div>
 
-                <div class="text-right">
+                 <div class="text-right">
                     <p class="text-[11px] text-gray-500">
                         Update Terakhir
                     </p>

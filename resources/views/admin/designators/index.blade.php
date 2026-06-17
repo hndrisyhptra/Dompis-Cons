@@ -97,7 +97,10 @@
                         <th class="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-300">
                             Pair Code
                         </th>
-                        <th class="px-4 py-3 text-right font-bold text-gray-600 dark:text-gray-300">
+                        <th class="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-300">
+                            Eviden Final
+                        </th>
+                        <th class="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-300">
                             Aksi
                         </th>
                     </tr>
@@ -142,6 +145,27 @@
                             </td>
 
                             <td class="px-4 py-3">
+                                <form method="POST"
+                                    action="{{ route('designators.toggle-finishing', $item->id_designator) }}">
+                                    @csrf
+                                    @method('PATCH')
+
+                                    <button type="submit"
+                                            class="relative inline-flex h-6 w-11 items-center rounded-full transition
+                                            {{ $item->requires_finishing_evidence ? 'bg-green-600' : 'bg-gray-300' }}">
+                                        <span class="inline-block h-5 w-5 transform rounded-full bg-white transition
+                                            {{ $item->requires_finishing_evidence ? 'translate-x-5' : 'translate-x-1' }}">
+                                        </span>
+                                    </button>
+                                </form>
+
+                                <div class="mt-1 text-[10px] font-bold
+                                    {{ $item->requires_finishing_evidence ? 'text-green-700' : 'text-gray-400' }}">
+                                    {{ $item->requires_finishing_evidence ? 'Wajib' : 'Tidak' }}
+                                </div>
+                            </td>
+
+                            <td class="px-4 py-3">
 
                                 <div class="flex justify-end gap-2">
 
@@ -178,7 +202,7 @@
                     @empty
 
                         <tr>
-                            <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">
                                 Belum ada data designator.
                             </td>
                         </tr>
@@ -220,8 +244,8 @@
 
                     {{-- Page Numbers --}}
                     @foreach ($designators->getUrlRange(
-                        max(1, $designators->currentPage()-2),
-                        min($designators->lastPage(), $designators->currentPage()+2)
+                        max(1, $designators->currentPage()-1),
+                        min($designators->lastPage(), $designators->currentPage()+1)
                     ) as $page => $url)
 
                         @if ($page == $designators->currentPage())

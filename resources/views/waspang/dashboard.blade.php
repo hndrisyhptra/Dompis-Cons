@@ -308,43 +308,52 @@
 
         <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm mb-4">
 
-            <div class="flex items-start justify-between gap-3">
+    <div class="flex items-start justify-between mb-3">
 
-                <div>
-                    <p class="text-xs text-gray-500 font-medium">
-                        Total Progress
-                    </p>
+        <div>
+            <p class="text-sm font-semibold text-gray-600">
+                Total Progress
+            </p>
 
-                    <h2 class="text-3xl font-black text-blue-700 mt-1">
-                        {{ $lopProgressPercent }}%
-                    </h2>
+            <p class="text-lg font-bold text-gray-900 mt-1">
+                {{ $progressDone }} dari {{ $progressTotal }} LOP
+            </p>
+        </div>
 
-                    <p class="text-xs text-gray-500 mt-1">
-                        {{ $lopSelesai }} dari {{ $totalLop }} LOP Finish
-                    </p>
-                </div>
-
-                <div class="text-right">
-                    <p class="text-xs text-gray-500">
+         <div class="text-right">
+                    <p class="text-[11px] text-gray-500">
                         Update Terakhir
                     </p>
 
-                    <p class="text-xs font-bold text-gray-900 mt-1">
+                    <p class="text-[11px] font-bold text-gray-900">
                         {{ $lastUpdate ? $lastUpdate->diffForHumans() : '-' }}
                     </p>
-                </div>
 
-            </div>
+         </div>
 
-            <div class="mt-4 h-2 bg-gray-200 rounded-full overflow-hidden">
+    </div>
 
-                <div class="h-full bg-blue-700 rounded-full"
-                    style="width: {{ $lopProgressPercent }}%">
-                </div>
+    <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
 
-            </div>
-
+        <div class="h-full bg-blue-600 rounded-full transition-all duration-500"
+             style="width: {{ $progressPercent }}%">
         </div>
+
+    </div>
+
+    <div class="flex items-center justify-between mt-2">
+
+        <p class="text-xs text-gray-500">
+            Progress Pekerjaan
+        </p>
+
+        <p class="text-sm font-bold text-blue-700">
+            {{ $progressPercent }}%
+        </p>
+
+    </div>
+
+</div>
 
 
     </div>

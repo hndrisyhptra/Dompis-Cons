@@ -25,7 +25,9 @@ class ProjectController extends Controller
             'assignments.waspang',
             'assignment.waspang',
             'evidences',
-            'lop'
+            'lop',
+            'boqItems.designatorData',
+            'boqItems.designatorDataByCode',
         ]);
 
         if ($request->filled('search')) {
