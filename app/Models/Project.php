@@ -125,9 +125,14 @@ class Project extends Model
                 && $items->where('status', 'approved')->count() == $items->count();
         })->count();
 
-        $finishingDone = $finishingTotal == 0
-            ? true
-            : $finishingApproved >= $finishingTotal;
+       $finishingDone =
+        $persiapanDone &&
+        $instalasiDone &&
+        $pengukuranDone &&
+        (
+            $finishingTotal == 0 ||
+            $finishingApproved >= $finishingTotal
+        );
 
         $doneStep = collect([
             $persiapanDone,
@@ -140,9 +145,8 @@ class Project extends Model
         
         $stageLabel = match (true) {
             $finishingDone => 'Ready UT',
-            $pengukuranDone => 'Pengukuran',
-            $instalasiDone => 'Instalasi',
-            $persiapanDone => 'Persiapan',
+            $instalasiDone => 'Pengukuran',
+            $persiapanDone => 'Instalasi',
             default => 'Persiapan',
         };
         return compact(

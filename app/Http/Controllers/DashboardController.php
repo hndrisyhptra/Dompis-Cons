@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Evidence;
 use App\Models\ProjectAssignment;
 use App\Models\EvidenceRevisionHistory;
+use App\Models\Lop;
 
 class DashboardController extends Controller
 {
@@ -17,116 +18,91 @@ class DashboardController extends Controller
 
         if ($role == 'admin') {
 
-            $query = Project::with([
-                'boqItems',
-                'assignments.waspang',
-                'evidences'
-            ]);
+        $lops = \App\Models\Lop::with([
+            'project.assignment',
+            'project.assignments.waspang',
+            'project.evidences',
+            'project.boqItems.designatorData',
+            'project.boqItems.designatorDataByCode',
+        ])->get();
 
-            /*
-            |--------------------------------------------------------------------------
-            | SEARCH
-            |--------------------------------------------------------------------------
-            */
+        $totalLop = $lops->count();
 
-            if ($request->search) {
+        $assignedLop = $lops->filter(function ($lop) {
+            return $lop->project?->assignment;
+        })->count();
 
-                $query->where(function ($q) use ($request) {
+        $waitingApproval = $lops->filter(function ($lop) {
+            return $lop->project?->evidences
+                ->where('status', 'pending')
+                ->count() > 0;
+        })->count();
 
-                    $q->where('project_name', 'like', '%' . $request->search . '%')
-                    ->orWhere('sto', 'like', '%' . $request->search . '%')
-                    ->orWhere('branch', 'like', '%' . $request->search . '%')
-                    ->orWhere('mitra_name', 'like', '%' . $request->search . '%');
+        $completedApproval = $lops->filter(function ($lop) {
+            return $lop->project
+                && $lop->project->progressSummary()['progress'] == 100;
+        })->count();
 
-                });
-            }
+        $makeStats = function ($field) use ($lops) {
+            return $lops
+                ->groupBy(function ($lop) use ($field) {
 
-            /*
-            |--------------------------------------------------------------------------
-            | FILTER STATUS
-            |--------------------------------------------------------------------------
-            */
+                    if ($field === 'program') {
+                        return $lop->project?->program ?: '-';
+                    }
 
-            if ($request->status) {
+                    return $lop->{$field} ?: '-';
+                })
+                ->map(function ($items, $label) {
 
-                $query->where('status', $request->status);
-            }
+                    $total = $items->count();
 
-            $projects = $query->latest()->get();
+                    $assigned = $items->filter(function ($lop) {
+                        return $lop->project?->assignment;
+                    })->count();
 
-            $totalProject = Project::count();
+                    $waiting = $items->filter(function ($lop) {
+                        return $lop->project?->evidences
+                            ->where('status', 'pending')
+                            ->count() > 0;
+                    })->count();
 
-            $activeProject = Project::where('status', 'active')->count();
+                    $completed = $items->filter(function ($lop) {
+                        return $lop->project
+                            && $lop->project->progressSummary()['progress'] == 100;
+                    })->count();
 
-            $waitingUt = Project::where('status', 'waiting_ut')->count();
+                    $percent = $total > 0
+                        ? round(($completed / $total) * 100)
+                        : 0;
 
-            $completedProject = Project::where('status', 'completed')->count();
+                    return [
+                        'label' => $label,
+                        'total' => $total,
+                        'assigned' => $assigned,
+                        'waiting' => $waiting,
+                        'completed' => $completed,
+                        'percent' => $percent,
+                    ];
+                })
+                ->sortByDesc('total')
+                ->values();
+        };
 
-            $waspangs = User::with('assignments')
-                ->where('role', 'waspang')
-                ->get();
+        $statsByBatch = $makeStats('batch');
+        $statsByBranch = $makeStats('branch');
+        $statsByProgram = $makeStats('program');
 
-            $allProjectsForAnalytics = Project::with(['boqItems', 'evidences'])->get();
-
-            $analyticsBySto = $allProjectsForAnalytics->groupBy('sto')->map(function ($items, $sto) {
-                $total = $items->count();
-
-                $ready = $items->filter(function ($project) {
-                    return $project->evidences
-                        ->where('stage', 'finishing')
-                        ->where('status', 'approved')
-                        ->count() > 0;
-                })->count();
-
-                return [
-                    'label' => $sto ?: '-',
-                    'total' => $total,
-                    'ready' => $ready,
-                    'ongoing' => $total - $ready,
-                    'percent' => $total > 0 ? round(($ready / $total) * 100) : 0,
-                ];
-            })->values();
-
-           $analyticsByBranch = $allProjectsForAnalytics->groupBy('branch')->map(function ($items, $branch) {
-                $total = $items->count();
-
-                $ready = $items->filter(function ($project) {
-                    return $project->evidences
-                        ->where('stage', 'finishing')
-                        ->where('status', 'approved')
-                        ->count() > 0;
-                })->count();
-
-                return [
-                    'label' => $branch ?: '-',
-                    'total' => $total,
-                    'ready' => $ready,
-                    'ongoing' => $total - $ready,
-                    'percent' => $total > 0 ? round(($ready / $total) * 100) : 0,
-                ];
-            })->values();
-
-            $totalApprovedEvidence = \App\Models\Evidence::where('status', 'approved')->count();
-
-            $totalPendingEvidence = \App\Models\Evidence::where('status', 'pending')->count();
-
-            $totalRejectedEvidence = \App\Models\Evidence::where('status', 'rejected')->count();    
-
-            return view('admin.dashboard', compact(
-                'projects',
-                'waspangs',
-                'totalProject',
-                'activeProject',
-                'waitingUt',
-                'completedProject',
-                'analyticsBySto',
-                'analyticsByBranch',
-                'totalApprovedEvidence',
-                'totalPendingEvidence',
-                'totalRejectedEvidence',
-                
-            ));
-        }
+        return view('admin.dashboard', compact(
+            'totalLop',
+            'assignedLop',
+            'waitingApproval',
+            'completedApproval',
+            'statsByBatch',
+            'statsByBranch',
+            'statsByProgram'
+        ));
+    }
 
     if ($role == 'waspang') {
     return redirect()->route('waspang.dashboard');

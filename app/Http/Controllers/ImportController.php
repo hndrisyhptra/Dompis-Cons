@@ -114,9 +114,7 @@ class ImportController extends Controller
                 'status_project' => $statusProject,
             ];
 
-            $project = Project::where('pid', $pid)
-                ->orWhere('pid_sap', $pidSap)
-                ->first();
+            $project = Project::where('pid', $pid)->first();
 
             if ($project) {
                 $project->update($projectPayload);
@@ -147,7 +145,9 @@ class ImportController extends Controller
             $lop = null;
 
             if ($idIhld) {
-                $lop = Lop::where('id_ihld', $idIhld)->first();
+                $lop = Lop::where('project_id', $project->id_project)
+                    ->where('id_ihld', $idIhld)
+                    ->first();
             }
 
             if (!$lop) {
@@ -563,6 +563,9 @@ class ImportController extends Controller
         $unmappedLop = 0;
         $unmappedDesignator = 0;
         $priceMissing = 0;
+        $matchedLop = 0;
+        $matchedHeaders = [];
+        $unmatchedHeaders = [];
 
         // Loop kolom mulai B, karena A adalah Designator
         for ($col = 2; $col <= $highestColumnIndex; $col++) {
@@ -597,8 +600,12 @@ class ImportController extends Controller
 
             if (!$lop) {
                 $unmappedLop++;
+                $unmatchedHeaders[] = $headerValue;
                 continue;
             }
+
+            $matchedLop++;
+            $matchedHeaders[] = $headerValue;
 
             // Set package ke LOP jika belum ada
             if (!$lop->package_id) {
@@ -697,8 +704,14 @@ class ImportController extends Controller
 
         return back()->with(
             'success',
-            "Import BOQ selesai. ({$imported}) Data baru, ({$updated}) diperbarui, ({$unmappedLop}) PID/Nama LOP tidak ketemu, ({$unmappedDesignator})designator tidak ketemu."
+            "Import BOQ selesai. 
+            | Match PID/Nama LOP: {$matchedLop} 
+            | Tidak Match: {$unmappedLop} 
+            | Data baru: {$imported} 
+            | Update: {$updated}
+            | Designator tidak ketemu: {$unmappedDesignator}"
         );
+        
     }
 
     //HELPER PID
