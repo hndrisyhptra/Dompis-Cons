@@ -54,7 +54,7 @@
             @forelse($projects as $project)
 
             @php
-            $items = $project->evidences;
+            $items = $project->evidences ?? collect();
             $projectId = $project->id_project;
             $waspang = optional($project->assignment)->waspang;
 
@@ -67,30 +67,64 @@
                 ->unique()
                 ->count();
 
-            $instalasiTotal = $project->boqItems->count();
+            /*
+            |--------------------------------------------------------------------------
+            | INSTALASI - MATERIAL ONLY
+            |--------------------------------------------------------------------------
+            */
 
-            $instalasiApproved = $items
-                ->where('stage', 'instalasi')
-                ->where('status', 'approved')
-                ->pluck('boq_item_id')
-                ->unique()
-                ->count();
+            $materialBoqItems = ($project->boqItems ?? collect())->filter(function ($boq) {
+                return str_starts_with($boq->designator, 'M-')
+                    || optional($boq->designatorData)->type === 'material'
+                    || optional($boq->designatorDataByCode)->type === 'material';
+            });
 
-            $pengukuranTotal = 3;
+            $instalasiTotal = $materialBoqItems->count();
 
-            $pengukuranApproved = $items
-                ->where('stage', 'pengukuran')
-                ->where('status', 'approved')
-                ->pluck('evidence_type')
-                ->unique()
-                ->count();
+            $instalasiApproved = $materialBoqItems->filter(function ($boq) use ($items) {
+                $boqEvidences = $items
+                    ->where('stage', 'instalasi')
+                    ->where('evidence_type', 'progress_boq')
+                    ->where('boq_item_id', $boq->id_boq);
 
-            $finishingTotal = 1;
+                return $boqEvidences->count() > 0
+                    && $boqEvidences->where('status', 'pending')->count() == 0
+                    && $boqEvidences->where('status', 'rejected')->count() == 0
+                    && $boqEvidences->where('status', 'approved')->count() == $boqEvidences->count();
+            })->count();
 
-            $finishingApproved = $items
-                ->where('stage', 'finishing')
-                ->where('status', 'approved')
-                ->count() > 0 ? 1 : 0;
+            /*
+            |--------------------------------------------------------------------------
+            | PENGUKURAN - OPTIONAL
+            |--------------------------------------------------------------------------
+            */
+
+            $pengukuranTotal = 0;
+            $pengukuranApproved = 0;
+
+            /*
+            |--------------------------------------------------------------------------
+            | FINISHING - HANYA ITEM WAJIB FINISHING
+            |--------------------------------------------------------------------------
+            */
+
+            $finishingRequiredItems = $materialBoqItems->filter(function ($boq) {
+                return optional($boq->designatorData)->requires_finishing_evidence == 1
+                    || optional($boq->designatorDataByCode)->requires_finishing_evidence == 1;
+            });
+
+            $finishingTotal = $finishingRequiredItems->count();
+
+            $finishingApproved = $finishingRequiredItems->filter(function ($boq) use ($items) {
+                $finalEvidences = $items
+                    ->where('stage', 'finishing')
+                    ->where('boq_item_id', $boq->id_boq);
+
+                return $finalEvidences->count() > 0
+                    && $finalEvidences->where('status', 'pending')->count() == 0
+                    && $finalEvidences->where('status', 'rejected')->count() == 0
+                    && $finalEvidences->where('status', 'approved')->count() == $finalEvidences->count();
+            })->count();
 
             $pendingCount = $items->where('status', 'pending')->count();
             $approvedCount = $items->where('status', 'approved')->count();
@@ -99,13 +133,11 @@
             $progress =
                 $persiapanApproved +
                 $instalasiApproved +
-                $pengukuranApproved +
                 $finishingApproved;
 
             $total =
                 $persiapanTotal +
                 $instalasiTotal +
-                $pengukuranTotal +
                 $finishingTotal;
 
             $progressPercent = $total > 0
@@ -160,23 +192,17 @@
                         {{-- STATUS --}}
                         <div class="shrink-0">
 
-                            @if($pendingCount > 0)
+                            @if(round($progressPercent) == 100)
 
-                                <div class="px-2.5 py-1 rounded-xl bg-yellow-100 text-yellow-700 text-[10px] font-bold whitespace-nowrap">
-                                    {{ $pendingCount }} Pending
-                                </div>
-
-                            @elseif($rejectedCount > 0)
-
-                                <div class="px-2.5 py-1 rounded-xl bg-red-100 text-red-700 text-[10px] font-bold whitespace-nowrap">
-                                    {{ $rejectedCount }} Rejected
-                                </div>
+                                <span class="px-2.5 py-1 rounded-xl bg-green-100 text-green-700 text-[10px] font-bold">
+                                    Complete
+                                </span>
 
                             @else
 
-                                <div class="px-2.5 py-1 rounded-xl bg-green-100 text-green-700 text-[10px] font-bold whitespace-nowrap">
-                                    Complete
-                                </div>
+                                <span class="px-2.5 py-1 rounded-xl bg-yellow-100 text-yellow-700 text-[10px] font-bold">
+                                    In Review
+                                </span>
 
                             @endif
 
