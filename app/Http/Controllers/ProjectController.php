@@ -10,7 +10,9 @@ use App\Models\BoqItem;
 use App\Models\Evidence;
 use App\Models\Notification;
 use App\Models\Lop;
+use App\Models\ProjectActivityLog;
 use App\Models\EvidenceRevisionHistory;
+use App\Services\ProjectActivityService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -57,7 +59,7 @@ class ProjectController extends Controller
 
         $projects = $query
             ->latest('updated_at')
-            ->paginate(6)
+            ->paginate(10)
             ->withQueryString();
 
         $programs = Project::whereNotNull('program')
@@ -98,43 +100,62 @@ class ProjectController extends Controller
     public function assignWaspang(Request $request)
     {
         $request->validate([
-            'project_id' => 'required|exists:projects,id_project',
-            'waspang_id' => 'required|exists:users,id_user',
+            'project_id' => 'required',
+            'waspang_id' => 'required',
         ]);
 
-        $project = Project::findOrFail($request->project_id);
-
-        $assignment = ProjectAssignment::where('project_id', $request->project_id)->first();
-
-        $oldWaspangId = $assignment?->waspang_id;
+        $oldAssignment = ProjectAssignment::where('project_id', $request->project_id)->first();
 
         ProjectAssignment::updateOrCreate(
             [
-                'project_id' => $request->project_id,
+                'project_id' => $request->project_id
             ],
             [
-                'waspang_id' => $request->waspang_id,
-                'assigned_at' => now(),
+                'waspang_id' => $request->waspang_id
             ]
         );
 
-        if ($oldWaspangId != $request->waspang_id) {
-            Notification::create([
-                'user_id' => $request->waspang_id,
-                'project_id' => $request->project_id,
-                'type' => 'new_order',
-                'title' => 'LOP Baru diassign',
-                'message' => 'Anda mendapat assignment project "' . $project->project_name . '"',
-                'redirect_url' => route('waspang.projects.show', $project->id_project),
-            ]);
-        }
+        $lop = Lop::where('project_id', $request->project_id)->first();
+        $waspang = User::where('id_user', $request->waspang_id)->first();
 
-        return back()->with('success', 'Waspang berhasil diassign');
+        ProjectActivityService::log([
+            'project_id' => $request->project_id,
+            'lop_id' => $lop?->id_lop,
+            'target_user_id' => $request->waspang_id,
+            'activity_type' => $oldAssignment ? 'reassign_waspang' : 'assign_waspang',
+            'title' => $oldAssignment ? 'Reassign Waspang' : 'Assign Waspang',
+            'description' => 'Project di-assign ke Waspang ' . ($waspang?->name ?? '-'),
+            'status_before' => $oldAssignment ? 'assigned' : 'unassigned',
+            'status_after' => 'assigned',
+            'meta' => [
+                'old_waspang_id' => $oldAssignment?->waspang_id,
+                'new_waspang_id' => $request->waspang_id,
+                'new_waspang_name' => $waspang?->name,
+            ],
+        ]);
+
+        return back()->with('success', 'Waspang berhasil di-assign');
     }
 
     public function removeAssign($project)
     {
+        $oldAssignment = ProjectAssignment::where('project_id', $project)->first();
+
         ProjectAssignment::where('project_id', $project)->delete();
+
+        ProjectActivityService::log([
+            'project_id' => $project,
+            'lop_id' => Lop::where('project_id', $project)->value('id_lop'),
+            'target_user_id' => $oldAssignment?->waspang_id,
+            'activity_type' => 'remove_assignment',
+            'title' => 'Assignment Dihapus',
+            'description' => 'Assignment Waspang dihapus dari project.',
+            'status_before' => 'assigned',
+            'status_after' => 'unassigned',
+            'meta' => [
+                'old_waspang_id' => $oldAssignment?->waspang_id,
+            ],
+        ]);
 
         return back()->with('success', 'Assignment berhasil dihapus');
     }
@@ -400,7 +421,9 @@ public function importCsv(Request $request)
 
     public function approveEvidence($id)
     {
-        $evidence = Evidence::findOrFail($id);
+        $evidence = Evidence::with('project')->findOrFail($id);
+
+        $oldStatus = $evidence->status;
 
         Evidence::where('project_id', $evidence->project_id)
             ->where('stage', $evidence->stage)
@@ -413,21 +436,24 @@ public function importCsv(Request $request)
                 'review_note' => null,
             ]);
 
-        // REDIRECT MAPPING
-        $redirectRoute = match ($evidence->stage) {
+        $lopId = Lop::where('project_id', $evidence->project_id)->value('id_lop');
 
-            'persiapan' => route('waspang.projects.persiapan', $evidence->project_id),
+        ProjectActivityService::log([
+            'project_id' => $evidence->project_id,
+            'lop_id' => $lopId,
+            'evidence_id' => $evidence->id_evidence,
+            'activity_type' => 'approve_evidence',
+            'title' => 'Eviden Disetujui',
+            'description' => 'Admin menyetujui eviden tahap ' . ucfirst($evidence->stage),
+            'stage' => $evidence->stage,
+            'status_before' => $oldStatus,
+            'status_after' => 'approved',
+            'meta' => [
+                'evidence_type' => $evidence->evidence_type,
+                'boq_item_id' => $evidence->boq_item_id,
+            ],
+        ]);
 
-            'instalasi' => route('waspang.projects.instalasi', $evidence->project_id),
-
-            'pengukuran' => route('waspang.projects.pengukuran', $evidence->project_id),
-
-            'finishing' => route('waspang.projects.finishing', $evidence->project_id),
-
-            default => route('waspang.projects.show', $evidence->project_id),
-        };
-
-        // NOTIF APPROVED
         Notification::create([
             'user_id' => $evidence->uploaded_by,
             'project_id' => $evidence->project_id,
@@ -437,17 +463,46 @@ public function importCsv(Request $request)
             'redirect_url' => route('waspang.projects.show', $evidence->project_id),
         ]);
 
-        // READY UT NOTIFICATION
-        if ($evidence->stage == 'finishing') {
+        $project = Project::with([
+            'evidences',
+            'boqItems.designatorData',
+            'boqItems.designatorDataByCode',
+        ])->find($evidence->project_id);
 
-            Notification::create([
-                'user_id' => $evidence->uploaded_by,
-                'project_id' => $evidence->project_id,
-                'type' => 'ready_ut',
-                'title' => 'Project Ready UT',
-                'message' => 'Project "' . $evidence->project->project_name . '" siap uji terima.',
-            ]);
+        if ($project) {
+            $summary = $project->progressSummary();
 
+            $alreadyCompleteLogged = ProjectActivityLog::where('project_id', $project->id_project)
+                ->where('activity_type', 'project_completed')
+                ->exists();
+
+            if (($summary['progress'] ?? 0) == 100 && !$alreadyCompleteLogged) {
+                $project->update([
+                    'status' => 'completed',
+                ]);
+
+                ProjectActivityService::log([
+                    'project_id' => $project->id_project,
+                    'lop_id' => $lopId,
+                    'activity_type' => 'project_completed',
+                    'title' => 'Project Complete',
+                    'description' => 'Seluruh eviden wajib sudah approved. Project mencapai progress 100%.',
+                    'status_after' => 'completed',
+                    'meta' => [
+                        'progress' => 100,
+                        'stage' => $summary['stage'] ?? null,
+                    ],
+                ]);
+
+                Notification::create([
+                    'user_id' => $evidence->uploaded_by,
+                    'project_id' => $evidence->project_id,
+                    'type' => 'ready_ut',
+                    'title' => 'Project Ready UT',
+                    'message' => 'Project "' . $evidence->project->project_name . '" siap uji terima.',
+                    'redirect_url' => route('waspang.projects.show', $evidence->project_id),
+                ]);
+            }
         }
 
         return back()->with('success', 'Eviden berhasil diapprove');
@@ -459,7 +514,9 @@ public function importCsv(Request $request)
             'review_note' => 'required|string',
         ]);
 
-        $evidence = Evidence::findOrFail($id);
+        $evidence = Evidence::with('project')->findOrFail($id);
+
+        $oldStatus = $evidence->status;
 
         Evidence::where('project_id', $evidence->project_id)
             ->where('stage', $evidence->stage)
@@ -472,24 +529,41 @@ public function importCsv(Request $request)
                 'review_note' => $request->review_note,
             ]);
 
-        // AUTO CREATE REJECT NOTIFICATION
         Notification::create([
             'user_id' => $evidence->uploaded_by,
             'project_id' => $evidence->project_id,
             'type' => 'reject',
             'title' => 'Eviden ditolak Admin',
             'message' => 'Eviden ' . $evidence->stage . ' ditolak. Note: "' . $request->review_note . '"',
+            'redirect_url' => route('waspang.projects.show', $evidence->project_id),
         ]);
 
         EvidenceRevisionHistory::create([
-        'evidence_id' => $evidence->id_evidence,
-        'project_id' => $evidence->project_id,
-        'reviewed_by' => auth()->user()->id_user,
-        'stage' => $evidence->stage,
-        'evidence_type' => $evidence->evidence_type,
-        'review_note' => $request->review_note,
-        'status' => 'rejected',
-    ]);
+            'evidence_id' => $evidence->id_evidence,
+            'project_id' => $evidence->project_id,
+            'reviewed_by' => auth()->user()->id_user,
+            'stage' => $evidence->stage,
+            'evidence_type' => $evidence->evidence_type,
+            'review_note' => $request->review_note,
+            'status' => 'rejected',
+        ]);
+
+        ProjectActivityService::log([
+            'project_id' => $evidence->project_id,
+            'lop_id' => Lop::where('project_id', $evidence->project_id)->value('id_lop'),
+            'evidence_id' => $evidence->id_evidence,
+            'activity_type' => 'reject_evidence',
+            'title' => 'Eviden Ditolak',
+            'description' => 'Admin menolak eviden. Catatan: ' . $request->review_note,
+            'stage' => $evidence->stage,
+            'status_before' => $oldStatus,
+            'status_after' => 'rejected',
+            'meta' => [
+                'review_note' => $request->review_note,
+                'evidence_type' => $evidence->evidence_type,
+                'boq_item_id' => $evidence->boq_item_id,
+            ],
+        ]);
 
         return back()->with('success', 'Eviden berhasil direject');
     }

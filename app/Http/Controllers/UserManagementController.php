@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-// use PhpOffice\PhpSpreadsheet\IOFactory;
-// use Illuminate\Support\Facades\Validator;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Support\Facades\Validator;
 
 class UserManagementController extends Controller
 {
@@ -91,91 +91,116 @@ class UserManagementController extends Controller
         return back()->with('success', 'User berhasil dinonaktifkan');
     }
 
-    public function import(Request $request)
-    {
-        $request->validate([
-            'file' => 'required|mimes:xlsx,xls',
+    public function importCsv(Request $request)
+{
+    $request->validate([
+        'file' => 'required|file|mimes:csv,txt|max:5120',
+    ]);
+
+    $file = $request->file('file');
+    $handle = fopen($file->getRealPath(), 'r');
+
+    if (!$handle) {
+        return back()->with('error', 'File CSV tidak bisa dibaca.');
+    }
+
+    $imported = 0;
+    $skipped = 0;
+    $errors = [];
+
+    /*
+    |--------------------------------------------------------------------------
+    | Format CSV
+    |--------------------------------------------------------------------------
+    | Kolom:
+    | A = nik
+    | B = name
+    | C = username
+    | D = role
+    | E = password
+    |--------------------------------------------------------------------------
+    */
+
+    $rowNumber = 0;
+
+    while (($row = fgetcsv($handle, 10000, ',')) !== false) {
+        $rowNumber++;
+
+        // Skip header baris pertama
+        if ($rowNumber == 1) {
+            continue;
+        }
+
+        $nik = trim((string) ($row[0] ?? ''));
+        $name = trim((string) ($row[1] ?? ''));
+        $username = trim((string) ($row[2] ?? ''));
+        $role = strtolower(trim((string) ($row[3] ?? '')));
+        $password = trim((string) ($row[4] ?? ''));
+
+        if (!$nik && !$name && !$username && !$role && !$password) {
+            continue;
+        }
+
+        $validator = Validator::make([
+            'nik' => $nik,
+            'name' => $name,
+            'username' => $username,
+            'role' => $role,
+            'password' => $password,
+        ], [
+            'nik' => 'required|string|max:30',
+            'name' => 'required|string|max:255',
+            'username' => 'required|string|max:100',
+            'role' => 'required|in:admin,waspang,pm',
+            'password' => 'required|string|min:6',
         ]);
 
-        $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
-        $sheet = $spreadsheet->getActiveSheet();
-
-        $highestRow = $sheet->getHighestRow();
-
-        $imported = 0;
-        $updated = 0;
-        $skipped = 0;
-        $errors = [];
-
-        for ($row = 2; $row <= $highestRow; $row++) {
-
-            $nik = trim((string) $sheet->getCell('A' . $row)->getValue());
-            $name = trim((string) $sheet->getCell('B' . $row)->getValue());
-            $username = trim((string) $sheet->getCell('C' . $row)->getValue());
-            $role = strtolower(trim((string) $sheet->getCell('D' . $row)->getValue()));
-            $password = trim((string) $sheet->getCell('E' . $row)->getValue());
-
-            if (!$nik && !$name && !$username && !$role && !$password) {
-                continue;
-            }
-
-            $validator = Validator::make([
-                'nik' => $nik,
-                'name' => $name,
-                'username' => $username,
-                'role' => $role,
-                'password' => $password,
-            ], [
-                'nik' => 'required|string|max:30',
-                'name' => 'required|string|max:255',
-                'username' => 'required|string|max:100',
-                'role' => 'required|in:admin,waspang,pm',
-                'password' => 'required|string|min:6',
-            ]);
-
-            if ($validator->fails()) {
-                $skipped++;
-                $errors[] = 'Baris ' . $row . ': ' . implode(', ', $validator->errors()->all());
-                continue;
-            }
-
-            $existingUser = User::where('username', $username)
-                ->orWhere('nik', $nik)
-                ->first();
-
-            if ($existingUser) {
-                $existingUser->update([
-                    'nik' => $nik,
-                    'name' => $name,
-                    'username' => $username,
-                    'role' => $role,
-                    'status' => 'active',
-                    'password' => $password,
-                ]);
-
-                $updated++;
-            } else {
-                User::create([
-                    'nik' => $nik,
-                    'name' => $name,
-                    'username' => $username,
-                    'role' => $role,
-                    'status' => 'active',
-                    'password' => $password,
-                ]);
-
-                $imported++;
-            }
+        if ($validator->fails()) {
+            $skipped++;
+            $errors[] = 'Baris ' . $rowNumber . ': ' . implode(', ', $validator->errors()->all());
+            continue;
         }
 
-        $message = "Import selesai. Baru: {$imported}, Update: {$updated}, Skip: {$skipped}.";
+        // Jika NIK sudah ada, skip
+        $nikExists = User::where('nik', $nik)->exists();
 
-        if (!empty($errors)) {
-            return back()
-                ->with('success', $message)
-                ->with('import_errors', array_slice($errors, 0, 10));
+        if ($nikExists) {
+            $skipped++;
+            $errors[] = "Baris {$rowNumber}: NIK {$nik} sudah ada, data dilewati.";
+            continue;
         }
 
-        return back()->with('success', $message);
+        // Jika username sudah ada, skip
+        $usernameExists = User::where('username', $username)->exists();
+
+        if ($usernameExists) {
+            $skipped++;
+            $errors[] = "Baris {$rowNumber}: Username {$username} sudah ada, data dilewati.";
+            continue;
+        }
+
+        User::create([
+            'nik' => $nik,
+            'name' => $name,
+            'username' => $username,
+            'role' => $role,
+            'status' => 'active',
+            'password' => Hash::make($password),
+        ]);
+
+        $imported++;
     }
+
+    fclose($handle);
+
+    $message = "Import CSV selesai. Baru: {$imported}, Skip: {$skipped}.";
+
+    if (!empty($errors)) {
+        return back()
+            ->with('success', $message)
+            ->with('import_errors', array_slice($errors, 0, 10));
+    }
+
+    return back()->with('success', $message);
+}
 }

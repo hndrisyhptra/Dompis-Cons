@@ -7,6 +7,9 @@ use App\Models\ProjectAssignment;
 use App\Models\Notification;
 use App\Models\Evidence;
 use App\Models\EvidenceRevisionHistory;
+use App\Models\Lop;
+use App\Services\ProjectActivityService;
+use App\Models\ProjectIssue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -130,6 +133,7 @@ class WaspangController extends Controller
                 'lop',
                 'evidences',
                 'boqItems',
+                'issues',
             ])
             ->whereHas('assignments', function ($q) {
                 $q->where('waspang_id', auth()->user()->id_user);
@@ -607,12 +611,14 @@ class WaspangController extends Controller
             'description' => 'nullable|string',
             'latitude' => 'nullable',
             'longitude' => 'nullable',
+            'boq_item_id' => 'nullable',
+            'quantity_actual' => 'nullable|numeric|min:0',
         ]);
 
-        //FOLDER BERDASARKAN ID PROJECT
         $projectFolder = 'project-' . $project->id_project;
         $stage = $request->stage;
         $type = $request->evidence_type;
+        $lopId = Lop::where('project_id', $project->id_project)->value('id_lop');
 
         foreach ($request->file('photos') as $photo) {
             $filename = now()->format('Ymd_His') . '_' . uniqid() . '.jpg';
@@ -623,7 +629,7 @@ class WaspangController extends Controller
                 'public'
             );
 
-            Evidence::create([
+            $evidence = Evidence::create([
                 'project_id' => $project->id_project,
                 'boq_item_id' => $request->boq_item_id,
                 'uploaded_by' => auth()->user()->id_user,
@@ -635,6 +641,24 @@ class WaspangController extends Controller
                 'description' => $request->description,
                 'status' => 'pending',
             ]);
+
+            ProjectActivityService::log([
+                'project_id' => $evidence->project_id,
+                'lop_id' => $lopId,
+                'evidence_id' => $evidence->id_evidence,
+                'activity_type' => 'upload_evidence',
+                'title' => 'Upload Eviden',
+                'description' => 'Waspang upload eviden tahap ' . ucfirst($evidence->stage),
+                'stage' => $evidence->stage,
+                'status_after' => 'pending',
+                'meta' => [
+                    'evidence_type' => $evidence->evidence_type,
+                    'boq_item_id' => $evidence->boq_item_id,
+                    'file_path' => $evidence->file_path,
+                    'latitude' => $evidence->latitude,
+                    'longitude' => $evidence->longitude,
+                ],
+            ]);
         }
 
         if ($request->boq_item_id && $request->quantity_actual !== null) {
@@ -642,7 +666,33 @@ class WaspangController extends Controller
                 ->update([
                     'quantity_actual' => $request->quantity_actual
                 ]);
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lopId,
+                'activity_type' => 'update_quantity_actual',
+                'title' => 'Update Quantity Actual',
+                'description' => 'Waspang update quantity actual BOQ.',
+                'stage' => $stage,
+                'status_after' => 'updated',
+                'meta' => [
+                    'boq_item_id' => $request->boq_item_id,
+                    'quantity_actual' => $request->quantity_actual,
+                ],
+            ]);
         }
+
+        $statusProject = match ($stage) {
+            'persiapan' => 'preparation',
+            'instalasi' => 'instalasi',
+            'pengukuran' => 'instalasi',
+            'finishing' => 'finishing',
+            default => 'active',
+        };
+
+        $project->update([
+            'status' => $statusProject,
+        ]);
 
         return back()->with('success', 'Eviden berhasil diupload dan menunggu approval');
     }
@@ -658,6 +708,25 @@ class WaspangController extends Controller
         if ($evidence->status === 'approved') {
             return back()->with('error', 'Eviden yang sudah approved tidak bisa dihapus');
         }
+
+        $lopId = Lop::where('project_id', $evidence->project_id)->value('id_lop');
+
+        ProjectActivityService::log([
+            'project_id' => $evidence->project_id,
+            'lop_id' => $lopId,
+            'evidence_id' => $evidence->id_evidence,
+            'activity_type' => 'delete_evidence',
+            'title' => 'Hapus Eviden',
+            'description' => 'Waspang menghapus eviden yang belum approved.',
+            'stage' => $evidence->stage,
+            'status_before' => $evidence->status,
+            'status_after' => 'deleted',
+            'meta' => [
+                'evidence_type' => $evidence->evidence_type,
+                'boq_item_id' => $evidence->boq_item_id,
+                'file_path' => $evidence->file_path,
+            ],
+        ]);
 
         Storage::disk('public')->delete($evidence->file_path);
 
@@ -691,6 +760,113 @@ class WaspangController extends Controller
             ->delete();
 
         return back()->with('success', 'Notifikasi berhasil di besihkan');
+    }
+
+    //UPDATE KENDALA
+    public function storeIssue(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+
+        $request->validate([
+            'issue_type' => 'required|string|max:100',
+            'description' => 'required|string|max:2000',
+            'photos' => 'nullable|array',
+            'photos.*' => 'image|mimes:jpg,jpeg,png,webp|max:4096',
+        ]);
+
+        $lopId = Lop::where('project_id', $project->id_project)->value('id_lop');
+
+        $photoPaths = [];
+
+        if ($request->hasFile('photos')) {
+            $projectFolder = 'project-' . $project->id_project;
+
+            foreach ($request->file('photos') as $photo) {
+                $filename = now()->format('Ymd_His') . '_' . uniqid() . '.jpg';
+
+                $path = $photo->storeAs(
+                    "issues/{$projectFolder}",
+                    $filename,
+                    'public'
+                );
+
+                $photoPaths[] = $path;
+            }
+        }
+
+        $issue = ProjectIssue::create([
+            'project_id' => $project->id_project,
+            'lop_id' => $lopId,
+            'user_id' => auth()->user()->id_user,
+            'issue_type' => $request->issue_type,
+            'description' => $request->description,
+            'photo_path' => $photoPath,
+            'status' => 'kendala',
+        ]);
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lopId,
+            'activity_type' => 'update_kendala',
+            'title' => 'Update Kendala',
+            'description' => 'Waspang melaporkan kendala: ' . $request->description,
+            'status_after' => 'kendala',
+            'meta' => [
+                'issue_id' => $issue->id,
+                'issue_type' => $issue->issue_type,
+                'photo_path' => $photoPath,
+            ],
+        ]);
+
+        $admins = User::whereIn('role', ['admin', 'pm'])->get();
+
+        foreach ($admins as $admin) {
+            Notification::create([
+                'user_id' => $admin->id_user,
+                'project_id' => $project->id_project,
+                'type' => 'kendala',
+                'title' => 'Kendala Baru dari Waspang',
+                'message' => 'Project ' . $project->project_name . ' terkendala: ' . $request->description,
+                'redirect_url' => route('admin.projects.tracking', $project->id_project),
+            ]);
+        }
+
+        return back()->with('success', 'Kendala berhasil dikirim. Admin/PM sudah menerima notifikasi.');
+    }
+
+    public function resumeIssue(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+
+        $issue = ProjectIssue::where('project_id', $project->id_project)
+            ->where('user_id', auth()->user()->id_user)
+            ->where('status', 'kendala')
+            ->latest()
+            ->first();
+
+        if (!$issue) {
+            return back()->with('error', 'Tidak ada kendala aktif pada project ini.');
+        }
+
+        $issue->update([
+            'status' => 'open',
+            'resolution_note' => 'Waspang Resume Project dan lanjut upload eviden.',
+        ]);
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $issue->lop_id,
+            'activity_type' => 'resume_project',
+            'title' => 'Project Resume',
+            'description' => 'Waspang melanjutkan project setelah update kendala.',
+            'status_before' => 'kendala',
+            'status_after' => 'open',
+            'meta' => [
+                'issue_id' => $issue->id,
+            ],
+        ]);
+
+        return back()->with('success', 'Project berhasil di-resume. Silakan lanjut upload eviden.');
     }
 
     public function profile()

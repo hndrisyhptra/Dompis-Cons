@@ -9,6 +9,7 @@ use App\Models\ProjectAssignment;
 use App\Models\EvidenceRevisionHistory;
 use App\Models\Lop;
 use App\Models\BoqItem;
+use App\Models\ProjectActivityLog;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -245,5 +246,26 @@ class DashboardController extends Controller
             'projects',
             'evidences'
         ));
+    }
+
+    public function tracking($project)
+    {
+        $project = Project::with([
+            'lop',
+            'activityLogs.user',
+            'activityLogs.targetUser',
+            'activityLogs.evidence',
+        ])->where('id_project', $project)->firstOrFail();
+
+        $logs = ProjectActivityLog::with([
+            'user',
+            'targetUser',
+            'evidence',
+        ])
+            ->where('project_id', $project->id_project)
+            ->latest()
+            ->get();
+
+        return view('admin.projects.tracking', compact('project', 'logs'));
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+
 use Illuminate\Database\Eloquent\Model;
 
 class Project extends Model
@@ -161,5 +162,16 @@ class Project extends Model
             'progress',
             'stageLabel'
         );
+    }
+
+    public function activityLogs()
+    {
+        return $this->hasMany(ProjectActivityLog::class, 'project_id', 'id_project')
+            ->latest();
+    }
+
+    public function issues()
+    {
+        return $this->hasMany(\App\Models\ProjectIssue::class, 'project_id', 'id_project');
     }
 }

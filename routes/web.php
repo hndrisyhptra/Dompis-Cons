@@ -312,6 +312,12 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/waspang/notifications/{id}', [WaspangController::class, 'deleteNotification'])
         ->name('waspang.notifications.delete');
 
+    Route::post('/waspang/projects/{project}/issues', [WaspangController::class, 'storeIssue'])
+            ->name('waspang.projects.issues.store');
+    
+    Route::post('/waspang/projects/{project}/issues/resume', [WaspangController::class, 'resumeIssue'])
+            ->name('waspang.projects.issues.resume');
+
     });
 
     Route::middleware(['auth'])->group(function () {
@@ -326,6 +332,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/admin/users/{id}', [UserManagementController::class, 'destroy'])
         ->name('admin.users.destroy');
+    
+
+     Route::get('/admin/projects/{project}/tracking', [DashboardController::class, 'tracking'])
+            ->name('admin.projects.tracking');
 });
 
 

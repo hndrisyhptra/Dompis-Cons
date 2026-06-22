@@ -53,339 +53,364 @@
                     </a>
                 </div>
 
-                {{-- Filter Chips --}}
-                <div class="space-y-3">
+                {{-- Filter Dropdown --}}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 
                     {{-- Program --}}
-                    <div class="flex flex-col lg:flex-row lg:items-center gap-2">
-                        <div class="w-18 shrink-0 text-xs font-black uppercase tracking-wide text-gray-400">
+                    <div>
+                        <label class="block text-xs font-black uppercase tracking-wide text-gray-400 mb-1">
                             Program
-                        </div>
+                        </label>
 
-                        <div class="flex flex-wrap gap-2">
-                            <a href="{{ request()->fullUrlWithQuery(['program' => null]) }}"
-                            class="px-4 py-2 rounded-full text-xs font-bold border transition
-                            {{ !request('program') ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                                Semua Program
-                            </a>
+                        <select name="program"
+                                onchange="this.form.submit()"
+                                class="w-full h-11 rounded-2xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Semua Program</option>
 
                             @foreach($programs as $program)
-                                <a href="{{ request()->fullUrlWithQuery(['program' => $program]) }}"
-                                class="px-4 py-2 rounded-full text-xs font-bold border transition
-                                {{ request('program') == $program ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                <option value="{{ $program }}" {{ request('program') == $program ? 'selected' : '' }}>
                                     {{ $program }}
-                                </a>
+                                </option>
                             @endforeach
-                        </div>
-                    
+                        </select>
+                    </div>
 
                     {{-- Branch --}}
-                    <div class="flex flex-col lg:flex-row lg:items-center gap-2">
-                        <div class="w-18 shrink-0 text-xs font-black uppercase tracking-wide text-gray-400">
+                    <div>
+                        <label class="block text-xs font-black uppercase tracking-wide text-gray-400 mb-1">
                             Branch
-                        </div>
+                        </label>
 
-                        <div class="flex flex-wrap gap-2">
-                            <a href="{{ request()->fullUrlWithQuery(['branch' => null]) }}"
-                            class="px-4 py-2 rounded-full text-xs font-bold border transition
-                            {{ !request('branch') ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                                Semua Branch
-                            </a>
+                        <select name="branch"
+                                onchange="this.form.submit()"
+                                class="w-full h-11 rounded-2xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Semua Branch</option>
 
                             @foreach($branches as $branch)
-                                <a href="{{ request()->fullUrlWithQuery(['branch' => $branch]) }}"
-                                class="px-4 py-2 rounded-full text-xs font-bold border transition
-                                {{ request('branch') == $branch ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                                <option value="{{ $branch }}" {{ request('branch') == $branch ? 'selected' : '' }}>
                                     {{ $branch }}
-                                </a>
+                                </option>
                             @endforeach
-                        </div>
+                        </select>
                     </div>
-                </div>
-
-                    {{-- Tahapan --}}
-                    <!-- <div class="flex flex-col lg:flex-row lg:items-center gap-2">
-                        <div class="w-24 shrink-0 text-xs font-black uppercase tracking-wide text-gray-400">
-                            Tahapan
-                        </div>
-
-                        <div class="flex flex-wrap gap-2">
-                            <a href="{{ request()->fullUrlWithQuery(['stage' => null]) }}"
-                            class="px-4 py-2 rounded-full text-xs font-bold border transition
-                            {{ !request('stage') ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                                Semua
-                            </a>
-
-                            <a href="{{ request()->fullUrlWithQuery(['stage' => 'preparation']) }}"
-                            class="px-4 py-2 rounded-full text-xs font-bold border transition
-                            {{ request('stage') == 'preparation' ? 'bg-red-600 text-white border-red-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                                Preparation
-                            </a>
-
-                            <a href="{{ request()->fullUrlWithQuery(['stage' => 'instalasi']) }}"
-                            class="px-4 py-2 rounded-full text-xs font-bold border transition
-                            {{ request('stage') == 'instalasi' ? 'bg-yellow-600 text-white border-yellow-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                                Instalasi
-                            </a>
-
-                            <a href="{{ request()->fullUrlWithQuery(['stage' => 'pengukuran']) }}"
-                            class="px-4 py-2 rounded-full text-xs font-bold border transition
-                            {{ request('stage') == 'pengukuran' ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                                Pengukuran
-                            </a>
-
-                            <a href="{{ request()->fullUrlWithQuery(['stage' => 'finishing']) }}"
-                            class="px-4 py-2 rounded-full text-xs font-bold border transition
-                            {{ request('stage') == 'finishing' ? 'bg-green-600 text-white border-green-600 shadow-sm' : 'bg-white dark:bg-gray-950 border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                                Finishing
-                            </a>
-                        </div>
-                    </div> -->
 
                 </div>
 
             </form>
 
         </div>
+{{-- Project Table List --}}
+<div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
 
-{{-- Project Cards --}}
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+        <div>
+            <h2 class="text-base font-black text-gray-900 dark:text-white">Daftar Project</h2>
+            <p class="text-xs text-gray-500 mt-1">Monitoring progress, assignment, evidence dan KML</p>
+        </div>
 
-@forelse($projects as $project)
+        <span class="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
+            {{ method_exists($projects, 'total') ? $projects->total() : $projects->count() }} Project
+        </span>
+    </div>
 
-   @php
-    $summary = $project->progressSummary();
+    <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
+                <tr>
+                    <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Project</th>
+                    <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Lokasi</th>
+                    <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Waspang</th>
+                    <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Tahapan</th>
+                    <!-- <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Evidence</th> -->
+                    <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Progress</th>
+                    <th class="px-5 py-3 text-center text-xs font-black uppercase text-gray-500">Aksi</th>
+                </tr>
+            </thead>
 
-    $persiapanDone = $summary['persiapanDone'];
-    $instalasiDone = $summary['instalasiDone'];
-    $pengukuranDone = $summary['pengukuranDone'];
-    $finishingDone = $summary['finishingDone'];
+            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                @forelse($projects as $project)
+                    @php
+                        $summary = $project->progressSummary();
 
-    $boqTotal = $summary['materialTotal'];
-    $boqApproved = $summary['instalasiApproved'];
-    $finishingApproved = $summary['finishingApproved'];
-    $finishingTotal = $summary['finishingTotal'] ?? 0;
+                        $persiapanDone = $summary['persiapanDone'];
+                        $instalasiDone = $summary['instalasiDone'];
+                        $pengukuranDone = $summary['pengukuranDone'];
+                        $finishingDone = $summary['finishingDone'];
 
-    $progress = $summary['progress'];
-    $stageLabel = $summary['stageLabel'];
+                        $boqTotal = $summary['materialTotal'];
+                        $boqApproved = $summary['instalasiApproved'];
 
-    $evidences = $project->evidences ?? collect();
-    $waspang = optional($project->assignment)->waspang;
+                        $progress = $summary['progress'];
+                        $stageLabel = $summary['stageLabel'];
 
-    $pendingCount = $evidences->where('status', 'pending')->count();
-    $approvedCount = $evidences->where('status', 'approved')->count();
-    $rejectedCount = $evidences->where('status', 'rejected')->count();
+                        $evidences = $project->evidences ?? collect();
+                        $waspang = optional($project->assignment)->waspang;
 
-    if ($progress == 100) {
-        $accentColor = 'bg-green-600';
-        $borderColor = 'border-l-green-600';
-        $progressColor = 'bg-green-600';
-        $badgeClass = 'bg-green-100 text-green-700';
-    } elseif ($stageLabel === 'Finishing') {
-        $accentColor = 'bg-blue-600';
-        $borderColor = 'border-l-blue-600';
-        $progressColor = 'bg-blue-600';
-        $badgeClass = 'bg-purple-100 text-blue-700';
-    } elseif ($stageLabel === 'Pengukuran') {
-        $accentColor = 'bg-blue-500';
-        $borderColor = 'border-l-blue-500';
-        $progressColor = 'bg-blue-500';
-        $badgeClass = 'bg-blue-100 text-blue-700';
-    } elseif ($stageLabel === 'Instalasi') {
-        $accentColor = 'bg-yellow-600';
-        $borderColor = 'border-l-yellow-600';
-        $progressColor = 'bg-yellow-600';
-        $badgeClass = 'bg-yellow-100 text-yellow-700';
-    } else {
-        $accentColor = 'bg-red-500';
-        $borderColor = 'border-l-red-500';
-        $progressColor = 'bg-red-500';
-        $badgeClass = 'bg-red-100 text-red-700';
-    }
-@endphp
+                        $pendingCount = $evidences->where('status', 'pending')->count();
+                        $approvedCount = $evidences->where('status', 'approved')->count();
+                        $rejectedCount = $evidences->where('status', 'rejected')->count();
 
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-4 {{ $borderColor }} rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition">
+                        if ($progress == 100) {
+                            $stageBadge = 'bg-green-100 text-green-700';
+                            $progressColor = 'bg-green-600';
+                        } elseif ($stageLabel === 'Finishing') {
+                            $stageBadge = 'bg-purple-100 text-purple-700';
+                            $progressColor = 'bg-purple-600';
+                        } elseif ($stageLabel === 'Pengukuran') {
+                            $stageBadge = 'bg-blue-100 text-blue-700';
+                            $progressColor = 'bg-blue-600';
+                        } elseif ($stageLabel === 'Instalasi') {
+                            $stageBadge = 'bg-yellow-100 text-yellow-700';
+                            $progressColor = 'bg-yellow-600';
+                        } else {
+                            $stageBadge = 'bg-red-100 text-red-700';
+                            $progressColor = 'bg-red-600';
+                        }
+                    @endphp
 
-        <div class="h-1 {{ $accentColor }}"></div>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
+                        <td class="px-5 py-4">
+                            <div class="flex items-start gap-3">
+                                <div class="w-10 h-10 rounded-2xl bg-gray-900 text-white flex items-center justify-center text-xs font-black shrink-0">
+                                    #{{ $project->id_project }}
+                                </div>
 
-        <div class="p-4">
+                                <div class="min-w-[220px]">
+                                    <p class="font-black text-gray-900 dark:text-white leading-snug">
+                                        {{ $project->project_name }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        PID: {{ $project->pid ?? '-' }} · {{ strtoupper($project->execution_type ?? '-') }}
+                                    </p>
+                                </div>
+                            </div>
+                        </td>
 
-            {{-- Header --}}
-            <div class="flex items-start justify-between gap-3">
+                        <td class="px-5 py-4">
+                            <p class="font-bold text-gray-800 dark:text-gray-100">
+                                {{ $project->lop?->branch ?? '-' }}
+                            </p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                STO {{ $project->lop?->sto ?? '-' }}
+                            </p>
+                        </td>
 
-                <div class="min-w-0">
+                        <td class="px-5 py-4">
+                            @if($waspang)
+                                <p class="font-bold text-gray-900 dark:text-white">{{ $waspang->name }}</p>
+                                <p class="text-xs text-green-600 font-bold">Assigned</p>
+                            @else
+                                <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-bold">
+                                    Belum diassign
+                                </span>
+                            @endif
+                        </td>
 
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="px-2 py-0.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-[10px] font-bold">
-                            #{{ $project->id_project }}
-                        </span>
+                        <td class="px-5 py-4">
+                            <span class="px-3 py-1 rounded-full {{ $stageBadge }} text-xs font-black">
+                                {{ $stageLabel }}
+                            </span>
 
-                        <span class="px-2 py-0.5 rounded-lg {{ $badgeClass }} text-[10px] font-bold">
-                            {{ $stageLabel }}
-                        </span>
+                            <div class="flex gap-1 mt-2">
+
+                                <span class="w-2.5 h-2.5 rounded-full
+                                    {{ in_array($stageLabel, ['Persiapan','Instalasi','Pengukuran','Finishing']) ? 'bg-red-500' : 'bg-gray-300' }}">
+                                </span>
+
+                                <span class="w-2.5 h-2.5 rounded-full
+                                    {{ in_array($stageLabel, ['Instalasi','Pengukuran','Finishing']) ? 'bg-yellow-500' : 'bg-gray-300' }}">
+                                </span>
+
+                                <span class="w-2.5 h-2.5 rounded-full
+                                    {{ in_array($stageLabel, ['Pengukuran','Finishing']) ? 'bg-blue-500' : 'bg-gray-300' }}">
+                                </span>
+
+                                <span class="w-2.5 h-2.5 rounded-full
+                                    {{ $stageLabel == 'Finishing' ? 'bg-green-500' : 'bg-gray-300' }}">
+                                </span>
+
+                            </div>
+                        </td>
+
+                        <!-- <td class="px-5 py-4">
+                            <div class="flex flex-wrap gap-1">
+                                <span class="px-2 py-1 rounded-lg bg-yellow-100 text-yellow-700 text-[11px] font-black">P {{ $pendingCount }}</span>
+                                <span class="px-2 py-1 rounded-lg bg-green-100 text-green-700 text-[11px] font-black">A {{ $approvedCount }}</span>
+                                <span class="px-2 py-1 rounded-lg bg-red-100 text-red-700 text-[11px] font-black">R {{ $rejectedCount }}</span>
+                            </div>
+
+                            <p class="text-xs text-gray-500 mt-2">
+                                BOQ {{ $boqApproved }}/{{ $boqTotal }}
+                            </p>
+                        </td> -->
+
+                        <td class="px-5 py-4 min-w-[150px]">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-bold text-gray-500">Progress</span>
+                                <span class="text-sm font-black text-gray-900 dark:text-white">{{ $progress }}%</span>
+                            </div>
+
+                            <div class="h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                                <div class="h-full rounded-full {{ $progressColor }}" style="width: {{ $progress }}%"></div>
+                            </div>
+                        </td>
+
+                       <td class="px-5 py-4 text-right">
+
+                        <div class="relative inline-block text-left">
+
+                            <button type="button"
+                                    onclick="toggleMenu('menu-{{ $project->id_project }}')"
+                                    class="w-9 h-9 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center">
+
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    class="w-5 h-5 text-gray-600"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor">
+
+                                    <path stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        stroke-width="2"
+                                        d="M12 5h.01M12 12h.01M12 19h.01"/>
+                                </svg>
+
+                            </button>
+
+                            <div id="menu-{{ $project->id_project }}"
+                                class="hidden absolute right-0 mt-2 w-52 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-xl z-50">
+
+                                <div class="py-2 space-y-0.5">
+
+                        <button type="button"
+                                onclick="openDetailModal('detail-modal-{{ $project->id_project }}')"
+                                class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0x" />
+                            </svg>
+                            <span>Detail Project</span>
+                        </button>
+
+                        <button type="button"
+                                onclick="openAssignModal('{{ $project->id_project }}', @js($project->project_name))"
+                                class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                            </svg>
+                            <span>{{ $waspang ? 'Reassign Waspang' : 'Assign Waspang' }}</span>
+                        </button>
+
+                        <button type="button"
+                                onclick="openKmlModal('{{ $project->id_project }}', @js($project->project_name))"
+                                class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                            </svg>
+                            <span>Upload KML</span>
+                        </button>
+
+                        @if($project->kml_file)
+                            <a href="{{ route('projects.view-kml', $project->id_project) }}"
+                            class="block px-4 py-2 text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
+                                </svg>
+                                <span>View KML</span>
+                            </a>
+                        @endif
+
+                        <a href="{{ route('admin.projects.tracking', $project->id_project) }}"
+                        class="block px-4 py-2 text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25A7.5 7.5 0 1119.5 10.5z" />
+                            </svg>
+                            <span>Tracking</span>
+                        </a>
+
+                        <button type="button"
+                                onclick="openEditProjectModal({ id:'{{ $project->id_project }}' })"
+                                class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
+                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                            </svg>
+                            <span>Edit</span>
+                        </button>
+
+                        <hr class="my-1 border-gray-200 dark:border-gray-700" />
+
+                        <form method="POST" action="{{ route('projects.destroy',$project->id_project) }}">
+                            @csrf
+                            @method('DELETE')
+
+                            <button type="submit"
+                                    onclick="return confirm('Hapus project ini?')"
+                                    class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors">
+                                <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                </svg>
+                                <span>Delete</span>
+                            </button>
+                        </form>
+
                     </div>
-
-                    <h2 class="text-sm font-bold text-gray-900 dark:text-white truncate">
-                        {{ $project->project_name }}
-                    </h2>
-
-                    <p class="text-[11px] text-gray-500 mt-1 truncate">
-                        {{ $project->lop?->branch }} · {{ $project->lop?->sto }} · {{ $project->execution_type }}
-                    </p>
-
-                </div>
-
-                <div class="text-right shrink-0">
-                    <p class="text-[10px] text-gray-500">Progress</p>
-                    <p class="text-xl font-black text-gray-900 dark:text-white">
-                        {{ $progress }}%
-                    </p>
-                </div>
-
-            </div>
-
-            {{-- Meta --}}
-            <div class="grid grid-cols-2 gap-2 mt-3">
-
-                <div class="rounded-xl bg-gray-50 dark:bg-gray-800 p-2">
-                    <p class="text-[10px] text-gray-500">Nama Waspang</p>
-                    <p class="text-[11px] font-bold text-gray-900 dark:text-white truncate">
-                        {{ $waspang->name ?? 'Belum diassign' }}
-                    </p>
-                </div>
-
-                <div class="rounded-xl bg-gray-50 dark:bg-gray-800 p-2">
-                    <p class="text-[10px] text-gray-500">BOQ Approved</p>
-                    <p class="text-[11px] font-bold text-gray-900 dark:text-white">
-                        Instalasi {{ $boqApproved }}/{{ $boqTotal }} Item Designators
-                    </p>
-                    <!-- <p class="text-[10px] text-red-600">
-                        Debug Finish: {{ $finishingApproved }}/{{ $finishingTotal }}
-                    </p> -->
-                </div>
-
-            </div>
-
-            {{-- Progress Bar --}}
-            <div class="mt-3 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div class="h-full {{ $progressColor }} rounded-full"
-                     style="width: {{ $progress }}%">
-                </div>
-            </div>
-
-            {{-- Step Badges --}}
-            <div class="grid grid-cols-4 gap-1.5 mt-3 text-center text-[10px] font-bold">
-
-                <div class="rounded-lg py-1 {{ $persiapanDone ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500' }}">
-                    Persiapan
-                </div>
-
-                <div class="rounded-lg py-1 {{ $instalasiDone ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500' }}">
-                    Instalasi
-                </div>
-
-                <div class="rounded-lg py-1 {{ $pengukuranDone ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500' }}">
-                    Pengukuran
-                </div>
-
-                <div class="rounded-lg py-1 {{ $finishingDone ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">
-                    Finishing
-                </div>
-
-            </div>
-
-            {{-- Approval Summary --}}
-            <div class="flex items-center justify-between mt-3">
-
-                <div class="flex items-center gap-1.5 text-[10px] font-bold">
-
-                    <span class="px-2 py-1 rounded-lg bg-yellow-100 text-yellow-700">
-                        P {{ $pendingCount }}
-                    </span>
-
-                    <span class="px-2 py-1 rounded-lg bg-green-100 text-green-700">
-                        A {{ $approvedCount }}
-                    </span>
-
-                    <span class="px-2 py-1 rounded-lg bg-red-100 text-red-700">
-                        R {{ $rejectedCount }}
-                    </span>
-
-                </div>
-
-                <button type="button"
-                        onclick="openDetailModal('detail-modal-{{ $project->id_project }}')"
-                        class="h-8 px-3 rounded-xl bg-gray-900 text-white text-[11px] font-bold hover:bg-black transition">
-                    Detail
-                </button>
-
-            </div>
-
-            {{-- Actions --}}
-            <div class="grid grid-cols-2 gap-2 mt-3">
-
-              <button type="button"
-                        onclick="openKmlModal('{{ $project->id_project }}', @js($project->project_name))"
-                        class="h-9 inline-flex items-center justify-center rounded-xl border border-blue-300 text-blue-600 text-xs font-bold hover:bg-blue-50 transition">
-                    Upload KML
-                </button>
-
-                @if($project->kml_file)
-                    <a href="{{ route('projects.view-kml', $project->id_project) }}"
-                    class="h-9 inline-flex items-center justify-center rounded-xl border border-green-300 text-green-600 text-xs font-bold hover:bg-green-50 transition">
-                        View KML
-                    </a>
-                @else
-                    <button type="button"
-                            disabled
-                            class="h-9 inline-flex items-center justify-center rounded-xl border border-gray-200 text-gray-400 text-xs font-bold cursor-not-allowed">
-                        View KML
-                    </button>
-                @endif
-
-                @if($progress == 100)
-
-                    <a href="#"
-                       class="h-9 col-span-2 inline-flex items-center justify-center rounded-xl bg-green-700 text-white text-xs font-bold hover:bg-green-800 transition">
-                        Berkas Siap Uji Terima
-                    </a>
-
-                @else
-
-                    <button type="button"
-                            onclick="openAssignModal('{{ $project->id_project }}', @js($project->project_name))"
-                            class="h-9 inline-flex items-center justify-center rounded-xl border border-gray-300 dark:border-gray-700 text-xs font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                        {{ $waspang ? 'Reassign' : 'Assign' }}
-                    </button>
-
-                    <button type="button"
-                            onclick="openBoqModal('{{ $project->id_project }}', @js($project->project_name))"
-                            class="h-9 inline-flex items-center justify-center rounded-xl border border-gray-300 dark:border-gray-700 text-xs font-bold hover:bg-gray-50 dark:hover:bg-gray-800 transition">
-                        + Item Designator
-                    </button>
-
-                @endif
-
-            </div>
 
         </div>
 
     </div>
 
+</td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center">
+                            <div class="mx-auto w-14 h-14 rounded-3xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-2xl mb-3">
+                                📂
+                            </div>
+                            <p class="font-black text-gray-900 dark:text-white">Belum ada project</p>
+                            <p class="text-sm text-gray-500 mt-1">Data project akan tampil di sini setelah upload/import PID.</p>
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
 
-    {{-- DETAIL MODAL --}}
+{{-- DETAIL MODAL AREA - DI LUAR TABLE --}}
+@foreach($projects as $project)
+    @php
+        $summary = $project->progressSummary();
+
+        $progress = $summary['progress'];
+        $stageLabel = $summary['stageLabel'];
+        $evidences = $project->evidences ?? collect();
+        $waspang = optional($project->assignment)->waspang;
+
+        if ($progress == 100) {
+            $stageBadge = 'bg-green-100 text-green-700';
+        } elseif ($stageLabel === 'Finishing') {
+            $stageBadge = 'bg-purple-100 text-purple-700';
+        } elseif ($stageLabel === 'Pengukuran') {
+            $stageBadge = 'bg-blue-100 text-blue-700';
+        } elseif ($stageLabel === 'Instalasi') {
+            $stageBadge = 'bg-yellow-100 text-yellow-700';
+        } else {
+            $stageBadge = 'bg-red-100 text-red-700';
+        }
+    @endphp
+
     <div id="detail-modal-{{ $project->id_project }}"
          class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
 
-        <div class="bg-white dark:bg-gray-900 w-full max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden flex flex-col">
+        <div class="bg-white dark:bg-gray-900 w-full max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden flex flex-col shadow-2xl">
 
             <div class="flex items-start justify-between gap-4 px-6 py-5 border-b border-gray-200 dark:border-gray-800">
-
                 <div>
                     <h2 class="text-xl font-bold text-gray-900 dark:text-white">
-                        Detail LOP
+                        Detail Project
                     </h2>
-
                     <p class="text-sm text-gray-500 mt-1">
                         {{ $project->project_name }}
                     </p>
@@ -396,44 +421,42 @@
                         class="w-10 h-10 rounded-xl border border-gray-300 dark:border-gray-700 flex items-center justify-center text-2xl hover:bg-gray-100 dark:hover:bg-gray-800">
                     ×
                 </button>
-
             </div>
 
             <div class="overflow-y-auto">
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 px-6 py-5 border-b border-gray-200 dark:border-gray-800">
-
                     <div>
                         <p class="text-xs uppercase text-gray-400 font-semibold">Branch</p>
                         <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">
-                            {{ $project->lop?->branch }}
+                            {{ $project->lop?->branch ?? '-' }}
                         </p>
                     </div>
 
                     <div>
                         <p class="text-xs uppercase text-gray-400 font-semibold">STO</p>
                         <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">
-                            {{ $project->lop?->sto }}
+                            {{ $project->lop?->sto ?? '-' }}
                         </p>
                     </div>
 
                     <div>
                         <p class="text-xs uppercase text-gray-400 font-semibold">Mitra</p>
                         <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">
-                            {{ $project->mitra_name }}
+                            {{ $project->mitra_name ?? $project->lop?->mitra_name ?? '-' }}
                         </p>
                     </div>
 
                     <div>
                         <p class="text-xs uppercase text-gray-400 font-semibold">Jenis Eksekusi</p>
                         <span class="inline-flex mt-1 px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
-                            {{ strtoupper($project->execution_type) }}
+                            {{ strtoupper($project->execution_type ?? '-') }}
                         </span>
                     </div>
 
                     <div>
                         <p class="text-xs uppercase text-gray-400 font-semibold">Progress</p>
-                        <span class="inline-flex mt-1 px-3 py-1 rounded-full {{ $badgeClass }} text-xs font-bold">
+                        <span class="inline-flex mt-1 px-3 py-1 rounded-full {{ $stageBadge }} text-xs font-bold">
                             {{ $progress }}% · {{ $stageLabel }}
                         </span>
                     </div>
@@ -444,27 +467,27 @@
                             {{ $waspang->name ?? 'Belum diassign' }}
                         </p>
                     </div>
-
                 </div>
 
                 <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-
-                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">
-                        Item BOQ Awal
-                    </h3>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+                            Item Designator
+                        </h3>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Total {{ $project->boqItems->count() }} item designator
+                        </p>
+                    </div>
 
                     <button type="button"
                             onclick="openBoqModal('{{ $project->id_project }}', @js($project->project_name))"
-                            class="h-10 px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold">
-                        + Item Designator
+                            class="h-10 px-4 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700">
+                        + Tambah Designator
                     </button>
-
                 </div>
 
                 <div class="overflow-x-auto">
-
                     <table class="w-full text-sm">
-
                         <thead class="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-800">
                             <tr>
                                 <th class="text-left px-6 py-3 font-semibold text-gray-600 dark:text-gray-300">Designator</th>
@@ -476,9 +499,7 @@
                         </thead>
 
                         <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
-
                             @forelse($project->boqItems as $boq)
-
                                 @php
                                     $boqHasEvidence = $evidences
                                         ->where('stage', 'instalasi')
@@ -488,27 +509,25 @@
                                 @endphp
 
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
-
                                     <td class="px-6 py-4 font-semibold text-gray-900 dark:text-white">
                                         {{ $boq->designator ?? '-' }}
                                     </td>
 
                                     <td class="px-6 py-4">
                                         <p class="font-bold text-gray-900 dark:text-white">
-                                            {{ $boq->item_name }}
+                                            {{ $boq->item_name ?? '-' }}
                                         </p>
                                     </td>
 
                                     <td class="px-6 py-4 text-gray-600 dark:text-gray-300">
-                                        {{ $boq->unit }}
+                                        {{ $boq->unit ?? '-' }}
                                     </td>
 
                                     <td class="px-6 py-4 text-right font-bold text-gray-900 dark:text-white">
-                                        {{ $boq->quantity_plan }}
+                                        {{ $boq->quantity_plan ?? 0 }}
                                     </td>
 
                                     <td class="px-6 py-4 text-center">
-
                                         @if($boqHasEvidence)
                                             <span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">
                                                 Uploaded
@@ -518,55 +537,39 @@
                                                 Belum
                                             </span>
                                         @endif
-
                                     </td>
-
                                 </tr>
-
                             @empty
-
                                 <tr>
                                     <td colspan="5" class="px-6 py-8 text-center text-gray-500">
-                                        Belum ada item BOQ untuk project ini.
+                                        Belum ada item designator untuk project ini.
                                     </td>
                                 </tr>
-
                             @endforelse
-
                         </tbody>
-
                     </table>
-
                 </div>
-
             </div>
 
             <div class="flex flex-col sm:flex-row justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-
-                <!-- <button type="button"
-                        onclick="closeDetailModal('detail-modal-{{ $project->id_project }}')"
-                        class="h-11 px-6 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold hover:bg-gray-100 dark:hover:bg-gray-800">
-                    Tutup
-                </button> -->
-
                 <button type="button"
                         onclick="openAssignModal('{{ $project->id_project }}', @js($project->project_name))"
                         class="h-11 px-6 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold hover:bg-gray-100 dark:hover:bg-gray-800">
                     👷 {{ $waspang ? 'Reassign Waspang' : 'Assign Waspang' }}
                 </button>
 
-               <button type="button"
+                <button type="button"
                         onclick="openEditProjectModal({
                             id: '{{ $project->id_project }}',
                             project_name: @js($project->project_name),
-                            branch: @js($project->branch),
-                            sto: @js($project->sto),
-                            mitra_name: @js($project->mitra_name),
-                            jenis_eksekusi: '{{ $project->jenis_eksekusi }}',
-                            status: '{{ $project->status }}',
+                            branch: @js($project->lop?->branch),
+                            sto: @js($project->lop?->sto),
+                            mitra_name: @js($project->mitra_name ?? $project->lop?->mitra_name),
+                            jenis_eksekusi: @js($project->execution_type),
+                            status: @js($project->status_project),
                             latitude: @js($project->latitude),
                             longitude: @js($project->longitude),
-                            location_address: @js($project->location_address)
+                            location_address: @js($project->location_address),
                             boq_items: @js($project->boqItems->map(function($boq) {
                                 return [
                                     'id_boq' => $boq->id_boq,
@@ -592,22 +595,17 @@
                         Delete
                     </button>
                 </form>
-
             </div>
 
         </div>
-
     </div>
+@endforeach
 
-@empty
-
-    <div class="col-span-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 text-center text-gray-500">
-        Belum ada project.
+@if($projects->hasPages())
+    <div class="mt-6">
+        {{ $projects->links() }}
     </div>
-
-@endforelse
-
-</div>
+@endif
 
 {{-- ASSIGN MODAL --}}
 <div id="assignModal"
@@ -754,11 +752,6 @@
     </div>
 
 </div>
- @if($projects->hasPages())
-        <div class="mt-6">
-            {{ $projects->links() }}
-        </div>
-    @endif
 
 {{-- IMPORT CSV MODAL --}}
 <div id="importModal"
@@ -1795,5 +1788,30 @@ function removeBoqRow(button)
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
+</script>
+
+<script>
+function toggleMenu(id)
+{
+    document.querySelectorAll('[id^="menu-"]').forEach(menu => {
+
+        if(menu.id !== id){
+            menu.classList.add('hidden');
+        }
+
+    });
+
+    document.getElementById(id).classList.toggle('hidden');
+}
+
+document.addEventListener('click', function(e){
+
+    if(!e.target.closest('.relative')){
+        document.querySelectorAll('[id^="menu-"]').forEach(menu=>{
+            menu.classList.add('hidden');
+        });
+    }
+
+});
 </script>
 
