@@ -171,9 +171,9 @@
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
                         <td class="px-5 py-4">
                             <div class="flex items-start gap-3">
-                                <div class="w-10 h-10 rounded-2xl bg-gray-900 text-white flex items-center justify-center text-xs font-black shrink-0">
-                                    #{{ $project->id_project }}
-                                </div>
+                                <!-- <div class="w-10 h-10 rounded-2xl bg-gray-900 text-white dark:bg-white-900 dark:text-white flex items-center justify-center text-xs font-black shrink-0">
+                                    {{ $project->status }}
+                                </div> -->
 
                                 <div class="min-w-[220px]">
                                     <p class="font-black text-gray-900 dark:text-white leading-snug">
@@ -261,14 +261,15 @@
 
                             <button type="button"
                                     onclick="toggleMenu('menu-{{ $project->id_project }}')"
-                                    class="w-9 h-9 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center">
+                                    class="w-9 h-9 rounded-xl flex items-center justify-center transition-colors duration-200
+                                        text-gray-600 hover:bg-gray-200 hover:text-gray-900
+                                        dark:text-white dark:hover:bg-gray-400 dark:hover:text-gray-100">
 
                                 <svg xmlns="http://www.w3.org/2000/svg"
-                                    class="w-5 h-5 text-gray-600"
+                                    class="w-5 h-5"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor">
-
                                     <path stroke-linecap="round"
                                         stroke-linejoin="round"
                                         stroke-width="2"
