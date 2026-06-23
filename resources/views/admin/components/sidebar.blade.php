@@ -129,7 +129,7 @@
                         <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                         HEM
                     </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Home</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">HEM</span>
                 </a>
 
                 <a href="{{ route('projects.index', ['program' => 'OLO']) }}"
@@ -147,9 +147,9 @@
                 {{ $activeProgram == 'Konstruksi Eksternal' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-red-500"></span>
-                        Konstruksi Eksternal
+                        Eksternal
                     </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700">External</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700">Exbis</span>
                 </a>
 
             </div>

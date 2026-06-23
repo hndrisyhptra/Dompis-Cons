@@ -255,7 +255,7 @@
                             </div>
                         </td>
 
-                       <td class="px-5 py-4 text-right">
+                       <td class="px-5 py-4 text-center">
 
                         <div class="relative inline-block text-left">
 

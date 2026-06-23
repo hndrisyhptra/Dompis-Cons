@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProjectIssue extends Model
 {
+    protected $primaryKey = 'id_project_issues';
+
     protected $fillable = [
         'project_id',
         'lop_id',

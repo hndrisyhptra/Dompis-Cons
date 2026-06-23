@@ -8,6 +8,7 @@ use App\Models\Notification;
 use App\Models\Evidence;
 use App\Models\EvidenceRevisionHistory;
 use App\Models\Lop;
+use App\Models\User;
 use App\Services\ProjectActivityService;
 use App\Models\ProjectIssue;
 use Illuminate\Http\Request;
@@ -642,18 +643,23 @@ class WaspangController extends Controller
                 'status' => 'pending',
             ]);
 
+            $evidence->load('boqItem');
+            $evidenceLabel = $this->evidenceLabel($evidence);
+
             ProjectActivityService::log([
                 'project_id' => $evidence->project_id,
                 'lop_id' => $lopId,
                 'evidence_id' => $evidence->id_evidence,
                 'activity_type' => 'upload_evidence',
                 'title' => 'Upload Eviden',
-                'description' => 'Waspang upload eviden tahap ' . ucfirst($evidence->stage),
+                'description' => 'Waspang upload eviden: ' . $evidenceLabel,
                 'stage' => $evidence->stage,
                 'status_after' => 'pending',
                 'meta' => [
                     'evidence_type' => $evidence->evidence_type,
                     'boq_item_id' => $evidence->boq_item_id,
+                    'boq_designator' => $evidence->boqItem?->designator,
+                    'boq_item_name' => $evidence->boqItem?->item_name,
                     'file_path' => $evidence->file_path,
                     'latitude' => $evidence->latitude,
                     'longitude' => $evidence->longitude,
@@ -800,7 +806,7 @@ class WaspangController extends Controller
             'user_id' => auth()->user()->id_user,
             'issue_type' => $request->issue_type,
             'description' => $request->description,
-            'photo_path' => $photoPath,
+            'photo_paths' => $photoPaths,
             'status' => 'kendala',
         ]);
 
@@ -814,7 +820,7 @@ class WaspangController extends Controller
             'meta' => [
                 'issue_id' => $issue->id,
                 'issue_type' => $issue->issue_type,
-                'photo_path' => $photoPath,
+                'photo_paths' => $photoPaths,
             ],
         ]);
 
@@ -862,7 +868,7 @@ class WaspangController extends Controller
             'status_before' => 'kendala',
             'status_after' => 'open',
             'meta' => [
-                'issue_id' => $issue->id,
+                'issue_id' => $issue->id_project_issues,
             ],
         ]);
 
@@ -874,5 +880,30 @@ class WaspangController extends Controller
         return view('waspang.profile');
     }
 
+
+    private function evidenceLabel($evidence)
+    {
+        $typeLabels = [
+            'barang_tiba' => 'Barang Tiba',
+            'perizinan' => 'Perizinan',
+            'progress_boq' => 'Progress BOQ',
+            'otdr' => 'OTDR',
+            'opm' => 'OPM',
+            'kedalaman' => 'Kedalaman Galian',
+            'finishing' => 'Finishing',
+        ];
+
+        $stageLabel = ucfirst($evidence->stage ?? '-');
+        $typeLabel = $typeLabels[$evidence->evidence_type] ?? ucfirst(str_replace('_', ' ', $evidence->evidence_type));
+
+        if ($evidence->boqItem) {
+            return $stageLabel . ' | ' .
+                $typeLabel . ' | ' .
+                ($evidence->boqItem->designator ?? '-') . ' - ' .
+                ($evidence->boqItem->item_name ?? '-');
+        }
+
+        return $stageLabel . ' | ' . $typeLabel;
+    }
 
 }

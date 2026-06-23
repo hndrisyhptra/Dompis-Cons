@@ -333,7 +333,7 @@
                         ->sortByDesc('updated_at')
                         ->first();
 
-                    $mainButtonText = $resumeIssue ? 'Resume Project' : 'Upload Eviden';
+                    $mainButtonText = $resumeIssue ? 'Upload Eviden' : 'Upload Eviden';
                 @endphp
 
                 @php
@@ -370,17 +370,17 @@
 
                     @else
 
-                        <a href="{{ $nextRoute }}"
-                        class="h-10 inline-flex items-center justify-center rounded-xl bg-blue-700 text-white text-sm font-bold">
-                            {{ $mainButtonText }}
-                        </a>
-
                         <button
                             type="button"
                             onclick="document.getElementById('kendalaModal-{{ $project->id_project }}').classList.remove('hidden')"
                             class="h-10 inline-flex items-center justify-center rounded-xl bg-orange-600 text-white text-sm font-bold">
                             Update Kendala
                         </button>
+
+                        <a href="{{ $nextRoute }}"
+                        class="h-10 inline-flex items-center justify-center rounded-xl bg-blue-700 text-white text-sm font-bold">
+                            {{ $mainButtonText }}
+                        </a>
 
                     @endif
 
@@ -389,140 +389,142 @@
             </div>
 
             <div id="kendalaModal-{{ $project->id_project }}"
-     class="hidden fixed inset-0 z-[9999] bg-black/60 px-4 flex items-center justify-center">
+                class="hidden fixed inset-0 z-[9999] bg-black/60 px-4 flex items-center justify-center">
 
-    <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+                <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
 
-        <div class="bg-orange-600 text-white px-5 py-4 flex items-start justify-between">
-            <div>
-                <h2 class="text-lg font-black">
-                    Update Kendala
-                </h2>
-                <p class="text-xs text-orange-100 mt-1">
-                    {{ $project->project_name }}
-                </p>
-            </div>
-
-            <button type="button"
-                    onclick="closeKendalaModal('{{ $project->id_project }}')"
-                    class="w-9 h-9 rounded-full bg-white/20 text-white font-black">
-                ×
-            </button>
-        </div>
-
-        <form method="POST"
-              action="{{ route('waspang.projects.issues.store', $project->id_project) }}"
-              enctype="multipart/form-data"
-              class="p-5 space-y-4"
-              data-issue-uploader="{{ $project->id_project }}">
-
-            @csrf
-
-            <div>
-                <label class="text-xs font-black text-gray-600">
-                    Jenis Kendala
-                </label>
-
-                <select name="issue_type"
-                        required
-                        class="mt-1 w-full h-11 rounded-2xl border border-gray-300 px-3 text-sm font-semibold focus:ring-2 focus:ring-orange-100 focus:border-orange-600 outline-none">
-                    <option value="">Pilih kendala</option>
-                    <option value="perizinan">Perizinan</option>
-                    <option value="material">Material</option>
-                    <option value="akses_lokasi">Akses Lokasi</option>
-                    <option value="cuaca">Cuaca</option>
-                    <option value="teknis">Teknis Lapangan</option>
-                    <option value="lainnya">Lainnya</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="text-xs font-black text-gray-600">
-                    Keterangan Kendala
-                </label>
-
-                <textarea name="description"
-                          required
-                          rows="4"
-                          placeholder="Contoh: belum bisa lanjut karena izin warga belum keluar..."
-                          class="mt-1 w-full rounded-2xl border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-100 focus:border-orange-600 outline-none"></textarea>
-            </div>
-
-            <div>
-                <label class="text-xs font-black text-gray-600">
-                    Foto Kendala <span class="text-gray-400">(opsional, bisa banyak)</span>
-                </label>
-
-                <label class="mt-1 flex flex-col items-center justify-center w-full min-h-[120px] border-2 border-dashed border-orange-300 rounded-3xl bg-orange-50 cursor-pointer hover:bg-orange-100 transition">
-                    <div class="text-center px-4">
-                        <div class="mx-auto w-12 h-12 rounded-2xl bg-orange-600 text-white flex items-center justify-center text-2xl font-black">
-                            +
+                    <div class="bg-orange-600 text-white px-5 py-4 flex items-start justify-between">
+                        <div>
+                            <h2 class="text-lg font-black">
+                                Update Kendala
+                            </h2>
+                            <p class="text-xs text-orange-100 mt-1">
+                                {{ $project->project_name }}
+                            </p>
                         </div>
 
-                        <p class="mt-3 text-sm font-black text-orange-700">
-                            Pilih Foto Kendala
-                        </p>
-
-                        <p class="text-xs text-gray-500 mt-1">
-                            JPG, PNG, WEBP · otomatis dikompres
-                        </p>
-                    </div>
-
-                    <input
-                        type="file"
-                        name="photos[]"
-                        accept="image/*"
-                        multiple
-                        class="hidden issue-photo-input"
-                        data-project-id="{{ $project->id_project }}"
-                    >
-                </label>
-
-                <div class="mt-3 hidden issue-preview-wrapper" data-project-id="{{ $project->id_project }}">
-                    <div class="flex items-center justify-between mb-2">
-                        <p class="text-xs font-black text-gray-600">
-                            Preview Foto
-                        </p>
-
                         <button type="button"
-                                class="text-xs font-black text-red-600 issue-clear-all"
-                                data-project-id="{{ $project->id_project }}">
-                            Hapus Semua
+                                onclick="closeKendalaModal('{{ $project->id_project }}')"
+                                class="w-9 h-9 rounded-full bg-white/20 text-white font-black">
+                            ×
                         </button>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-2 issue-preview-grid" data-project-id="{{ $project->id_project }}"></div>
+                    <form method="POST"
+                        action="{{ route('waspang.projects.issues.store', $project->id_project) }}"
+                        enctype="multipart/form-data"
+                        class="p-5 space-y-4"
+                        data-issue-uploader="{{ $project->id_project }}">
+
+                        @csrf
+
+                        <div>
+                            <label class="text-xs font-black text-gray-600">
+                                Jenis Kendala
+                            </label>
+
+                            <select name="issue_type"
+                                    required
+                                    class="mt-1 w-full h-11 rounded-2xl border border-gray-300 px-3 text-sm font-semibold focus:ring-2 focus:ring-orange-100 focus:border-orange-600 outline-none">
+                                <option value="">Pilih kendala</option>
+                                <option value="perizinan">Perizinan</option>
+                                <option value="material">Material</option>
+                                <option value="akses_lokasi">Akses Lokasi</option>
+                                <option value="cuaca">Cuaca</option>
+                                <option value="teknis">Teknis Lapangan</option>
+                                <option value="lainnya">Lainnya</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-black text-gray-600">
+                                Keterangan Kendala
+                            </label>
+
+                            <textarea name="description"
+                                    required
+                                    rows="4"
+                                    placeholder="Contoh: belum bisa lanjut karena izin warga belum keluar..."
+                                    class="mt-1 w-full rounded-2xl border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-100 focus:border-orange-600 outline-none"></textarea>
+                        </div>
+
+                        <div>
+                            <label class="text-xs font-black text-gray-600">
+                                Eviden Kendala <span class="text-gray-400">(opsional, bisa banyak)</span>
+                            </label>
+
+                            <label class="mt-1 flex flex-col items-center justify-center w-full min-h-[120px] border-2 border-dashed border-orange-300 rounded-3xl bg-orange-50 cursor-pointer hover:bg-orange-100 transition">
+                                <div class="text-center px-4">
+                                    <div class="mx-auto w-12 h-12 rounded-2xl bg-orange-600 text-white flex items-center justify-center text-2xl font-black">
+                                        +
+                                    </div>
+
+                                    <p class="mt-3 text-sm font-black text-orange-700">
+                                        Pilih Foto Kendala
+                                    </p>
+
+                                    <p class="text-xs text-gray-500 mt-1">
+                                        JPG, PNG, WEBP · otomatis dikompres
+                                    </p>
+                                </div>
+
+                                <input
+                                    type="file"
+                                    name="photos[]"
+                                    accept="image/*"
+                                    multiple
+                                    class="hidden issue-photo-input"
+                                    data-project-id="{{ $project->id_project }}"
+                                >
+                            </label>
+
+                            <div class="mt-3 hidden issue-preview-wrapper" data-project-id="{{ $project->id_project }}">
+                                <div class="flex items-center justify-between mb-2">
+                                    <p class="text-xs font-black text-gray-600">
+                                        Preview Foto
+                                    </p>
+
+                                    <button type="button"
+                                            class="text-xs font-black text-red-600 issue-clear-all"
+                                            data-project-id="{{ $project->id_project }}">
+                                        Hapus Semua
+                                    </button>
+                                </div>
+
+                                <div class="grid grid-cols-3 gap-2 issue-preview-grid" data-project-id="{{ $project->id_project }}"></div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <button type="button"
+                                    onclick="closeKendalaModal('{{ $project->id_project }}')"
+                                    class="h-11 rounded-2xl bg-gray-100 text-gray-700 text-sm font-black">
+                                Batal
+                            </button>
+
+                            <button type="submit"
+                                    class="h-11 rounded-2xl bg-orange-600 text-white text-sm font-black">
+                                Kirim Kendala
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-2 pt-1">
-                <button type="button"
-                        onclick="closeKendalaModal('{{ $project->id_project }}')"
-                        class="h-11 rounded-2xl bg-gray-100 text-gray-700 text-sm font-black">
-                    Batal
-                </button>
-
-                <button type="submit"
-                        class="h-11 rounded-2xl bg-orange-600 text-white text-sm font-black">
-                    Kirim Kendala
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
+                @if($kendalaIssue)
+                    <div class="mt-3 rounded-xl bg-orange-50 border border-orange-200 p-3">
+                        <p class="text-xs font-bold text-orange-700">
+                            Project sedang terkendala
+                        </p>
+                        <p class="text-xs text-orange-600 mt-1">
+                            {{ $kendalaIssue->description }}
+                        </p>
+                    </div>
+                @endif
 
             </div>
 
-            @if($kendalaIssue)
-                <div class="mt-3 rounded-xl bg-orange-50 border border-orange-200 p-3">
-                    <p class="text-xs font-bold text-orange-700">
-                        Project sedang terkendala
-                    </p>
-                    <p class="text-xs text-orange-600 mt-1">
-                        {{ $kendalaIssue->description }}
-                    </p>
-                </div>
-            @endif
+            
 
         @empty
 

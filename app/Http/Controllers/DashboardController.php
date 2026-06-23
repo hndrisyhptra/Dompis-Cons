@@ -9,6 +9,7 @@ use App\Models\ProjectAssignment;
 use App\Models\EvidenceRevisionHistory;
 use App\Models\Lop;
 use App\Models\BoqItem;
+use App\Models\Designator;
 use App\Models\ProjectActivityLog;
 use Illuminate\Http\Request;
 
@@ -252,9 +253,11 @@ class DashboardController extends Controller
     {
         $project = Project::with([
             'lop',
+            'evidences',
             'activityLogs.user',
             'activityLogs.targetUser',
             'activityLogs.evidence',
+            'boqItems.designatorData',
         ])->where('id_project', $project)->firstOrFail();
 
         $logs = ProjectActivityLog::with([

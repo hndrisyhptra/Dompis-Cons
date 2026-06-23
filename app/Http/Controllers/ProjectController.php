@@ -421,9 +421,11 @@ public function importCsv(Request $request)
 
     public function approveEvidence($id)
     {
-        $evidence = Evidence::with('project')->findOrFail($id);
+        $evidence = Evidence::with(['project', 'boqItem'])->findOrFail($id);
 
         $oldStatus = $evidence->status;
+
+        $evidenceLabel = $this->evidenceLabel($evidence);
 
         Evidence::where('project_id', $evidence->project_id)
             ->where('stage', $evidence->stage)
@@ -444,13 +446,15 @@ public function importCsv(Request $request)
             'evidence_id' => $evidence->id_evidence,
             'activity_type' => 'approve_evidence',
             'title' => 'Eviden Disetujui',
-            'description' => 'Admin menyetujui eviden tahap ' . ucfirst($evidence->stage),
+            'description' => 'Admin menyetujui eviden: ' . $evidenceLabel,
             'stage' => $evidence->stage,
             'status_before' => $oldStatus,
             'status_after' => 'approved',
             'meta' => [
                 'evidence_type' => $evidence->evidence_type,
                 'boq_item_id' => $evidence->boq_item_id,
+                'boq_designator' => $evidence->boqItem?->designator,
+                'boq_item_name' => $evidence->boqItem?->item_name,
             ],
         ]);
 
@@ -514,9 +518,11 @@ public function importCsv(Request $request)
             'review_note' => 'required|string',
         ]);
 
-        $evidence = Evidence::with('project')->findOrFail($id);
+        $evidence = Evidence::with(['project', 'boqItem'])->findOrFail($id);
 
         $oldStatus = $evidence->status;
+
+        $evidenceLabel = $this->evidenceLabel($evidence);
 
         Evidence::where('project_id', $evidence->project_id)
             ->where('stage', $evidence->stage)
@@ -554,7 +560,7 @@ public function importCsv(Request $request)
             'evidence_id' => $evidence->id_evidence,
             'activity_type' => 'reject_evidence',
             'title' => 'Eviden Ditolak',
-            'description' => 'Admin menolak eviden. Catatan: ' . $request->review_note,
+            'description' => 'Admin menolak eviden: ' . $evidenceLabel . '. Catatan: ' . $request->review_note,
             'stage' => $evidence->stage,
             'status_before' => $oldStatus,
             'status_after' => 'rejected',
@@ -562,6 +568,8 @@ public function importCsv(Request $request)
                 'review_note' => $request->review_note,
                 'evidence_type' => $evidence->evidence_type,
                 'boq_item_id' => $evidence->boq_item_id,
+                'boq_designator' => $evidence->boqItem?->designator,
+                'boq_item_name' => $evidence->boqItem?->item_name,
             ],
         ]);
 
@@ -757,6 +765,31 @@ public function importCsv(Request $request)
         $kmlUrl = asset('storage/' . $project->kml_file);
 
         return view('admin.projects.kml-map', compact('project', 'kmlUrl'));
+    }
+
+    private function evidenceLabel($evidence)
+    {
+        $typeLabels = [
+            'barang_tiba' => 'Barang Tiba',
+            'perizinan' => 'Perizinan',
+            'progress_boq' => 'Progress BOQ',
+            'otdr' => 'OTDR',
+            'opm' => 'OPM',
+            'kedalaman' => 'Kedalaman Galian',
+            'finishing' => 'Finishing',
+        ];
+
+        $stageLabel = ucfirst($evidence->stage ?? '-');
+        $typeLabel = $typeLabels[$evidence->evidence_type] ?? ucfirst(str_replace('_', ' ', $evidence->evidence_type));
+
+        if ($evidence->boqItem) {
+            return $stageLabel . ' | ' .
+                $typeLabel . ' | ' .
+                ($evidence->boqItem->designator ?? '-') . ' - ' .
+                ($evidence->boqItem->item_name ?? '-');
+        }
+
+        return $stageLabel . ' | ' . $typeLabel;
     }
 
 }
