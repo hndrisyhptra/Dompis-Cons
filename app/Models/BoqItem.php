@@ -14,6 +14,7 @@ class BoqItem extends Model
 
     protected $fillable = [
         'project_id',
+        'lop_id',
         'designator_id',
         'designator',
         'item_name',

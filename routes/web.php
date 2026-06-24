@@ -375,6 +375,30 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/admin/import/pid/{project}/delete', [ImportController::class, 'destroyPid'])
             ->name('admin.import.pid.delete');
 
+        Route::get('/admin/import/pid', [ImportController::class, 'pid'])
+            ->name('admin.import.pid');
+
+        Route::post('/admin/import/pid/upload', [ImportController::class, 'importPid'])
+            ->name('admin.import.pid.upload');
+
+        Route::get('/admin/import/pid/template', [ImportController::class, 'downloadPidTemplate'])
+            ->name('admin.import.pid.template');
+
+        Route::get('/admin/data-pid', [ImportController::class, 'dataPid'])
+            ->name('admin.data-pid');
+
+        Route::get('/admin/import/boq', [ImportController::class, 'boqIndex'])
+            ->name('admin.import.boq');
+
+        Route::post('/admin/import/boq/upload', [ImportController::class, 'importBoq'])
+            ->name('admin.import.boq.upload');
+
+        Route::get('/admin/data-boq', [ImportController::class, 'dataBoq'])
+            ->name('admin.data-boq');
+
+        Route::get('/admin/import/boq/template', [ImportController::class, 'downloadBoqTemplate'])
+            ->name('admin.import.boq.template');
+
     });
 
     

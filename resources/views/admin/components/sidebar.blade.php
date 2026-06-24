@@ -311,6 +311,80 @@
                        Bulk Import BOQ
                     </span>
                 </a>
+            </div>
+        </div>
+
+        @php
+            $masterDataOpen = request()->routeIs('admin.data-pid*')
+                || request()->routeIs('admin.data-boq*');
+        @endphp
+
+        {{-- MASTER DATA PID & BOQ --}}
+        <div x-data="{ open: {{ $masterDataOpen ? 'true' : 'false' }} }">
+
+            <button type="button"
+                    @click="open = !open"
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    {{ $masterDataOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                <div class="flex items-center gap-3">
+                    @if($masterDataOpen)
+                        <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+                    @endif
+
+                    <div class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-600/40 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            class="w-5 h-5"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path d="M20 5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2.5a1.5 1.5 0 0 1 1.2.6l.6.8a1.5 1.5 0 0 0 1.2.6z"/>
+                            <path d="M3 8.268a2 2 0 0 0-1 1.738V19a2 2 0 0 0 2 2h11a2 2 0 0 0 1.732-1"/>
+                        </svg>
+                    </div>
+
+                    <span>Master Data</span>
+                </div>
+
+                <svg :class="open ? 'rotate-180' : ''"
+                    class="w-4 h-4 transition-transform"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+
+            <div x-show="open"
+                x-transition
+                class="mt-1 ml-5 pl-3 border-l border-gray-200 dark:border-gray-700 space-y-1">
+
+                <a href="{{ route('admin.data-pid') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.data-pid*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                    <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        Data PID
+                    </span>
+                </a>
+
+                <a href="{{ route('admin.data-boq') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.master-boq*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                    <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        Data BOQ
+                    </span>
+                </a>
 
             </div>
         </div>

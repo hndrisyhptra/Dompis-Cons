@@ -2,652 +2,655 @@
 
 @section('content')
 
-<div class="space-y-5">
+@php
+    $result = session('import_result');
+@endphp
 
-    {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+<div class="min-h-screen bg-slate-50 dark:bg-slate-950 -m-4 md:-m-6 p-4 md:p-6">
 
-        <div>
-            <h1 class="text-xl font-bold text-gray-900 dark:text-white">
-               Bulk Import PID
-            </h1>
+    <div class="max-w-7xl mx-auto space-y-6">
 
-            <p class="text-sm text-gray-500">
-                Upload Data PID dan LOP lengkap.
-            </p>
-        </div>
+        {{-- HEADER --}}
+        <div class="rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                <div>
+                    <p class="text-xs font-black text-blue-700 uppercase tracking-widest">
+                        Import Data
+                    </p>
 
-    </div>
+                    <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mt-1">
+                        Bulk Import PID
+                    </h1>
 
-    {{-- ALERT --}}
-    @if(session('success'))
-        <div class="rounded-2xl bg-green-50 border border-green-200 text-green-700 px-4 py-3 text-sm font-semibold">
-            {{ session('success') }}
-        </div>
-    @endif
+                    <p class="text-sm text-slate-500 mt-2 max-w-2xl">
+                        Upload file Excel/CSV untuk validasi, create, dan update data PID serta LOP secara otomatis.
+                    </p>
+                </div>
 
-    @if($errors->any())
-        <div class="rounded-2xl bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
-            {{ $errors->first() }}
-        </div>
-    @endif
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <a href="{{ route('admin.import.pid.template') }}"
+                    class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700">
+                        <span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download-icon lucide-download">
+                                <path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>
+                            </svg>
+                        </span>
+                        <span>Download Template</span>
+                    </a>
 
-    {{-- UPLOAD CARD --}}
-    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
-
-        <form action="{{ route('admin.import.pid.upload') }}"
-              method="POST"
-              enctype="multipart/form-data"
-              class="flex flex-col lg:flex-row lg:items-end gap-3">
-
-            @csrf
-
-            <div class="flex-1">
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">
-                    File Excel PID
-                </label>
-
-                <input type="file"
-                    name="file"
-                    accept=".xlsx,.xls"
-                    required
-                    class="block w-full text-sm border border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer bg-white dark:bg-gray-950 dark:text-gray-300
-                            file:mr-3 file:py-2.5 file:px-4 file:rounded-l-xl file:border-0 file:text-sm file:font-bold
-                            file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <a href="{{ route('admin.data-pid') }}"
+                    class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20">
+                        <span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-spreadsheet-icon lucide-file-spreadsheet"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+                                <path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/>
+                            </svg>
+                        </span>
+                        <span>Data PID</span>
+                    </a>
+                </div>
             </div>
 
-            <button class="h-10 px-5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold shrink-0">
-                Upload
-            </button>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
 
-        </form>
+                <div class="rounded-3xl bg-white border border-slate-200 p-5 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-slate-500 font-bold uppercase">
+                                Format File
+                            </p>
+                            <p class="text-sm font-black text-slate-900 mt-2">
+                                XLSX / XLS / CSV
+                            </p>
+                            <p class="text-xs text-slate-500 mt-1">
+                                Support file import PID
+                            </p>
+                        </div>
 
-        <div class="mt-3 rounded-xl bg-gray-50 dark:bg-gray-950 border border-gray-100 dark:border-gray-800 p-3">
-            <p class="text-xs text-gray-500 leading-relaxed">
-                Format header:
-                <span class="font-mono text-gray-700 dark:text-gray-300">
-                    pid, pid_sap, nama_lop, program, execution_type, status_project, id_ihld, tematik, sto, branch, batch, no_sp, tgl_sp, tgl_toc, mitra_name
-                </span>
-            </p>
+                        <div class="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-2xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-symlink-icon lucide-file-symlink"><path d="M4 11V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h7"/>
+                                <path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m10 18 3-3-3-3"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-3xl bg-white border border-emerald-200 p-5 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-emerald-700 font-bold uppercase">
+                                Validasi Wajib
+                            </p>
+                            <p class="text-sm font-black text-emerald-700 mt-2">
+                                PID SAP + LOP
+                            </p>
+                            <p class="text-xs text-slate-500 mt-1">
+                                Mandatory field
+                            </p>
+                        </div>
+
+                        <div class="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-2xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-ticket-check-icon lucide-ticket-check">
+                                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="m9 12 2 2 4-4"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-3xl bg-white border border-indigo-200 p-5 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-indigo-700 font-bold uppercase">
+                                Mode Import
+                            </p>
+                            <p class="text-sm font-black text-indigo-700 mt-2">
+                                Create / Update
+                            </p>
+                            <p class="text-xs text-slate-500 mt-1">
+                                Upsert data project
+                            </p>
+                        </div>
+
+                        <div class="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-2xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pencil-ruler-icon lucide-pencil-ruler"><path d="M13 7 8.7 2.7a2.41 2.41 0 0 0-3.4 0L2.7 5.3a2.41 2.41 0 0 0 0 3.4L7 13"/>
+                                <path d="m8 6 2-2"/><path d="m18 16 2-2"/><path d="m17 11 4.3 4.3c.94.94.94 2.46 0 3.4l-2.6 2.6c-.94.94-2.46.94-3.4 0L11 17"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rounded-3xl bg-white border border-amber-200 p-5 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-xs text-amber-700 font-bold uppercase">
+                                Upload Terakhir
+                            </p>
+                            <p class="text-sm font-black text-amber-700 mt-2 truncate max-w-[160px]">
+                                {{ $lastImport?->uploader?->name ?? '-' }}
+                            </p>
+                            <p class="text-xs text-slate-500 mt-1">
+                                {{ $lastImport?->created_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? '-' }} WIB
+                            </p>
+                        </div>
+
+                        <div class="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center text-2xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-clock-icon lucide-clipboard-clock"><path d="M16 14v2.2l1.6 1"/><path d="M16 4h2a2 2 0 0 1 2 2v.832"/>
+                                <path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h2"/><circle cx="16" cy="16" r="6"/><rect x="8" y="2" width="8" height="4" rx="1"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
         </div>
 
-    </div>
-
-    <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
-    <h2 class="text-lg font-bold text-gray-800 dark:text-gray-200"></h2>
-     <form method="GET"
-          action="{{ route('admin.import.pid') }}"
-          class="flex gap-2">
-
-        <input type="text"
-               name="search"
-               value="{{ $search ?? '' }}"
-               placeholder="Cari PID, PID SAP, LOP..."
-               class="h-10 w-80 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm px-3">
-
-        <button
-            class="h-10 px-4 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold">
-            Cari
-        </button>
-
-        @if(!empty($search))
-            <a href="{{ route('admin.import.pid') }}"
-               class="h-10 px-4 rounded-xl border border-gray-300 text-sm font-bold inline-flex items-center justify-center">
-                Reset
-            </a>
+        {{-- ALERT --}}
+        @if(session('success'))
+            <div class="rounded-3xl bg-emerald-50 border border-emerald-200 text-emerald-700 px-5 py-4 text-sm font-bold">
+                {{ session('success') }}
+            </div>
         @endif
 
-    </form>
-    </div>
-    
-
-    {{-- TABLE CARD --}}
-    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-
-        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-3">
-
-            <div>
-                <h2 class="text-sm font-bold text-gray-900 dark:text-white">
-                    Data PID Terbaru
-                </h2>
-
-                <p class="text-xs text-gray-500">
-                    Menampilkan 10 data per halaman
-                </p>
+        @if(session('error'))
+            <div class="rounded-3xl bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm font-bold">
+                {{ session('error') }}
             </div>
+        @endif
 
-            <span class="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold">
-                {{ $projects->total() }} data
-            </span>
+        @if($errors->any())
+            <div class="rounded-3xl bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm font-bold">
+                {{ $errors->first() }}
+            </div>
+        @endif
 
-        </div>
+        {{-- LIVE PROGRESS --}}
+                <div id="progressCard"
+                     class="hidden bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
 
-        <div class="overflow-x-auto">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                        <div>
+                            <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                                Proses Import Berjalan
+                            </h2>
+                            <p id="progressFileName" class="text-sm text-slate-500">
+                                Membaca file...
+                            </p>
+                        </div>
 
-            <table class="w-full text-sm">
-
-                <thead class="bg-gray-50 dark:bg-gray-800">
-                    <tr>
-                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">
-                            PID
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">
-                            PID SAP
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">
-                            Nama LOP
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">
-                            ID IHLD
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">
-                            Program
-                        </th>
-                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">
-                            Aksi
-                        </th>
-                    </tr>
-                </thead>
-
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-800">
-
-                    @forelse($projects as $project)
-
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/70 transition">
-
-                            <td class="px-4 py-3 font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                                {{ $project->pid ?? '-' }}
-                            </td>
-
-                            <td class="px-4 py-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                                {{ $project->pid_sap ?? '-' }}
-                            </td>
-
-                            <td class="px-4 py-3">
-                                <p class="font-semibold text-gray-900 dark:text-white max-w-xs truncate">
-                                    {{ $project->project_name ?? '-' }}
-                                </p>
-                            </td>
-                            <td class="px-4 py-3">
-                                <p class="font-semibold text-gray-900 dark:text-white max-w-xs truncate">
-                                    {{ $project->lop?->id_ihld ?? '-' }}
-                                </p>
-                            </td>
-
-                            <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                                {{ $project->program ?? '-' }}
-                            </td>
-
-                            <td class="px-4 py-3">
-                                <div class="flex flex-wrap gap-2">
-
-                                    <!-- <a href="{{ route('admin.import.boq') }}?project_id={{ $project->id_project }}"
-                                    class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-bold hover:bg-blue-100">
-                                        Upload BOQ
-                                    </a>
-
-                                    <a href="#"
-                                    class="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-100">
-                                        Upload KML
-                                    </a>
-
-                                    @if($project->kml_file)
-                                        <a href="{{ asset('storage/' . $project->kml_file) }}"
-                                        target="_blank"
-                                        class="px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold hover:bg-green-100">
-                                            View KML
-                                        </a>
-                                    @else
-                                        <span class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-400 text-xs font-bold">
-                                            View KML
-                                        </span>
-                                    @endif -->
-
-                                    <button type="button"
-                                            onclick="openDetailModal('detailProject{{ $project->id_project }}')"
-                                            class="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200">
-                                        Detail
-                                    </button>
-
-                                    <button type="button"
-                                            onclick="openDetailModal('editProject{{ $project->id_project }}')"
-                                            class="px-3 py-1.5 rounded-lg bg-yellow-50 text-yellow-700 text-xs font-bold hover:bg-yellow-100">
-                                        Edit
-                                    </button>
-
-                                    <form action="{{ route('admin.import.pid.delete', $project->id_project) }}"
-                                        method="POST"
-                                        onsubmit="return confirm('Yakin hapus project ini? Semua BOQ dan assignment akan ikut terhapus.')">
-
-                                        @csrf
-                                        @method('DELETE')
-
-                                        <button
-                                            class="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 text-xs font-bold hover:bg-red-100">
-                                            Delete
-                                        </button>
-
-                                    </form>
-
-                                </div>
-                            </td>
-
-                        </tr>
-
-                        <div id="detailProject{{ $project->id_project }}"
-                        class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
-
-                        <div class="bg-white dark:bg-gray-900 w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl">
-
-                            {{-- HEADER --}}
-                            <div class="bg-blue-700 px-6 py-5 text-white">
-                                <div class="flex items-start justify-between gap-4">
-                                    <div class="min-w-0">
-                                        <p class="text-xs font-semibold opacity-80">Detail Project</p>
-                                        <h2 class="text-lg font-black leading-snug break-words">
-                                            {{ $project->project_name ?? '-' }}
-                                        </h2>
-                                        <p class="text-xs mt-1 opacity-90">
-                                            {{ $project->pid ?? '-' }} · {{ $project->pid_sap ?? '-' }}
-                                        </p>
-                                    </div>
-
-                                    <button type="button"
-                                            onclick="closeDetailModal('detailProject{{ $project->id_project }}')"
-                                            class="w-9 h-9 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xl">
-                                        ×
-                                    </button>
-                                </div>
-                            </div>
-
-                            {{-- BODY --}}
-                            <div class="p-5 overflow-y-auto max-h-[70vh] space-y-5">
-
-                                {{-- PROJECT --}}
-                                <div>
-                                    <h3 class="text-xs font-black text-gray-400 uppercase mb-3">
-                                        Data PID
-                                    </h3>
-
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">PID</p>
-                                            <p class="font-bold">{{ $project->pid ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">PID SAP</p>
-                                            <p class="font-bold">{{ $project->pid_sap ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">Program</p>
-                                            <p class="font-bold">{{ $project->program ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">Jenis Eksekusi</p>
-                                            <p class="font-bold capitalize">{{ $project->execution_type ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">Status Project</p>
-                                            <p class="font-bold capitalize">{{ $project->status_project ?? '-' }}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {{-- LOP --}}
-                                <div>
-                                    <h3 class="text-xs font-black text-gray-400 uppercase mb-3">
-                                        Data LOP
-                                    </h3>
-
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <div class="rounded-2xl bg-blue-50 dark:bg-gray-950 p-3 md:col-span-3">
-                                            <p class="text-xs text-gray-500">Nama LOP</p>
-                                            <p class="font-bold break-words">{{ $project->lop?->lop_name ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">ID IHLD</p>
-                                            <p class="font-bold">{{ $project->lop?->id_ihld ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">STO</p>
-                                            <p class="font-bold">{{ $project->lop?->sto ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">Branch</p>
-                                            <p class="font-bold">{{ $project->lop?->branch ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">Tematik</p>
-                                            <p class="font-bold">{{ $project->lop?->tematik ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">Batch</p>
-                                            <p class="font-bold">{{ $project->lop?->batch ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">Mitra</p>
-                                            <p class="font-bold">{{ $project->lop?->mitra_name ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">No SP</p>
-                                            <p class="font-bold">{{ $project->lop?->no_sp ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">Tanggal SP</p>
-                                            <p class="font-bold">{{ $project->lop?->tgl_sp ?? '-' }}</p>
-                                        </div>
-
-                                        <div class="rounded-2xl bg-gray-50 dark:bg-gray-950 p-3">
-                                            <p class="text-xs text-gray-500">Tanggal TOC</p>
-                                            <p class="font-bold">{{ $project->lop?->tgl_toc ?? '-' }}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                            </div>
-
-                            {{-- FOOTER --}}
-                            <div class="px-5 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 flex justify-end">
-                                <button type="button"
-                                        onclick="closeDetailModal('detailProject{{ $project->id_project }}')"
-                                        class="h-10 px-5 rounded-xl bg-gray-900 text-white text-sm font-bold hover:bg-gray-800">
-                                    Tutup
-                                </button>
-                            </div>
-
+                        <div class="text-right">
+                            <p id="progressPercentText" class="text-3xl font-black text-blue-700">
+                                0%
+                            </p>
+                            <p class="text-xs text-slate-500 font-bold">
+                                Processing
+                            </p>
                         </div>
                     </div>
 
-                    {{-- MODAL EDIT --}}
-                    <div id="editProject{{ $project->id_project }}"
-                        class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4">
-
-                        <div class="bg-white dark:bg-gray-900 w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl border border-gray-200 dark:border-gray-800 shadow-2xl">
-
-                            <div class="bg-yellow-500 px-6 py-5 text-white">
-                                <div class="flex items-start justify-between gap-4">
-                                    <div>
-                                        <p class="text-xs font-semibold opacity-90">Edit Data</p>
-                                        <h2 class="text-lg font-black leading-snug">
-                                            {{ $project->project_name ?? '-' }}
-                                        </h2>
-                                    </div>
-
-                                    <button type="button"
-                                            onclick="closeDetailModal('editProject{{ $project->id_project }}')"
-                                            class="w-9 h-9 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xl">
-                                        ×
-                                    </button>
-                                </div>
-                            </div>
-
-                            <form method="POST"
-                                action="{{ route('admin.import.pid.update', $project->id_project) }}">
-                                @csrf
-                                @method('PUT')
-
-                                <div class="p-5 overflow-y-auto max-h-[65vh] space-y-5">
-
-                                    <div>
-                                        <h3 class="text-xs font-black text-gray-400 uppercase mb-3">
-                                            Data PID
-                                        </h3>
-
-                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">PID</label>
-                                                <input name="pid"
-                                                    value="{{ $project->pid }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">PID SAP</label>
-                                                <input name="pid_sap"
-                                                    value="{{ $project->pid_sap }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">Program</label>
-                                                <input name="program"
-                                                    value="{{ $project->program }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div class="md:col-span-3">
-                                                <label class="text-xs font-bold text-gray-500">Nama LOP</label>
-                                                <input name="nama_lop"
-                                                    value="{{ $project->project_name }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">Execution Type</label>
-                                                <select name="execution_type"
-                                                        class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                                    <option value="kemitraan" @selected($project->execution_type == 'kemitraan')>Kemitraan</option>
-                                                    <option value="swakelola" @selected($project->execution_type == 'swakelola')>Swakelola</option>
-                                                    <option value="turnkey" @selected($project->execution_type == 'turnkey')>Turnkey</option>
-                                                </select>
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">Status Project</label>
-                                                <select name="status_project"
-                                                        class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                                    <option value="init" @selected($project->status_project == 'init')>Init</option>
-                                                    <option value="active" @selected($project->status_project == 'active')>Active</option>
-                                                    <option value="close" @selected($project->status_project == 'close')>Close</option>
-                                                    <option value="bast" @selected($project->status_project == 'bast')>Bast</option>
-                                                </select>
-                                            </div>
-
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 class="text-xs font-black text-gray-400 uppercase mb-3">
-                                            Data LOP
-                                        </h3>
-
-                                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">ID IHLD</label>
-                                                <input name="id_ihld"
-                                                    value="{{ $project->lop?->id_ihld }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">Tematik</label>
-                                                <input name="tematik"
-                                                    value="{{ $project->lop?->tematik }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">STO</label>
-                                                <input name="sto"
-                                                    value="{{ $project->lop?->sto }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">Branch</label>
-                                                <input name="branch"
-                                                    value="{{ $project->lop?->branch }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">Batch</label>
-                                                <input name="batch"
-                                                    value="{{ $project->lop?->batch }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">No SP</label>
-                                                <input name="no_sp"
-                                                    value="{{ $project->lop?->no_sp }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">Tanggal SP</label>
-                                                <input type="date"
-                                                    name="tgl_sp"
-                                                    value="{{ $project->lop?->tgl_sp }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">Tanggal TOC</label>
-                                                <input type="date"
-                                                    name="tgl_toc"
-                                                    value="{{ $project->lop?->tgl_toc }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                            <div>
-                                                <label class="text-xs font-bold text-gray-500">Mitra</label>
-                                                <input name="mitra_name"
-                                                    value="{{ $project->lop?->mitra_name }}"
-                                                    class="mt-1 w-full rounded-xl border-gray-300 text-sm">
-                                            </div>
-
-                                        </div>
-                                    </div>
-
-                                </div>
-
-                                <div class="px-5 py-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-950 flex justify-end gap-2">
-                                    <button type="button"
-                                            onclick="closeDetailModal('editProject{{ $project->id_project }}')"
-                                            class="h-10 px-5 rounded-xl border border-gray-300 text-sm font-bold">
-                                        Batal
-                                    </button>
-
-                                    <button class="h-10 px-5 rounded-xl bg-yellow-500 text-white text-sm font-bold hover:bg-yellow-600">
-                                        Simpan Perubahan
-                                    </button>
-                                </div>
-
-                            </form>
-
+                    <div class="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-6">
+                        <div id="progressBar"
+                             class="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-500"
+                             style="width: 0%">
                         </div>
                     </div>
 
-                    @empty
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div id="stepReading" class="rounded-3xl bg-blue-50 border border-blue-100 p-4">
+                            <p class="text-2xl mb-2">📖</p>
+                            <p class="text-sm font-black text-blue-700">Reading File</p>
+                            <p class="text-xs text-blue-600 mt-1">Membaca Excel/CSV</p>
+                        </div>
 
-                        <tr>
-                            <td colspan="7" class="px-4 py-8 text-center text-sm text-gray-500">
-                                Belum ada data PID.
-                            </td>
-                        </tr>
+                        <div id="stepValidating" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
+                            <p class="text-2xl mb-2">🔍</p>
+                            <p class="text-sm font-black text-slate-700">Validating Data</p>
+                            <p class="text-xs text-slate-500 mt-1">Cek PID SAP & LOP</p>
+                        </div>
 
+                        <div id="stepFinalizing" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
+                            <p class="text-2xl mb-2">⚙️</p>
+                            <p class="text-sm font-black text-slate-700">Finalizing Import</p>
+                            <p class="text-xs text-slate-500 mt-1">Create / update data</p>
+                        </div>
 
-                    @endforelse
+                        <div id="stepComplete" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
+                            <p class="text-2xl mb-2">✅</p>
+                            <p class="text-sm font-black text-slate-700">Import Complete</p>
+                            <p class="text-xs text-slate-500 mt-1">Menyiapkan hasil</p>
+                        </div>
+                    </div>
+                </div>
 
-                </tbody>
+                {{-- RESULT --}}
+                @if($result)
+                    @php
+                        $total = max((int) ($result['total_rows'] ?? 0), 1);
+                        $validPercent = round((($result['valid_rows'] ?? 0) / $total) * 100);
+                        $invalidPercent = round((($result['invalid_rows_count'] ?? 0) / $total) * 100);
+                    @endphp
 
-            </table>
+                    <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
 
-        </div>
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                            <div>
+                                <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                                    Detail Hasil Pengecekan Import
+                                </h2>
+                                <p class="text-sm text-slate-500">
+                                    File: <b>{{ $result['file_name'] ?? '-' }}</b>
+                                </p>
+                            </div>
 
-        {{-- PAGINATION --}}
-        @if ($projects->hasPages())
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-gray-200 dark:border-gray-800">
+                            <span class="px-4 py-2 rounded-2xl bg-emerald-50 text-emerald-700 text-xs font-black">
+                                IMPORT COMPLETE
+                            </span>
+                        </div>
 
-            <div class="text-sm text-gray-500 dark:text-gray-400">
-                Menampilkan
-                <span class="font-semibold">{{ $projects->firstItem() }}</span>
-                -
-                <span class="font-semibold">{{ $projects->lastItem() }}</span>
-                dari
-                <span class="font-semibold">{{ $projects->total() }}</span>
-                data
-            </div>
+                        @if(!empty($result['missing_headers']))
+                            <div class="rounded-3xl bg-red-50 border border-red-200 p-5 mb-5">
+                                <p class="text-sm font-black text-red-700">
+                                    Header wajib tidak ditemukan
+                                </p>
+                                <p class="text-xs text-red-600 mt-1">
+                                    {{ implode(', ', $result['missing_headers']) }}
+                                </p>
+                            </div>
+                        @endif
 
-            <div class="flex items-center gap-1">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div class="rounded-3xl bg-slate-50 dark:bg-slate-800 p-5">
+                                <p class="text-xs text-slate-500 font-bold">Total Row</p>
+                                <p class="text-3xl font-black text-slate-900 dark:text-white mt-1">
+                                    {{ $result['total_rows'] ?? 0 }}
+                                </p>
+                            </div>
 
-                {{-- Previous --}}
-                @if ($projects->onFirstPage())
-                    <span class="px-3 py-2 rounded-lg border text-gray-400 cursor-not-allowed">
-                        ←
-                    </span>
-                @else
-                    <a href="{{ $projects->previousPageUrl() }}"
-                    class="px-3 py-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800">
-                        ←
-                    </a>
+                            <div class="rounded-3xl bg-emerald-50 dark:bg-emerald-900/20 p-5">
+                                <p class="text-xs text-emerald-700 dark:text-emerald-300 font-bold">Valid Row</p>
+                                <p class="text-3xl font-black text-emerald-700 dark:text-emerald-300 mt-1">
+                                    {{ $result['valid_rows'] ?? 0 }}
+                                </p>
+                                <div class="mt-3 h-2 rounded-full bg-emerald-100 overflow-hidden">
+                                    <div class="h-full bg-emerald-600 rounded-full" style="width: {{ $validPercent }}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-3xl bg-red-50 dark:bg-red-900/20 p-5">
+                                <p class="text-xs text-red-700 dark:text-red-300 font-bold">Invalid Row</p>
+                                <p class="text-3xl font-black text-red-700 dark:text-red-300 mt-1">
+                                    {{ $result['invalid_rows_count'] ?? 0 }}
+                                </p>
+                                <div class="mt-3 h-2 rounded-full bg-red-100 overflow-hidden">
+                                    <div class="h-full bg-red-500 rounded-full" style="width: {{ $invalidPercent }}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-3xl bg-blue-50 dark:bg-blue-900/20 p-5">
+                                <p class="text-xs text-blue-700 dark:text-blue-300 font-bold">Processed Row</p>
+                                <p class="text-3xl font-black text-blue-700 dark:text-blue-300 mt-1">
+                                    {{ $result['processed_rows'] ?? $result['valid_rows'] ?? 0 }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                            <div class="rounded-3xl bg-blue-50 p-5">
+                                <p class="text-xs text-blue-700 font-bold">Project Baru</p>
+                                <p class="text-2xl font-black text-blue-700 mt-1">
+                                    {{ $result['project_imported'] ?? 0 }}
+                                </p>
+                            </div>
+
+                            <div class="rounded-3xl bg-amber-50 p-5">
+                                <p class="text-xs text-amber-700 font-bold">Update Project</p>
+                                <p class="text-2xl font-black text-amber-700 mt-1">
+                                    {{ $result['project_updated'] ?? 0 }}
+                                </p>
+                            </div>
+
+                            <div class="rounded-3xl bg-indigo-50 p-5">
+                                <p class="text-xs text-indigo-700 font-bold">LOP Baru</p>
+                                <p class="text-2xl font-black text-indigo-700 mt-1">
+                                    {{ $result['lop_imported'] ?? 0 }}
+                                </p>
+                            </div>
+
+                            <div class="rounded-3xl bg-orange-50 p-5">
+                                <p class="text-xs text-orange-700 font-bold">Update LOP</p>
+                                <p class="text-2xl font-black text-orange-700 mt-1">
+                                    {{ $result['lop_updated'] ?? 0 }}
+                                </p>
+                            </div>
+                        </div>
+
+                        @if(!empty($result['invalid_rows']))
+                            <div class="mt-6 rounded-[2rem] border border-red-200 bg-red-50 overflow-hidden">
+                                <div class="px-5 py-4 border-b border-red-200">
+                                    <h3 class="text-sm font-black text-red-700">
+                                        Preview Data Tidak Memenuhi Syarat
+                                    </h3>
+                                    <p class="text-xs text-red-600 mt-1">
+                                        Menampilkan maksimal 10 baris pertama yang gagal validasi.
+                                    </p>
+                                </div>
+
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-red-100/70">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Row</th>
+                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">PID</th>
+                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">PID SAP</th>
+                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Nama LOP</th>
+                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Keterangan</th>
+                                            </tr>
+                                        </thead>
+
+                                        <tbody class="divide-y divide-red-200">
+                                            @foreach($result['invalid_rows'] as $invalid)
+                                                <tr>
+                                                    <td class="px-4 py-3 font-bold text-red-700">
+                                                        {{ $invalid['row'] }}
+                                                    </td>
+
+                                                    <td class="px-4 py-3 text-red-700">
+                                                        {{ $invalid['pid'] ?? '-' }}
+                                                    </td>
+
+                                                    <td class="px-4 py-3 text-red-700">
+                                                        {{ $invalid['pid_sap'] ?? '-' }}
+                                                    </td>
+
+                                                    <td class="px-4 py-3 text-red-700">
+                                                        {{ $invalid['nama_lop'] ?? '-' }}
+                                                    </td>
+
+                                                    <td class="px-4 py-3 font-bold text-red-700">
+                                                        {{ $invalid['reason'] }}
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
+
+                    </div>
                 @endif
 
-                {{-- Page Numbers --}}
-                @foreach ($projects->getUrlRange(
-                    max(1, $projects->currentPage() - 2),
-                    min($projects->lastPage(), $projects->currentPage() + 2)
-                ) as $page => $url)
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
 
-                    @if ($page == $projects->currentPage())
-                        <span class="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold">
-                            {{ $page }}
-                        </span>
-                    @else
-                        <a href="{{ $url }}"
-                        class="px-4 py-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800">
-                            {{ $page }}
-                        </a>
-                    @endif
+            {{-- MAIN --}}
+            <div class="xl:col-span-8 space-y-6">
 
-                @endforeach
+                {{-- UPLOAD CARD --}}
+                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
 
-                {{-- Next --}}
-                @if ($projects->hasMorePages())
-                    <a href="{{ $projects->nextPageUrl() }}"
-                    class="px-3 py-2 rounded-lg border hover:bg-gray-100 dark:hover:bg-gray-800">
-                        →
-                    </a>
-                @else
-                    <span class="px-3 py-2 rounded-lg border text-gray-400 cursor-not-allowed">
-                        →
-                    </span>
-                @endif
+                     <div class="flex items-start gap-4 mb-6">
+                        <div class="w-14 h-14 rounded-3xl bg-blue-50 text-blue-700 flex items-center justify-center text-2xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cloud-upload-icon lucide-cloud-upload">
+                                <path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>
+                            </svg>
+                        </div>
+
+                        <div>
+                            <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                                Upload File PID
+                            </h2>
+                            <p class="text-sm text-slate-500">
+                                Sistem akan membaca file, validasi mandatory field, menampilkan hasil pengecekan, lalu menyimpan data valid.
+                            </p>
+                        </div>
+                    </div>
+
+                    <form id="importForm"
+                          action="{{ route('admin.import.pid.upload') }}"
+                          method="POST"
+                          enctype="multipart/form-data"
+                          class="space-y-5">
+
+                        @csrf
+
+                        <label for="file"
+                               class="group relative flex flex-col items-center justify-center min-h-[200px] rounded-[2rem] border-2 border-dashed border-blue-200 dark:border-slate-700 bg-blue-50/50 dark:bg-slate-950 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer transition">
+
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cloud-upload-icon lucide-cloud-upload">
+                                <path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>
+                            </svg>
+
+                            <p class="text-base font-black text-slate-900 dark:text-white">
+                                Klik untuk pilih file PID
+                            </p>
+
+                            <p id="fileName" class="text-sm text-slate-500 mt-1">
+                                Belum ada file dipilih
+                            </p>
+
+                            <p class="text-xs text-slate-400 mt-3">
+                                Support: .xlsx, .xls, .csv
+                            </p>
+
+                            <input id="file"
+                                   type="file"
+                                   name="file"
+                                   accept=".xlsx,.xls,.csv"
+                                   required
+                                   class="hidden"
+                                   onchange="showSelectedFile(this)">
+                        </label>
+
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <button id="uploadButton"
+                                    class="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-lg shadow-blue-700/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rocket-icon lucide-rocket"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/>
+                                    <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/>
+                                </svg>
+                                <span>Start Upload</span>
+                            </button>
+
+                            <a href="{{ route('admin.import.pid.template') }}"
+                               class="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download-icon lucide-download">
+                                    <path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>
+                                </svg>
+                                <span>Download Template</span>
+                            </a>
+                        </div>
+                    </form>
+                </div>
 
             </div>
+
+            {{-- SIDEBAR --}}
+            <div class="xl:col-span-4 space-y-5">
+
+                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                    <h2 class="text-sm font-black text-slate-900 dark:text-white">
+                        Mandatory Field
+                    </h2>
+
+                    <div class="mt-4 space-y-3">
+                        <div class="rounded-3xl bg-emerald-50 border border-emerald-100 p-4">
+                            <p class="text-sm font-black text-emerald-700">PID SAP</p>
+                            <p class="text-xs text-emerald-600 mt-1">Wajib diisi untuk mapping project.</p>
+                        </div>
+
+                        <div class="rounded-3xl bg-emerald-50 border border-emerald-100 p-4">
+                            <p class="text-sm font-black text-emerald-700">Nama LOP</p>
+                            <p class="text-xs text-emerald-600 mt-1">Wajib diisi untuk membuat data LOP.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                    <h2 class="text-sm font-black text-slate-900 dark:text-white">
+                        Upload Terakhir
+                    </h2>
+
+                    <div class="mt-4 rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
+                        <p class="text-xs text-slate-500 font-bold">Nama File</p>
+                        <p class="text-sm font-black text-slate-900 dark:text-white mt-1 break-words">
+                            {{ $lastImport?->file_name ?? '-' }}
+                        </p>
+
+                        <div class="grid grid-cols-2 gap-3 mt-4">
+                            <div>
+                                <p class="text-xs text-slate-500 font-bold">Uploader</p>
+                                <p class="text-sm font-black text-slate-900 dark:text-white">
+                                    {{ $lastImport?->uploader?->name ?? '-' }}
+                                </p>
+                            </div>
+
+                            <div>
+                                <p class="text-xs text-slate-500 font-bold">Waktu</p>
+                                <p class="text-sm font-black text-slate-900 dark:text-white">
+                                    {{ $lastImport?->created_at?->timezone('Asia/Jakarta')->format('H:i') ?? '-' }} WIB
+                                </p>
+                            </div>
+                        </div>
+
+                        <p class="text-xs text-slate-500 mt-3">
+                            {{ $lastImport?->created_at?->timezone('Asia/Jakarta')->format('d M Y') ?? '-' }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                    <h2 class="text-sm font-black text-slate-900 dark:text-white">
+                        Format Header
+                    </h2>
+
+                    <div class="mt-4 rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
+                        <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-mono">
+                            pid, pid_sap, nama_lop, program, execution_type, status_project, id_ihld, tematik, sto, branch, batch, no_sp, tgl_sp, tgl_toc, mitra_name
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                    <h2 class="text-sm font-black text-slate-900 dark:text-white">
+                        History Upload
+                    </h2>
+
+                    <div class="mt-4 space-y-3">
+                        @forelse($importLogs as $log)
+                            <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="text-xs font-black text-slate-900 dark:text-white truncate">
+                                        {{ $log->file_name ?? '-' }}
+                                    </p>
+
+                                    <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black">
+                                        {{ strtoupper($log->status ?? 'success') }}
+                                    </span>
+                                </div>
+
+                                <p class="text-xs text-slate-500 mt-2">
+                                    Upload oleh <b>{{ $log->uploader?->name ?? '-' }}</b>
+                                </p>
+
+                                <p class="text-xs text-slate-500">
+                                    {{ $log->created_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB
+                                </p>
+
+                                <div class="grid grid-cols-3 gap-2 mt-3 text-center">
+                                    <div class="rounded-2xl bg-white dark:bg-slate-900 p-2">
+                                        <p class="text-[10px] text-slate-500">Import</p>
+                                        <p class="font-black text-blue-600">{{ $log->imported }}</p>
+                                    </div>
+
+                                    <div class="rounded-2xl bg-white dark:bg-slate-900 p-2">
+                                        <p class="text-[10px] text-slate-500">Update</p>
+                                        <p class="font-black text-amber-600">{{ $log->updated }}</p>
+                                    </div>
+
+                                    <div class="rounded-2xl bg-white dark:bg-slate-900 p-2">
+                                        <p class="text-[10px] text-slate-500">Skip</p>
+                                        <p class="font-black text-red-600">{{ $log->skipped }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 p-5 text-center">
+                                <p class="text-sm text-slate-500">
+                                    Belum ada history upload.
+                                </p>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
+            </div>
+
         </div>
-    @endif
 
     </div>
-
 </div>
 
 <script>
-    function openDetailModal(id) {
-        const modal = document.getElementById(id);
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
+    function showSelectedFile(input) {
+        const fileName = document.getElementById('fileName');
+
+        if (input.files && input.files[0]) {
+            fileName.innerText = input.files[0].name;
+        } else {
+            fileName.innerText = 'Belum ada file dipilih';
+        }
     }
 
-    function closeDetailModal(id) {
-        const modal = document.getElementById(id);
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
+    const importForm = document.getElementById('importForm');
+
+    importForm.addEventListener('submit', function () {
+        const fileInput = document.getElementById('file');
+
+        if (!fileInput.files.length) {
+            return;
+        }
+
+        document.getElementById('progressCard').classList.remove('hidden');
+        document.getElementById('progressFileName').innerText = fileInput.files[0].name;
+
+        document.getElementById('uploadButton').disabled = true;
+        document.getElementById('uploadButton').classList.add('opacity-60', 'cursor-not-allowed');
+        document.getElementById('uploadButton').innerHTML = '<span>⏳</span><span>Uploading...</span>';
+
+        runImportProgress();
+    });
+
+    function setProgress(percent, activeStepId) {
+        document.getElementById('progressBar').style.width = percent + '%';
+        document.getElementById('progressPercentText').innerText = percent + '%';
+
+        const steps = [
+            'stepReading',
+            'stepValidating',
+            'stepFinalizing',
+            'stepComplete'
+        ];
+
+        steps.forEach(function (id) {
+            const el = document.getElementById(id);
+
+            el.classList.add('opacity-50', 'bg-slate-50', 'border-slate-100');
+            el.classList.remove('bg-blue-50', 'border-blue-100', 'bg-emerald-50', 'border-emerald-100');
+        });
+
+        const active = document.getElementById(activeStepId);
+
+        if (activeStepId === 'stepComplete') {
+            active.classList.remove('opacity-50', 'bg-slate-50', 'border-slate-100');
+            active.classList.add('bg-emerald-50', 'border-emerald-100');
+        } else {
+            active.classList.remove('opacity-50', 'bg-slate-50', 'border-slate-100');
+            active.classList.add('bg-blue-50', 'border-blue-100');
+        }
+    }
+
+    function runImportProgress() {
+        setTimeout(() => setProgress(20, 'stepReading'), 200);
+        setTimeout(() => setProgress(45, 'stepValidating'), 900);
+        setTimeout(() => setProgress(75, 'stepFinalizing'), 1600);
+        setTimeout(() => setProgress(95, 'stepComplete'), 2300);
     }
 </script>
 

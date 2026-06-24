@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Package;
 
 class Lop extends Model
 {
@@ -55,5 +56,16 @@ class Lop extends Model
     public function project()
     {
         return $this->belongsTo(Project::class, 'project_id', 'id_project');
+    }
+
+
+    public function package()
+    {
+        return $this->belongsTo(Package::class, 'package_id', 'id_package');
+    }
+
+    public function boqItems()
+    {
+        return $this->hasMany(BoqItem::class, 'lop_id', 'id_lop');
     }
 }

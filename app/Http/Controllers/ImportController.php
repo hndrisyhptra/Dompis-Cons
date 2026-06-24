@@ -8,6 +8,7 @@ use App\Models\BoqItem;
 use App\Models\Designator;
 use App\Models\Evidence;
 use App\Models\ProjectAssignment;
+use App\Models\ImportLog;
 use App\Models\Package as PackageModel;
 use App\Models\DesignatorPackagePrice;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -18,33 +19,33 @@ class ImportController extends Controller
 {
     public function pidIndex(Request $request)
     {
-        $search = $request->search;
-
-        $projects = Project::with('lop')
-            ->when($search, function ($query) use ($search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('pid', 'like', "%{$search}%")
-                    ->orWhere('pid_sap', 'like', "%{$search}%")
-                    ->orWhere('project_name', 'like', "%{$search}%")
-                    ->orWhere('program', 'like', "%{$search}%")
-                    ->orWhere('execution_type', 'like', "%{$search}%")
-                    ->orWhere('status_project', 'like', "%{$search}%");
-                });
-            })
+        $lastImport = ImportLog::with('uploader')
+            ->where('type', 'pid')
             ->latest()
-            ->paginate(10)
-            ->withQueryString();
+            ->first();
 
-        return view('admin.import.pid', compact('projects', 'search'));
+        $importLogs = ImportLog::with('uploader')
+            ->where('type', 'pid')
+            ->latest()
+            ->take(2)
+            ->get();
+
+        return view('admin.import.pid', compact(
+            'lastImport',
+            'importLogs'
+        ));
     }
 
     public function importPid(Request $request)
     {
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls',
+            'file' => 'required|mimes:xlsx,xls,csv',
         ]);
 
-        $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
+        $file = $request->file('file');
+        $fileName = $file->getClientOriginalName();
+
+        $spreadsheet = IOFactory::load($file->getRealPath());
         $sheet = $spreadsheet->getActiveSheet();
 
         $highestRow = $sheet->getHighestRow();
@@ -63,11 +64,48 @@ class ImportController extends Controller
             $headers[$col] = $header;
         }
 
+        $requiredHeaders = [
+            'pid_sap',
+            'nama_lop',
+        ];
+
+        $missingHeaders = [];
+
+        foreach ($requiredHeaders as $requiredHeader) {
+            if (!in_array($requiredHeader, $headers)) {
+                $missingHeaders[] = $requiredHeader;
+            }
+        }
+
+        if (!empty($missingHeaders)) {
+            return back()
+                ->with('import_result', [
+                    'file_name' => $fileName,
+                    'total_rows' => max($highestRow - 1, 0),
+                    'valid_rows' => 0,
+                    'invalid_rows_count' => 0,
+                    'invalid_rows' => [],
+                    'missing_headers' => $missingHeaders,
+                    'imported' => 0,
+                    'updated' => 0,
+                    'skipped' => 0,
+                    'project_imported' => 0,
+                    'project_updated' => 0,
+                    'lop_imported' => 0,
+                    'lop_updated' => 0,
+                ])
+                ->with('error', 'Import gagal. Header wajib tidak ditemukan: ' . implode(', ', $missingHeaders));
+        }
+
         $projectImported = 0;
         $projectUpdated = 0;
         $lopImported = 0;
         $lopUpdated = 0;
         $skipped = 0;
+        $validRows = 0;
+
+        $invalidRows = [];
+        $pidSapTracker = [];
 
         for ($row = 2; $row <= $highestRow; $row++) {
 
@@ -89,10 +127,41 @@ class ImportController extends Controller
             $namaLop = $this->cleanValue($data['nama_lop'] ?? null);
             $idIhld = $this->cleanValue($data['id_ihld'] ?? null);
 
-            if (!$pid || !$namaLop) {
+            $rowErrors = [];
+
+            if (!$pidSap) {
+                $rowErrors[] = 'PID SAP wajib diisi';
+            }
+
+            if (!$namaLop) {
+                $rowErrors[] = 'Nama LOP wajib diisi';
+            }
+
+            if ($pidSap) {
+                $pidSapKey = strtolower(trim($pidSap));
+
+                if (isset($pidSapTracker[$pidSapKey])) {
+                    $rowErrors[] = 'PID SAP duplikat di file, sama dengan row ' . $pidSapTracker[$pidSapKey];
+                } else {
+                    $pidSapTracker[$pidSapKey] = $row;
+                }
+            }
+
+            if (!empty($rowErrors)) {
                 $skipped++;
+
+                $invalidRows[] = [
+                    'row' => $row,
+                    'pid' => $pid,
+                    'pid_sap' => $pidSap,
+                    'nama_lop' => $namaLop,
+                    'reason' => implode(', ', $rowErrors),
+                ];
+
                 continue;
             }
+
+            $validRows++;
 
             $executionType = $this->cleanValue($data['execution_type'] ?? 'kemitraan') ?: 'kemitraan';
             $statusProject = $this->cleanValue($data['status_project'] ?? 'active') ?: 'active';
@@ -105,8 +174,15 @@ class ImportController extends Controller
                 $statusProject = 'active';
             }
 
+            /*
+            | PID di file boleh kosong.
+            | Karena mandatory utama adalah PID SAP + Nama LOP,
+            | maka pid project fallback ke PID SAP agar create project tetap aman.
+            */
+            $pidForProject = $pid ?: $pidSap;
+
             $projectPayload = [
-                'pid' => $pid,
+                'pid' => $pidForProject,
                 'pid_sap' => $pidSap,
                 'project_name' => $namaLop,
                 'program' => $this->cleanValue($data['program'] ?? null),
@@ -114,7 +190,11 @@ class ImportController extends Controller
                 'status_project' => $statusProject,
             ];
 
-            $project = Project::where('pid', $pid)->first();
+            $project = Project::where('pid_sap', $pidSap)->first();
+
+            if (!$project && $pid) {
+                $project = Project::where('pid', $pid)->first();
+            }
 
             if ($project) {
                 $project->update($projectPayload);
@@ -167,10 +247,38 @@ class ImportController extends Controller
             }
         }
 
-        return back()->with(
-            'success',
-            "Import PID selesai. Project Baru {$projectImported}, Update Project {$projectUpdated}, LOP Baru {$lopImported}, Update LOP {$lopUpdated}, Data di Skip {$skipped}."
-        );
+        ImportLog::create([
+            'type' => 'pid',
+            'file_name' => $fileName,
+            'uploaded_by' => auth()->user()->id_user ?? auth()->id(),
+            'total_rows' => max($highestRow - 1, 0),
+            'imported' => $projectImported,
+            'updated' => $projectUpdated,
+            'skipped' => $skipped,
+            'status' => 'success',
+        ]);
+
+        return back()
+            ->with('import_result', [
+                'file_name' => $fileName,
+                'total_rows' => max($highestRow - 1, 0),
+                'valid_rows' => $validRows,
+                'invalid_rows_count' => count($invalidRows),
+                'invalid_rows' => array_slice($invalidRows, 0, 10),
+                'missing_headers' => [],
+                'processed_rows' => $validRows,
+                'imported' => $projectImported,
+                'updated' => $projectUpdated,
+                'skipped' => $skipped,
+                'project_imported' => $projectImported,
+                'project_updated' => $projectUpdated,
+                'lop_imported' => $lopImported,
+                'lop_updated' => $lopUpdated,
+            ])
+            ->with(
+                'success',
+                "Import PID selesai. Project Baru {$projectImported}, Update Project {$projectUpdated}, LOP Baru {$lopImported}, Update LOP {$lopUpdated}, Data di Skip {$skipped}."
+            );
     }
 
     public function updatePid(Request $request, Project $project)
@@ -527,9 +635,23 @@ class ImportController extends Controller
 
     public function boqIndex()
     {
-        return view('admin.import.boq');
-    }
+        $lastImport = ImportLog::with('uploader')
+            ->where('type', 'boq')
+            ->latest()
+            ->first();
 
+        $importLogs = ImportLog::with('uploader')
+            ->where('type', 'boq')
+            ->latest()
+            ->skip(1)
+            ->take(2)
+            ->get();
+
+        return view('admin.import.boq', compact(
+            'lastImport',
+            'importLogs'
+        ));
+    }
     public function importBoq(Request $request)
     {
         $request->validate([
@@ -537,12 +659,12 @@ class ImportController extends Controller
             'mapping_by' => 'required|in:pid,lop_name',
         ]);
 
-        $spreadsheet = IOFactory::load($request->file('file')->getRealPath());
+        $file = $request->file('file');
+        $fileName = $file->getClientOriginalName();
 
-        // Ambil sheet aktif / sheet pertama dari file upload
+        $spreadsheet = IOFactory::load($file->getRealPath());
         $sheet = $spreadsheet->getActiveSheet();
 
-        // Nama sheet contoh: PAKET 5
         $sheetName = strtoupper(trim($sheet->getTitle()));
 
         $package = PackageModel::whereRaw('UPPER(package_name) = ?', [$sheetName])
@@ -550,24 +672,49 @@ class ImportController extends Controller
             ->first();
 
         if (!$package) {
-            return back()->with('error', "Package {$sheetName} belum ada di master package.");
+            return back()
+                ->with('import_result', [
+                    'file_name' => $fileName,
+                    'sheet_name' => $sheetName,
+                    'status' => 'failed',
+                    'error_message' => "Package {$sheetName} belum ada di master package.",
+                    'total_headers' => 0,
+                    'matched_lop' => 0,
+                    'unmapped_lop' => 0,
+                    'existing_boq_headers' => 0,
+                    'imported' => 0,
+                    'updated' => 0,
+                    'skipped' => 0,
+                    'unmapped_designator' => 0,
+                    'price_missing' => 0,
+                    'volume_items' => 0,
+                    'invalid_rows' => [],
+                ])
+                ->with('error', "Package {$sheetName} belum ada di master package.");
         }
 
         $highestRow = $sheet->getHighestRow();
         $highestColumn = $sheet->getHighestColumn();
-        $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
+        $highestColumnIndex = Coordinate::columnIndexFromString($highestColumn);
 
         $imported = 0;
         $updated = 0;
         $skipped = 0;
+
         $unmappedLop = 0;
         $unmappedDesignator = 0;
         $priceMissing = 0;
         $matchedLop = 0;
+        $volumeItems = 0;
+
+        // Ini yang akan dipakai untuk card "Data Sudah Ada"
+        $existingBoqHeaders = 0;
+
         $matchedHeaders = [];
         $unmatchedHeaders = [];
+        $existingHeaders = [];
+        $invalidRows = [];
 
-        // Loop kolom mulai B, karena A adalah Designator
         for ($col = 2; $col <= $highestColumnIndex; $col++) {
 
             $columnLetter = Coordinate::stringFromColumnIndex($col);
@@ -581,7 +728,6 @@ class ImportController extends Controller
             }
 
             if ($request->mapping_by === 'pid') {
-
                 $project = Project::where('pid', $headerValue)
                     ->orWhere('pid_sap', $headerValue)
                     ->first();
@@ -589,65 +735,67 @@ class ImportController extends Controller
                 $lop = $project
                     ? Lop::where('project_id', $project->id_project)->first()
                     : null;
-
             } else {
-
                 $lop = Lop::whereRaw('LOWER(TRIM(lop_name)) = ?', [
                     strtolower(trim($headerValue))
                 ])->first();
-
             }
 
             if (!$lop) {
                 $unmappedLop++;
                 $unmatchedHeaders[] = $headerValue;
+
+                $invalidRows[] = [
+                    'type' => 'LOP / PID tidak match',
+                    'header' => $headerValue,
+                    'row' => '-',
+                    'designator' => '-',
+                    'qty' => '-',
+                    'reason' => 'Header kolom tidak ditemukan di data PID/LOP',
+                ];
+
                 continue;
             }
 
             $matchedLop++;
             $matchedHeaders[] = $headerValue;
 
-            // Set package ke LOP jika belum ada
+            /*
+            |--------------------------------------------------------------------------
+            | Hitung header yang sudah punya BOQ
+            |--------------------------------------------------------------------------
+            | Ini menghitung PID SAP / Nama LOP yang sudah pernah memiliki BOQ.
+            | Bukan menghitung jumlah item designator.
+            |--------------------------------------------------------------------------
+            */
+            $hasExistingBoq = BoqItem::where('lop_id', $lop->id_lop)->exists();
+
+            if ($hasExistingBoq) {
+                $existingBoqHeaders++;
+                $existingHeaders[] = $headerValue;
+            }
+
             if (!$lop->package_id) {
                 $lop->update([
                     'package_id' => $package->id_package,
                 ]);
             }
 
-            // Loop row mulai 2, karena row 1 header
             for ($row = 2; $row <= $highestRow; $row++) {
 
                 $baseDesignator = strtoupper(
-                    trim(
-                        (string) $sheet->getCell('A' . $row)->getValue()
-                    )
+                    trim((string) $sheet->getCell('A' . $row)->getValue())
                 );
-                $columnLetter = Coordinate::stringFromColumnIndex($col);
 
-                $qty = $sheet
-                    ->getCell($columnLetter . $row)
-                    ->getCalculatedValue();
-
+                $qty = $sheet->getCell($columnLetter . $row)->getCalculatedValue();
                 $qty = is_numeric($qty) ? (float) $qty : 0;
 
                 if ($baseDesignator === '' || $qty <= 0) {
+                    $skipped++;
                     continue;
                 }
 
-                /*
-                |--------------------------------------------------------------------------
-                | Cari designator
-                |--------------------------------------------------------------------------
-                | File BOQ berisi base code:
-                | AB-OF-SM-12D
-                |
-                | Master designator bisa:
-                | M-AB-OF-SM-12D
-                | J-AB-OF-SM-12D
-                |
-                | Maka kita cari berdasarkan pair_code.
-                |--------------------------------------------------------------------------
-                */
+                $volumeItems++;
 
                 $designators = Designator::where('pair_code', $baseDesignator)
                     ->orWhere('designator', $baseDesignator)
@@ -655,6 +803,16 @@ class ImportController extends Controller
 
                 if ($designators->count() == 0) {
                     $unmappedDesignator++;
+
+                    $invalidRows[] = [
+                        'type' => 'Designator tidak ditemukan',
+                        'header' => $headerValue,
+                        'row' => $row,
+                        'designator' => $baseDesignator,
+                        'qty' => $qty,
+                        'reason' => 'Designator tidak ada di master designator / pair_code',
+                    ];
+
                     continue;
                 }
 
@@ -668,50 +826,266 @@ class ImportController extends Controller
 
                     if (!$price) {
                         $priceMissing++;
+
+                        $invalidRows[] = [
+                            'type' => 'Harga package kosong',
+                            'header' => $headerValue,
+                            'row' => $row,
+                            'designator' => $designator->designator,
+                            'qty' => $qty,
+                            'reason' => "Harga {$designator->designator} untuk {$package->package_name} belum ada",
+                        ];
                     }
 
                     $totalPrice = $qty * $unitPrice;
 
                     $existing = BoqItem::where('lop_id', $lop->id_lop)
-                        ->where('designator_id', $designator->id_designator)
+                        ->where(function ($q) use ($designator) {
+                            $q->where('designator_id', $designator->id_designator)
+                                ->orWhere('designator', $designator->designator);
+                        })
                         ->first();
 
-                    BoqItem::updateOrCreate(
-                        [
-                            'lop_id' => $lop->id_lop,
-                            'designator_id' => $designator->id_designator,
-                        ],
-                        [
-                            'project_id' => $lop->project_id,
-                            'designator' => $designator->designator,
-                            'item_name' => $designator->item_name,
-                            'unit' => $designator->unit,
-                            'quantity_plan' => $qty,
-                            'quantity_actual' => 0,
-                            'unit_price' => $unitPrice,
-                            'total_price' => $totalPrice,
-                        ]
-                    );
-
                     if ($existing) {
-                        $updated++;
-                    } else {
-                        $imported++;
+                        $skipped++;
+                        continue;
                     }
+
+                    BoqItem::create([
+                        'project_id' => $lop->project_id,
+                        'lop_id' => $lop->id_lop,
+                        'designator_id' => $designator->id_designator,
+                        'designator' => $designator->designator,
+                        'item_name' => $designator->item_name,
+                        'unit' => $designator->unit,
+                        'quantity_plan' => $qty,
+                        'quantity_actual' => 0,
+                        'unit_price' => $unitPrice,
+                        'total_price' => $totalPrice,
+                    ]);
+
+                    $imported++;
                 }
             }
         }
 
-        return back()->with(
-            'success',
-            "Import BOQ selesai. 
-            | Match PID/Nama LOP: {$matchedLop} 
-            | Tidak Match: {$unmappedLop} 
-            | Data baru: {$imported} 
-            | Update: {$updated}
-            | Designator tidak ketemu: {$unmappedDesignator}"
-        );
-        
+        ImportLog::create([
+            'type' => 'boq',
+            'file_name' => $fileName,
+            'uploaded_by' => auth()->user()->id_user ?? auth()->id(),
+            'total_rows' => max($highestRow - 1, 0),
+            'imported' => $imported,
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'status' => 'success',
+        ]);
+
+        return back()
+            ->with('import_result', [
+                'file_name' => $fileName,
+                'sheet_name' => $sheetName,
+                'package_name' => $package->package_name ?? $sheetName,
+                'mapping_by' => $request->mapping_by,
+
+                'total_rows' => max($highestRow - 1, 0),
+                'total_headers' => count($matchedHeaders) + count($unmatchedHeaders),
+                'matched_lop' => $matchedLop,
+                'unmapped_lop' => $unmappedLop,
+
+                // Ini untuk card Data Sudah Ada
+                'existing_boq_headers' => $existingBoqHeaders,
+
+                'volume_items' => $volumeItems,
+                'imported' => $imported,
+                'updated' => $updated,
+                'skipped' => $skipped,
+
+                'unmapped_designator' => $unmappedDesignator,
+                'price_missing' => $priceMissing,
+
+                'matched_headers' => array_slice($matchedHeaders, 0, 10),
+                'unmatched_headers' => array_slice($unmatchedHeaders, 0, 10),
+                'existing_headers' => array_slice($existingHeaders, 0, 10),
+                'invalid_rows' => array_slice($invalidRows, 0, 10),
+            ])
+            ->with(
+                'success',
+                "Import BOQ selesai. Match LOP {$matchedLop}, Tidak Match {$unmappedLop}, Data Sudah Ada {$existingBoqHeaders}, Data Baru {$imported}, Designator Tidak Ketemu {$unmappedDesignator}."
+            );
+    }
+
+    public function dataBoq(Request $request)
+    {
+        $search = $request->search;
+        $package = $request->package;
+
+        $lops = Lop::query()
+            ->with([
+                'project',
+                'package',
+                'boqItems.designatorData',
+            ])
+            ->whereHas('boqItems')
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('lop_name', 'like', "%{$search}%")
+                        ->orWhere('id_ihld', 'like', "%{$search}%")
+                        ->orWhere('sto', 'like', "%{$search}%")
+                        ->orWhere('branch', 'like', "%{$search}%")
+                        ->orWhere('mitra_name', 'like', "%{$search}%")
+                        ->orWhereHas('project', function ($p) use ($search) {
+                            $p->where('pid', 'like', "%{$search}%")
+                                ->orWhere('pid_sap', 'like', "%{$search}%")
+                                ->orWhere('project_name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->when($package, function ($query) use ($package) {
+                $query->where('package_id', $package);
+            })
+            ->latest('id_lop')
+            ->paginate(10)
+            ->withQueryString();
+
+        $packages = PackageModel::orderBy('package_name')->get();
+
+        $allBoq = BoqItem::with('designatorData')->get();
+
+        $totalLopBoq = Lop::whereHas('boqItems')->count();
+        $totalItemBoq = $allBoq->count();
+
+        $totalMaterial = $allBoq->filter(function ($item) {
+            return str_starts_with(strtoupper($item->designator ?? ''), 'M-');
+        })->count();
+
+        $totalJasa = $allBoq->filter(function ($item) {
+            return str_starts_with(strtoupper($item->designator ?? ''), 'J-');
+        })->count();
+
+        $totalPlanValue = $allBoq->sum('total_price');
+
+        $totalLopBoq = Lop::whereHas('boqItems')->count();
+
+        $totalBoqValue = BoqItem::sum('total_price');
+
+        $sudahAssign = Lop::whereHas('boqItems')
+            ->whereHas('project.assignments')
+            ->count();
+
+        $belumAssign = Lop::whereHas('boqItems')
+            ->whereDoesntHave('project.assignments')
+            ->count();
+
+        return view('admin.import.data-boq', compact(
+            'lops',
+            'packages',
+            'search',
+            'package',
+
+            'totalLopBoq',
+            'totalBoqValue',
+            'sudahAssign',
+            'belumAssign'
+        ));
+    }
+
+    public function downloadPidTemplate()
+    {
+        $headers = [
+            'pid',
+            'pid_sap',
+            'nama_lop',
+            'program',
+            'execution_type',
+            'status_project',
+            'id_ihld',
+            'tematik',
+            'sto',
+            'branch',
+            'batch',
+            'no_sp',
+            'tgl_sp',
+            'tgl_toc',
+            'mitra_name',
+        ];
+
+        $sample = [
+            'PID001',
+            'SAP001',
+            'LOP AREA 1',
+            'OSP',
+            'kemitraan',
+            'active',
+            'IHLD001',
+            'FTTH',
+            'SDA',
+            'SURABAYA',
+            'BATCH 1',
+            'SP001',
+            '2026-06-23',
+            '2026-06-30',
+            'MITRA A',
+        ];
+
+        $filename = 'template_import_pid.csv';
+
+        $callback = function () use ($headers, $sample) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $headers);
+            fputcsv($file, $sample);
+            fclose($file);
+        };
+
+        return response()->streamDownload($callback, $filename, [
+            'Content-Type' => 'text/csv',
+        ]);
+    }
+
+    public function downloadBoqTemplate()
+    {
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('PAKET 5');
+
+        $sheet->setCellValue('A1', 'DESIGNATOR');
+        $sheet->setCellValue('B1', 'PID_SAP_001');
+        $sheet->setCellValue('C1', 'PID_SAP_002');
+        $sheet->setCellValue('D1', 'PID_SAP_003');
+
+        $designators = Designator::query()
+            ->whereNotNull('pair_code')
+            ->select('pair_code')
+            ->distinct()
+            ->orderBy('pair_code')
+            ->get();
+
+        $row = 2;
+
+        foreach ($designators as $designator) {
+            $sheet->setCellValue("A{$row}", $designator->pair_code);
+            $sheet->setCellValue("B{$row}", 0);
+            $sheet->setCellValue("C{$row}", 0);
+            $sheet->setCellValue("D{$row}", 0);
+            $row++;
+        }
+
+        $sheet->getColumnDimension('A')->setWidth(28);
+        $sheet->getColumnDimension('B')->setWidth(18);
+        $sheet->getColumnDimension('C')->setWidth(18);
+        $sheet->getColumnDimension('D')->setWidth(18);
+
+        $sheet->freezePane('B2');
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+
+        $fileName = 'template_import_boq.xlsx';
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 
     //HELPER PID
@@ -737,6 +1111,43 @@ class ImportController extends Controller
         $value = str_replace(',', '.', $value);
 
         return is_numeric($value) ? $value : null;
+    }
+
+    public function dataPid(Request $request)
+    {
+        $search = $request->search;
+
+        $projects = Project::with('lop')
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('pid', 'like', "%{$search}%")
+                        ->orWhere('pid_sap', 'like', "%{$search}%")
+                        ->orWhere('project_name', 'like', "%{$search}%")
+                        ->orWhere('program', 'like', "%{$search}%")
+                        ->orWhere('execution_type', 'like', "%{$search}%")
+                        ->orWhere('status_project', 'like', "%{$search}%");
+                });
+            })
+            ->latest()
+            ->paginate(10)
+            ->withQueryString();
+
+            $totalPid = Project::count();
+
+            $totalLop = Lop::count();
+
+            $sudahAdaBoq = Lop::whereHas('boqItems')->count();
+
+            $belumAdaBoq = Lop::whereDoesntHave('boqItems')->count();
+
+        return view('admin.import.data-pid', compact(
+            'projects',
+            'search',
+            'totalPid',
+            'totalLop',
+            'sudahAdaBoq',
+            'belumAdaBoq'
+        ));
     }
 
     //HELPER LOP
