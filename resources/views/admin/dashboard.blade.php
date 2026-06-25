@@ -10,16 +10,17 @@
             'label' => 'Total LOP',
             'value' => $totalLop ?? 0,
             'desc' => 'Seluruh LOP terdaftar',
-            'icon' => '📁',
-            'border' => 'border-slate-200',
-            'text' => 'text-slate-900',
-            'bg' => 'bg-slate-50',
+            // Paste kode SVG Anda di sini
+            'icon' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-slate-500 lucide lucide-file-spreadsheet"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>',
+            'border' => 'border-blue-200',
+            'text' => 'text-blue-900',
+            'bg' => 'bg-blue-50',
         ],
         [
             'label' => 'BOQ Ready',
             'value' => $boqReady ?? 0,
             'desc' => 'LOP sudah memiliki BOQ',
-            'icon' => '📦',
+            'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-package-open-icon lucide-package-open"><path d="M12 22v-9"/><path d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z"/><path d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13"/><path d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z"/></svg>',
             'border' => 'border-blue-200',
             'text' => 'text-blue-700',
             'bg' => 'bg-blue-50',
@@ -28,7 +29,7 @@
             'label' => 'Sudah Assign',
             'value' => $assignedLop ?? 0,
             'desc' => 'Sudah dibagikan ke Waspang',
-            'icon' => '👷',
+            'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-check-icon lucide-user-check"><path d="m16 11 2 2 4-4"/><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
             'border' => 'border-indigo-200',
             'text' => 'text-indigo-700',
             'bg' => 'bg-indigo-50',
@@ -37,7 +38,7 @@
             'label' => 'Completed',
             'value' => $completedApproval ?? 0,
             'desc' => 'Progress selesai 100%',
-            'icon' => '✅',
+            'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-big-icon lucide-circle-check-big"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>',
             'border' => 'border-emerald-200',
             'text' => 'text-emerald-700',
             'bg' => 'bg-emerald-50',
@@ -123,7 +124,7 @@
                         </div>
 
                         <div class="w-14 h-14 rounded-2xl {{ $card['bg'] }} flex items-center justify-center text-2xl">
-                            {{ $card['icon'] }}
+                            {!! $card['icon'] !!}
                         </div>
                     </div>
                 </div>

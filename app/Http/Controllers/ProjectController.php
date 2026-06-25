@@ -106,12 +106,13 @@ class ProjectController extends Controller
 
         $oldAssignment = ProjectAssignment::where('project_id', $request->project_id)->first();
 
-        ProjectAssignment::updateOrCreate(
+         ProjectAssignment::updateOrCreate(
             [
                 'project_id' => $request->project_id
             ],
             [
-                'waspang_id' => $request->waspang_id
+                'waspang_id' => $request->waspang_id,
+                'assigned_by' => auth()->user()->id_user,
             ]
         );
 

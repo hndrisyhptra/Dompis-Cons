@@ -12,11 +12,12 @@ class ProjectAssignment extends Model
 
     protected $primaryKey = 'id_proassign';
 
-    public $timestamps = false;
+    public $timestamps = true;
 
     protected $fillable = [
     'project_id',
     'waspang_id',
+    'assigned_by',
     ];
 
     public function waspang()
@@ -27,5 +28,10 @@ class ProjectAssignment extends Model
     public function project()
     {
         return $this->belongsTo(Project::class, 'project_id', 'id_project');
+    }
+
+    public function admin()
+    {
+        return $this->belongsTo(User::class, 'assigned_by', 'id_user');
     }
 }

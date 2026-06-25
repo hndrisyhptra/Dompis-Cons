@@ -12,6 +12,7 @@ use App\Models\BoqItem;
 use App\Models\Designator;
 use App\Models\ProjectActivityLog;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class DashboardController extends Controller
 {
@@ -392,5 +393,119 @@ class DashboardController extends Controller
             ->get();
 
         return view('admin.projects.tracking', compact('project', 'logs'));
+    }
+
+    public function adminInbox(Request $request)
+{
+    $search = $request->search;
+
+    $assignments = ProjectAssignment::with([
+        'project.lop',
+        'project.evidences',
+        'project.boqItems',
+        'waspang',
+        'admin',
+    ])
+        ->where('assigned_by', auth()->user()->id_user)
+        ->latest()
+        ->get()
+        ->filter(function ($assignment) {
+            if (!$assignment->project) {
+                return false;
+            }
+
+            $summary = $assignment->project->progressSummary();
+
+            return $summary['progress'] < 100;
+        });
+
+    if ($search) {
+        $assignments = $assignments->filter(function ($assignment) use ($search) {
+            $project = $assignment->project;
+            $lop = $project?->lop;
+
+            return str_contains(strtolower($project?->pid ?? ''), strtolower($search))
+                || str_contains(strtolower($project?->pid_sap ?? ''), strtolower($search))
+                || str_contains(strtolower($project?->project_name ?? ''), strtolower($search))
+                || str_contains(strtolower($lop?->lop_name ?? ''), strtolower($search))
+                || str_contains(strtolower($lop?->sto ?? ''), strtolower($search))
+                || str_contains(strtolower($lop?->branch ?? ''), strtolower($search));
+        });
+    }
+
+        $assignments = $assignments->values();
+
+        $page = request()->get('page', 1);
+        $perPage = 20;
+
+        $assignments = new LengthAwarePaginator(
+            $assignments->forPage($page, $perPage),
+            $assignments->count(),
+            $perPage,
+            $page,
+            [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ]
+        );
+
+    return view('admin.inbox.index', compact('assignments', 'search'));
+}
+
+    public function adminHistory(Request $request)
+    {
+        $search = $request->search;
+
+        $assignments = ProjectAssignment::with([
+            'project.lop',
+            'project.evidences',
+            'project.boqItems',
+            'waspang',
+            'admin',
+        ])
+            ->where('assigned_by', auth()->user()->id_user)
+            ->latest()
+            ->get()
+            ->filter(function ($assignment) {
+                if (!$assignment->project) {
+                    return false;
+                }
+
+                $summary = $assignment->project->progressSummary();
+
+                return $summary['progress'] >= 100;
+            });
+
+        if ($search) {
+            $assignments = $assignments->filter(function ($assignment) use ($search) {
+                $project = $assignment->project;
+                $lop = $project?->lop;
+
+                return str_contains(strtolower($project?->pid ?? ''), strtolower($search))
+                    || str_contains(strtolower($project?->pid_sap ?? ''), strtolower($search))
+                    || str_contains(strtolower($project?->project_name ?? ''), strtolower($search))
+                    || str_contains(strtolower($lop?->lop_name ?? ''), strtolower($search))
+                    || str_contains(strtolower($lop?->sto ?? ''), strtolower($search))
+                    || str_contains(strtolower($lop?->branch ?? ''), strtolower($search));
+            });
+        }
+
+        $assignments = $assignments->values();
+
+        $page = request()->get('page', 1);
+        $perPage = 20;
+
+        $assignments = new LengthAwarePaginator(
+            $assignments->forPage($page, $perPage),
+            $assignments->count(),
+            $perPage,
+            $page,
+            [
+                'path' => request()->url(),
+                'query' => request()->query(),
+            ]
+        );
+
+        return view('admin.inbox.history', compact('assignments', 'search'));
     }
 }

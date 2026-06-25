@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
-use App\Services\ProjectActivityService;
-use App\Models\Lop;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -69,6 +67,7 @@ class AssignWaspangController extends Controller
             'search' => $search,
         ]);
     }
+    
 
     public function history(Request $request, $id)
     {

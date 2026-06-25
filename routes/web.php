@@ -45,6 +45,16 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admin/map-monitoring', [DashboardController::class, 'mapMonitoring'])
         ->middleware(['auth'])
         ->name('admin.map.monitoring');
+
+    Route::get('/admin/inbox', [DashboardController::class, 'adminInbox'])
+         ->name('admin.inbox');
+
+    Route::get('/admin/history', [DashboardController::class, 'adminHistory'])
+        ->name('admin.history');
+
+    Route::get('/admin/projects/{id}', [DashboardController::class, 'show'])
+        ->name('admin.projects.show');
+        
     /*
     |--------------------------------------------------------------------------
     | PROJECT / LOP & BOQ
