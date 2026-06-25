@@ -195,25 +195,41 @@
 
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div id="stepReading" class="rounded-3xl bg-blue-50 border border-blue-100 p-4">
-                            <p class="text-2xl mb-2">📖</p>
+                            <p class="text-2xl mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-notebook-pen-icon lucide-notebook-pen"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
+                                    <path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
+                                </svg>
+                            </p>
                             <p class="text-sm font-black text-blue-700">Reading File</p>
                             <p class="text-xs text-blue-600 mt-1">Membaca Excel/CSV</p>
                         </div>
 
                         <div id="stepValidating" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                            <p class="text-2xl mb-2">🔍</p>
+                            <p class="text-2xl mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-checks-icon lucide-list-checks">
+                                    <path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/>
+                                </svg>
+                            </p>
                             <p class="text-sm font-black text-slate-700">Validating Data</p>
                             <p class="text-xs text-slate-500 mt-1">Cek PID SAP & LOP</p>
                         </div>
 
                         <div id="stepFinalizing" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                            <p class="text-2xl mb-2">⚙️</p>
+                            <p class="text-2xl mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-handshake-icon lucide-handshake">
+                                    <path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>
+                                </svg>
+                            </p>
                             <p class="text-sm font-black text-slate-700">Finalizing Import</p>
                             <p class="text-xs text-slate-500 mt-1">Create / update data</p>
                         </div>
 
                         <div id="stepComplete" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                            <p class="text-2xl mb-2">✅</p>
+                            <p class="text-2xl mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-big-icon lucide-circle-check-big">
+                                    <path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>
+                                </svg>
+                            </p>
                             <p class="text-sm font-black text-slate-700">Import Complete</p>
                             <p class="text-xs text-slate-500 mt-1">Menyiapkan hasil</p>
                         </div>

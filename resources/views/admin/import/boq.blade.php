@@ -318,6 +318,76 @@
                     </div>
                 @endif
 
+                {{-- LIVE PROGRESS --}}
+                <div id="progressCard"
+                     class="hidden bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
+
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                        <div>
+                            <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                                Proses Import BOQ Berjalan
+                            </h2>
+                            <p id="progressFileName" class="text-sm text-slate-500">
+                                Membaca file...
+                            </p>
+                        </div>
+
+                        <div class="text-right">
+                            <p id="progressPercentText" class="text-3xl font-black text-blue-700">0%</p>
+                            <p class="text-xs text-slate-500 font-bold">Processing</p>
+                        </div>
+                    </div>
+
+                    <div class="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-6">
+                        <div id="progressBar"
+                             class="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-500"
+                             style="width: 0%">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div id="stepReading" class="rounded-3xl bg-blue-50 border border-blue-100 p-4">
+                            <p class="text-2xl mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-notebook-pen-icon lucide-notebook-pen"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
+                                    <path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
+                                </svg>
+                            </p>
+                            <p class="text-sm font-black text-blue-700">Reading File</p>
+                            <p class="text-xs text-blue-600 mt-1">Membaca matrix BOQ</p>
+                        </div>
+
+                        <div id="stepValidating" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
+                            <p class="text-2xl mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-checks-icon lucide-list-checks">
+                                    <path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/>
+                                </svg>
+                            </p>
+                            <p class="text-sm font-black text-slate-700">Validating BOQ</p>
+                            <p class="text-xs text-slate-500 mt-1">Cek package & volume</p>
+                        </div>
+
+                        <div id="stepMatching" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
+                            <p class="text-2xl mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link-icon lucide-link">
+                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                                </svg>
+                            </p>
+                            <p class="text-sm font-black text-slate-700">Matching Data</p>
+                            <p class="text-xs text-slate-500 mt-1">LOP & designator</p>
+                        </div>
+
+                        <div id="stepComplete" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
+                            <p class="text-2xl mb-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-big-icon lucide-circle-check-big">
+                                    <path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>
+                                </svg>
+                            </p>
+                            <p class="text-sm font-black text-slate-700">Import Complete</p>
+                            <p class="text-xs text-slate-500 mt-1">Menyiapkan hasil</p>
+                        </div>
+                    </div>
+                </div>
+
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
 
             {{-- MAIN --}}
@@ -411,60 +481,6 @@
                             </a>
                             
                     </form>
-                </div>
-
-                {{-- LIVE PROGRESS --}}
-                <div id="progressCard"
-                     class="hidden bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
-
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                        <div>
-                            <h2 class="text-lg font-black text-slate-900 dark:text-white">
-                                Proses Import BOQ Berjalan
-                            </h2>
-                            <p id="progressFileName" class="text-sm text-slate-500">
-                                Membaca file...
-                            </p>
-                        </div>
-
-                        <div class="text-right">
-                            <p id="progressPercentText" class="text-3xl font-black text-blue-700">0%</p>
-                            <p class="text-xs text-slate-500 font-bold">Processing</p>
-                        </div>
-                    </div>
-
-                    <div class="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-6">
-                        <div id="progressBar"
-                             class="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-500"
-                             style="width: 0%">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div id="stepReading" class="rounded-3xl bg-blue-50 border border-blue-100 p-4">
-                            <p class="text-2xl mb-2">📖</p>
-                            <p class="text-sm font-black text-blue-700">Reading File</p>
-                            <p class="text-xs text-blue-600 mt-1">Membaca matrix BOQ</p>
-                        </div>
-
-                        <div id="stepValidating" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                            <p class="text-2xl mb-2">🔍</p>
-                            <p class="text-sm font-black text-slate-700">Validating BOQ</p>
-                            <p class="text-xs text-slate-500 mt-1">Cek package & volume</p>
-                        </div>
-
-                        <div id="stepMatching" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                            <p class="text-2xl mb-2">🔗</p>
-                            <p class="text-sm font-black text-slate-700">Matching Data</p>
-                            <p class="text-xs text-slate-500 mt-1">LOP & designator</p>
-                        </div>
-
-                        <div id="stepComplete" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                            <p class="text-2xl mb-2">✅</p>
-                            <p class="text-sm font-black text-slate-700">Import Complete</p>
-                            <p class="text-xs text-slate-500 mt-1">Menyiapkan hasil</p>
-                        </div>
-                    </div>
                 </div>
 
             </div>

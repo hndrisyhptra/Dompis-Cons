@@ -3,290 +3,509 @@
 @section('content')
 
 @php
-    $onProgress = max(($assignedLop ?? 0) - ($completedApproval ?? 0), 0);
-    $unassigned = max(($totalLop ?? 0) - ($assignedLop ?? 0), 0);
-    $completePercent = ($totalLop ?? 0) > 0 ? round(($completedApproval / $totalLop) * 100) : 0;
+    $completionRate = $completionRate ?? 0;
 
-    $cards = [
+    $mainCards = [
         [
             'label' => 'Total LOP',
-            'value' => $totalLop,
+            'value' => $totalLop ?? 0,
             'desc' => 'Seluruh LOP terdaftar',
-            'color' => 'text-slate-900 dark:text-white',
-            'bg' => 'bg-slate-100 dark:bg-slate-800',
-            'icon' => 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5l5 5v11a2 2 0 01-2 2z',
+            'icon' => '📁',
+            'border' => 'border-slate-200',
+            'text' => 'text-slate-900',
+            'bg' => 'bg-slate-50',
+        ],
+        [
+            'label' => 'BOQ Ready',
+            'value' => $boqReady ?? 0,
+            'desc' => 'LOP sudah memiliki BOQ',
+            'icon' => '📦',
+            'border' => 'border-blue-200',
+            'text' => 'text-blue-700',
+            'bg' => 'bg-blue-50',
         ],
         [
             'label' => 'Sudah Assign',
-            'value' => $assignedLop,
-            'desc' => 'Sudah memiliki Waspang',
-            'color' => 'text-blue-700 dark:text-blue-400',
-            'bg' => 'bg-blue-100 dark:bg-blue-900/40',
-            'icon' => 'M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m4-4a4 4 0 100-8 4 4 0 000 8zm6 0a3 3 0 100-6 3 3 0 000 6z',
+            'value' => $assignedLop ?? 0,
+            'desc' => 'Sudah dibagikan ke Waspang',
+            'icon' => '👷',
+            'border' => 'border-indigo-200',
+            'text' => 'text-indigo-700',
+            'bg' => 'bg-indigo-50',
         ],
         [
-            'label' => 'Menunggu Review',
-            'value' => $waitingApproval,
-            'desc' => 'Progress belum 100%',
-            'color' => 'text-amber-600 dark:text-amber-400',
-            'bg' => 'bg-amber-100 dark:bg-amber-900/40',
-            'icon' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
-        ],
-        [
-            'label' => 'Complete Approval',
-            'value' => $completedApproval,
+            'label' => 'Completed',
+            'value' => $completedApproval ?? 0,
             'desc' => 'Progress selesai 100%',
-            'color' => 'text-emerald-700 dark:text-emerald-400',
-            'bg' => 'bg-emerald-100 dark:bg-emerald-900/40',
-            'icon' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+            'icon' => '✅',
+            'border' => 'border-emerald-200',
+            'text' => 'text-emerald-700',
+            'bg' => 'bg-emerald-50',
         ],
+    ];
+
+    $evidenceCards = [
+        ['label' => 'Total Evidence', 'value' => $totalEvidence ?? 0, 'color' => 'slate'],
+        ['label' => 'Pending', 'value' => $pendingEvidence ?? 0, 'color' => 'amber'],
+        ['label' => 'Approved', 'value' => $approvedEvidence ?? 0, 'color' => 'emerald'],
+        ['label' => 'Rejected', 'value' => $rejectedEvidence ?? 0, 'color' => 'red'],
     ];
 
     $sections = [
-        'Statistik Batch' => $statsByBatch,
-        'Statistik Branch' => $statsByBranch,
-        'Statistik Program' => $statsByProgram,
+        'Statistik Branch' => $statsByBranch ?? collect(),
+        'Statistik Program' => $statsByProgram ?? collect(),
+        'Statistik Batch' => $statsByBatch ?? collect(),
     ];
 @endphp
 
-<div class="space-y-6">
+<div class="min-h-screen bg-slate-50 dark:bg-slate-950 -m-4 md:-m-6 p-4 md:p-6">
 
-    {{-- Header --}}
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div>
-            <h1 class="text-2xl lg:text-3xl font-black text-gray-900 dark:text-white">
-                Dashboard Monitoring
-            </h1>
-            <p class="text-sm text-gray-500 mt-1">
-                Ringkasan progress LOP, assignment, approval, dan performa project.
-            </p>
-        </div>
-    </div>
+    <div class="max-w-7xl mx-auto space-y-6">
 
-    {{-- KPI Cards --}}
-    <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        @foreach($cards as $card)
-            <div class="group bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm hover:shadow-lg transition">
-                <div class="flex items-start justify-between gap-3">
-                    <div>
-                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                            {{ $card['label'] }}
+        {{-- HEADER --}}
+        <div class="rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                <div>
+                    <p class="text-xs font-black text-blue-700 uppercase tracking-widest">
+                        Analytics Dashboard
+                    </p>
+
+                    <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mt-1">
+                        Dashboard Monitoring
+                    </h1>
+
+                    <!-- <p class="text-sm text-slate-500 mt-2 max-w-2xl">
+                        Ringkasan operasional Dompis dari upload PID, BOQ, assignment Waspang, evidence, approval, sampai project complete.
+                    </p> -->
+                </div>
+
+                <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-4 min-w-[220px]">
+                    <p class="text-xs text-slate-500 font-bold uppercase">
+                        Completion Rate
+                    </p>
+
+                    <div class="flex items-end justify-between gap-3 mt-2">
+                        <p class="text-3xl font-black text-emerald-700">
+                            {{ $completionRate }}%
                         </p>
-                        <h2 class="text-3xl font-black mt-2 {{ $card['color'] }}">
-                            {{ number_format($card['value']) }}
-                        </h2>
-                        <p class="text-xs text-gray-500 mt-1">
-                            {{ $card['desc'] }}
-                        </p>
+
+                        <span class="text-xs font-black text-slate-500">
+                            {{ number_format($completedApproval ?? 0) }}/{{ number_format($totalLop ?? 0) }}
+                        </span>
                     </div>
 
-                    <div class="w-11 h-11 rounded-2xl {{ $card['bg'] }} flex items-center justify-center">
-                        <svg class="w-6 h-6 {{ $card['color'] }}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="{{ $card['icon'] }}" />
-                        </svg>
+                    <div class="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                        <div class="h-full rounded-full bg-emerald-500"
+                             style="width: {{ min($completionRate, 100) }}%">
+                        </div>
                     </div>
                 </div>
             </div>
-        @endforeach
-    </div>
-
-    <!-- {{-- Quick Monitoring --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-        <div class="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-5 text-white shadow-sm">
-            <p class="text-sm text-blue-100">On Progress</p>
-            <h3 class="text-4xl font-black mt-2">{{ number_format($onProgress) }}</h3>
-            <p class="text-sm text-blue-100 mt-2">
-                LOP sudah assign namun belum complete approval.
-            </p>
         </div>
 
-        <div class="bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl p-5 text-white shadow-sm">
-            <p class="text-sm text-amber-100">Belum Assign</p>
-            <h3 class="text-4xl font-black mt-2">{{ number_format($unassigned) }}</h3>
-            <p class="text-sm text-amber-100 mt-2">
-                Perlu segera dialokasikan ke Waspang.
-            </p>
+        {{-- MAIN KPI --}}
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            @foreach($mainCards as $card)
+                <div class="rounded-3xl bg-white dark:bg-slate-900 border {{ $card['border'] }} dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition">
+                    <div class="flex items-center justify-between gap-4">
+                        <div>
+                            <p class="text-xs text-slate-500 font-bold uppercase">
+                                {{ $card['label'] }}
+                            </p>
+
+                            <p class="text-3xl font-black {{ $card['text'] }} dark:text-white mt-2">
+                                {{ number_format($card['value']) }}
+                            </p>
+
+                            <p class="text-xs text-slate-500 mt-1">
+                                {{ $card['desc'] }}
+                            </p>
+                        </div>
+
+                        <div class="w-14 h-14 rounded-2xl {{ $card['bg'] }} flex items-center justify-center text-2xl">
+                            {{ $card['icon'] }}
+                        </div>
+                    </div>
+                </div>
+            @endforeach
         </div>
 
-        <div class="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-5 text-white shadow-sm">
-            <p class="text-sm text-emerald-100">Completion Rate</p>
-            <h3 class="text-4xl font-black mt-2">{{ $completePercent }}%</h3>
-            <p class="text-sm text-emerald-100 mt-2">
-                Persentase LOP yang sudah selesai approval.
-            </p>
+        {{-- PIPELINE --}}
+        <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
+                <div>
+                    <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                        Alur Progress
+                    </h2>
+                    <p class="text-sm text-slate-500">
+                        Kondisi project berdasarkan flow operasional.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                @foreach($stageSummary ?? [] as $stage)
+                    @php
+                        $color = $stage['color'] ?? 'slate';
+
+                        $classes = [
+                            'amber' => 'bg-amber-50 border-amber-200 text-amber-700',
+                            'red' => 'bg-red-50 border-red-200 text-red-700',
+                            'blue' => 'bg-blue-50 border-blue-200 text-blue-700',
+                            'orange' => 'bg-orange-50 border-orange-200 text-orange-700',
+                            'emerald' => 'bg-emerald-50 border-emerald-200 text-emerald-700',
+                            'slate' => 'bg-slate-50 border-slate-200 text-slate-700',
+                        ];
+
+                        $class = $classes[$color] ?? $classes['slate'];
+                    @endphp
+
+                    <div class="rounded-3xl border p-5 {{ $class }}">
+                        <p class="text-xs font-black uppercase">
+                            {{ $stage['label'] }}
+                        </p>
+
+                        <p class="text-3xl font-black mt-2">
+                            {{ number_format($stage['value']) }}
+                        </p>
+
+                        <p class="text-xs mt-1 opacity-80">
+                            {{ $stage['desc'] }}
+                        </p>
+                    </div>
+                @endforeach
+            </div>
         </div>
 
-    </div> -->
+        {{-- EVIDENCE + BOQ --}}
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-5">
 
-    {{-- Section Tables --}}
-    <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        @foreach($sections as $title => $items)
-
-            <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
-
-                <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+            {{-- Evidence --}}
+            <div class="xl:col-span-7 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <div class="flex items-center justify-between gap-4 mb-5">
                     <div>
-                        <h2 class="text-sm font-black text-gray-900 dark:text-white">
+                        <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                            Evidence Review
+                        </h2>
+                        <p class="text-sm text-slate-500">
+                            Status approval evidence dari Waspang.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    @foreach($evidenceCards as $item)
+                        @php
+                            $colorClass = match($item['color']) {
+                                'amber' => 'bg-amber-50 border-amber-100 text-amber-700',
+                                'emerald' => 'bg-emerald-50 border-emerald-100 text-emerald-700',
+                                'red' => 'bg-red-50 border-red-100 text-red-700',
+                                default => 'bg-slate-50 border-slate-100 text-slate-700',
+                            };
+                        @endphp
+
+                        <div class="rounded-3xl border p-4 {{ $colorClass }}">
+                            <p class="text-xs font-bold">
+                                {{ $item['label'] }}
+                            </p>
+
+                            <p class="text-3xl font-black mt-2">
+                                {{ number_format($item['value']) }}
+                            </p>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
+                        <p class="text-xs text-slate-500 font-bold">Belum BOQ</p>
+                        <p class="text-2xl font-black text-amber-700 mt-1">
+                            {{ number_format($belumBoq ?? 0) }}
+                        </p>
+                    </div>
+
+                    <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
+                        <p class="text-xs text-slate-500 font-bold">Belum Assign</p>
+                        <p class="text-2xl font-black text-red-700 mt-1">
+                            {{ number_format($unassignedLop ?? 0) }}
+                        </p>
+                    </div>
+
+                    <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
+                        <p class="text-xs text-slate-500 font-bold">On Progress</p>
+                        <p class="text-2xl font-black text-blue-700 mt-1">
+                            {{ number_format($onProgress ?? 0) }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {{-- BOQ Summary --}}
+            <div class="xl:col-span-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                    BOQ Summary
+                </h2>
+
+                <p class="text-sm text-slate-500 mt-1">
+                    Nilai dan progress BOQ actual.
+                </p>
+
+                <div class="mt-5 rounded-3xl bg-emerald-50 border border-emerald-100 p-5">
+                    <p class="text-xs text-emerald-700 font-bold uppercase">
+                        Total Nilai BOQ
+                    </p>
+
+                    <p class="text-2xl font-black text-emerald-700 mt-2">
+                        Rp {{ number_format($totalBoqValue ?? 0, 0, ',', '.') }}
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mt-3">
+                    <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
+                        <p class="text-xs text-slate-500 font-bold">Item Material</p>
+                        <p class="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                            {{ number_format($materialItem ?? 0) }}
+                        </p>
+                    </div>
+
+                    <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
+                        <p class="text-xs text-slate-500 font-bold">Item Jasa</p>
+                        <p class="text-2xl font-black text-slate-900 dark:text-white mt-1">
+                            {{ number_format($jasaItem ?? 0) }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <div class="flex items-center justify-between text-xs mb-2">
+                        <span class="font-bold text-slate-500">
+                            BOQ Actual Rate
+                        </span>
+                        <span class="font-black text-slate-900 dark:text-white">
+                            {{ $boqActualRate ?? 0 }}%
+                        </span>
+                    </div>
+
+                    <div class="h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                        <div class="h-full rounded-full bg-blue-600"
+                             style="width: {{ min($boqActualRate ?? 0, 100) }}%">
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-slate-500 mt-2">
+                        {{ number_format($boqActualItem ?? 0) }} dari {{ number_format($totalBoqItem ?? 0) }} item sudah memiliki actual.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        {{-- STATISTICS TABLES --}}
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+            @foreach($sections as $title => $items)
+                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                    <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
+                        <h2 class="text-sm font-black text-slate-900 dark:text-white">
                             {{ $title }}
                         </h2>
-                        <p class="text-xs text-gray-500 mt-1">
+                        <p class="text-xs text-slate-500 mt-1">
                             Total, assignment, review, dan completion.
                         </p>
                     </div>
-                </div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-xs">
-                        <thead class="bg-gray-50 dark:bg-gray-800/70">
-                            <tr class="text-gray-500">
-                                <th class="px-4 py-3 text-left">Nama</th>
-                                <th class="px-3 py-3 text-center">Total</th>
-                                <th class="px-3 py-3 text-center">Assign</th>
-                                <th class="px-3 py-3 text-center">Review</th>
-                                <th class="px-3 py-3 text-center">Done</th>
-                                <th class="px-3 py-3 text-center">%</th>
-                            </tr>
-                        </thead>
-
-                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            @forelse($items as $item)
-                                @php
-                                    $percent = $item['percent'] ?? (
-                                        ($item['total'] ?? 0) > 0
-                                            ? round(($item['completed'] / $item['total']) * 100)
-                                            : 0
-                                    );
-                                @endphp
-
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
-                                    <td class="px-4 py-3">
-                                        <div class="font-black text-gray-900 dark:text-white">
-                                            {{ $item['label'] }}
-                                        </div>
-                                        <div class="mt-1 h-1.5 w-24 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-                                            <div class="h-full bg-emerald-500 rounded-full" style="width: {{ $percent }}%"></div>
-                                        </div>
-                                    </td>
-
-                                    <td class="px-3 py-3 text-center font-bold text-gray-700 dark:text-gray-200">
-                                        {{ $item['total'] }}
-                                    </td>
-
-                                    <td class="px-3 py-3 text-center">
-                                        <span class="inline-flex px-2 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 font-black">
-                                            {{ $item['assigned'] }}
-                                        </span>
-                                    </td>
-
-                                    <td class="px-3 py-3 text-center">
-                                        <span class="inline-flex px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 font-black">
-                                            {{ $item['waiting'] }}
-                                        </span>
-                                    </td>
-
-                                    <td class="px-3 py-3 text-center">
-                                        <span class="inline-flex px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 font-black">
-                                            {{ $item['completed'] }}
-                                        </span>
-                                    </td>
-
-                                    <td class="px-3 py-3 text-center font-black text-gray-900 dark:text-white">
-                                        {{ $percent }}%
-                                    </td>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead class="bg-slate-50 dark:bg-slate-800">
+                                <tr class="text-slate-500">
+                                    <th class="px-4 py-3 text-left">Nama</th>
+                                    <th class="px-3 py-3 text-center">Total</th>
+                                    <th class="px-3 py-3 text-center">Assign</th>
+                                    <th class="px-3 py-3 text-center">Review</th>
+                                    <th class="px-3 py-3 text-center">Done</th>
+                                    <th class="px-3 py-3 text-center">%</th>
                                 </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="px-3 py-8 text-center text-gray-500">
-                                        Belum ada data.
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
+                            </thead>
+
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                @forelse($items as $item)
+                                    @php
+                                        $percent = $item['percent'] ?? 0;
+                                    @endphp
+
+                                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">
+                                        <td class="px-4 py-3 min-w-[140px]">
+                                            <div class="font-black text-slate-900 dark:text-white">
+                                                {{ $item['label'] }}
+                                            </div>
+
+                                            <div class="mt-1 h-1.5 w-24 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                <div class="h-full bg-emerald-500 rounded-full"
+                                                     style="width: {{ min($percent, 100) }}%">
+                                                </div>
+                                            </div>
+                                        </td>
+
+                                        <td class="px-3 py-3 text-center font-bold text-slate-700 dark:text-slate-200">
+                                            {{ $item['total'] }}
+                                        </td>
+
+                                        <td class="px-3 py-3 text-center">
+                                            <span class="inline-flex px-2 py-1 rounded-full bg-blue-50 text-blue-700 font-black">
+                                                {{ $item['assigned'] }}
+                                            </span>
+                                        </td>
+
+                                        <td class="px-3 py-3 text-center">
+                                            <span class="inline-flex px-2 py-1 rounded-full bg-amber-50 text-amber-700 font-black">
+                                                {{ $item['waiting'] }}
+                                            </span>
+                                        </td>
+
+                                        <td class="px-3 py-3 text-center">
+                                            <span class="inline-flex px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-black">
+                                                {{ $item['completed'] }}
+                                            </span>
+                                        </td>
+
+                                        <td class="px-3 py-3 text-center font-black text-slate-900 dark:text-white">
+                                            {{ $percent }}%
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="6" class="px-3 py-8 text-center text-slate-500">
+                                            Belum ada data.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-
-            </div>
-
-        @endforeach
-    </div>
-
-    {{-- Monitoring tambahan --}}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-        <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
-            <h2 class="text-sm font-black text-gray-900 dark:text-white">
-                Rekomendasi Monitoring PM/Admin
-            </h2>
-
-            <div class="mt-4 space-y-3 text-sm">
-                <div class="flex items-start gap-3">
-                    <span class="w-2 h-2 mt-2 rounded-full bg-red-500"></span>
-                    <p class="text-gray-600 dark:text-gray-300">
-                        <b>Aging Project</b> — LOP yang belum selesai lebih dari 7, 14, 30 hari.
-                    </p>
-                </div>
-
-                <div class="flex items-start gap-3">
-                    <span class="w-2 h-2 mt-2 rounded-full bg-amber-500"></span>
-                    <p class="text-gray-600 dark:text-gray-300">
-                        <b>Top Problem Project</b> — Project progress rendah, evidence reject, atau belum assign.
-                    </p>
-                </div>
-
-                <div class="flex items-start gap-3">
-                    <span class="w-2 h-2 mt-2 rounded-full bg-blue-500"></span>
-                    <p class="text-gray-600 dark:text-gray-300">
-                        <b>Performa Waspang</b> — jumlah project aktif, selesai, dan overload.
-                    </p>
-                </div>
-
-                <div class="flex items-start gap-3">
-                    <span class="w-2 h-2 mt-2 rounded-full bg-emerald-500"></span>
-                    <p class="text-gray-600 dark:text-gray-300">
-                        <b>Performa Mitra</b> — total LOP, selesai, dan completion rate per mitra.
-                    </p>
-                </div>
-            </div>
+            @endforeach
         </div>
 
-        <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
-            <h2 class="text-sm font-black text-gray-900 dark:text-white">
-                Prioritas Follow Up Hari Ini
-            </h2>
+        {{-- WASPANG + ATTENTION --}}
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
 
-            <div class="mt-4 space-y-3">
-                <div class="p-4 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/40">
-                    <p class="text-sm font-black text-red-700 dark:text-red-300">
-                        LOP belum assign
-                    </p>
-                    <p class="text-xs text-red-600 dark:text-red-300 mt-1">
-                        Perlu dicek agar tidak tertahan sebelum pekerjaan lapangan.
-                    </p>
-                </div>
+            {{-- Waspang Performance --}}
+            <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                    Waspang Performance
+                </h2>
 
-                <div class="p-4 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/40">
-                    <p class="text-sm font-black text-amber-700 dark:text-amber-300">
-                        Evidence menunggu review
-                    </p>
-                    <p class="text-xs text-amber-600 dark:text-amber-300 mt-1">
-                        Perlu approval agar progress bisa naik ke tahap berikutnya.
-                    </p>
-                </div>
+                <p class="text-sm text-slate-500 mt-1">
+                    Distribusi assignment per Waspang.
+                </p>
 
-                <div class="p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/40">
-                    <p class="text-sm font-black text-blue-700 dark:text-blue-300">
-                        Project belum complete
-                    </p>
-                    <p class="text-xs text-blue-600 dark:text-blue-300 mt-1">
-                        Pantau project aktif yang belum mencapai progress 100%.
-                    </p>
+                <div class="mt-5 space-y-3">
+                    @forelse($waspangStats ?? [] as $waspang)
+                        @php
+                            $maxAssign = max(($waspangStats ?? collect())->max('total_assignment') ?? 1, 1);
+                            $percent = round(($waspang->total_assignment / $maxAssign) * 100);
+                        @endphp
+
+                        <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="text-sm font-black text-slate-900 dark:text-white">
+                                        {{ $waspang->name ?? $waspang->username ?? '-' }}
+                                    </p>
+
+                                    <p class="text-xs text-slate-500">
+                                        {{ $waspang->username ?? '-' }}
+                                    </p>
+                                </div>
+
+                                <span class="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-black">
+                                    {{ $waspang->total_assignment }} project
+                                </span>
+                            </div>
+
+                            <div class="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                                <div class="h-full rounded-full bg-blue-600"
+                                     style="width: {{ $percent }}%">
+                                </div>
+                            </div>
+                        </div>
+                    @empty
+                        <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 p-6 text-center">
+                            <p class="text-sm text-slate-500">
+                                Belum ada data Waspang.
+                            </p>
+                        </div>
+                    @endforelse
                 </div>
             </div>
+
+            {{-- Attention Projects --}}
+            <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                    Project Butuh Perhatian
+                </h2>
+
+                <p class="text-sm text-slate-500 mt-1">
+                    LOP yang belum BOQ, belum assign, atau memiliki evidence rejected.
+                </p>
+
+                <div class="mt-5 space-y-3">
+                    @forelse($attentionProjects ?? [] as $lop)
+                        @php
+                            $project = $lop->project;
+                            $hasBoq = $project?->boqItems?->count() > 0;
+                            $hasAssign = $project?->assignment;
+                            $hasRejected = $project?->evidences?->where('status', 'rejected')->count() > 0;
+                        @endphp
+
+                        <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-black text-slate-900 dark:text-white truncate">
+                                        {{ $lop->lop_name ?? $project?->project_name ?? '-' }}
+                                    </p>
+
+                                    <p class="text-xs text-slate-500 mt-1">
+                                        {{ $project?->pid_sap ?? '-' }} · {{ $lop->branch ?? '-' }} · {{ $lop->sto ?? '-' }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap gap-2 mt-3">
+                                @if(!$hasBoq)
+                                    <span class="px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-black">
+                                        Belum BOQ
+                                    </span>
+                                @endif
+
+                                @if(!$hasAssign)
+                                    <span class="px-3 py-1 rounded-full bg-red-50 text-red-700 text-[11px] font-black">
+                                        Belum Assign
+                                    </span>
+                                @endif
+
+                                @if($hasRejected)
+                                    <span class="px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-black">
+                                        Evidence Rejected
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    @empty
+                        <div class="rounded-3xl bg-emerald-50 border border-emerald-100 p-6 text-center">
+                            <p class="text-sm font-black text-emerald-700">
+                                Tidak ada project prioritas.
+                            </p>
+                            <p class="text-xs text-emerald-600 mt-1">
+                                Semua data dalam kondisi aman.
+                            </p>
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
         </div>
 
     </div>
-
 </div>
 
 @endsection

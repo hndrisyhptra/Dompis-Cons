@@ -21,130 +21,252 @@ class DashboardController extends Controller
 
         if ($role == 'admin') {
 
-            $lops = Lop::with([
-                'project.assignment',
-                'project.assignments.waspang',
-                'project.evidences',
-                'project.boqItems.designatorData',
-                'project.boqItems.designatorDataByCode',
-            ])->get();
+        $lops = Lop::with([
+            'project.assignment',
+            'project.assignments.waspang',
+            'project.evidences',
+            'project.boqItems.designatorData',
+            'project.boqItems.designatorDataByCode',
+        ])->get();
 
-            $totalLop = $lops->count();
+        $totalLop = $lops->count();
 
-            $assignedLop = $lops->filter(function ($lop) {
-                return $lop->project?->assignment;
-            })->count();
+        $boqReady = $lops->filter(function ($lop) {
+            return $lop->project?->boqItems?->count() > 0;
+        })->count();
 
-            /*
-            |--------------------------------------------------------------------------
-            | Waiting Approval
-            |--------------------------------------------------------------------------
-            | Final logic:
-            | In Review = progress > 0 dan progress < 100
-            | Bukan berdasarkan evidence pending saja
-            |--------------------------------------------------------------------------
-            */
-            $waitingApproval = $lops->filter(function ($lop) {
-                if (!$lop->project) {
-                    return false;
-                }
+        $belumBoq = max($totalLop - $boqReady, 0);
 
-                $summary = $lop->project->progressSummary();
+        $assignedLop = $lops->filter(function ($lop) {
+            return $lop->project?->assignment;
+        })->count();
 
-                return $summary['progress'] > 0 && $summary['progress'] < 100;
-            })->count();
+        $unassignedLop = max($totalLop - $assignedLop, 0);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Completed Approval
-            |--------------------------------------------------------------------------
-            | Complete = progress 100%
-            |--------------------------------------------------------------------------
-            */
-            $completedApproval = $lops->filter(function ($lop) {
-                if (!$lop->project) {
-                    return false;
-                }
+        $waitingApproval = $lops->filter(function ($lop) {
+            if (!$lop->project) {
+                return false;
+            }
 
-                $summary = $lop->project->progressSummary();
+            $summary = $lop->project->progressSummary();
 
-                return $summary['progress'] == 100;
-            })->count();
+            return $summary['progress'] > 0 && $summary['progress'] < 100;
+        })->count();
 
-            /*
-            |--------------------------------------------------------------------------
-            | Statistik Per Batch / Branch / Program
-            |--------------------------------------------------------------------------
-            */
-            $makeStats = function ($field) use ($lops) {
-                return $lops
-                    ->groupBy(function ($lop) use ($field) {
+        $completedApproval = $lops->filter(function ($lop) {
+            if (!$lop->project) {
+                return false;
+            }
 
-                        if ($field === 'program') {
-                            return $lop->project?->program ?: '-';
+            $summary = $lop->project->progressSummary();
+
+            return $summary['progress'] == 100;
+        })->count();
+
+        $onProgress = max($assignedLop - $completedApproval, 0);
+
+        $completionRate = $totalLop > 0
+            ? round(($completedApproval / $totalLop) * 100)
+            : 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Evidence Summary
+        |--------------------------------------------------------------------------
+        */
+        $totalEvidence = Evidence::count();
+
+        $pendingEvidence = Evidence::where('status', 'pending')->count();
+
+        $approvedEvidence = Evidence::where('status', 'approved')->count();
+
+        $rejectedEvidence = Evidence::where('status', 'rejected')->count();
+
+        /*
+        |--------------------------------------------------------------------------
+        | BOQ Summary
+        |--------------------------------------------------------------------------
+        */
+        $totalBoqItem = BoqItem::count();
+
+        $totalBoqValue = BoqItem::sum('total_price');
+
+        $materialItem = BoqItem::where('designator', 'like', 'M-%')->count();
+
+        $jasaItem = BoqItem::where('designator', 'like', 'J-%')->count();
+
+        $boqActualItem = BoqItem::where('quantity_actual', '>', 0)->count();
+
+        $boqActualRate = $totalBoqItem > 0
+            ? round(($boqActualItem / $totalBoqItem) * 100)
+            : 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Stage / Pipeline Summary
+        |--------------------------------------------------------------------------
+        */
+        $stageSummary = [
+            [
+                'label' => 'Belum BOQ',
+                'value' => $belumBoq,
+                'color' => 'amber',
+                'desc' => 'LOP belum memiliki BOQ',
+            ],
+            [
+                'label' => 'Belum Assign',
+                'value' => $unassignedLop,
+                'color' => 'red',
+                'desc' => 'LOP belum dibagikan ke Waspang',
+            ],
+            [
+                'label' => 'On Progress',
+                'value' => $onProgress,
+                'color' => 'blue',
+                'desc' => 'Sudah assign dan sedang berjalan',
+            ],
+            [
+                'label' => 'Waiting Approval',
+                'value' => $waitingApproval,
+                'color' => 'orange',
+                'desc' => 'Progress menunggu review',
+            ],
+            [
+                'label' => 'Completed',
+                'value' => $completedApproval,
+                'color' => 'emerald',
+                'desc' => 'Progress selesai 100%',
+            ],
+        ];
+
+        /*
+        |--------------------------------------------------------------------------
+        | Statistik Per Batch / Branch / Program
+        |--------------------------------------------------------------------------
+        */
+        $makeStats = function ($field) use ($lops) {
+            return $lops
+                ->groupBy(function ($lop) use ($field) {
+                    if ($field === 'program') {
+                        return $lop->project?->program ?: '-';
+                    }
+
+                    return $lop->{$field} ?: '-';
+                })
+                ->map(function ($items, $label) {
+                    $total = $items->count();
+
+                    $assigned = $items->filter(function ($lop) {
+                        return $lop->project?->assignment;
+                    })->count();
+
+                    $waiting = $items->filter(function ($lop) {
+                        if (!$lop->project) {
+                            return false;
                         }
 
-                        return $lop->{$field} ?: '-';
-                    })
-                    ->map(function ($items, $label) {
+                        $summary = $lop->project->progressSummary();
 
-                        $total = $items->count();
+                        return $summary['progress'] > 0 && $summary['progress'] < 100;
+                    })->count();
 
-                        $assigned = $items->filter(function ($lop) {
-                            return $lop->project?->assignment;
-                        })->count();
+                    $completed = $items->filter(function ($lop) {
+                        if (!$lop->project) {
+                            return false;
+                        }
 
-                        $waiting = $items->filter(function ($lop) {
-                            if (!$lop->project) {
-                                return false;
-                            }
+                        $summary = $lop->project->progressSummary();
 
-                            $summary = $lop->project->progressSummary();
+                        return $summary['progress'] == 100;
+                    })->count();
 
-                            return $summary['progress'] > 0 && $summary['progress'] < 100;
-                        })->count();
+                    $percent = $total > 0
+                        ? round(($completed / $total) * 100)
+                        : 0;
 
-                        $completed = $items->filter(function ($lop) {
-                            if (!$lop->project) {
-                                return false;
-                            }
+                    return [
+                        'label' => $label,
+                        'total' => $total,
+                        'assigned' => $assigned,
+                        'waiting' => $waiting,
+                        'completed' => $completed,
+                        'percent' => $percent,
+                    ];
+                })
+                ->sortByDesc('total')
+                ->values();
+        };
 
-                            $summary = $lop->project->progressSummary();
+        $statsByBatch = $makeStats('batch');
+        $statsByBranch = $makeStats('branch');
+        $statsByProgram = $makeStats('program');
 
-                            return $summary['progress'] == 100;
-                        })->count();
+        /*
+        |--------------------------------------------------------------------------
+        | Waspang Performance
+        |--------------------------------------------------------------------------
+        */
+        $waspangStats = User::where('role', 'waspang')
+            ->withCount([
+                'assignments as total_assignment',
+            ])
+            ->orderByDesc('total_assignment')
+            ->take(8)
+            ->get();
 
-                        $percent = $total > 0
-                            ? round(($completed / $total) * 100)
-                            : 0;
+        /*
+        |--------------------------------------------------------------------------
+        | Project Butuh Perhatian
+        |--------------------------------------------------------------------------
+        */
+        $attentionProjects = $lops
+            ->filter(function ($lop) {
+                if (!$lop->project) {
+                    return true;
+                }
 
-                        return [
-                            'label' => $label,
-                            'total' => $total,
-                            'assigned' => $assigned,
-                            'waiting' => $waiting,
-                            'completed' => $completed,
-                            'percent' => $percent,
-                        ];
-                    })
-                    ->sortByDesc('total')
-                    ->values();
-            };
+                $hasBoq = $lop->project->boqItems?->count() > 0;
+                $hasAssignment = $lop->project?->assignment;
+                $hasRejected = $lop->project->evidences?->where('status', 'rejected')->count() > 0;
 
-            $statsByBatch = $makeStats('batch');
-            $statsByBranch = $makeStats('branch');
-            $statsByProgram = $makeStats('program');
+                return !$hasBoq || !$hasAssignment || $hasRejected;
+            })
+            ->take(8)
+            ->values();
 
-            return view('admin.dashboard', compact(
-                'totalLop',
-                'assignedLop',
-                'waitingApproval',
-                'completedApproval',
-                'statsByBatch',
-                'statsByBranch',
-                'statsByProgram'
-            ));
-        }
+        return view('admin.dashboard', compact(
+            'totalLop',
+            'boqReady',
+            'belumBoq',
+            'assignedLop',
+            'unassignedLop',
+            'waitingApproval',
+            'completedApproval',
+            'onProgress',
+            'completionRate',
+
+            'totalEvidence',
+            'pendingEvidence',
+            'approvedEvidence',
+            'rejectedEvidence',
+
+            'totalBoqItem',
+            'totalBoqValue',
+            'materialItem',
+            'jasaItem',
+            'boqActualItem',
+            'boqActualRate',
+
+            'stageSummary',
+
+            'statsByBatch',
+            'statsByBranch',
+            'statsByProgram',
+
+            'waspangStats',
+            'attentionProjects'
+        ));
+    }
 
         if ($role == 'waspang') {
             return redirect()->route('waspang.dashboard');

@@ -193,12 +193,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/designator-prices/import', [DesignatorPriceController::class, 'import'])
         ->name('designator-prices.import');
 
-    Route::get('/admin/import/boq', [ImportController::class, 'boqIndex'])
-        ->name('admin.import.boq');
-
-    Route::post('/admin/import/boq', [ImportController::class, 'importBoq'])
-        ->name('admin.import.boq.upload');
-
     Route::post('/users/import', [UserManagementController::class, 'import'])
         ->name('admin.users.import');
 
@@ -374,12 +368,6 @@ Route::middleware(['auth'])->group(function () {
 
         Route::delete('/admin/import/pid/{project}/delete', [ImportController::class, 'destroyPid'])
             ->name('admin.import.pid.delete');
-
-        Route::get('/admin/import/pid', [ImportController::class, 'pid'])
-            ->name('admin.import.pid');
-
-        Route::post('/admin/import/pid/upload', [ImportController::class, 'importPid'])
-            ->name('admin.import.pid.upload');
 
         Route::get('/admin/import/pid/template', [ImportController::class, 'downloadPidTemplate'])
             ->name('admin.import.pid.template');
