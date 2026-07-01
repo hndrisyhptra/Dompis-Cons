@@ -6,6 +6,7 @@ use App\Models\Designator;
 use App\Models\Package;
 use App\Models\DesignatorPackagePrice;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DesignatorPriceController extends Controller
 {
@@ -29,7 +30,9 @@ class DesignatorPriceController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        $designators = Designator::orderBy('designator')->get();
+        $designators = Designator::forCustomer($this->defaultCustomerId())
+            ->orderBy('designator')
+            ->get();
         $packages = Package::orderBy('package_code')->get();
 
         return view('admin.designator-prices.index', compact(
@@ -125,7 +128,9 @@ class DesignatorPriceController extends Controller
                 continue;
             }
 
-            $designator = Designator::where('designator', $designatorCode)->first();
+            $designator = Designator::forCustomer($this->defaultCustomerId())
+                ->where('designator', $designatorCode)
+                ->first();
             $package = Package::where('package_code', $packageCode)->first();
 
             if (!$designator || !$package) {
@@ -185,5 +190,12 @@ class DesignatorPriceController extends Controller
         $value = preg_replace('/[^0-9.]/', '', $value);
 
         return is_numeric($value) ? $value : null;
+    }
+
+    private function defaultCustomerId(): ?int
+    {
+        return DB::table('customers')
+            ->where('customer_code', 'TIF')
+            ->value('id_customer');
     }
 }

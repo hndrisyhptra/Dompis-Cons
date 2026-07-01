@@ -10,6 +10,7 @@ use App\Models\BoqItem;
 use App\Models\Evidence;
 use App\Models\Notification;
 use App\Models\Lop;
+use App\Models\Customer;
 use App\Models\ProjectActivityLog;
 use App\Models\EvidenceRevisionHistory;
 use App\Services\ProjectActivityService;
@@ -78,7 +79,9 @@ class ProjectController extends Controller
             ->where('role', 'waspang')
             ->get();
 
-        $designators = Designator::orderBy('designator')->get();
+        $designators = Designator::forCustomer(Customer::defaultId())
+            ->orderBy('designator')
+            ->get();
 
         $totalProject = Project::count();
         $activeProject = Project::where('status', 'active')->count();
@@ -176,6 +179,7 @@ class ProjectController extends Controller
     public function store(Request $request)
     {
         $request->validate([
+        'customer_id' => 'required|exists:customers,id_customer',
         'project_name' => 'required|string|max:255',
         'branch' => 'required|string|max:255',
         'sto' => 'required|string|max:20',
@@ -192,6 +196,7 @@ class ProjectController extends Controller
     try {
 
         $project = Project::create([
+            'customer_id'      => $request->customer_id,
             'project_name' => $request->project_name,
             'branch' => $request->branch,
             'sto' => $request->sto,
@@ -217,7 +222,9 @@ class ProjectController extends Controller
                     $qty = 0;
                 }
 
-                $designator = Designator::find($designatorId);
+                $designator = Designator::forCustomer($project->customer_id)
+                    ->where('id_designator', $designatorId)
+                    ->first();
 
                 if (!$designator) {
                     continue;
@@ -252,6 +259,7 @@ class ProjectController extends Controller
         $project = Project::findOrFail($id);
 
         $request->validate([
+            'customer_id' => 'required|exists:customers,id_customer',
             'project_name' => 'required|string|max:255',
             'branch' => 'nullable|string|max:255',
             'sto' => 'nullable|string|max:20',
@@ -261,6 +269,7 @@ class ProjectController extends Controller
         ]);
 
         $project->update($request->only([
+            'customer_id',
             'project_name',
             'branch',
             'sto',
@@ -291,7 +300,9 @@ class ProjectController extends Controller
                     continue;
                 }
 
-                $designator = Designator::find($designatorId);
+                $designator = Designator::forCustomer($project->customer_id)
+                    ->where('id_designator', $designatorId)
+                    ->first();
 
                 if (!$designator) {
                     continue;
@@ -323,6 +334,7 @@ public function destroy($id)
 public function importCsv(Request $request)
     {
         $request->validate([
+            'customer_id' => 'required|exists:customers,id_customer',
             'csv_file' => 'required|file|mimes:csv,txt',
         ]);
 
@@ -371,6 +383,7 @@ public function importCsv(Request $request)
             }
 
             Project::create([
+                'customer_id'    => $request->customer_id,
                 'project_name' => trim($row[0]),
                 'branch' => trim($row[1]),
                 'sto' => trim($row[2]),
@@ -696,13 +709,17 @@ public function importCsv(Request $request)
             'boq_qty' => 'required|array',
         ]);
 
+        $project = Project::findOrFail($request->project_id);
+
         foreach ($request->designator_id as $index => $designatorId) {
 
             if (!$designatorId) {
                 continue;
             }
 
-            $designator = Designator::find($designatorId);
+            $designator = Designator::forCustomer($project->customer_id)
+                ->where('id_designator', $designatorId)
+                ->first();
 
             if (!$designator) {
                 continue;
@@ -710,6 +727,7 @@ public function importCsv(Request $request)
 
             BoqItem::create([
                 'project_id' => $request->project_id,
+                'designator_id' => $designator->id_designator,
                 'designator' => $designator->designator,
                 'item_name' => $designator->item_name,
                 'unit' => $designator->unit,
@@ -767,6 +785,13 @@ public function importCsv(Request $request)
 
         return view('admin.projects.kml-map', compact('project', 'kmlUrl'));
     }
+
+    // private function defaultCustomerId(): ?int
+    // {
+    //     return DB::table('customers')
+    //         ->where('customer_code', 'TIF')
+    //         ->value('id_customer');
+    // }
 
     private function evidenceLabel($evidence)
     {

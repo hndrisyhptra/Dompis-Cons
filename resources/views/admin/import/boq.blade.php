@@ -460,6 +460,7 @@
                                     required
                                     class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm">
                                 <option value="pid">By PID SAP</option>
+                                 <option value="id_ihld">ID IHLD</option>
                                 <option value="lop_name">By Nama LOP</option>
                             </select>
                         </div>

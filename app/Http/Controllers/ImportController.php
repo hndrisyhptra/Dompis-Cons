@@ -14,6 +14,8 @@ use App\Models\DesignatorPackagePrice;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
+use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 
 class ImportController extends Controller
 {
@@ -38,6 +40,8 @@ class ImportController extends Controller
 
     public function importPid(Request $request)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(0);
         $request->validate([
             'file' => 'required|mimes:xlsx,xls,csv',
         ]);
@@ -45,7 +49,10 @@ class ImportController extends Controller
         $file = $request->file('file');
         $fileName = $file->getClientOriginalName();
 
-        $spreadsheet = IOFactory::load($file->getRealPath());
+        $reader = new Xlsx();
+        $reader->setReadDataOnly(true);
+
+        $spreadsheet = $reader->load($file->getRealPath());
         $sheet = $spreadsheet->getActiveSheet();
 
         $highestRow = $sheet->getHighestRow();
@@ -66,6 +73,7 @@ class ImportController extends Controller
 
         $requiredHeaders = [
             'pid_sap',
+            'id_ihld',
             'nama_lop',
         ];
 
@@ -654,15 +662,24 @@ class ImportController extends Controller
     }
     public function importBoq(Request $request)
     {
+        ini_set('memory_limit', '1024M');
+        set_time_limit(0);
         $request->validate([
             'file' => 'required|mimes:xlsx,xls',
-            'mapping_by' => 'required|in:pid,lop_name',
+            'mapping_by' => 'required|in:pid,id_ihld,lop_name',
         ]);
 
         $file = $request->file('file');
         $fileName = $file->getClientOriginalName();
 
-        $spreadsheet = IOFactory::load($file->getRealPath());
+        $reader = new Xlsx();
+
+        $reader->setReadDataOnly(true);
+
+        $reader->setReadEmptyCells(false);
+
+        $spreadsheet = $reader->load($file->getRealPath());
+
         $sheet = $spreadsheet->getActiveSheet();
 
         $sheetName = strtoupper(trim($sheet->getTitle()));
@@ -697,6 +714,10 @@ class ImportController extends Controller
         $highestColumn = $sheet->getHighestColumn();
         $highestColumnIndex = Coordinate::columnIndexFromString($highestColumn);
 
+        DB::beginTransaction();
+
+        try {
+
         $imported = 0;
         $updated = 0;
         $skipped = 0;
@@ -727,18 +748,39 @@ class ImportController extends Controller
                 continue;
             }
 
-            if ($request->mapping_by === 'pid') {
-                $project = Project::where('pid', $headerValue)
-                    ->orWhere('pid_sap', $headerValue)
-                    ->first();
+            switch ($request->mapping_by) {
 
-                $lop = $project
-                    ? Lop::where('project_id', $project->id_project)->first()
-                    : null;
-            } else {
-                $lop = Lop::whereRaw('LOWER(TRIM(lop_name)) = ?', [
-                    strtolower(trim($headerValue))
-                ])->first();
+                case 'pid':
+
+                    $project = Project::where('pid', $headerValue)
+                        ->orWhere('pid_sap', $headerValue)
+                        ->first();
+
+                    $lop = $project
+                        ? Lop::where('project_id', $project->id_project)->first()
+                        : null;
+
+                    break;
+
+                case 'id_ihld':
+
+                    $lop = Lop::where('id_ihld', $headerValue)->first();
+
+                    break;
+
+                case 'lop_name':
+
+                    $lop = Lop::whereRaw(
+                        'LOWER(TRIM(lop_name)) = ?',
+                        [strtolower(trim($headerValue))]
+                    )->first();
+
+                    break;
+
+                default:
+
+                    $lop = null;
+
             }
 
             if (!$lop) {
@@ -746,12 +788,12 @@ class ImportController extends Controller
                 $unmatchedHeaders[] = $headerValue;
 
                 $invalidRows[] = [
-                    'type' => 'LOP / PID tidak match',
+                    'type' => 'PID / ID IHLD / LOP tidak match',
                     'header' => $headerValue,
                     'row' => '-',
                     'designator' => '-',
                     'qty' => '-',
-                    'reason' => 'Header kolom tidak ditemukan di data PID/LOP',
+                    'reason' => 'Header kolom tidak ditemukan di data PID/ID IHLD/LOP',
                 ];
 
                 continue;
@@ -781,6 +823,9 @@ class ImportController extends Controller
                 ]);
             }
 
+            $projectCustomerId = Project::where('id_project', $lop->project_id)
+                ->value('customer_id');
+
             for ($row = 2; $row <= $highestRow; $row++) {
 
                 $baseDesignator = strtoupper(
@@ -797,8 +842,11 @@ class ImportController extends Controller
 
                 $volumeItems++;
 
-                $designators = Designator::where('pair_code', $baseDesignator)
-                    ->orWhere('designator', $baseDesignator)
+                $designators = Designator::forCustomer($projectCustomerId)
+                    ->where(function ($query) use ($baseDesignator) {
+                        $query->where('pair_code', $baseDesignator)
+                            ->orWhere('designator', $baseDesignator);
+                    })
                     ->get();
 
                 if ($designators->count() == 0) {
@@ -869,6 +917,8 @@ class ImportController extends Controller
             }
         }
 
+        DB::commit();
+
         ImportLog::create([
             'type' => 'boq',
             'file_name' => $fileName,
@@ -912,6 +962,20 @@ class ImportController extends Controller
                 'success',
                 "Import BOQ selesai. Match LOP {$matchedLop}, Tidak Match {$unmappedLop}, Data Sudah Ada {$existingBoqHeaders}, Data Baru {$imported}, Designator Tidak Ketemu {$unmappedDesignator}."
             );
+
+        }
+            catch (\Throwable $e){
+
+                DB::rollBack();
+
+                \Log::error($e);
+
+                return back()->with(
+                    'error',
+                    'Import BOQ gagal : '.$e->getMessage()
+                );
+
+            }
     }
 
     public function dataBoq(Request $request)
@@ -1054,6 +1118,7 @@ class ImportController extends Controller
         $sheet->setCellValue('D1', 'PID_SAP_003');
 
         $designators = Designator::query()
+            ->forCustomer($this->defaultCustomerId())
             ->whereNotNull('pair_code')
             ->select('pair_code')
             ->distinct()
@@ -1089,6 +1154,13 @@ class ImportController extends Controller
     }
 
     //HELPER PID
+    private function defaultCustomerId(): ?int
+    {
+        return DB::table('customers')
+            ->where('customer_code', 'TIF')
+            ->value('id_customer');
+    }
+
     private function cleanValue($value)
     {
         if ($value === null) {

@@ -213,11 +213,10 @@
                     <thead class="bg-slate-50 dark:bg-slate-800">
                         <tr>
                             <th class="px-5 py-4 text-left text-xs font-black text-slate-500 uppercase">PID SAP</th>
+                            <th class="px-5 py-4 text-center text-xs font-black text-slate-500 uppercase">ID IHLD</th>
                             <th class="px-5 py-4 text-left text-xs font-black text-slate-500 uppercase">Nama LOP</th>
                             <th class="px-5 py-4 text-left text-xs font-black text-slate-500 uppercase">Package</th>
                             <th class="px-5 py-4 text-center text-xs font-black text-slate-500 uppercase">Item</th>
-                            <th class="px-5 py-4 text-center text-xs font-black text-slate-500 uppercase">Material</th>
-                            <th class="px-5 py-4 text-center text-xs font-black text-slate-500 uppercase">Jasa</th>
                             <th class="px-5 py-4 text-right text-xs font-black text-slate-500 uppercase">Total Plan</th>
                             <th class="px-5 py-4 text-center text-xs font-black text-slate-500 uppercase">Aksi</th>
                         </tr>
@@ -261,6 +260,12 @@
                                     </p>
                                 </td>
 
+                                 <td class="px-5 py-4 text-center">
+                                    <span class="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-black">
+                                        {{ $lop->id_ihld ?? '-' }}
+                                    </span>
+                                </td>
+
                                 <td class="px-5 py-4 min-w-[260px]">
                                     <p class="font-black text-slate-900 dark:text-white">
                                         {{ $lop->lop_name ?? '-' }}
@@ -279,18 +284,6 @@
                                 <td class="px-5 py-4 text-center">
                                     <p class="font-black text-slate-900 dark:text-white">{{ $items->count() }}</p>
                                     <p class="text-xs text-slate-500">item</p>
-                                </td>
-
-                                <td class="px-5 py-4 text-center">
-                                    <span class="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-black">
-                                        {{ $materialCount }}
-                                    </span>
-                                </td>
-
-                                <td class="px-5 py-4 text-center">
-                                    <span class="px-3 py-1.5 rounded-full bg-amber-50 text-amber-700 text-xs font-black">
-                                        {{ $jasaCount }}
-                                    </span>
                                 </td>
 
                                 <td class="px-5 py-4 text-right whitespace-nowrap">
@@ -325,7 +318,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-5 py-12 text-center">
+                                <td colspan="7" class="px-5 py-12 text-center">
                                     <div class="w-16 h-16 rounded-3xl bg-slate-100 mx-auto flex items-center justify-center text-2xl mb-4">
                                         📊
                                     </div>

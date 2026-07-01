@@ -4,12 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Designator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DesignatorController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Designator::query();
+        $query = Designator::forCustomer($this->defaultCustomerId());
 
         if ($request->search) {
             $query->where(function ($q) use ($request) {
@@ -54,7 +55,9 @@ class DesignatorController extends Controller
 
     public function update(Request $request, $id)
     {
-        $designator = Designator::findOrFail($id);
+        $designator = Designator::forCustomer($this->defaultCustomerId())
+            ->where('id_designator', $id)
+            ->firstOrFail();
 
         $request->validate([
             'designator' => 'required|string|max:100',
@@ -79,7 +82,9 @@ class DesignatorController extends Controller
 
     public function destroy($id)
     {
-        $designator = Designator::findOrFail($id);
+        $designator = Designator::forCustomer($this->defaultCustomerId())
+            ->where('id_designator', $id)
+            ->firstOrFail();
         $designator->delete();
 
         return back()->with('success', 'Designator berhasil dihapus');
@@ -139,7 +144,9 @@ class DesignatorController extends Controller
                 'pair_code' => $pairCode,
             ];
 
-            $designator = Designator::where('designator', $designatorCode)->first();
+            $designator = Designator::forCustomer($this->defaultCustomerId())
+                ->where('designator', $designatorCode)
+                ->first();
 
             if ($designator) {
                 $designator->update($payload);
@@ -187,7 +194,9 @@ class DesignatorController extends Controller
 
     public function toggleFinishing($id)
     {
-        $designator = Designator::findOrFail($id);
+        $designator = Designator::forCustomer($this->defaultCustomerId())
+            ->where('id_designator', $id)
+            ->firstOrFail();
 
         $designator->update([
             'requires_finishing_evidence' => !$designator->requires_finishing_evidence,
@@ -199,6 +208,13 @@ class DesignatorController extends Controller
     private function guessPairCode($designator)
     {
         return preg_replace('/^[MJ]-/i', '', strtoupper($designator));
+    }
+
+    private function defaultCustomerId(): ?int
+    {
+        return DB::table('customers')
+            ->where('customer_code', 'TIF')
+            ->value('id_customer');
     }
 
     

@@ -13,6 +13,7 @@ class Project extends Model
 
     protected $fillable = [
         'pid',
+        'customer_id',
         'pid_sap',
         'project_name',
         'program',
@@ -30,6 +31,18 @@ class Project extends Model
         'map_note'
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (Project $project) {
+            if ($project->customer_id) {
+                return;
+            }
+
+            $project->customer_id = Customer::where('customer_code', 'TIF')
+                ->value('id_customer');
+        });
+    }
+
     /*
     |--------------------------------------------------------------------------
     | RELATIONS
@@ -39,6 +52,11 @@ class Project extends Model
     public function boqItems()
     {
         return $this->hasMany(BoqItem::class, 'project_id', 'id_project');
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'customer_id', 'id_customer');
     }
 
     public function assignment()

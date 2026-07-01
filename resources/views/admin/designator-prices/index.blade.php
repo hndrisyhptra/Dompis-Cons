@@ -299,10 +299,11 @@
                         Designator
                     </label>
 
-                    <select name="designator_id"
-                            id="designator_id"
-                            required
-                            class="mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+                    <select
+                        id="designator_id"
+                        name="designator_id"
+                        required
+                        class="select2-dark mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Pilih Designator</option>
 
                         @foreach($designators as $designator)
@@ -440,16 +441,42 @@
 </div>
 
 <script>
+
+function initDesignatorSelect()
+{
+    if ($('#designator_id').hasClass('select2-hidden-accessible')) {
+        return;
+    }
+
+    $('#designator_id').select2({
+        width: '100%',
+        dropdownParent: $('#priceModal'), // Memaksa dropdown masuk ke dalam Modal bertema Dark
+        placeholder: 'Cari Designator...',
+        allowClear: true,
+        containerCssClass: 'mt-1'
+    });
+}
+
 function openPriceModal()
 {
+    // 1. TAMPILKAN MODAL TERLEBIH DAHULU (PENTING!)
+    // Agar element modal sudah ada di layar saat dideteksi oleh Select2
     document.getElementById('priceModal').classList.remove('hidden');
     document.getElementById('priceModal').classList.add('flex');
 
+    // 2. Set Informasi Form
     document.getElementById('priceModalTitle').innerText = 'Tambah Harga';
     document.getElementById('priceForm').action = "{{ route('designator-prices.store') }}";
     document.getElementById('priceMethod').value = 'POST';
 
+    // 3. Reset Form Konten bawaan HTML
     document.getElementById('priceForm').reset();
+
+    // 4. JALANKAN INIT SELECT2 SETELAH MODAL TERBUKA
+    initDesignatorSelect();
+
+    // 5. Kosongkan nilai Select2 secara aman tanpa merusak UI-nya
+    $('#designator_id').val(null).trigger('change.select2');
 }
 
 function openEditPriceModal(item)
