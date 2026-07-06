@@ -171,12 +171,15 @@
 
                                     <button type="button"
                                             onclick="openEditDesignatorModal({
-                                                id: '{{ $item->id_designator }}',
-                                                designator: @js($item->designator),
-                                                item_name: @js($item->item_name),
-                                                unit: @js($item->unit),
-                                                type: @js($item->type),
-                                                pair_code: @js($item->pair_code)
+                                            id: '{{ $item->id_designator }}',
+                                            designator: @js($item->designator),
+                                            item_name: @js($item->item_name),
+                                            unit: @js($item->unit),
+                                            type: @js($item->type),
+                                            pair_code: @js($item->pair_code),
+                                            progress_category: @js($item->progress_category)
+
+                                                
                                             })"
                                             class="h-9 px-3 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800">
                                         Edit
@@ -373,6 +376,28 @@
                         class="mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
                 </div>
 
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Progress Category
+                    </label>
+
+                    <select
+                        name="progress_category"
+                        id="progress_category"
+                        class="w-full rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950"
+                    >
+
+                        @foreach($progressCategories as $category)
+
+                            <option value="{{ $category }}">
+                                {{ $category }}
+                            </option>
+
+                        @endforeach
+
+                    </select>
+                </div>
+
             </div>
 
             <div class="flex justify-end gap-3 px-5 py-4 border-t border-gray-200 dark:border-gray-800">
@@ -473,6 +498,7 @@
         document.getElementById('designatorModalTitle').innerText = 'Tambah Designator';
         document.getElementById('designatorForm').action = "{{ route('designators.store') }}";
         document.getElementById('designatorMethod').value = 'POST';
+        document.getElementById('progress_category').value = button.dataset.progressCategory;
 
         document.getElementById('designatorForm').reset();
     }
@@ -492,6 +518,7 @@
 
         document.getElementById('type').value = item.type ?? '';
         document.getElementById('pair_code').value = item.pair_code ?? '';
+        document.getElementById('progress_category').value = data.progress_category ?? 'OTHER';
     }
 
     function closeDesignatorModal()

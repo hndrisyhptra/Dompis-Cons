@@ -184,7 +184,7 @@ class ProjectController extends Controller
         'branch' => 'required|string|max:255',
         'sto' => 'required|string|max:20',
         'mitra_name' => 'nullable|string|max:100',
-        'jenis_eksekusi' => 'required|in:plan,survey,ogp,finish',
+        'jenis_eksekusi' => 'nullable|in:plan,survey,ogp,finish',
         'designator_id' => 'nullable|array',
         'designator_id.*' => 'nullable|exists:designators,id_designator',
         'boq_qty' => 'nullable|array',
@@ -294,6 +294,10 @@ class ProjectController extends Controller
 
         // TAMBAH DESIGNATOR BARU DARI MODAL EDIT
         if ($request->designator_id) {
+
+            // Ambil LOP otomatis (1 Project = 1 LOP)
+            $lop = $project->lop;
+
             foreach ($request->designator_id as $index => $designatorId) {
 
                 if (!$designatorId) {
@@ -308,13 +312,25 @@ class ProjectController extends Controller
                     continue;
                 }
 
+                // Hindari duplicate designator
+                $exists = BoqItem::where('lop_id', $lop?->id_lop)
+                    ->where('designator_id', $designator->id_designator)
+                    ->exists();
+
+                if ($exists) {
+                    continue;
+                }
+
                 BoqItem::create([
-                    'project_id' => $project->id_project,
-                    'designator_id' => $designator->id_designator,
-                    'designator' => $designator->designator,
-                    'item_name' => $designator->item_name,
-                    'unit' => $designator->unit,
-                    'quantity_plan' => $request->boq_qty[$index] ?? 0,
+                    'project_id'      => $project->id_project,
+                    'lop_id'          => $lop?->id_lop,
+
+                    'designator_id'   => $designator->id_designator,
+                    'designator'      => $designator->designator,
+                    'item_name'       => $designator->item_name,
+                    'unit'            => $designator->unit,
+
+                    'quantity_plan'   => $request->boq_qty[$index] ?? 0,
                     'quantity_actual' => 0,
                 ]);
             }
@@ -711,6 +727,13 @@ public function importCsv(Request $request)
 
         $project = Project::findOrFail($request->project_id);
 
+        // Ambil LOP otomatis (1 Project = 1 LOP)
+        $lop = $project->lop;
+
+        if (!$lop) {
+            return back()->with('error', 'LOP untuk project ini belum tersedia.');
+        }
+
         foreach ($request->designator_id as $index => $designatorId) {
 
             if (!$designatorId) {
@@ -725,20 +748,31 @@ public function importCsv(Request $request)
                 continue;
             }
 
+            // Cek duplicate
+            $exists = BoqItem::where('lop_id', $lop->id_lop)
+                ->where('designator_id', $designator->id_designator)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
             BoqItem::create([
-                'project_id' => $request->project_id,
-                'designator_id' => $designator->id_designator,
-                'designator' => $designator->designator,
-                'item_name' => $designator->item_name,
-                'unit' => $designator->unit,
-                'quantity_plan' => $request->boq_qty[$index] ?? 0,
+                'project_id'      => $project->id_project,
+                'lop_id'          => $lop->id_lop,
+
+                'designator_id'   => $designator->id_designator,
+                'designator'      => $designator->designator,
+                'item_name'       => $designator->item_name,
+                'unit'            => $designator->unit,
+
+                'quantity_plan'   => $request->boq_qty[$index] ?? 0,
                 'quantity_actual' => 0,
             ]);
         }
 
         return back()->with('success', 'Item BOQ berhasil ditambahkan.');
     }
-
     //RELASI DENGAN LOP
     public function lops()
     {

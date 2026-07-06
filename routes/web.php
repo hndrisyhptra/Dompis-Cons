@@ -12,6 +12,7 @@ use App\Http\Controllers\ImportController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\DesignatorPriceController;
 use App\Http\Controllers\AssignWaspangController;
+use App\Http\Controllers\DashboardPmController;
 
 
 
@@ -54,6 +55,16 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/admin/projects/{id}', [DashboardController::class, 'show'])
         ->name('admin.projects.show');
+
+    
+    /*
+    |--------------------------------------------------------------------------
+    | DASHBOARD PM
+    |--------------------------------------------------------------------------
+    */
+    
+    Route::get('/dashboard-pm', [DashboardPmController::class, 'index'])
+        ->name('dashboard.pm.index');
         
     /*
     |--------------------------------------------------------------------------

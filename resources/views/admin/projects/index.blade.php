@@ -977,12 +977,11 @@
 
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                        Jenis Eksekusi <span class="text-red-500">*</span>
+                        Jenis Eksekusi
                     </label>
 
                     <select name="jenis_eksekusi"
                             id="jenis_eksekusi"
-                            required
                             class="w-full h-11 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
                         <option value="">— Pilih jenis —</option>
                         <option value="plan">PLAN</option>

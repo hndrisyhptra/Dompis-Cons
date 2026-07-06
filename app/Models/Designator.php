@@ -18,6 +18,7 @@ class Designator extends Model
         'unit',
         'type',
         'pair_code',
+        'progress_category',
         'requires_finishing_evidence',
     ];
 

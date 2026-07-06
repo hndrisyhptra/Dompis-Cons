@@ -1,143 +1,225 @@
 <x-guest-layout>
 
-    <div class="min-h-screen bg-[#f7f6f2] flex items-center justify-center px-4 py-4">
+<div class="min-h-screen flex bg-white">
 
-        <div class="w-full max-w-sm">
+    {{-- LEFT IMAGE --}}
+    <div class="hidden lg:block lg:w-2/3 relative overflow-hidden">
 
-            {{-- LOGIN CARD --}}
-            <div class="bg-white border border-gray-200 rounded-[1.7rem] shadow-lg overflow-hidden">
+        <img
+            src="{{ asset('images/login-bg.png') }}"
+            class="absolute inset-0 w-full h-full object-cover"
+            alt="Login Background">
 
-                {{-- HEADER --}}
-                <div class="bg-blue-700 px-5 py-5 text-white text-center">
+        {{-- Overlay --}}
+        <div class="absolute inset-0 bg-gradient-to-r from-black/40 via-black/15 to-transparent"></div>
 
-                    <div class="mx-auto w-14 h-14 rounded-2xl bg-white overflow-hidden flex items-center justify-center mb-3">
-                        <img
-                            src="{{ asset('images/logo-dompis-cons.png') }}"
-                            alt="DOMPIS CONS"
-                            class="w-full h-full object-cover">
-                    </div>
+        {{-- Optional Text --}}
+        <div class="absolute bottom-12 left-12 text-white max-w-xl">
 
-                    <h1 class="text-2xl font-black leading-tight">
-                        DOMPIS CONS
-                    </h1>
+            <h2 class="text-5xl font-black leading-tight">
+                DOMPIS CONS
+            </h2>
 
-                    <p class="text-xs opacity-90 mt-1">
-                        Kontruksi Telkom Akses Area 3
-                    </p>
-
-                </div>
-
-                {{-- BODY --}}
-                <div class="p-5">
-
-                    <x-auth-session-status class="mb-3" :status="session('status')" />
-
-                    <form method="POST" action="{{ route('login') }}" class="space-y-4">
-                        @csrf
-
-                        {{-- Username --}}
-                        <div>
-                            <label for="username" class="block text-xs font-bold text-gray-600 mb-1.5">
-                                Username
-                            </label>
-
-                            <input id="username"
-                                   type="text"
-                                   name="username"
-                                   value="{{ old('username') }}"
-                                   required
-                                   autofocus
-                                   autocomplete="username"
-                                   placeholder="Masukkan username"
-                                   class="w-full h-11 rounded-xl border border-gray-300 bg-gray-50 px-4 text-sm font-medium
-                                          focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none">
-
-                            <x-input-error :messages="$errors->get('username')" class="mt-1.5" />
-                        </div>
-
-                        {{-- Password --}}
-                        <div>
-                            <label for="password" class="block text-xs font-bold text-gray-600 mb-1.5">
-                                Password
-                            </label>
-
-                            <div class="relative">
-                                <input id="password"
-                                       type="password"
-                                       name="password"
-                                       required
-                                       autocomplete="current-password"
-                                       placeholder="Masukkan password"
-                                       class="w-full h-11 rounded-xl border border-gray-300 bg-gray-50 px-4 pr-12 text-sm font-medium
-                                              focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none">
-
-                                <button type="button"
-                                        onclick="togglePassword()"
-                                        class="absolute inset-y-0 right-0 px-4 text-xs font-bold text-gray-500">
-                                    Show
-                                </button>
-                            </div>
-
-                            <x-input-error :messages="$errors->get('password')" class="mt-1.5" />
-                        </div>
-
-                        {{-- Remember --}}
-                        <div class="flex items-center justify-between pt-1">
-
-                            <label for="remember_me" class="inline-flex items-center">
-                                <input id="remember_me"
-                                       type="checkbox"
-                                       name="remember"
-                                       class="rounded border-gray-300 text-blue-700 shadow-sm focus:ring-blue-600">
-
-                                <span class="ml-2 text-xs text-gray-600">
-                                    Ingat saya
-                                </span>
-                            </label>
-
-                            <!--@if (Route::has('password.request'))-->
-                            <!--    <a href="{{ route('password.request') }}"-->
-                            <!--       class="text-xs font-bold text-blue-700">-->
-                            <!--        Lupa password?-->
-                            <!--    </a>-->
-                            <!--@endif-->
-
-                        </div>
-
-                        {{-- Button --}}
-                        <button type="submit"
-                                class="w-full h-11 rounded-xl bg-blue-700 text-white text-sm font-black
-                                       hover:bg-blue-800 active:scale-[0.98] transition">
-                            Login
-                        </button>
-
-                    </form>
-
-                </div>
-
-            </div>
-
-            <p class="text-center text-[11px] text-gray-400 mt-4">
-                © {{ date('Y') }} DOMPIS CONS
+            <p class="mt-4 text-xl text-gray-100 leading-relaxed">
+                Digital Operation Monitoring Project Information System
+                <br>
+                Construction Telkom Akses Area 3
             </p>
 
         </div>
 
     </div>
 
-    <script>
-        function togglePassword() {
-            const password = document.getElementById('password');
-            const button = event.currentTarget;
 
-            if (password.type === 'password') {
-                password.type = 'text';
-                button.innerText = 'Hide';
-            } else {
-                password.type = 'password';
-                button.innerText = 'Show';
-            }
-        }
-    </script>
+    {{-- RIGHT LOGIN --}}
+   <div class="w-full lg:w-[35%] bg-white flex items-center justify-center">
+
+    <div class="w-full max-w-md px-10">
+
+        {{-- Logo --}}
+        <div class="mb-12">
+
+            <img
+                src="{{ asset('images/logo-dompis-cons.png') }}"
+                class="w-20 h-20 rounded-2xl shadow-md">
+
+            <h1 class="mt-6 text-4xl font-black text-gray-900">
+                DOMPIS CONS
+            </h1>
+
+            <p class="mt-2 text-gray-500">
+                Digital Operation Monitoring Project Information System
+            </p>
+
+        </div>
+
+        <x-auth-session-status
+            class="mb-6"
+            :status="session('status')" />
+
+        <form method="POST"
+              action="{{ route('login') }}"
+              class="space-y-7">
+
+            @csrf
+
+            {{-- Username --}}
+            <div>
+
+                <label
+                    class="block text-sm font-semibold text-gray-700 mb-2">
+
+                    Username
+
+                </label>
+
+                <input
+                    id="username"
+                    type="text"
+                    name="username"
+                    value="{{ old('username') }}"
+                    required
+                    autofocus
+                    autocomplete="username"
+                    placeholder="Masukkan username"
+
+                    class="w-full
+                           border-0
+                           border-b-2
+                           border-gray-300
+                           bg-transparent
+                           px-0
+                           py-3
+                           text-lg
+                           focus:border-blue-600
+                           focus:ring-0
+                           placeholder:text-gray-400">
+
+                <x-input-error
+                    :messages="$errors->get('username')"
+                    class="mt-2"/>
+
+            </div>
+
+            {{-- Password --}}
+            <div>
+
+                <label
+                    class="block text-sm font-semibold text-gray-700 mb-2">
+
+                    Password
+
+                </label>
+
+                <div class="relative">
+
+                    <input
+                        id="password"
+                        type="password"
+                        name="password"
+                        required
+                        autocomplete="current-password"
+                        placeholder="Masukkan password"
+
+                        class="w-full
+                               border-0
+                               border-b-2
+                               border-gray-300
+                               bg-transparent
+                               px-0
+                               py-3
+                               pr-12
+                               text-lg
+                               focus:border-blue-600
+                               focus:ring-0
+                               placeholder:text-gray-400">
+
+                    <button
+                        type="button"
+                        onclick="togglePassword()"
+                        class="absolute right-0 top-1/2 -translate-y-1/2 text-sm font-medium text-blue-600 hover:text-blue-800">
+
+                        Show
+
+                    </button>
+
+                </div>
+
+                <x-input-error
+                    :messages="$errors->get('password')"
+                    class="mt-2"/>
+
+            </div>
+
+            {{-- Remember --}}
+            <div class="flex items-center justify-between">
+
+                <label class="flex items-center">
+
+                    <input
+                        type="checkbox"
+                        name="remember"
+                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+
+                    <span class="ml-2 text-sm text-gray-600">
+                        Ingat saya
+                    </span>
+
+                </label>
+
+            </div>
+
+            {{-- Button --}}
+            <button
+                type="submit"
+                class="w-full
+                       h-12
+                       rounded-xl
+                       bg-blue-700
+                       text-white
+                       font-semibold
+                       text-lg
+                       hover:bg-blue-800
+                       transition
+                       duration-300">
+
+                Login
+
+            </button>
+
+        </form>
+
+        <div class="mt-12 text-sm text-gray-400">
+            © {{ date('Y') }} DOMPIS CONS
+        </div>
+
+    </div>
+
+</div>
+</div>
+
+
+<script>
+
+function togglePassword(){
+
+    const password=document.getElementById('password');
+    const button=event.currentTarget;
+
+    if(password.type==="password"){
+
+        password.type="text";
+        button.innerHTML="Hide";
+
+    }else{
+
+        password.type="password";
+        button.innerHTML="Show";
+
+    }
+
+}
+
+</script>
 
 </x-guest-layout>

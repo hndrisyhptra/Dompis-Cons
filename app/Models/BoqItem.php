@@ -37,4 +37,46 @@ class BoqItem extends Model
     {
         return $this->belongsTo(Designator::class, 'designator', 'designator');
     }
+    public function project()
+    {
+        return $this->belongsTo(
+            Project::class,
+            'project_id',
+            'id_project'
+        );
+    }
+
+    public function lop()
+    {
+        return $this->belongsTo(
+            Lop::class,
+            'lop_id',
+            'id_lop'
+        );
+    }
+
+    public function scopeCategory($query, $category)
+    {
+        return $query->whereHas('designatorData', function ($q) use ($category) {
+
+            $q->where('progress_category', $category);
+
+        });
+    }
+
+    public function scopeProject($query, $projectId)
+    {
+        return $query->where(
+            'project_id',
+            $projectId
+        );
+    }
+
+    public function scopeLop($query, $lopId)
+    {
+        return $query->where(
+            'lop_id',
+            $lopId
+        );
+    }
 }
