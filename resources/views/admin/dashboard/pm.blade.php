@@ -2,236 +2,361 @@
 
 @section('content')
 
-{{-- Header --}}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+{{-- Header Section --}}
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
     <div>
-        <h1 class="text-xl font-bold text-gray-900 dark:text-white">
-            Dashboard PM
-        </h1>
+        <div class="flex items-center gap-2.5 mb-1">
+            <div class="w-2 h-6 bg-blue-600 rounded-full"></div>
+            <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                Dashboard PM
+            </h1>
+        </div>
         <p class="text-sm text-gray-500 dark:text-gray-400">
-            Progres Monitoring Improvement
+            Monitoring progres Penarikan Kabel dan Tanam Tiang secara real-time.
         </p>
     </div>
-    <div class="bg-white dark:bg-gray-900 px-4 py-2 rounded-xl shadow-xs border border-gray-200 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-400 self-stretch sm:self-auto text-center flex items-center justify-center">
-        <i class="fa-regular fa-calendar mr-2"></i> Tanggal Update: {{ \Carbon\Carbon::now()->translatedFormat('d F Y') }}
+    
+    <div class="flex items-center gap-2 bg-gray-50 dark:bg-gray-900/50 px-4 py-2.5 rounded-2xl border border-gray-200/60 dark:border-gray-800/60 self-start md:self-auto shadow-xs">
+        <i class="fa-regular fa-calendar-check text-blue-600 dark:text-blue-400 text-sm"></i>
+        <span class="text-xs font-semibold text-gray-600 dark:text-gray-300">
+            Data per: {{ \Carbon\Carbon::now()->translatedFormat('d F Y') }}
+        </span>
     </div>
 </div>
 
-{{-- Search & Filter --}}
-<div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-4 mb-6 shadow-sm">
-    <form method="GET" action="{{ route('dashboard.pm.index') }}" class="space-y-4">
-    
+{{-- Filter Panel Utama (Program & Branch) --}}
+<div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-5 mb-8 shadow-xs">
+    <form method="GET" action="{{ route('dashboard.pm.index') }}" id="filterForm">
+        {{-- Input hidden agar ketika ganti filter, limit per_page tidak reset ke 10 --}}
+        <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
 
-        {{-- Filter Dropdown --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {{-- Program --}}
-            <div>
-                <label class="block text-xs font-black uppercase tracking-wide text-gray-400 mb-1">
-                    Program
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-end">
+            {{-- Program Filter --}}
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    <i class="fa-solid fa-diagram-project mr-1 text-gray-300"></i> Pilih Program
                 </label>
-                <select name="program"
-                        onchange="this.form.submit()"
-                        class="w-full h-11 rounded-2xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-white cursor-pointer">
-                    <option value="">Semua Program</option>
-                    @foreach($programs as $program)
-                        <option value="{{ $program }}" {{ request('program') == $program ? 'selected' : '' }}>
-                            {{ $program }}
-                        </option>
-                    @endforeach
-                </select>
+                <div class="relative">
+                    <select name="program" onchange="document.getElementById('filterForm').submit()"
+                            class="w-full h-11 pl-4 pr-10 appearance-none rounded-xl bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 text-sm font-medium text-gray-800 dark:text-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer">
+                        <option value="">Semua Program</option>
+                        @foreach($programs as $program)
+                            <option value="{{ $program }}" {{ request('program') == $program ? 'selected' : '' }}>
+                                {{ $program }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400 text-xs">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                </div>
             </div>
 
-            {{-- Branch --}}
-            <div>
-                <label class="block text-xs font-black uppercase tracking-wide text-gray-400 mb-1">
-                    Branch
+            {{-- Branch Filter --}}
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    <i class="fa-solid fa-code-branch mr-1 text-gray-300"></i> Pilih Branch
                 </label>
-                <select name="branch"
-                        onchange="this.form.submit()"
-                        class="w-full h-11 rounded-2xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-blue-500 focus:border-blue-500 text-gray-900 dark:text-white cursor-pointer">
-                    <option value="">Semua Branch</option>
-                    @foreach($branches as $branch)
-                        <option value="{{ $branch }}" {{ request('branch') == $branch ? 'selected' : '' }}>
-                            {{ $branch }}
-                        </option>
-                    @endforeach
-                </select>
+                <div class="relative">
+                    <select name="branch" onchange="document.getElementById('filterForm').submit()"
+                            class="w-full h-11 pl-4 pr-10 appearance-none rounded-xl bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 text-sm font-medium text-gray-800 dark:text-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer">
+                        <option value="">Semua Branch</option>
+                        @foreach($branches as $branch)
+                            <option value="{{ $branch }}" {{ request('branch') == $branch ? 'selected' : '' }}>
+                                {{ $branch }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400 text-xs">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                </div>
             </div>
+
+            {{-- Reset Button --}}
+            @if(request('program') || request('branch') || request('per_page'))
+                <div>
+                    <a href="{{ route('dashboard.pm.index') }}" 
+                       class="inline-flex items-center justify-center h-11 px-5 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors w-full sm:w-auto">
+                        <i class="fa-solid fa-rotate-left mr-2"></i> Reset Filter
+                    </a>
+                </div>
+            @endif
         </div>
     </form>
 </div>
 
-{{-- INFOGRAPHIC CARDS / WIDGET TOTALS --}}
-<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-    <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded-lg flex items-center justify-center text-xl"><i class="fa-solid fa-layer-group"></i></div>
+{{-- Infographic Cards Widget --}}
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
+    {{-- Total Segmen --}}
+    <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
+        <div class="w-12 h-12 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center text-lg shadow-xs"><i class="fa-solid fa-layer-group"></i></div>
         <div>
-            <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Total Segment</p>
-            <h3 class="text-2xl font-bold text-gray-900 dark:text-white">{{ $totalSegments }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">Segmen</span></h3>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Segmen</p>
+            <h3 class="text-2xl font-black text-gray-900 dark:text-white mt-0.5">{{ $totalSegments }} <span class="text-xs font-medium text-gray-400">Segmen</span></h3>
         </div>
     </div>
-    <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-green-100 dark:bg-green-950 text-green-600 dark:text-green-400 rounded-lg flex items-center justify-center text-xl"><i class="fa-solid fa-ruler-combined"></i></div>
+    
+    {{-- Total Panjang FO --}}
+    <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
+        <div class="w-12 h-12 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center text-lg shadow-xs"><i class="fa-solid fa-ruler"></i></div>
         <div>
-            <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Total Panjang FO</p>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($totalKabelPlan, 0, ',', '.') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">m</span></h3>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Target FO</p>
+            <h3 class="text-xl font-black text-gray-900 dark:text-white mt-0.5">{{ number_format($totalKabelPlan, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">m</span></h3>
         </div>
     </div>
-    <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 rounded-lg flex items-center justify-center text-xl"><i class="fa-solid fa-cable-car"></i></div>
-        <div>
-            <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Aktual Penarikan FO</p>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($totalKabelActual, 0, ',', '.') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">m</span></h3>
-            <span class="text-xs font-bold text-amber-600 dark:text-amber-400">{{ number_format($totalKabelPersen, 2, ',', '.') }}%</span>
+    
+    {{-- Aktual Penarikan FO --}}
+    <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
+        <div class="w-12 h-12 bg-amber-500 text-white rounded-xl flex items-center justify-center text-lg shadow-xs"><i class="fa-solid fa-cable-car"></i></div>
+        <div class="w-full">
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Aktual FO</p>
+            <div class="flex items-baseline justify-between gap-2 mt-0.5">
+                <h3 class="text-xl font-black text-gray-900 dark:text-white">{{ number_format($totalKabelActual, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">m</span></h3>
+                <span class="text-xs font-extrabold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">{{ number_format($totalKabelPersen, 1, ',', '.') }}%</span>
+            </div>
         </div>
     </div>
-    <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 rounded-lg flex items-center justify-center text-xl"><i class="fa-solid fa-tower-broadcast"></i></div>
+    
+    {{-- Total Target Tiang --}}
+    <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
+        <div class="w-12 h-12 bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 rounded-xl flex items-center justify-center text-lg shadow-xs"><i class="fa-solid fa-tower-broadcast"></i></div>
         <div>
-            <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Total Target Tiang</p>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($totalTiangPlan, 0, ',', '.') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">pcs</span></h3>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Target Tiang</p>
+            <h3 class="text-xl font-black text-gray-900 dark:text-white mt-0.5">{{ number_format($totalTiangPlan, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">pcs</span></h3>
         </div>
     </div>
-    <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 rounded-lg flex items-center justify-center text-xl"><i class="fa-solid fa-mountain-sun"></i></div>
-        <div>
-            <p class="text-xs text-gray-400 font-medium uppercase tracking-wider">Aktual Tanam Tiang</p>
-            <h3 class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($totalTiangActual, 0, ',', '.') }} <span class="text-xs font-normal text-gray-500 dark:text-gray-400">pcs</span></h3>
-            <span class="text-xs font-bold text-red-600 dark:text-red-400">{{ number_format($totalTiangPersen, 2, ',', '.') }}%</span>
+    
+    {{-- Aktual Tanam Tiang --}}
+    <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
+        <div class="w-12 h-12 bg-green-500 text-white rounded-xl flex items-center justify-center text-lg shadow-xs"><i class="fa-solid fa-mountain-sun"></i></div>
+        <div class="w-full">
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Aktual Tiang</p>
+            <div class="flex items-baseline justify-between gap-2 mt-0.5">
+                <h3 class="text-xl font-black text-gray-900 dark:text-white">{{ number_format($totalTiangActual, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">pcs</span></h3>
+                <span class="text-xs font-extrabold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/60 px-1.5 py-0.5 rounded-md">{{ number_format($totalTiangPersen, 1, ',', '.') }}%</span>
+            </div>
         </div>
     </div>
 </section>
 
-{{-- MAIN DATA AREA --}}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-    <div class="lg:col-span-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 shadow-xs overflow-hidden flex flex-col justify-between">
-        <div class="p-4 border-b border-gray-100 dark:border-gray-800">
-            <h2 class="font-bold text-gray-900 dark:text-white text-sm uppercase tracking-wider">Progres Per Program</h2>
+{{-- Main Data Area --}}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+    {{-- Data Table Segmen Proyek --}}
+    <div class="lg:col-span-2 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs overflow-hidden flex flex-col justify-between">
+        
+        {{-- Table Header & Per-Page Selector (Di Atas Tabel) --}}
+        <div class="p-5 border-b border-gray-100 dark:border-gray-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <h2 class="font-bold text-gray-900 dark:text-white text-sm uppercase tracking-wider flex items-center gap-2">
+                <i class="fa-solid fa-table-list text-blue-600"></i> Detail Progres Per Segmen LOP
+            </h2>
+            
+            {{-- Per Page Form Selector --}}
+            <div class="flex items-center gap-2 self-end sm:self-auto">
+                <span class="text-xs text-gray-400 font-medium whitespace-nowrap">Tampilkan:</span>
+                <div class="relative w-28">
+                    <select onchange="window.location.href = this.value"
+                            class="w-full h-8 pl-3 pr-8 appearance-none rounded-lg bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer py-0">
+                        <option value="{{ request()->fullUrlWithQuery(['per_page' => 10]) }}" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10 baris</option>
+                        <option value="{{ request()->fullUrlWithQuery(['per_page' => 20]) }}" {{ request('per_page') == 20 ? 'selected' : '' }}>20 baris</option>
+                        <option value="{{ request()->fullUrlWithQuery(['per_page' => 50]) }}" {{ request('per_page') == 50 ? 'selected' : '' }}>50 baris</option>
+                        <option value="{{ request()->fullUrlWithQuery(['per_page' => 100]) }}" {{ request('per_page') == 100 ? 'selected' : '' }}>100 baris</option>
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-gray-400 text-[10px]">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="overflow-x-auto text-xs">
-            <table class="w-full text-left border-collapse">
+        
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="bg-gray-900 dark:bg-black text-white text-[10px] uppercase tracking-wider">
-                        <th class="p-2.5 border border-gray-700 text-center">No</th>
-                        <th class="p-2.5 border border-gray-700">Branch</th>
-                        <th class="p-2.5 border border-gray-700">STO</th>
-                        <th class="p-2.5 border border-gray-700">Nama LOP</th>
-                        <th class="p-2.5 border border-gray-700 text-right">Panjang Kabel (m)</th>
-                        <th class="p-2.5 border border-gray-700 text-center" colspan="2">Aktual Penarikan FO</th>
-                        <th class="p-2.5 border border-gray-700 text-right">Tiang (pcs)</th>
-                        <th class="p-2.5 border border-gray-700 text-center" colspan="2">Aktual Tanam Tiang</th>
+                    <tr class="bg-gray-50 dark:bg-black/40 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
+                        <th class="p-3.5 text-center w-12">No</th>
+                        <th class="p-3.5">Branch / STO</th>
+                        <th class="p-3.5">Nama LOP</th>
+                        <th class="p-3.5 text-center">Panjang FO (m)</th>
+                        <th class="p-3.5 text-center w-32">Aktual Penarikan FO</th>
+                        <th class="p-3.5 text-center">Tiang (pcs)</th>
+                        <th class="p-3.5 text-center w-32">Aktual Tanam Tiang</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-200 dark:divide-gray-800 text-gray-700 dark:text-gray-300">
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 text-gray-700 dark:text-gray-300">
                     @forelse($tableData as $row)
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-950 transition-colors">
-                        <td class="p-2 border border-gray-200 dark:border-gray-800 text-center">{{ $row['no'] }}</td>
-                        <td class="p-2 border border-gray-200 dark:border-gray-800 font-semibold text-gray-900 dark:text-white">{{ $row['branch'] }}</td>
-                        <td class="p-2 border border-gray-200 dark:border-gray-800 font-mono text-gray-500 dark:text-gray-400">{{ $row['sto'] }}</td>
-                        <td class="p-2 border border-gray-200 dark:border-gray-800 text-blue-600 dark:text-blue-400 font-medium">{{ $row['nama_lop'] }}</td>
-                        <td class="p-2 border border-gray-200 dark:border-gray-800 text-right font-mono">{{ number_format($row['kabel_plan'], 0, ',', '.') }}</td>
-                        <td class="p-2 border border-gray-200 dark:border-gray-800 text-right font-mono">{{ number_format($row['kabel_actual'], 0, ',', '.') }}</td>
-                        <td class="p-2 border border-gray-200 dark:border-gray-800 text-center whitespace-nowrap">
-                            <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400 block">{{ number_format($row['kabel_persen'], 2, ',', '.') }}%</span>
-                            <div class="w-16 bg-gray-200 dark:bg-gray-800 h-1.5 rounded-full mx-auto mt-0.5">
-                                <div class="bg-amber-500 h-1.5 rounded-full" style="width: {{ min($row['kabel_persen'], 100) }}%"></div>
+                    <tr class="hover:bg-gray-50/70 dark:hover:bg-gray-950/40 transition-colors">
+                        {{-- Menggunakan pagination index agar nomor berlanjut di page berikutnya --}}
+                        <td class="p-3.5 text-center text-gray-400 font-mono">
+                            {{ ($lopsData->currentPage() - 1) * $lopsData->perPage() + $loop->iteration }}
+                        </td>
+                        <td class="p-3.5">
+                            <div class="font-bold text-gray-900 dark:text-white">{{ $row['branch'] }}</div>
+                            <div class="text-[10px] text-gray-400 dark:text-gray-500 font-mono mt-0.5"><i class="fa-solid fa-location-dot mr-1"></i>{{ $row['sto'] }}</div>
+                        </td>
+                        <td class="p-3.5">
+                            <div class="font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">{{ $row['nama_lop'] }}</div>
+                        </td>
+                        <td class="p-3.5 text-center font-mono text-gray-900 dark:text-white">{{ number_format($row['kabel_plan'], 0, ',', '.') }} <span class="text-[10px] text-gray-400">m</span></td>
+                        <td class="p-3.5">
+                            <div class="space-y-1">
+                                <div class="flex items-center justify-between font-mono text-[10px]">
+                                    <span class="text-gray-400">{{ number_format($row['kabel_actual'], 0, ',', '.') }} m</span>
+                                    <span class="font-bold text-amber-600 dark:text-amber-400">{{ number_format($row['kabel_persen'], 1, ',', '.') }}%</span>
+                                </div>
+                                <div class="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                                    <div class="bg-amber-500 h-full rounded-full transition-all duration-500" style="width: {{ min($row['kabel_persen'], 100) }}%"></div>
+                                </div>
                             </div>
                         </td>
-                        <td class="p-2 border border-gray-200 dark:border-gray-800 text-right font-mono">{{ number_format($row['tiang_plan'], 0, ',', '.') }}</td>
-                        <td class="p-2 border border-gray-200 dark:border-gray-800 text-right font-mono">{{ number_format($row['tiang_actual'], 0, ',', '.') }}</td>
-                        <td class="p-2 border border-gray-200 dark:border-gray-800 text-center whitespace-nowrap">
-                            <span class="text-[10px] font-bold text-green-600 dark:text-green-400 block">{{ number_format($row['tiang_persen'], 2, ',', '.') }}%</span>
-                            <div class="w-16 bg-gray-200 dark:bg-gray-800 h-1.5 rounded-full mx-auto mt-0.5">
-                                <div class="bg-green-500 h-1.5 rounded-full" style="width: {{ min($row['tiang_persen'], 100) }}%"></div>
+                        <td class="p-3.5 text-right font-mono text-gray-900 dark:text-white">{{ number_format($row['tiang_plan'], 0, ',', '.') }} <span class="text-[10px] text-gray-400">pcs</span></td>
+                        <td class="p-3.5">
+                            <div class="space-y-1">
+                                <div class="flex items-center justify-between font-mono text-[10px]">
+                                    <span class="text-gray-400">{{ number_format($row['tiang_actual'], 0, ',', '.') }}pcs</span>
+                                    <span class="font-bold text-green-600 dark:text-green-400">{{ number_format($row['tiang_persen'], 1, ',', '.') }}%</span>
+                                </div>
+                                <div class="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                                    <div class="bg-green-500 h-full rounded-full transition-all duration-500" style="width: {{ min($row['tiang_persen'], 100) }}%"></div>
+                                </div>
                             </div>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="10" class="p-4 text-center text-gray-400 dark:text-gray-500 border border-gray-200 dark:border-gray-800">Tidak ada data proyek yang sesuai filter.</td>
+                        <td colspan="7" class="p-8 text-center text-gray-400 dark:text-gray-500 font-medium">
+                            <div class="flex flex-col items-center justify-center gap-2">
+                                <i class="fa-regular fa-folder-open text-3xl text-gray-300 mb-1"></i>
+                                Tidak ada segmen data proyek yang cocok dengan kriteria filter.
+                            </div>
+                        </td>
                     </tr>
                     @endforelse
                 </tbody>
-                <tfoot class="bg-gray-100 dark:bg-gray-950 font-bold text-gray-900 dark:text-white">
+                @if(count($tableData) > 0)
+                <tfoot class="bg-gray-50 dark:bg-black/30 font-bold text-gray-900 dark:text-white border-t border-gray-200 dark:border-gray-800">
                     <tr>
-                        <td colspan="4" class="p-2.5 border border-gray-200 dark:border-gray-800 text-center uppercase tracking-wider">Total</td>
-                        <td class="p-2.5 border border-gray-200 dark:border-gray-800 text-right font-mono">{{ number_format($totalKabelPlan, 0, ',', '.') }}</td>
-                        <td class="p-2.5 border border-gray-200 dark:border-gray-800 text-right font-mono">{{ number_format($totalKabelActual, 0, ',', '.') }}</td>
-                        <td class="p-2.5 border border-gray-200 dark:border-gray-800 text-center text-blue-600 dark:text-blue-400 font-mono">{{ number_format($totalKabelPersen, 2, ',', '.') }}%</td>
-                        <td class="p-2.5 border border-gray-200 dark:border-gray-800 text-right font-mono">{{ number_format($totalTiangPlan, 0, ',', '.') }}</td>
-                        <td class="p-2.5 border border-gray-200 dark:border-gray-800 text-right font-mono">{{ number_format($totalTiangActual, 0, ',', '.') }}</td>
-                        <td class="p-2.5 border border-gray-200 dark:border-gray-800 text-center text-blue-600 dark:text-blue-400 font-mono">{{ number_format($totalTiangPersen, 2, ',', '.') }}%</td>
+                        <td colspan="3" class="p-4 text-center uppercase tracking-wider text-xs font-bold text-gray-500 dark:text-gray-400">Total Halaman ini</td>
+                        <td class="p-4 text-right font-mono">{{ number_format($tableData ? array_sum(array_column($tableData, 'kabel_plan')) : 0, 0, ',', '.') }}</td>
+                        <td class="p-4 text-center font-mono text-amber-600 dark:text-amber-400 text-xs bg-amber-50/30 dark:bg-amber-950/10">Page Summary</td>
+                        <td class="p-4 text-right font-mono">{{ number_format($tableData ? array_sum(array_column($tableData, 'tiang_plan')) : 0, 0, ',', '.') }}</td>
+                        <td class="p-4 text-center font-mono text-green-600 dark:text-green-400 text-xs bg-green-50/30 dark:bg-green-950/10">Page Summary</td>
                     </tr>
                 </tfoot>
+                @endif
             </table>
         </div>
+
+        {{-- Pagination Links (Di Bawah Tabel) --}}
+        @if($lopsData->hasPages())
+        <div class="p-4 border-t border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-black/10">
+            {{ $lopsData->links() }}
+        </div>
+        @endif
     </div>
 
-    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 flex flex-col justify-between">
+    {{-- Ringkasan Status Proyek (Donut & Analytics) --}}
+    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-5 flex flex-col justify-between shadow-xs">
         <div>
-            <h2 class="font-bold text-gray-900 dark:text-white text-sm uppercase tracking-wider mb-4">Ringkasan Total Proyek</h2>
-            <div class="w-40 h-40 mx-auto relative mb-4">
+            <h2 class="font-bold text-gray-900 dark:text-white text-sm uppercase tracking-wider mb-6 flex items-center gap-2">
+                <i class="fa-solid fa-chart-pie text-blue-600"></i> Klasifikasi Progres
+            </h2>
+            <div class="w-44 h-44 mx-auto relative mb-6">
                 <canvas id="summaryDonut"></canvas>
             </div>
         </div>
+        
         @php 
             $totalAll = array_sum($summaryStatus);
-            $pSelesai = $totalAll > 0 ? round(($summaryStatus['selesai'] / $totalAll) * 100, 2) : 0;
-            $pSedang = $totalAll > 0 ? round(($summaryStatus['sedang'] / $totalAll) * 100, 2) : 0;
-            $pRendah = $totalAll > 0 ? round(($summaryStatus['rendah'] / $totalAll) * 100, 2) : 0;
-            $pBelum = $totalAll > 0 ? round(($summaryStatus['belum'] / $totalAll) * 100, 2) : 0;
+            $pSelesai = $totalAll > 0 ? round(($summaryStatus['selesai'] / $totalAll) * 100, 1) : 0;
+            $pSedang = $totalAll > 0 ? round(($summaryStatus['sedang'] / $totalAll) * 100, 1) : 0;
+            $pRendah = $totalAll > 0 ? round(($summaryStatus['rendah'] / $totalAll) * 100, 1) : 0;
+            $pBelum = $totalAll > 0 ? round(($summaryStatus['belum'] / $totalAll) * 100, 1) : 0;
         @endphp
-        <div class="text-xs space-y-2 text-gray-700 dark:text-gray-300">
-            <div class="flex justify-between items-center"><span class="text-green-600 dark:text-green-400 font-medium"><i class="fa-solid fa-square mr-1.5"></i> Selesai (&ge; 100%)</span> <span class="font-bold font-mono">{{ $summaryStatus['selesai'] }} ({{ $pSelesai }}%)</span></div>
-            <div class="flex justify-between items-center"><span class="text-amber-500 dark:text-amber-400 font-medium"><i class="fa-solid fa-square mr-1.5"></i> Sedang (50 - 99%)</span> <span class="font-bold font-mono">{{ $summaryStatus['sedang'] }} ({{ $pSedang }}%)</span></div>
-            <div class="flex justify-between items-center"><span class="text-orange-400 dark:text-orange-300 font-medium"><i class="fa-solid fa-square mr-1.5"></i> Rendah (1 - 49%)</span> <span class="font-bold font-mono">{{ $summaryStatus['rendah'] }} ({{ $pRendah }}%)</span></div>
-            <div class="flex justify-between items-center"><span class="text-red-500 dark:text-red-400 font-medium"><i class="fa-solid fa-square mr-1.5"></i> Belum Dikerjakan</span> <span class="font-bold font-mono">{{ $summaryStatus['belum'] }} ({{ $pBelum }}%)</span></div>
-            <hr class="border-gray-100 dark:border-gray-800 my-2">
-            <div class="flex justify-between items-center font-bold text-sm text-gray-900 dark:text-white"><span>TOTAL</span> <span>{{ $totalSegments }} Segmen</span></div>
+        
+        <div class="text-xs space-y-3">
+            <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
+                <span class="text-green-600 dark:text-green-400 font-semibold flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-md bg-emerald-500 inline-block"></span> Selesai (&ge; 100%)
+                </span> 
+                <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['selesai'] }} <span class="text-[10px] text-gray-400 font-normal">({{ $pSelesai }}%)</span></span>
+            </div>
+            
+            <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
+                <span class="text-amber-500 dark:text-amber-400 font-semibold flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-md bg-amber-500 inline-block"></span> Sedang (50 - 99%)
+                </span> 
+                <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['sedang'] }} <span class="text-[10px] text-gray-400 font-normal">({{ $pSedang }}%)</span></span>
+            </div>
+            
+            <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
+                <span class="text-orange-400 dark:text-orange-300 font-semibold flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-md bg-orange-400 inline-block"></span> Rendah (1 - 49%)
+                </span> 
+                <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['rendah'] }} <span class="text-[10px] text-gray-400 font-normal">({{ $pRendah }}%)</span></span>
+            </div>
+            
+            <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
+                <span class="text-red-500 dark:text-red-400 font-semibold flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-md bg-red-500 inline-block"></span> Belum Mulai
+                </span> 
+                <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['belum'] }} <span class="text-[10px] text-gray-400 font-normal">({{ $pBelum }}%)</span></span>
+            </div>
+            
+            <div class="pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center font-bold text-sm text-gray-900 dark:text-white px-1">
+                <span>TOTAL CAKUPAN</span> 
+                <span>{{ $totalSegments }} LOP</span>
+            </div>
         </div>
     </div>
 </div>
 
-{{-- BOTTOM GAUGES & GRAPHS --}}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center">
-        <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">Progres Penarikan FO</h4>
-        <div class="w-36 h-24 relative">
+{{-- Bottom Gauge Section --}}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+    {{-- Gauge FO --}}
+    <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 flex flex-col items-center justify-center shadow-xs">
+        <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Efisiensi Penarikan FO</h4>
+        <div class="w-40 h-24 relative">
             <canvas id="gaugeFO"></canvas>
             <div class="absolute bottom-0 inset-x-0 text-center">
-                <span class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($totalKabelPersen, 2, ',', '.') }}%</span>
+                <span class="text-2xl font-black text-gray-900 dark:text-white">{{ number_format($totalKabelPersen, 1, ',', '.') }}%</span>
             </div>
         </div>
-        <p class="text-[11px] text-gray-400 dark:text-gray-500 font-mono mt-2">{{ number_format($totalKabelActual, 0, ',', '.') }} m / {{ number_format($totalKabelPlan, 0, ',', '.') }} m</p>
+        <p class="text-[11px] text-gray-500 font-mono mt-3 bg-gray-50 dark:bg-gray-950 px-3 py-1 rounded-full border border-gray-100 dark:border-gray-800/60">
+            {{ number_format($totalKabelActual, 0, ',', '.') }} / {{ number_format($totalKabelPlan, 0, ',', '.') }} m
+        </p>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 flex flex-col items-center justify-center">
-        <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2">Progres Tanam Tiang</h4>
-        <div class="w-36 h-24 relative">
+    {{-- Gauge Tiang --}}
+    <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 flex flex-col items-center justify-center shadow-xs">
+        <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Efisiensi Tanam Tiang</h4>
+        <div class="w-40 h-24 relative">
             <canvas id="gaugeTiang"></canvas>
             <div class="absolute bottom-0 inset-x-0 text-center">
-                <span class="text-xl font-bold text-gray-900 dark:text-white">{{ number_format($totalTiangPersen, 2, ',', '.') }}%</span>
+                <span class="text-2xl font-black text-gray-900 dark:text-white">{{ number_format($totalTiangPersen, 1, ',', '.') }}%</span>
             </div>
         </div>
-        <p class="text-[11px] text-gray-400 dark:text-gray-500 font-mono mt-2">{{ number_format($totalTiangActual, 0, ',', '.') }} pcs / {{ number_format($totalTiangPlan, 0, ',', '.') }} pcs</p>
+        <p class="text-[11px] text-gray-500 font-mono mt-3 bg-gray-50 dark:bg-gray-950 px-3 py-1 rounded-full border border-gray-100 dark:border-gray-800/60">
+            {{ number_format($totalTiangActual, 0, ',', '.') }} / {{ number_format($totalTiangPlan, 0, ',', '.') }} pcs
+        </p>
     </div>
 
-    <div class="bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800">
-        <h4 class="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-3">Grafik Progres Per Bulan</h4>
+    {{-- Line Graph Bulanan --}}
+    <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
+        <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Tren Progres Lapangan (2026)</h4>
         <div class="h-32">
             <canvas id="lineMonthly"></canvas>
         </div>
     </div>
 </div>
 
-{{-- SCRIPT INTEGRATION FOR CHARTS --}}
+{{-- Chart JS Scripts --}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // 1. Donut Chart - Ringkasan Proyek
+    // 1. Donut Klasifikasi Status
     new Chart(document.getElementById('summaryDonut'), {
         type: 'doughnut',
         data: {
-            labels: ['Selesai', 'Sedang', 'Rendah', 'Belum Dikerjakan'],
+            labels: ['Selesai', 'Sedang', 'Rendah', 'Belum Mulai'],
             datasets: [{
                 data: [
                     {{ $summaryStatus['selesai'] }},
@@ -243,45 +368,49 @@
                 borderWidth: 0
             }]
         },
-        options: { cutout: '75%', plugins: { legend: { display: false } } }
+        options: { 
+            cutout: '80%', 
+            plugins: { legend: { display: false } },
+            maintainAspectRatio: false 
+        }
     });
 
-    // 2. Gauge Chart - Penarikan FO
+    // 2. Gauge Chart FO
     let kabelPersen = {{ min($totalKabelPersen, 100) }};
     new Chart(document.getElementById('gaugeFO'), {
         type: 'doughnut',
         data: {
             datasets: [{
                 data: [kabelPersen, 100 - kabelPersen],
-                backgroundColor: ['#F59E0B', '#E5E7EB'],
+                backgroundColor: ['#F59E0B', '#F3F4F6'],
                 borderWidth: 0
             }]
         },
-        options: { rotation: -90, circumference: 180, cutout: '80%', plugins: { legend: { display: false } } }
+        options: { rotation: -90, circumference: 180, cutout: '82%', plugins: { legend: { display: false } }, maintainAspectRatio: false }
     });
 
-    // 3. Gauge Chart - Tanam Tiang
+    // 3. Gauge Chart Tiang
     let tiangPersen = {{ min($totalTiangPersen, 100) }};
     new Chart(document.getElementById('gaugeTiang'), {
         type: 'doughnut',
         data: {
             datasets: [{
                 data: [tiangPersen, 100 - tiangPersen],
-                backgroundColor: ['#10B981', '#E5E7EB'],
+                backgroundColor: ['#10B981', '#F3F4F6'],
                 borderWidth: 0
             }]
         },
-        options: { rotation: -90, circumference: 180, cutout: '80%', plugins: { legend: { display: false } } }
+        options: { rotation: -90, circumference: 180, cutout: '82%', plugins: { legend: { display: false } }, maintainAspectRatio: false }
     });
 
-    // 4. Line Chart Progress Bulanan
+    // 4. Line Chart Tren Bulanan
     new Chart(document.getElementById('lineMonthly'), {
         type: 'line',
         data: {
             labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
             datasets: [
-                { label: 'Penarikan FO (%)', data: [10, 15, 22, 35, 48, {{ min($totalKabelPersen, 100) }}], borderColor: '#F59E0B', tension: 0.3, pointRadius: 2 },
-                { label: 'Tanam Tiang (%)', data: [20, 28, 40, 55, 68, {{ min($totalTiangPersen, 100) }}], borderColor: '#10B981', tension: 0.3, pointRadius: 2 }
+                { label: 'FO (%)', data: [12, 18, 25, 38, 50, {{ min($totalKabelPersen, 100) }}], borderColor: '#F59E0B', backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, borderWidth: 2 },
+                { label: 'Tiang (%)', data: [18, 24, 35, 50, 62, {{ min($totalTiangPersen, 100) }}], borderColor: '#10B981', backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, borderWidth: 2 }
             ]
         },
         options: { 
@@ -289,8 +418,8 @@
             maintainAspectRatio: false, 
             plugins: { legend: { display: false } }, 
             scales: { 
-                y: { min: 0, max: 100, ticks: { font: { size: 9 } } }, 
-                x: { ticks: { font: { size: 9 } } } 
+                y: { min: 0, max: 100, ticks: { font: { size: 9 }, stepSize: 25 }, grid: { color: '#F3F4F6' } }, 
+                x: { grid: { display: false }, ticks: { font: { size: 9 } } } 
             } 
         }
     });

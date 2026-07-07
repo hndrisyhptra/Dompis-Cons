@@ -361,6 +361,60 @@
 
                                         @endif
 
+                                   {{-- TAMPILKAN QUANTITY ACTUAL YANG DI-INPUT WASPANG (KPI KABEL / TIANG) --}}
+                                    @if(($log->activity_type === 'update_quantity_actual' || $log->activity_type === 'upload_evidence') && isset($meta['quantity_actual']))
+                                        @php
+                                            $satuan = 'unit'; // Default fallback awal
+                                            $boqItemId = $meta['boq_item_id'] ?? null;
+
+                                            if ($boqItemId) {
+                                                // Tarik langsung kategori asli dari database berdasarkan boq_item_id untuk menjamin keakuratan 100%
+                                                $dbDesignator = DB::table('boq_items')
+                                                    ->join('designators', 'designators.id_designator', '=', 'boq_items.designator_id')
+                                                    ->where('boq_items.id_boq', $boqItemId)
+                                                    ->select('designators.progress_category')
+                                                    ->first();
+
+                                                if ($dbDesignator) {
+                                                    $categoryName = trim(strtoupper($dbDesignator->progress_category));
+                                                    if ($categoryName === 'TIANG') {
+                                                        $satuan = 'pcs';
+                                                    } elseif ($categoryName === 'KABEL') {
+                                                        $satuan = 'meter';
+                                                    }
+                                                }
+                                            }
+                                            
+                                            // JIKA TETAP TIDAK KETEMU (Log manual / tanpa boq_item_id): Gunakan String Matching dari deskripsi log
+                                            if ($satuan === 'unit') {
+                                                $descUpper = strtoupper($log->description);
+                                                $designatorUpper = isset($meta['boq_designator']) ? strtoupper($meta['boq_designator']) : '';
+                                                
+                                                if (str_contains($descUpper, 'TIANG') || str_contains($designatorUpper, 'TIANG')) {
+                                                    $satuan = 'pcs';
+                                                } elseif (str_contains($descUpper, 'KABEL') || str_contains($descUpper, 'PENARIKAN') || str_contains($designatorUpper, 'OF') || str_contains($designatorUpper, 'SM')) {
+                                                    $satuan = 'meter';
+                                                }
+                                            }
+                                        @endphp
+
+                                        <div class="mt-3 pt-3 border-t border-dashed border-gray-200 dark:border-gray-700">
+                                            <div class="inline-flex items-center gap-2 bg-blue-50 dark:bg-blue-950/40 px-3 py-1.5 rounded-xl border border-blue-100 dark:border-blue-900/40">
+                                                <div class="w-2 h-2 rounded-full bg-blue-600 dark:bg-blue-400"></div>
+                                                <p class="text-xs font-semibold text-blue-800 dark:text-blue-300">
+                                                    Kuantitas Aktual Lapangan: 
+                                                    <span class="font-black text-sm text-blue-700 dark:text-blue-400">
+                                                        {{ number_format((float)$meta['quantity_actual'], 0, ',', '.') }}
+                                                    </span>
+                                                    <span class="text-xs font-bold text-blue-600 dark:text-blue-400 ml-0.5">
+                                                        {{ $satuan }}
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    @endif
+
+
                                     </div>
 
                                 </div>

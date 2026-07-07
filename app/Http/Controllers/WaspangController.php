@@ -370,7 +370,6 @@ class WaspangController extends Controller
         abort_if(!$persiapanComplete, 403);
 
         $boqTotal = $materialBoqItems->count();
-
         $boqUploaded = 0;
 
         foreach ($materialBoqItems as $boq) {
@@ -385,15 +384,11 @@ class WaspangController extends Controller
             }
         }
 
-        $instalasiComplete =
-            $boqTotal > 0 &&
-            $boqUploaded >= $boqTotal;
-
+        $instalasiComplete = $boqTotal > 0 && $boqUploaded >= $boqTotal;
         $pengukuranComplete = $this->isPengukuranUploaded($id);
         $finishingComplete = $this->isFinishingUploaded($id);
 
         $revisionHistories = [];
-
         foreach ($materialBoqItems as $boq) {
             $revisionHistories[$boq->id_boq] = EvidenceRevisionHistory::where('project_id', $project->id_project)
                 ->where('stage', 'instalasi')
@@ -408,14 +403,8 @@ class WaspangController extends Controller
         $project->setRelation('boqItems', $materialBoqItems);
 
         return view('waspang.steps.instalasi', compact(
-            'project',
-            'boqTotal',
-            'boqUploaded',
-            'persiapanComplete',
-            'instalasiComplete',
-            'pengukuranComplete',
-            'finishingComplete',
-            'revisionHistories'
+            'project', 'boqTotal', 'boqUploaded', 'persiapanComplete',
+            'instalasiComplete', 'pengukuranComplete', 'finishingComplete', 'revisionHistories'
         ));
     }
 
@@ -600,6 +589,7 @@ class WaspangController extends Controller
     }
 
     //UPLOAD FOTO di FOLDER 
+    // UPLOAD FOTO di FOLDER 
     public function uploadEvidence(Request $request, $id)
     {
         $project = $this->getAssignedProject($id);
@@ -619,7 +609,7 @@ class WaspangController extends Controller
         $projectFolder = 'project-' . $project->id_project;
         $stage = $request->stage;
         $type = $request->evidence_type;
-        $lopId = Lop::where('project_id', $project->id_project)->value('id_lop');
+        $lopId = \App\Models\Lop::where('project_id', $project->id_project)->value('id_lop');
 
         foreach ($request->file('photos') as $photo) {
             $filename = now()->format('Ymd_His') . '_' . uniqid() . '.jpg';
@@ -630,7 +620,7 @@ class WaspangController extends Controller
                 'public'
             );
 
-            $evidence = Evidence::create([
+            $evidence = \App\Models\Evidence::create([
                 'project_id' => $project->id_project,
                 'boq_item_id' => $request->boq_item_id,
                 'uploaded_by' => auth()->user()->id_user,
@@ -646,7 +636,7 @@ class WaspangController extends Controller
             $evidence->load('boqItem');
             $evidenceLabel = $this->evidenceLabel($evidence);
 
-            ProjectActivityService::log([
+            \App\Services\ProjectActivityService::log([
                 'project_id' => $evidence->project_id,
                 'lop_id' => $lopId,
                 'evidence_id' => $evidence->id_evidence,
@@ -668,37 +658,102 @@ class WaspangController extends Controller
         }
 
         if ($request->boq_item_id && $request->quantity_actual !== null) {
-            \App\Models\BoqItem::where('id_boq', $request->boq_item_id)
-                ->update([
-                    'quantity_actual' => $request->quantity_actual
-                ]);
+            $boqItem = \App\Models\BoqItem::where('id_boq', $request->boq_item_id)->first();
+            
+            if ($boqItem) {
+                $designator = \Illuminate\Support\Facades\DB::table('designators')
+                    ->where('id_designator', $boqItem->designator_id)
+                    ->first();
 
-            ProjectActivityService::log([
-                'project_id' => $project->id_project,
-                'lop_id' => $lopId,
-                'activity_type' => 'update_quantity_actual',
-                'title' => 'Update Quantity Actual',
-                'description' => 'Waspang update quantity actual BOQ.',
-                'stage' => $stage,
-                'status_after' => 'updated',
-                'meta' => [
-                    'boq_item_id' => $request->boq_item_id,
-                    'quantity_actual' => $request->quantity_actual,
-                ],
-            ]);
+                $category = $designator ? trim(strtoupper($designator->progress_category)) : '';
+
+                if (in_array($category, ['KABEL', 'TIANG'])) {
+                    // Perbaikan pemanggilan namespace \App\Models\BoqItem murni
+                    $items = \App\Models\BoqItem::query()
+                        ->join('designators', 'designators.id_designator', '=', 'boq_items.designator_id')
+                        ->where('boq_items.lop_id', $boqItem->lop_id)
+                        ->whereRaw("UPPER(TRIM(designators.progress_category)) = ?", [$category])
+                        ->orderByDesc('boq_items.quantity_plan')
+                        ->select('boq_items.*')
+                        ->get();
+
+                    $remaining = (float)$request->quantity_actual;
+
+                    foreach ($items as $item) {
+                        $plan = (float)$item->quantity_plan;
+                        $actual = min($plan, $remaining);
+
+                        \App\Models\BoqItem::where('id_boq', $item->id_boq)
+                            ->update([
+                                'quantity_actual' => $actual
+                            ]);
+
+                        $remaining -= $actual;
+                        if ($remaining <= 0) {
+                            $remaining = 0;
+                        }
+                    }
+
+                    \App\Services\ProjectActivityService::log([
+                        'project_id' => $project->id_project,
+                        'lop_id' => $lopId,
+                        'activity_type' => 'update_quantity_actual',
+                        'title' => 'Update Quantity Actual (' . $category . ')',
+                        'description' => 'Waspang update quantity actual untuk ' . ($designator->designator ?? 'Item'),
+                        'stage' => $stage,
+                        'status_after' => 'updated',
+                        'meta' => [
+                            'boq_item_id' => $request->boq_item_id,
+                            'quantity_actual' => $request->quantity_actual,
+                        ],
+                    ]);
+                    
+                } else {
+                    \App\Services\ProjectActivityService::log([
+                        'project_id' => $project->id_project,
+                        'lop_id' => $lopId,
+                        'activity_type' => 'upload_evidence_regular',
+                        'title' => 'Upload Eviden Pendukung',
+                        'description' => 'Waspang mengunggah bukti progress untuk item pendukung: ' . ($designator->designator ?? ''),
+                        'stage' => $stage,
+                        'status_after' => 'pending',
+                        'meta' => [
+                            'boq_item_id' => $request->boq_item_id,
+                            'info' => 'Item di luar kategori KPI Utama',
+                        ],
+                    ]);
+                }
+            }
         }
 
-        $statusProject = match ($stage) {
+        // 1. Mapping status_progress untuk tabel LOPS sesuai struktur ENUM-nya
+        $statusLopProgress = match ($stage) {
             'persiapan' => 'preparation',
             'instalasi' => 'instalasi',
-            'pengukuran' => 'instalasi',
+            'pengukuran' => 'instalasi', // fallback ke instalasi sesuai alur bisnis
             'finishing' => 'finishing',
-            default => 'active',
+            default => 'preparation',
         };
 
+        // 2. Update status_progress pada tabel lops yang terelasi dengan project ini
+        \App\Models\Lop::where('project_id', $project->id_project)
+            ->update([
+                'status_progress' => $statusLopProgress
+            ]);
+
+        // 3. Update status pada tabel projects menggunakan nilai ENUM yang valid ('active')
         $project->update([
-            'status' => $statusProject,
+            'status' => 'active', // Menjaga project tetap berstatus 'active' selama masa konstruksi
+            'status_project' => 'active' // Sinkronisasi kolom status_project bawaan tabel Anda
         ]);
+
+        // Jaminan HTTP Status 200 OK untuk Fetch Javascript
+        if ($request->ajax() || $request->wantsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Eviden dan Quantity Actual berhasil diperbarui.'
+            ], 200);
+        }
 
         return back()->with('success', 'Eviden berhasil diupload dan menunggu approval');
     }

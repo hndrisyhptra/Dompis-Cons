@@ -241,10 +241,29 @@
                                 {{ $boq->designator }}
                             </h3>
 
-                            <p class="text-xs text-gray-500 truncate">
-                               
-                                Plan {{ $boq->quantity_plan }} {{ $boq->unit }}
+                            <p>
+                                Qty Plan :
+                                <span class="font-semibold text-gray-700">
+                                    {{ number_format($boq->quantity_plan) }}
+                                    {{ $boq->unit }}
+                                </span>
                             </p>
+
+                            @php
+                                $category = strtoupper(optional($boq->designatorData)->progress_category ?? '');
+                            @endphp
+
+                            @if(in_array($category,['KABEL','TIANG']))
+
+                            <p>
+                                Aktual {{ $category }} :
+                                <span class="font-bold text-blue-700">
+                                    {{ number_format($boq->quantity_actual ?? 0) }}
+                                    {{ $boq->unit }}
+                                </span>
+                            </p>
+
+                            @endif
 
                             <p class="text-xs text-gray-500 truncate mt-0.5">
                                 {{ $photos->count() }} foto
@@ -350,12 +369,12 @@
                             '{{ $boq->id_boq }}',
                             @js($boq->item_name),
                             '{{ $boq->quantity_plan }}',
-                            '{{ $boq->unit }}'
-                        )"
+                            '{{ $boq->unit }}',
+                            '{{ $boq->quantity_actual ?? '' }}',
+                            '{{ strtoupper(optional($boq->designatorData)->progress_category ?? '') }}'
+                            )"
                             class="h-9 w-full rounded-xl bg-blue-700 text-white text-xs font-bold">
-
                         Upload / Update Eviden
-
                     </button>
 
                 </div>
@@ -439,10 +458,11 @@
                     </div>
 
                     <input type="file"
-                           id="photoInput"
-                           accept="image/*"
-                           multiple
-                           class="w-full rounded-xl border border-gray-300 p-3 text-sm">
+                            id="photoInput"
+                            name="photos[]"
+                            accept="image/*"
+                            multiple
+                            class="w-full rounded-xl border border-gray-300 p-3 text-sm">
 
                     <div id="previewContainer"
                          class="grid grid-cols-3 gap-3">
@@ -450,31 +470,57 @@
 
                     <div class="rounded-xl bg-green-50 border border-green-100 p-3">
 
-                        <p class="text-xs font-semibold text-green-700">
-                            Quantity Plan
-                        </p>
+                        <div class="flex justify-between">
 
-                        <p class="mt-1 text-lg font-bold text-green-800">
-                            <span id="planQuantity">0</span>
-                            <span id="planUnit"></span>
-                        </p>
+                            <span class="text-xs text-green-700">
 
-                        <p class="text-[11px] text-green-600 mt-1">
-                            Gunakan sebagai acuan pengisian Quantity Actual
-                        </p>
+                                Qty Plan
+
+                            </span>
+
+                            <span class="font-bold text-green-800">
+
+                                <span id="planQuantity"></span>
+
+                                <span id="planUnit"></span>
+
+                            </span>
+
+                        </div>
+
+                        <div class="flex justify-between mt-2">
+
+                            <span class="text-xs text-blue-700">
+
+                                Qty Actual Saat Ini
+
+                            </span>
+
+                            <span
+                                id="currentActual"
+                                class="font-bold text-blue-700">
+
+                            </span>
+
+                        </div>
 
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                             
                         <div>
-                            <label class="text-xs font-semibold text-gray-600">
+                            <label
+                                id="qtyLabel"
+                                class="text-xs font-semibold text-gray-600">
+
                                 Quantity Actual
+
                             </label>
                             <input type="number"
-                                   step="0.01"
-                                   name="quantity_actual"
-                                   placeholder="Actual"
-                                   class="mt-1 w-full h-10 rounded-xl border-gray-300 text-sm">
+                                    step="0.01"
+                                    name="quantity_actual"
+                                    id="quantity_actual"
+                                    placeholder="Actual"
+                                    class="mt-1 w-full h-10 rounded-xl border-gray-300 text-sm">
                         </div>
 
                         <div>
@@ -519,8 +565,7 @@
 <script>
 let selectedFiles = [];
 
-function openUploadModal(boqId, boqName,quantityPlan,
-    unit)
+function openUploadModal(boqId, boqName, quantityPlan, unit, quantityActual, category)
 {
     document.getElementById('uploadModal').classList.remove('hidden');
     document.getElementById('uploadModal').classList.add('flex');
@@ -530,6 +575,24 @@ function openUploadModal(boqId, boqName,quantityPlan,
 
     document.getElementById('planQuantity').innerText = quantityPlan;
     document.getElementById('planUnit').innerText = unit;
+    
+    // Set field value quantity_actual dari data looping database saat ini
+    document.getElementById('quantity_actual').value = quantityActual ? quantityActual : '';
+
+    document.getElementById('currentActual').innerText =
+    (quantityActual ? quantityActual : 0) + ' ' + unit;
+
+    if(category === 'KABEL' || category === 'TIANG'){
+
+        document.getElementById('qtyLabel').innerText =
+            'Update Progress ' + category;
+
+    }else{
+
+        document.getElementById('qtyLabel').innerText =
+            'Quantity Actual';
+
+    }
 
     selectedFiles = [];
     document.getElementById('photoInput').value = '';
@@ -626,29 +689,58 @@ function resizeImage(file, maxWidth = 1280, quality = 0.8)
     });
 }
 
-document.getElementById('uploadForm').addEventListener('submit', function(e) {
+ddocument.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
     if (selectedFiles.length === 0) {
-        alert('Pilih minimal 1 foto');
+        alert('Pilih minimal 1 foto sebagai bukti progress lapangan');
         return;
     }
 
-    const formData = new FormData(e.target);
+    // Inisialisasi FormData baru
+    const formData = new FormData();
 
+    // Ambil data element manual untuk menjamin keakuratan nilai update berulang
+    formData.append('_token', document.querySelector('input[name="_token"]').value);
+    formData.append('stage', 'instalasi');
+    formData.append('evidence_type', 'progress_boq');
+    formData.append('boq_item_id', document.getElementById('boq_item_id').value);
+    formData.append('latitude', document.getElementById('latitude').value);
+    formData.append('longitude', document.getElementById('longitude').value);
+    formData.append('description', document.getElementsByName('description')[0].value);
+    
+    // Ambil nilai actual murni dari ID Element
+    const qtyActualValue = document.getElementById('quantity_actual').value;
+    if (qtyActualValue !== '') {
+        formData.append('quantity_actual', qtyActualValue);
+    }
+
+    // Masukkan file resize dari array javascript 
     selectedFiles.forEach((file) => {
         formData.append('photos[]', file);
     });
 
+    // Eksekusi pengiriman data via Fetch
     fetch(e.target.action, {
         method: 'POST',
         body: formData,
         headers: {
-            'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
+            'X-Requested-With': 'XMLHttpRequest'
         }
     })
-    .then(() => window.location.reload())
-    .catch(() => alert('Upload gagal'));
+    .then(response => {
+        // SOLUSI UTAMA: Selama server merespon dengan status sukses (200-299), langsung reload halaman.
+        // Cara ini tidak akan memicu error akibat parsing teks/JSON yang tidak sinkron.
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            alert('Gagal memproses data. Silakan periksa kembali format inputan Anda.');
+        }
+    })
+    .catch(error => {
+        console.error('Fetch Error:', error);
+        alert('Terjadi kesalahan jaringan atau kendala server saat mengupload.');
+    });
 });
 </script>
 
