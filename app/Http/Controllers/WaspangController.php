@@ -657,18 +657,21 @@ class WaspangController extends Controller
             ]);
         }
 
-        if ($request->boq_item_id && $request->quantity_actual !== null) {
+        if ($request->boq_item_id) {
             $boqItem = \App\Models\BoqItem::where('id_boq', $request->boq_item_id)->first();
             
             if ($boqItem) {
+                // Cari kategori progres langsung dari master tabel designators
                 $designator = \Illuminate\Support\Facades\DB::table('designators')
                     ->where('id_designator', $boqItem->designator_id)
                     ->first();
 
+                // Standarisasi string pencocokan ke UPPERCASE murni database
                 $category = $designator ? trim(strtoupper($designator->progress_category)) : '';
 
-                if (in_array($category, ['KABEL', 'TIANG'])) {
-                    // Perbaikan pemanggilan namespace \App\Models\BoqItem murni
+                // KONDISI A: JIKA KATEGORI ADALAH KABEL ATAU TIANG (Gunakan Aturan Cascade/Split Target)
+                if (in_array($category, ['KABEL', 'TIANG']) && $request->quantity_actual !== null) {
+                    
                     $items = \App\Models\BoqItem::query()
                         ->join('designators', 'designators.id_designator', '=', 'boq_items.designator_id')
                         ->where('boq_items.lop_id', $boqItem->lop_id)
@@ -694,32 +697,44 @@ class WaspangController extends Controller
                         }
                     }
 
+                    // Log aktivitas untuk KPI Utama
                     \App\Services\ProjectActivityService::log([
                         'project_id' => $project->id_project,
                         'lop_id' => $lopId,
                         'activity_type' => 'update_quantity_actual',
                         'title' => 'Update Quantity Actual (' . $category . ')',
-                        'description' => 'Waspang update quantity actual untuk ' . ($designator->designator ?? 'Item'),
+                        'description' => 'Waspang update kuantitas aktual terdistribusi untuk kategori ' . $category,
                         'stage' => $stage,
                         'status_after' => 'updated',
                         'meta' => [
                             'boq_item_id' => $request->boq_item_id,
                             'quantity_actual' => $request->quantity_actual,
+                            'progress_category' => $category
                         ],
                     ]);
                     
                 } else {
+                    // KONDISI B: JIKA BUKAN KABEL / TIANG (Simpan langsung nilainya ke baris item itu sendiri)
+                    $actualValue = $request->quantity_actual !== null ? (float)$request->quantity_actual : 0;
+
+                    \App\Models\BoqItem::where('id_boq', $request->boq_item_id)
+                        ->update([
+                            'quantity_actual' => $actualValue
+                        ]);
+
+                    // Log aktivitas untuk item pendukung biasa
                     \App\Services\ProjectActivityService::log([
                         'project_id' => $project->id_project,
                         'lop_id' => $lopId,
                         'activity_type' => 'upload_evidence_regular',
                         'title' => 'Upload Eviden Pendukung',
-                        'description' => 'Waspang mengunggah bukti progress untuk item pendukung: ' . ($designator->designator ?? ''),
+                        'description' => 'Waspang mengupdate kuantitas aktual item pendukung: ' . ($designator->designator ?? '') . ' sebesar ' . $actualValue,
                         'stage' => $stage,
                         'status_after' => 'pending',
                         'meta' => [
                             'boq_item_id' => $request->boq_item_id,
-                            'info' => 'Item di luar kategori KPI Utama',
+                            'quantity_actual' => $actualValue,
+                            'info' => 'Item reguler (Non-KPI Utama)',
                         ],
                     ]);
                 }

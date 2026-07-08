@@ -1,13 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Step 3 Pengukuran</title>
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
-</head>
+@extends('layouts.waspang')
 
-<body class="bg-[#f7f6f2] text-gray-900">
+@section('content')
 
 <div class="min-h-screen max-w-md mx-auto bg-[#f7f6f2] pb-24">
 
@@ -60,123 +53,81 @@
 
     {{-- HEADER --}}
     <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
-
         <div class="flex items-center gap-3">
-
-            <a href="{{ route('waspang.projects.instalasi', $project->id_project) }}"
-               class="text-3xl leading-none">
-                ‹
-            </a>
-
-            <h1 class="text-xl font-bold">
-                Step 3 - Pengukuran
-            </h1>
+            <a href="{{ route('waspang.projects.show', $project->id_project) }}" class="text-3xl leading-none">‹</a>
+            <h1 class="text-xl font-bold">Step 3 - Pengukuran</h1>
         </div>
 
-        {{-- STEPPER --}}
-        <div class="relative px-2">
-
+        {{-- Stepper --}}
+        <div class="relative px-2 mt-4">
             <div class="absolute top-4 left-10 right-10 h-1 bg-blue-300/60 rounded-full"></div>
-
             <div class="relative grid grid-cols-4 text-center">
-
+                {{-- STEP 1 --}}
                 <a href="{{ route('waspang.projects.show', $project->id_project) }}">
-                    <div class="mx-auto w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold">
-                        ✓
-                    </div>
-                    <p class="mt-2 text-xs">Persiapan</p>
+                    <div class="mx-auto w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold">✓</div>
+                    <p class="mt-2 text-xs text-blue-100">Persiapan</p>
                 </a>
-
+                {{-- STEP 2 --}}
                 <a href="{{ route('waspang.projects.instalasi', $project->id_project) }}">
-                    <div class="mx-auto w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold">
-                        ✓
-                    </div>
-                    <p class="mt-2 text-xs">Instalasi</p>
+                    <div class="mx-auto w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold">✓</div>
+                    <p class="mt-2 text-xs text-blue-100">Instalasi</p>
                 </a>
-
+                {{-- STEP 3 (AKTIF) --}}
                 <a href="{{ route('waspang.projects.pengukuran', $project->id_project) }}">
                     <div class="mx-auto w-8 h-8 rounded-full {{ $pengukuranUploadedComplete ? 'bg-green-100 text-green-700' : 'bg-white text-blue-700' }} flex items-center justify-center text-sm font-bold">
                         {{ $pengukuranUploadedComplete ? '✓' : '3' }}
                     </div>
-                    <p class="mt-2 text-xs font-bold">Pengukuran</p>
+                    <p class="mt-2 text-xs font-bold text-white">Pengukuran</p>
                 </a>
-
+                {{-- STEP 4 --}}
                 @if($pengukuranUploadedComplete)
                     <a href="{{ route('waspang.projects.finishing', $project->id_project) }}">
-                        <div class="mx-auto w-8 h-8 rounded-full bg-white text-blue-700 flex items-center justify-center text-sm font-bold">
-                            4
+                        <div class="mx-auto w-8 h-8 rounded-full {{ $finishingComplete ? 'bg-green-100 text-green-700' : 'bg-white text-blue-700' }} flex items-center justify-center text-sm font-bold">
+                            {{ $finishingComplete ? '✓' : '4' }}
                         </div>
-                        <p class="mt-2 text-xs">Finishing</p>
+                        <p class="mt-2 text-xs text-blue-100">Finishing</p>
                     </a>
                 @else
                     <div class="opacity-50">
-                        <div class="mx-auto w-8 h-8 rounded-full bg-blue-400 text-white flex items-center justify-center text-sm font-bold">
-                            4
-                        </div>
-                        <p class="mt-2 text-xs">Finishing</p>
+                        <div class="mx-auto w-8 h-8 rounded-full bg-blue-400 text-white flex items-center justify-center text-sm font-bold">4</div>
+                        <p class="mt-2 text-xs text-blue-200">Finishing</p>
                     </div>
                 @endif
-
             </div>
-
         </div>
+</div>
 
-    </div>
-
-    {{-- Project Info --}}
-        <div class="px-2 mt-2">
-            <div class="bg-white rounded-2xl border border-gray-200 p-4">
-
-            {{-- Nama LOP --}}
-            <div class="mb-4">
-                <p class="text-xs text-gray-500">Nama LOP</p>
-                <p class="text-sm font-bold leading-snug break-words">
-                    {{ $project->project_name }}
-                </p>
+   {{-- Project Info --}}
+    <div class="px-4 mt-4">
+        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs">
+            <div class="mb-3">
+                <p class="text-xs text-gray-400 font-medium">Nama LOP</p>
+                <p class="text-sm font-bold text-gray-900 break-words mt-0.5">{{ $project->project_name }}</p>
             </div>
-
-                {{-- Info lainnya --}}
-                <div class="grid grid-cols-2 gap-y-4 gap-x-4">
-
-                        <div>
-                            <p class="text-xs text-gray-500">STO</p>
-                            <p class="text-sm font-bold">
-                                {{ $project->lop?->sto ?? '-' }}
-                            </p>
-                        </div>
-
-                        <div>
-                            <p class="text-xs text-gray-500">Branch</p>
-                            <p class="text-sm font-bold">
-                                {{ $project->lop?->branch ?? '-' }}
-                            </p>
-                        </div>
-
-                        <div class="col-span-2">
-                            <p class="text-xs text-gray-500">Mitra</p>
-                            <p class="text-sm font-bold leading-snug break-words">
-                                {{ $project->lop?->mitra_name ?? '-' }}
-                            </p>
-                        </div>
-
+            <div class="grid grid-cols-2 gap-3 border-t border-gray-50 pt-3">
+                <div>
+                    <p class="text-xs text-gray-400 font-medium">STO</p>
+                    <p class="text-xs font-bold text-gray-800 font-mono mt-0.5">{{ $project->lop?->sto ?? '-' }}</p>
                 </div>
-
+                <div>
+                    <p class="text-xs text-gray-400 font-medium">Branch</p>
+                    <p class="text-xs font-bold text-gray-800 mt-0.5">{{ $project->lop?->branch ?? '-' }}</p>
+                </div>
+                <div class="col-span-2 border-t border-gray-50 pt-2">
+                    <p class="text-xs text-gray-400 font-medium">Mitra Pelaksana</p>
+                    <p class="text-xs font-bold text-gray-800 mt-0.5 break-words">{{ $project->lop?->mitra_name ?? '-' }}</p>
+                </div>
             </div>
+        </div>
     </div>
 
     {{-- STEP 3 LIST --}}
     <div class="px-4 mt-5">
 
         <div class="flex items-center justify-between mb-3">
-
             <div>
-                <h2 class="text-sm font-bold text-gray-500 uppercase">
-                    Step 3 - Pengukuran
-                </h2>
-
-                <p class="text-xs text-gray-500">
-                    Upload eviden OTDR, OPM & Kedalaman Galian
-                </p>
+                <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Step 3 Pengukuran</h2>
+                <p class="text-[11px] text-gray-500">Tap item untuk Upload eviden OTDR, OPM & Kedalaman Galian</p>
             </div>
 
             @if($pengukuranUploadedComplete)
@@ -372,104 +323,117 @@
 
     </div>
 
-    {{-- UPLOAD MODAL --}}
-    <div id="uploadModal"
-         class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
+    {{-- MODAL UPLOAD OVERLAY (SERAGAM APPS VIEW) --}}
+    <div id="uploadModal" class="hidden fixed inset-0 z-[9999] bg-black/60 px-4 flex items-center justify-center backdrop-blur-xs animate-fade-in">
+        <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
-        <div class="bg-white w-full max-w-md max-h-[90vh] rounded-2xl overflow-hidden flex flex-col">
-
-            <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-
+            {{-- HEADER MODAL (WARNA BIRU MODERN) --}}
+            <div class="bg-blue-700 text-white px-5 py-4 flex items-start justify-between shrink-0">
                 <div>
-                    <h2 id="uploadTitle" class="text-lg font-bold">
+                    <h2 id="uploadTitle" class="text-lg font-black tracking-tight">
                         Upload Eviden Pengukuran
                     </h2>
-                    <p class="text-xs text-gray-500">
-                        Pilih foto, otomatis dikompres sebelum upload
+                    <p id="selectedEvidenceName" class="text-xs text-blue-100 mt-1 font-medium break-all line-clamp-1">
+                        Jenis dokumen/eviden pengukuran
                     </p>
                 </div>
 
                 <button type="button"
                         onclick="closeUploadModal()"
-                        class="w-10 h-10 rounded-xl border border-gray-300 text-xl">
+                        class="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 text-white font-black text-lg flex items-center justify-center transition">
                     ×
                 </button>
-
             </div>
 
-            <form id="uploadForm"
-                  method="POST"
-                  action="{{ route('waspang.evidence.upload', $project->id_project) }}"
-                  enctype="multipart/form-data"
-                  class="flex flex-col min-h-0">
+            {{-- FORM SUBMIT AJAX --}}
+            <form id="uploadForm" method="POST" action="{{ route('waspang.evidence.upload', $project->id_project) }}" class="flex flex-col min-h-0 overflow-y-auto p-5 space-y-4">
                 @csrf
-
                 <input type="hidden" name="stage" value="pengukuran">
                 <input type="hidden" name="evidence_type" id="upload_evidence_type">
                 <input type="hidden" name="latitude" id="latitude">
                 <input type="hidden" name="longitude" id="longitude">
 
-                <div class="p-5 overflow-y-auto space-y-4">
-
-                    <div class="rounded-xl bg-blue-50 text-blue-700 text-xs p-3">
-                        Jenis eviden:
-                        <span id="selectedEvidenceName" class="font-bold"></span>
-                    </div>
-
-                    <input type="file"
-                           id="photoInput"
-                           accept="image/*"
-                           multiple
-                           class="w-full rounded-xl border border-gray-300 p-3 text-sm">
-
-                    <div id="previewContainer"
-                         class="grid grid-cols-3 gap-3">
-                    </div>
-
-                    <textarea name="description"
-                              id="descriptionInput"
-                              rows="3"
-                              placeholder="Catatan opsional..."
-                              class="w-full rounded-xl border-gray-300 text-sm"></textarea>
-
-                    <div id="opmNoteInfo"
-                         class="hidden rounded-xl bg-yellow-50 text-yellow-800 text-xs p-3">
-                        Untuk pengukuran OPM, isi nama ODP pada catatan.
-                        Contoh: ODP-BDG-FAT-001.
-                    </div>
-
+                {{-- BANNER INFORMASI KHUSUS OPM --}}
+                <div id="opmNoteInfo" class="hidden rounded-xl bg-amber-50 border border-amber-200 text-amber-800 p-3 text-xs leading-snug shrink-0 animate-fade-in">
+                    <span class="font-bold block uppercase tracking-wider text-[10px] text-amber-600 mb-0.5">⚠️ Perhatian Khusus OPM:</span>
+                    Nama ODP wajib diisi pada catatan. Contoh format: <span class="font-mono font-bold">ODP-BDG-FAT-001</span>.
                 </div>
 
-                <div class="grid grid-cols-2 gap-3 px-5 py-4 border-t border-gray-200">
+                {{-- AREA DROPZONE SELECT/UPLOAD FOTO --}}
+                <div class="text-xs">
+                    <label class="text-xs font-black text-gray-600 block mb-1.5">
+                        Pilih Eviden Pengukuran
+                    </label>
 
-                    <button type="button"
-                            onclick="closeUploadModal()"
-                            class="h-10 rounded-xl border border-gray-300 text-sm font-bold">
+                    <label class="flex flex-col items-center justify-center w-full min-h-[125px] border-2 border-dashed border-blue-300 rounded-2xl bg-blue-50/40 cursor-pointer hover:bg-blue-50 transition p-4">
+                        <div class="text-center">
+                            <div class="mx-auto w-11 h-11 rounded-xl bg-blue-700 text-white flex items-center justify-center text-xl font-black shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera-icon lucide-camera">
+                                    <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/>
+                                </svg>
+                            </div>
+
+                            <p class="mt-2.5 text-xs font-black text-blue-800">
+                                Pilih Eviden
+                            </p>
+
+                            <p class="text-[10px] text-gray-400 mt-0.5">
+                                JPG, PNG, WEBP · Auto Compress
+                            </p>
+                        </div>
+
+                        <input type="file" id="photoInput" accept="image/*" multiple class="hidden">
+                    </label>
+
+                    {{-- PREVIEW MULTIPLE FOTO --}}
+                    <div id="previewWrapper" class="mt-3 hidden animate-fade-in">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                                Preview Foto (<span id="photoCount">0</span>)
+                            </p>
+
+                            <button type="button" id="clearAllPhotos" class="text-[11px] font-bold text-red-600 hover:text-red-700 transition">
+                                Hapus Semua
+                            </button>
+                        </div>
+
+                        <div id="previewContainer" class="grid grid-cols-3 gap-2"></div>
+                    </div>
+                </div>
+
+                {{-- INPUT CATATAN --}}
+                <div class="text-xs">
+                    <label class="text-xs font-black text-gray-600 block">
+                        Catatan / Detail Keterangan
+                    </label>
+
+                    <textarea name="description" id="descriptionInput" rows="3" placeholder="Catatan opsional..." class="mt-1.5 w-full rounded-2xl border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-700 outline-none transition resize-none"></textarea>
+                </div>
+
+                {{-- ACTION BUTTONS --}}
+                <div class="grid grid-cols-2 gap-2 pt-2 shrink-0">
+                    <button type="button" onclick="closeUploadModal()" class="h-11 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-black transition">
                         Batal
                     </button>
 
-                    <button type="submit"
-                            class="h-10 rounded-xl bg-blue-700 text-white text-sm font-bold">
+                    <button type="submit" class="h-11 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-md transition">
                         Upload
                     </button>
-
                 </div>
-
             </form>
-
         </div>
-
     </div>
 
     @include('waspang.partials.bottom-nav', ['active' => 'inbox'])
-
 </div>
+@endsection
 
+@section('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 let selectedFiles = [];
 
-function openUploadModal(type, title)
-{
+function openUploadModal(type, title) {
     document.getElementById('uploadModal').classList.remove('hidden');
     document.getElementById('uploadModal').classList.add('flex');
 
@@ -477,114 +441,119 @@ function openUploadModal(type, title)
     document.getElementById('uploadTitle').innerText = title;
     document.getElementById('selectedEvidenceName').innerText = title;
 
-    selectedFiles = [];
-
-    document.getElementById('photoInput').value = '';
-    document.getElementById('previewContainer').innerHTML = '';
-
     const descriptionInput = document.getElementById('descriptionInput');
     const opmNoteInfo = document.getElementById('opmNoteInfo');
 
     descriptionInput.value = '';
 
+    // Kondisi khusus untuk tipe pengukuran OPM
     if (type === 'opm') {
-        descriptionInput.placeholder = 'Isi nama ODP, contoh: ODP-BDG-FAT-001';
+        descriptionInput.placeholder = 'Isi nama ODP, contoh: ODP-BDG-FAT-001 *wajib';
         opmNoteInfo.classList.remove('hidden');
     } else {
         descriptionInput.placeholder = 'Catatan opsional...';
         opmNoteInfo.classList.add('hidden');
     }
 
+    clearAllPhotosAction();
+
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function(position) {
             document.getElementById('latitude').value = position.coords.latitude;
             document.getElementById('longitude').value = position.coords.longitude;
-        });
+        }, function(err) {
+            console.warn("GPS Lock Bypass: ", err.message);
+        }, { enableHighAccuracy: true });
     }
 }
 
-function closeUploadModal()
-{
+function closeUploadModal() {
     document.getElementById('uploadModal').classList.add('hidden');
     document.getElementById('uploadModal').classList.remove('flex');
 }
 
 document.getElementById('photoInput').addEventListener('change', async function(e) {
     const files = Array.from(e.target.files);
-
     for (const file of files) {
-        const resized = await resizeImage(file, 1280, 0.8);
-        selectedFiles.push(resized);
+        if (!file.type.startsWith('image/')) continue;
+        const compressed = await compressImage(file, 1280, 0.75);
+        selectedFiles.push({
+            file: compressed,
+            url: URL.createObjectURL(compressed)
+        });
     }
-
-    renderPreview();
+    renderEvidencePreview();
+    document.getElementById('photoInput').value = '';
 });
 
-function renderPreview()
-{
+function renderEvidencePreview() {
     const container = document.getElementById('previewContainer');
+    const wrapper = document.getElementById('previewWrapper');
+    const countLabel = document.getElementById('photoCount');
     container.innerHTML = '';
 
-    selectedFiles.forEach((file, index) => {
-        const url = URL.createObjectURL(file);
+    if (selectedFiles.length === 0) {
+        wrapper.classList.add('hidden');
+        return;
+    }
 
-        container.innerHTML += `
-            <div class="relative aspect-square rounded-xl overflow-hidden border border-gray-200">
-                <img src="${url}" class="w-full h-full object-cover">
+    wrapper.classList.remove('hidden');
+    countLabel.innerText = selectedFiles.length;
 
-                <button type="button"
-                        onclick="removeSelectedPhoto(${index})"
-                        class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white text-xs">
-                    ×
-                </button>
-            </div>
+    selectedFiles.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.className = 'relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-200 shadow-xs';
+        card.innerHTML = `
+            <img src="${item.url}" class="w-full h-full object-cover">
+            <button type="button" onclick="removeEvidencePhoto(${index})" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 text-white text-xs font-black flex items-center justify-center transition hover:bg-black">×</button>
+            <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] px-1.5 py-0.5 truncate font-medium">${formatFileSize(item.file.size)}</div>
         `;
+        container.appendChild(card);
     });
 }
 
-function removeSelectedPhoto(index)
-{
+function removeEvidencePhoto(index) {
+    if (selectedFiles[index]) URL.revokeObjectURL(selectedFiles[index].url);
     selectedFiles.splice(index, 1);
-    renderPreview();
+    renderEvidencePreview();
 }
 
-function resizeImage(file, maxWidth = 1280, quality = 0.8)
-{
+function clearAllPhotosAction() {
+    selectedFiles.forEach(item => URL.revokeObjectURL(item.url));
+    selectedFiles = [];
+    renderEvidencePreview();
+}
+
+document.getElementById('clearAllPhotos').addEventListener('click', clearAllPhotosAction);
+
+function compressImage(file, maxWidth = 1280, quality = 0.75) {
     return new Promise((resolve) => {
         const reader = new FileReader();
-
-        reader.onload = function(event) {
+        reader.onload = (event) => {
             const img = new Image();
-
-            img.onload = function() {
+            img.onload = () => {
                 const canvas = document.createElement('canvas');
-
-                let width = img.width;
-                let height = img.height;
-
+                let width = img.width, height = img.height;
                 if (width > maxWidth) {
                     height = Math.round((height * maxWidth) / width);
                     width = maxWidth;
                 }
-
-                canvas.width = width;
-                canvas.height = height;
-
-                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-
-                canvas.toBlob(function(blob) {
-                    resolve(new File([blob], file.name, {
-                        type: 'image/jpeg',
-                        lastModified: Date.now()
-                    }));
+                canvas.width = width; canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                    resolve(new File([blob], file.name.replace(/\.[^/.]+$/, '') + '.jpg', { type: 'image/jpeg', lastModified: Date.now() }));
                 }, 'image/jpeg', quality);
             };
-
             img.src = event.target.result;
         };
-
         reader.readAsDataURL(file);
     });
+}
+
+function formatFileSize(bytes) {
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 document.getElementById('uploadForm').addEventListener('submit', function(e) {
@@ -594,32 +563,43 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     const description = document.getElementById('descriptionInput').value.trim();
 
     if (selectedFiles.length === 0) {
-        alert('Pilih minimal 1 foto');
+        Swal.fire({ title: 'Pilih Foto!', text: 'Mohon lampirkan minimal 1 foto fisik bukti pengukuran.', icon: 'warning', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
         return;
     }
 
+    // Validasi wajib isi catatan khusus untuk tipe OPM
     if (evidenceType === 'opm' && description === '') {
-        alert('Nama ODP wajib diisi pada catatan untuk Pengukuran OPM');
+        Swal.fire({ title: 'Catatan Wajib!', text: 'Nama ODP wajib ditulis pada catatan untuk jenis Pengukuran OPM.', icon: 'error', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
         return;
     }
 
-    const formData = new FormData(e.target);
+    const formData = new FormData();
+    formData.append('_token', document.querySelector('input[name="_token"]').value);
+    formData.append('stage', 'pengukuran');
+    formData.append('evidence_type', evidenceType);
+    formData.append('latitude', document.getElementById('latitude').value);
+    formData.append('longitude', document.getElementById('longitude').value);
+    formData.append('description', description);
 
-    selectedFiles.forEach((file) => {
-        formData.append('photos[]', file);
-    });
+    selectedFiles.forEach(item => formData.append('photos[]', item.file));
 
     fetch(e.target.action, {
         method: 'POST',
         body: formData,
-        headers: {
-            'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(response => {
+        if (response.ok) {
+            closeUploadModal();
+            Swal.fire({ title: 'Berhasil Disimpan!', text: 'Eviden progress pengukuran berhasil diperbarui.', icon: 'success', showConfirmButton: false, timer: 1500, timerProgressBar: true, customClass: { popup: 'rounded-3xl' } })
+            .then(() => window.location.reload());
+        } else {
+            Swal.fire({ title: 'Gagal Memproses!', text: 'Terjadi kesalahan sistem atau kegalaran validasi backend.', icon: 'error', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
         }
     })
-    .then(() => window.location.reload())
-    .catch(() => alert('Upload gagal'));
+    .catch(() => {
+        Swal.fire({ title: 'Gangguan Jaringan!', text: 'Gagal menghubungi server. Pastikan koneksi internet di lapangan stabil.', icon: 'warning', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
+    });
 });
 </script>
-
-</body>
-</html>
+@endsection
