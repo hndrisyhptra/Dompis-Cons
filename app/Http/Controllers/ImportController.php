@@ -17,6 +17,7 @@ use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 
+
 class ImportController extends Controller
 {
     public function pidIndex(Request $request)
@@ -49,11 +50,20 @@ class ImportController extends Controller
         $file = $request->file('file');
         $fileName = $file->getClientOriginalName();
 
-        $reader = new Xlsx();
-        $reader->setReadDataOnly(true);
-
-        $spreadsheet = $reader->load($file->getRealPath());
+        // --- AWAL PERBAIKAN LOGIKA DETEKSI OTOMATIS SPREADSHEET ---
+        $filePath = $file->getRealPath();
+        
+        try {
+            // Gunakan IOFactory::createReader untuk mendeteksi tipe file murni secara dinamis
+            $reader = IOFactory::createReaderForFile($filePath);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($filePath);
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gagal membaca file spreadsheet. Pastikan file tidak corrupt. Detail: ' . $e->getMessage());
+        }
+        
         $sheet = $spreadsheet->getActiveSheet();
+        // --- AKHIR PERBAIKAN LOGIKA ---
 
         $highestRow = $sheet->getHighestRow();
         $highestColumn = $sheet->getHighestColumn();

@@ -29,7 +29,11 @@
 <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
 
     <div class="flex items-center gap-3">
-            <a href="{{ route('waspang.projects.show', $project->id_project) }}" class="text-3xl leading-none">‹</a>
+            <a href="{{ route('waspang.projects.pengukuran', $project->id_project) }}" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-2xl font-medium transition active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left-icon lucide-chevron-left">
+                    <path d="m15 18-6-6 6-6"/>
+                </svg>
+            </a>
             <h1 class="text-xl font-bold">Step 4 - Finishing</h1>
         </div>
 
@@ -121,6 +125,7 @@
     </div>
 
 </div>
+
 
 {{-- APPROVAL SUMMARY --}}
 <div class="px-4 mt-4">
@@ -317,15 +322,21 @@
 
     @if($readyForUt)
 
-        <button type="button"
-                class="h-11 w-full rounded-2xl bg-green-700 text-white inline-flex items-center justify-center text-sm font-bold">
-            Siap Generate Berkas Uji Terima
-        </button>
+        {{-- Mengarah ke halaman review komparasi Plan vs Actual --}}
+        <a href="{{ route('waspang.projects.review_final', $project->id_project) }}"
+           class="h-11 w-full rounded-2xl bg-blue-700 hover:bg-blue-800 text-white inline-flex items-center justify-center text-sm font-black transition shadow-md">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-check mr-2">
+                <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <path d="m9 14 2 2 4-4"/>
+            </svg>
+            Review BOQ Final
+        </a>
 
     @else
 
         <button disabled
-                class="h-11 w-full rounded-2xl bg-gray-300 text-gray-500 inline-flex items-center justify-center text-sm font-bold">
+                class="h-11 w-full rounded-2xl bg-gray-300 text-gray-500 inline-flex items-center justify-center text-sm font-bold cursor-not-allowed">
             Menunggu Semua Eviden Approved
         </button>
 

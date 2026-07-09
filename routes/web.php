@@ -260,6 +260,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/waspang/projects/{id}/finishing', [WaspangController::class, 'finishing'])
         ->name('waspang.projects.finishing');
 
+    Route::get('/waspang/projects/{id}/review-final', [WaspangController::class, 'reviewFinal'])
+        ->name('waspang.projects.review_final');
+
 
     /*
     |--------------------------------------------------------------------------

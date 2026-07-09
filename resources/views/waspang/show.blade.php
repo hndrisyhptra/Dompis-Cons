@@ -52,13 +52,19 @@
         $finishingComplete = $boqTotal > 0 && $finishingUploaded >= $boqTotal;
     @endphp
 
-    {{-- HEADER & STEPPER PROGRESS MURNI APPS --}}
+    {{-- HEADER --}}
     <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
         <div class="flex items-center gap-3">
-            <a href="{{ route('waspang.inbox') }}" class="text-3xl leading-none">‹</a>
+            <a href="{{ route('waspang.inbox') }}" 
+                class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-2xl font-medium transition active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left-icon lucide-chevron-left">
+                    <path d="m15 18-6-6 6-6"/>
+                </svg>
+            </a>
             <h1 class="text-xl font-bold">Step 1 - Persiapan</h1>
         </div>
 
+        {{-- STEPPER PROGRESS APPS --}}
         <div class="relative px-2 mt-4">
             <div class="absolute top-4 left-10 right-10 h-1 bg-blue-300/60 rounded-full"></div>
             <div class="relative grid grid-cols-4 text-center">

@@ -243,7 +243,7 @@ class WaspangController extends Controller
 
         return $persiapanDone &&
             $instalasiDone &&
-            $pengukuranDone &&
+            //$pengukuranDone &&
             $finishingDone;
     }
 
@@ -449,6 +449,46 @@ class WaspangController extends Controller
         ])->findOrFail($id);
 
         return view('waspang.steps.finishing', compact('project'));
+    }
+
+    public function reviewFinal($id)
+    {
+        // 1. Validasi hak akses penugasan waspang
+        $project = $this->getAssignedProject($id);
+
+        // 2. Load ulang relasi secara eksplisit untuk menjamin keakuratan data
+        $project->load([
+            'lop',
+            'boqItems' => function ($query) {
+                // Ikut sertakan data master designator untuk mendapatkan nama, unit, dan tipe
+                $query->with('designatorData');
+            },
+            'evidences' => function ($query) {
+                $query->where('status', 'approved');
+            }
+        ]);
+
+        // 3. Pisahkan item berdasarkan arsitektur modul Anda (KPI vs Non-KPI / Material)
+        $boqItems = $project->boqItems ?? collect();
+
+        // Anda bisa memilah item material saja atau semua item sesuai kebutuhan cetak UT
+        $materialBoqItems = $boqItems->filter(function ($boq) {
+            return str_starts_with($boq->designator, 'M-') 
+                || optional($boq->designatorData)->type === 'material';
+        })->values();
+
+        // 4. Hitung ringkasan akumulasi total untuk widget pencapaian di atas halaman
+        $summary = [
+            'total_items'  => $materialBoqItems->count(),
+            'total_plan'   => $materialBoqItems->sum('quantity_plan'),
+            'total_actual' => $materialBoqItems->sum('quantity_actual'),
+            'matched'      => $materialBoqItems->filter(function($item) {
+                return (float)$item->quantity_actual >= (float)$item->quantity_plan;
+            })->count()
+        ];
+
+        // 5. Lempar ke view review komparasi khusus mobile
+        return view('waspang.steps.review-final', compact('project', 'materialBoqItems', 'summary'));
     }
 
     //WASPANG STAGE HELPER PRIVATE

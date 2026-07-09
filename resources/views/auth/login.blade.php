@@ -6,7 +6,7 @@
     <div class="hidden lg:block lg:w-2/3 relative overflow-hidden">
 
         <img
-            src="{{ asset('images/login-bg.png') }}"
+            src="{{ asset('images/login-bg.webp') }}"
             class="absolute inset-0 w-full h-full object-cover"
             alt="Login Background">
 

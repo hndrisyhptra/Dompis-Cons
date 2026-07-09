@@ -22,7 +22,12 @@
     {{-- HEADER --}}
     <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
         <div class="flex items-center gap-3">
-            <a href="{{ route('waspang.projects.show', $project->id_project) }}" class="text-3xl leading-none">‹</a>
+            <a href="{{ route('waspang.projects.show', $project->id_project) }}"
+                class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-2xl font-medium transition active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left-icon lucide-chevron-left">
+                    <path d="m15 18-6-6 6-6"/>
+                </svg>
+            </a>
             <h1 class="text-xl font-bold">Step 2 - Instalasi</h1>
         </div>
 
