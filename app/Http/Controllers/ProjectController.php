@@ -17,6 +17,9 @@ use App\Services\ProjectActivityService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Illuminate\Support\Str;
+use ZipArchive;
 
 
 class ProjectController extends Controller
@@ -773,6 +776,83 @@ public function importCsv(Request $request)
         ])->where('id_project', $id)->firstOrFail();
 
         return view('admin.evidences.review-finishing', compact('project'));
+    }
+
+    public function reviewBoq($id)
+    {
+        // Ambil project lengkap dengan relasi LOP dan item BOQ beserta data master designator-nya
+        $project = Project::with([
+            'lop',
+            'boqItems' => function ($query) {
+                $query->with('designatorData');
+            }
+        ])->findOrFail($id);
+
+        // Lempar data ke file review-boq yang baru saja dibuat
+        return view('admin.evidences.review-boq', compact('project'));
+    }
+
+    public function downloadPreview($id)
+    {
+        $project = Project::with([
+            'lop',
+            'evidences' => function($q) {
+                $q->where('status', 'approved'); // Hanya ambil berkas yang lolos verifikasi
+            }
+        ])->findOrFail($id);
+
+        return view('admin.evidences.download-preview', compact('project'));
+    }
+
+    public function downloadZip($id)
+    {
+        $project = Project::with(['evidences' => function($q) {
+            $q->where('status', 'approved');
+        }])->findOrFail($id);
+
+        $evidences = $project->evidences;
+
+        if ($evidences->isEmpty()) {
+            return back()->with('error', 'Tidak ada berkas yang disetujui (Approved) untuk diunduh.');
+        }
+
+        // 1. Buat file ZIP temporary di folder storage lokal aplikasi
+        $zipFileName = 'Eviden_Approved_' . Str::slug($project->project_name) . '.zip';
+        $zipPath = storage_path('app/public/' . $zipFileName);
+
+        $zip = new ZipArchive;
+        
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true) {
+            
+            foreach ($evidences as $evidence) {
+                $filePath = public_path('storage/' . $evidence->file_path);
+                
+                if (file_exists($filePath) && is_file($filePath)) {
+                    // Susun struktur sub-folder di dalam ZIP
+                    $folderInsideZip = $evidence->stage . '/' . $evidence->evidence_type . '/';
+                    $fileExtension = pathinfo($filePath, PATHINFO_EXTENSION);
+                    
+                    // Buat nama unik untuk foto di dalam ZIP
+                    $fileNameInsideZip = $folderInsideZip . now()->format('Ymd') . '_' . uniqid() . '.' . $fileExtension;
+                    
+                    $zip->addFile($filePath, $fileNameInsideZip);
+                }
+            }
+            $zip->close();
+        }
+
+        // 2. Pastikan file ZIP temporary berhasil dibuat sebelum dikirim ke browser
+        if (!file_exists($zipPath)) {
+            return back()->with('error', 'Gagal membuat file arsip kompresi.');
+        }
+
+        // 3. Bersihkan buffer output PHP untuk mencegah kebocoran karakter spasi liar (ERR_INVALID_RESPONSE)
+        if (ob_get_level()) {
+            ob_end_clean();
+        }
+
+        // 4. Kirim file ZIP ke browser, lalu otomatis hapus file temporary setelah di-download
+        return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
     }
 
     public function storeBoq(Request $request)

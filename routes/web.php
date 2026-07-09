@@ -313,6 +313,17 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admin/evidences/review/{project}/finishing', [ProjectController::class, 'reviewFinishing'])
     ->name('admin.evidences.review.finishing');
 
+    Route::get('/admin/projects/{id}/review-boq', [ProjectController::class, 'reviewBoq'])
+    ->name('admin.projects.review_boq');
+
+    // Route untuk halaman preview daftar berkas yang akan di-download
+    Route::get('/admin/projects/{id}/download-preview', [ProjectController::class, 'downloadPreview'])
+    ->name('admin.projects.download_preview');
+
+    // Route API eksekusi generate & stream ZIP file
+    Route::get('/admin/projects/{id}/download-zip', [ProjectController::class, 'downloadZip'])
+    ->name('admin.projects.download_zip');
+
 
     //WASPANG MOBILE
     Route::get('/waspang/projects/{id}/pengukuran', [WaspangController::class, 'pengukuran'])

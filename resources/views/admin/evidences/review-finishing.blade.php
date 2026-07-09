@@ -454,24 +454,25 @@
     <div class="flex items-center justify-between pt-2">
 
         <a href="{{ route('admin.evidences.review.pengukuran', $project->id_project) }}"
-           class="h-10 px-5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold inline-flex items-center justify-center">
+           class="h-10 px-5 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold inline-flex items-center justify-center bg-white dark:bg-gray-800 transition hover:bg-gray-50">
             ← Step 3 Pengukuran
         </a>
 
-        @if($finishingApproved)
+        <div class="flex items-center gap-2">
+            {{-- TOMBOL BARU: PREVIEW BULK DOWNLOAD FOLDER --}}
+            <a href="{{ route('admin.projects.download_preview', $project->id_project) }}"
+               class="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-slate-50 hover:bg-slate-100 text-sm font-bold inline-flex items-center justify-center gap-1.5 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                Bulk Download
+            </a>
 
-            <button class="h-10 px-5 rounded-xl bg-green-600 text-white text-sm font-bold">
-                ✓ Siap Uji Terima
-            </button>
-
-        @else
-
-            <button disabled
-                    class="h-10 px-5 rounded-xl border border-gray-300 text-sm font-bold text-gray-400">
-                Menunggu Approval
-            </button>
-
-        @endif
+            @if($finishingApproved)
+                <a href="{{ route('admin.projects.review_boq', $project->id_project) }}"
+                   class="h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center gap-1.5 transition shadow-sm">
+                    Review BOQ
+                </a>
+            @endif
+        </div>
 
     </div>
 
