@@ -316,6 +316,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/admin/projects/{id}/review-boq', [ProjectController::class, 'reviewBoq'])
     ->name('admin.projects.review_boq');
 
+    Route::get('/admin/projects/{project}/review-finishing', [ProjectController::class, 'reviewFinishing'])
+    ->name('admin.projects.review.finishing');
+
     // Route untuk halaman preview daftar berkas yang akan di-download
     Route::get('/admin/projects/{id}/download-preview', [ProjectController::class, 'downloadPreview'])
     ->name('admin.projects.download_preview');

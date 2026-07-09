@@ -804,36 +804,44 @@ public function importCsv(Request $request)
         return view('admin.evidences.download-preview', compact('project'));
     }
 
-    public function downloadZip($id)
+    public function downloadZip(Request $request, $id)
     {
-        $project = Project::with(['evidences' => function($q) {
-            $q->where('status', 'approved');
+        $onlyStage = $request->query('only_stage'); // Ambil info parameter pemicu unduhan step
+
+        $project = Project::with(['evidences' => function($q) use ($onlyStage) {
+            $q->where('status', 'approved')
+            ->when($onlyStage, function($sub) use ($onlyStage) {
+                $sub->where('stage', $onlyStage); // Filter stage jika diklik tombol per-step
+            });
         }])->findOrFail($id);
 
         $evidences = $project->evidences;
 
         if ($evidences->isEmpty()) {
-            return back()->with('error', 'Tidak ada berkas yang disetujui (Approved) untuk diunduh.');
+            return back()->with('error', 'Tidak ada data foto yang disetujui untuk diunduh.');
         }
 
-        // 1. Buat file ZIP temporary di folder storage lokal aplikasi
-        $zipFileName = 'Eviden_Approved_' . Str::slug($project->project_name) . '.zip';
+        // Nama file dinamis
+        $suffix = $onlyStage ? '_' . ucfirst($onlyStage) : '_Semua_Eviden';
+        $zipFileName = 'Eviden' . $suffix . '_' . Str::slug($project->project_name) . '.zip';
         $zipPath = storage_path('app/public/' . $zipFileName);
 
         $zip = new ZipArchive;
         
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true) {
-            
             foreach ($evidences as $evidence) {
+                // Membaca relasi untuk menyematkan nama designator ke file fisik jika ada
+                $evidence->load('boqItem');
+                $designatorCode = $evidence->boqItem ? '_' . Str::slug($evidence->boqItem->designator) : '';
+
                 $filePath = public_path('storage/' . $evidence->file_path);
                 
                 if (file_exists($filePath) && is_file($filePath)) {
-                    // Susun struktur sub-folder di dalam ZIP
                     $folderInsideZip = $evidence->stage . '/' . $evidence->evidence_type . '/';
                     $fileExtension = pathinfo($filePath, PATHINFO_EXTENSION);
                     
-                    // Buat nama unik untuk foto di dalam ZIP
-                    $fileNameInsideZip = $folderInsideZip . now()->format('Ymd') . '_' . uniqid() . '.' . $fileExtension;
+                    // Menyertakan kode designator ke nama file di dalam ZIP agar informatif sewaktu dibuka admin
+                    $fileNameInsideZip = $folderInsideZip . now()->format('Ymd') . $designatorCode . '_' . uniqid() . '.' . $fileExtension;
                     
                     $zip->addFile($filePath, $fileNameInsideZip);
                 }
@@ -841,17 +849,14 @@ public function importCsv(Request $request)
             $zip->close();
         }
 
-        // 2. Pastikan file ZIP temporary berhasil dibuat sebelum dikirim ke browser
         if (!file_exists($zipPath)) {
             return back()->with('error', 'Gagal membuat file arsip kompresi.');
         }
 
-        // 3. Bersihkan buffer output PHP untuk mencegah kebocoran karakter spasi liar (ERR_INVALID_RESPONSE)
         if (ob_get_level()) {
             ob_end_clean();
         }
 
-        // 4. Kirim file ZIP ke browser, lalu otomatis hapus file temporary setelah di-download
         return response()->download($zipPath, $zipFileName)->deleteFileAfterSend(true);
     }
 

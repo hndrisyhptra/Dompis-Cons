@@ -23,9 +23,9 @@
                     </div>
             </div>
             
-            <a href="{{ route('admin.evidences.approval') }}"
-               class="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-black shadow-xs inline-flex items-center justify-center transition hover:bg-slate-50 shrink-0">
-                ← Kembali ke Approval
+            <a href="{{ route('admin.projects.review.finishing', $project->id_project) }}"
+            class="h-10 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-black shadow-xs inline-flex items-center justify-center transition hover:bg-slate-50 shrink-0">
+                ← Kembali ke Review Finishing
             </a>
         </div>
     </div>
