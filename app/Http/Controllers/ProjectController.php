@@ -424,29 +424,87 @@ public function importCsv(Request $request)
     public function approvalIndex(Request $request)
     {
         $search = $request->search;
+        $statusFilter = $request->input('status_filter', 'pending');
+        $myKawal = $request->input('my_kawal', '0');
+        $programFilter = $request->program;
+        $branchFilter = $request->branch;
 
-        $projects = Project::with([
+        $query = Project::with([
             'evidences',
-            'boqItems',
+            'boqItems.designatorData',
             'assignment.waspang',
-        ])
-        ->whereHas('evidences')
-        ->when($search, function ($query) use ($search) {
+            'lop'
+        ])->whereHas('evidences');
+
+        // ==========================================================================
+        // ATURAN BARU: SEARCH BAR BERSIFAT GLOBAL (Mengabaikan Filter Lain jika Diisi)
+        // ==========================================================================
+        if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('project_name', 'like', "%{$search}%")
-                ->orWhere('sto', 'like', "%{$search}%")
-                ->orWhere('branch', 'like', "%{$search}%")
-                ->orWhere('mitra_name', 'like', "%{$search}%");
-            })
-            ->orWhereHas('assignment.waspang', function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%");
+                  ->orWhere('execution_type', 'like', "%{$search}%")
+                  ->orWhereHas('lop', function ($lopQ) use ($search) {
+                      $lopQ->where('sto', 'like', "%{$search}%")
+                           ->orWhere('branch', 'like', "%{$search}%")
+                           ->orWhere('mitra_name', 'like', "%{$search}%")
+                           ->orWhere('program_sap', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('assignment.waspang', function ($waspangQ) use ($search) {
+                      $waspangQ->where('name', 'like', "%{$search}%");
+                  });
             });
-        })
-        ->latest('updated_at')
-        ->paginate(12)
-        ->withQueryString();
+        } else {
+            // JIKA TIDAK SEDANG SEARCH, BARULAH FILTER-FILTER INI BERFUNGSI normal
 
-        return view('admin.evidences.approval', compact('projects', 'search'));
+            // 1. FILTER TABS STATUS APPROVAL
+            $query->when($statusFilter === 'pending', function ($q) {
+                $q->whereHas('evidences', function ($sub) {
+                    $sub->where('status', 'pending');
+                });
+            })
+            ->when($statusFilter === 'complete', function ($q) {
+                $q->where(function($sub) {
+                    $sub->where('status', 'completed')
+                      ->orWhereDoesntHave('evidences', function($ev) {
+                          $ev->whereIn('status', ['pending', 'rejected']);
+                      });
+                });
+            });
+
+            // 2. SINKRONISASI KAWALANKU: Menggunakan kolom 'assigned_by' dari pro_assign
+            $query->when($myKawal == '1', function ($q) {
+                $q->whereHas('assignment', function ($sub) {
+                    $sub->where('assigned_by', auth()->user()->id_user); 
+                });
+            });
+
+            // 3. FILTER DROPDOWN PROGRAM
+            $query->when($programFilter, function ($q) use ($programFilter) {
+                $q->whereHas('lop', function ($sub) use ($programFilter) {
+                    $sub->where('program_sap', $programFilter);
+                });
+            });
+
+            // 4. FILTER DROPDOWN BRANCH
+            $query->when($branchFilter, function ($q) use ($branchFilter) {
+                $q->whereHas('lop', function ($sub) use ($branchFilter) {
+                    $sub->where('branch', $branchFilter);
+                });
+            });
+        }
+
+        $projects = $query->latest('updated_at')->paginate(12)->withQueryString();
+
+        // Data pendukung komponen dropdown select
+        $availableBranches = \App\Models\Lop::whereNotNull('branch')->distinct()->pluck('branch');
+        $availablePrograms = \App\Models\Lop::whereNotNull('program_sap')->distinct()->pluck('program_sap');
+
+        return view('admin.evidences.approval', compact(
+            'projects', 
+            'search', 
+            'availableBranches', 
+            'availablePrograms'
+        ));
     }
 
     public function approveEvidence($id)
