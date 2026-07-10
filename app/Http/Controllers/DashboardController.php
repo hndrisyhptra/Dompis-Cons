@@ -20,9 +20,17 @@ class DashboardController extends Controller
     {
         $role = auth()->user()->role;
 
-        if ($role == 'admin') {
+        // Sesuai dengan instruksi arsitektur baru: Isolasi Role PM dan Waspang
+        if ($role == 'waspang') {
+            return redirect()->route('waspang.dashboard');
+        }
 
-        $lops = Lop::with([
+        if ($role == 'pm') {
+            return redirect()->route('pm.dashboard'); // Dialihkan ke Controller Mandiri PM
+        }
+
+        if ($role == 'admin') {
+            $lops = Lop::with([
             'project.assignment',
             'project.assignments.waspang',
             'project.evidences',
@@ -268,17 +276,16 @@ class DashboardController extends Controller
             'attentionProjects'
         ));
     }
-
-        if ($role == 'waspang') {
-            return redirect()->route('waspang.dashboard');
+            return view('admin.dashboard', compact(
+                'totalLop', 'boqReady', 'belumBoq', 'assignedLop', 'unassignedLop',
+                'waitingApproval', 'completedApproval', 'onProgress', 'completionRate',
+                'totalEvidence', 'pendingEvidence', 'approvedEvidence', 'rejectedEvidence',
+                'totalBoqItem', 'totalBoqValue', 'materialItem', 'jasaItem',
+                'boqActualItem', 'boqActualRate', 'stageSummary', 'statsByBatch',
+                'statsByBranch', 'statsByProgram', 'waspangStats', 'attentionProjects'
+            ));
+            abort(403);
         }
-
-        if ($role == 'pm') {
-            return view('dashboard.pm');
-        }
-
-        abort(403);
-    }
 
     public function show($id)
     {

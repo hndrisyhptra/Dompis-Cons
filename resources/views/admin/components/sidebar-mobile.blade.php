@@ -6,7 +6,7 @@
 
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold">
-                DC
+                D
             </div>
 
             <div>

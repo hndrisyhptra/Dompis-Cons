@@ -427,6 +427,36 @@ Route::middleware(['auth'])->group(function () {
 
     });
 
+    /*
+|--------------------------------------------------------------------------
+| DASHBOARD PM
+|--------------------------------------------------------------------------
+*/
+
+    Route::middleware(['auth'])->prefix('pm')->name('pm.')->group(function () {
+    
+    // 1. Dashboard PM (Ini route yang memicu error saat login tadi)
+    Route::get('/dashboard', [DashboardPmController::class, 'index'])->name('dashboard');
+    
+    // 2. Rekap Progress LOP
+    Route::get('/rekap-progress', [DashboardPmController::class, 'rekap'])->name('rekap.progress');
+
+    // ---------------------------------------------------------
+    // 
+    // MAP MONITORING CLUSTER PM
+    // ---------------------------------------------------------
+    // Route Fitur Peta
+    Route::get('/map-monitoring', [DashboardPmController::class, 'map'])->name('map.monitoring');
+    Route::get('/api/map-data', [DashboardPmController::class, 'mapData'])->name('api.map.data');
+    
+    Route::get('/kinerja-waspang', function() { 
+        return 'Halaman Kinerja Waspang (Under Construction)'; 
+    })->name('kinerja.waspang');
+    
+    Route::get('/assign-waspang', function() { 
+        return 'Halaman Assign Waspang (Under Construction)'; 
+    })->name('assign.waspang');
+});
     
 
 

@@ -628,7 +628,6 @@ class WaspangController extends Controller
         return $boqApproved == $boqTotal;
     }
 
-    //UPLOAD FOTO di FOLDER 
     // UPLOAD FOTO di FOLDER 
     public function uploadEvidence(Request $request, $id)
     {
@@ -701,15 +700,13 @@ class WaspangController extends Controller
             $boqItem = \App\Models\BoqItem::where('id_boq', $request->boq_item_id)->first();
             
             if ($boqItem) {
-                // Cari kategori progres langsung dari master tabel designators
                 $designator = \Illuminate\Support\Facades\DB::table('designators')
                     ->where('id_designator', $boqItem->designator_id)
                     ->first();
 
-                // Standarisasi string pencocokan ke UPPERCASE murni database
                 $category = $designator ? trim(strtoupper($designator->progress_category)) : '';
 
-                // KONDISI A: JIKA KATEGORI ADALAH KABEL ATAU TIANG (Gunakan Aturan Cascade/Split Target)
+                // KONDISI A: JIKA KATEGORI ADALAH KABEL ATAU TIANG (Gunakan Aturan Cascade Tanpa Limit Akhir)
                 if (in_array($category, ['KABEL', 'TIANG']) && $request->quantity_actual !== null) {
                     
                     $items = \App\Models\BoqItem::query()
@@ -721,10 +718,19 @@ class WaspangController extends Controller
                         ->get();
 
                     $remaining = (float)$request->quantity_actual;
+                    $totalItems = $items->count();
 
-                    foreach ($items as $item) {
+                    foreach ($items as $index => $item) {
                         $plan = (float)$item->quantity_plan;
-                        $actual = min($plan, $remaining);
+
+                        // 🔍 BAGIAN UTAMA YANG DIUBAH:
+                        // Jika baris loop ini adalah baris material terakhir, tampung SEMUA sisa over-volume input aktual
+                        if ($index === $totalItems - 1) {
+                            $actual = $remaining;
+                        } else {
+                            // Jika bukan baris terakhir, alokasikan bertahap sesuai batas nominal plan baris tersebut
+                            $actual = min($plan, $remaining);
+                        }
 
                         \App\Models\BoqItem::where('id_boq', $item->id_boq)
                             ->update([
@@ -737,7 +743,7 @@ class WaspangController extends Controller
                         }
                     }
 
-                    // Log aktivitas untuk KPI Utama
+                    // Log aktivitas KPI Utama
                     \App\Services\ProjectActivityService::log([
                         'project_id' => $project->id_project,
                         'lop_id' => $lopId,
@@ -754,7 +760,7 @@ class WaspangController extends Controller
                     ]);
                     
                 } else {
-                    // KONDISI B: JIKA BUKAN KABEL / TIANG (Simpan langsung nilainya ke baris item itu sendiri)
+                    // KONDISI B: JIKA BUKAN KABEL / TIANG (Simpan langsung nilainya secara utuh)
                     $actualValue = $request->quantity_actual !== null ? (float)$request->quantity_actual : 0;
 
                     \App\Models\BoqItem::where('id_boq', $request->boq_item_id)
@@ -762,7 +768,6 @@ class WaspangController extends Controller
                             'quantity_actual' => $actualValue
                         ]);
 
-                    // Log aktivitas untuk item pendukung biasa
                     \App\Services\ProjectActivityService::log([
                         'project_id' => $project->id_project,
                         'lop_id' => $lopId,
@@ -781,36 +786,7 @@ class WaspangController extends Controller
             }
         }
 
-        // 1. Mapping status_progress untuk tabel LOPS sesuai struktur ENUM-nya
-        $statusLopProgress = match ($stage) {
-            'persiapan' => 'preparation',
-            'instalasi' => 'instalasi',
-            'pengukuran' => 'instalasi', // fallback ke instalasi sesuai alur bisnis
-            'finishing' => 'finishing',
-            default => 'preparation',
-        };
-
-        // 2. Update status_progress pada tabel lops yang terelasi dengan project ini
-        \App\Models\Lop::where('project_id', $project->id_project)
-            ->update([
-                'status_progress' => $statusLopProgress
-            ]);
-
-        // 3. Update status pada tabel projects menggunakan nilai ENUM yang valid ('active')
-        $project->update([
-            'status' => 'active', // Menjaga project tetap berstatus 'active' selama masa konstruksi
-            'status_project' => 'active' // Sinkronisasi kolom status_project bawaan tabel Anda
-        ]);
-
-        // Jaminan HTTP Status 200 OK untuk Fetch Javascript
-        if ($request->ajax() || $request->wantsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
-            return response()->json([
-                'success' => true,
-                'message' => 'Eviden dan Quantity Actual berhasil diperbarui.'
-            ], 200);
-        }
-
-        return back()->with('success', 'Eviden berhasil diupload dan menunggu approval');
+        return back()->with('success', 'Eviden berhasil diunggah');
     }
 
     public function deleteEvidence($id)

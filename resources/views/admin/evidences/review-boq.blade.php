@@ -58,8 +58,8 @@
         $planTiang = $tiangItems->sum('quantity_plan');
         $actualTiang = $tiangItems->sum('quantity_actual');
 
-        $accKabel = $planKabel > 0 ? min(100, round(($actualKabel / $planKabel) * 100)) : 0;
-        $accTiang = $planTiang > 0 ? min(100, round(($actualTiang / $planTiang) * 100)) : 0;
+        $accKabel = $planKabel > 0 ? round(($actualKabel / $planKabel) * 100) : 0;
+        $accTiang = $planTiang > 0 ? round(($actualTiang / $planTiang) * 100) : 0;
     @endphp
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -119,7 +119,7 @@
     {{-- TABEL MATERIAL DETIL --}}
     <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden">
         <div class="p-5 border-b border-slate-50 dark:border-slate-800/80 bg-slate-50/30">
-            <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">Rincian Item Material Komparatif</h3>
+            <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">Item Designator</h3>
         </div>
 
         <div class="overflow-x-auto">
@@ -158,7 +158,12 @@
                                 {{ $item->unit }}
                             </td>
                             <td class="py-4 px-6 text-center">
-                                @if($isMatch)
+                                @if((float)$item->quantity_actual > (float)$item->quantity_plan)
+                                    {{-- STATUS BARU: JIKA AKTUAL MELEBIHI TARGET PLAN --}}
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-100">
+                                        ▲ Kelebihan Volume
+                                    </span>
+                                @elseif((float)$item->quantity_actual == (float)$item->quantity_plan)
                                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-extrabold text-[10px] border border-emerald-100">
                                         ✓ Terpenuhi
                                     </span>

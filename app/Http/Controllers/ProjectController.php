@@ -567,6 +567,27 @@ public function importCsv(Request $request)
         if ($project) {
             $summary = $project->progressSummary();
 
+            /*
+            |--------------------------------------------------------------------------
+            | SINKRONISASI OTOMATIS STATUS TABEL LOPS
+            |--------------------------------------------------------------------------
+            */
+            $dbStatus = null;
+            if (($summary['progress'] ?? 0) == 100) {
+                // Jika web mendeteksi 100%, paksa DB tabel lops menjadi finishing
+                $dbStatus = 'finishing';
+            } elseif ($evidence->stage == 'persiapan') {
+                // Jika tahapan persiapan di-approve (tapi belum 100%), naikkan ke instalasi
+                $dbStatus = 'instalasi';
+            }
+
+            if ($dbStatus) {
+                Lop::where('project_id', $project->id_project)->update([
+                    'status_progress' => $dbStatus
+                ]);
+            }
+            // ------------------------------------------------------------------------
+
             $alreadyCompleteLogged = ProjectActivityLog::where('project_id', $project->id_project)
                 ->where('activity_type', 'project_completed')
                 ->exists();
@@ -936,18 +957,46 @@ public function importCsv(Request $request)
         }
 
         $file = $request->file('kml_file');
-
         $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
         $safeName = str_replace([' ', '/', '\\'], '-', strtolower($originalName));
-
         $fileName = $safeName . '-' . time() . '.kml';
 
+        // Simpan file ke storage public
         $path = $file->storeAs('kml', $fileName, 'public');
-
         $project->kml_file = $path;
+
+        /*
+        |--------------------------------------------------------------------------
+        | PARSING KOORDINAT ANCHOR UNTUK CLUSTER DASHBOARD
+        |--------------------------------------------------------------------------
+        */
+        try {
+            $kmlContent = file_get_contents($file->getRealPath());
+            // Bersihkan namespace XML agar mudah dibaca oleh SimpleXMLElement
+            $cleanKml = preg_replace('/xmlns="[^"]+"/', '', $kmlContent);
+            $xml = new \SimpleXMLElement($cleanKml);
+
+            // Cari tag <coordinates> pertama di dalam file KML
+            $coordinates = $xml->xpath('//coordinates');
+            if (!empty($coordinates)) {
+                // Bersihkan spasi/line break dan ambil baris koordinat pertama
+                $coordString = trim((string)$coordinates[0]);
+                $pureCoords = preg_split('/\s+/', $coordString);
+                $firstSet = explode(',', $pureCoords[0]);
+
+                if (count($firstSet) >= 2) {
+                    // Format KML standar adalah: longitude, latitude, altitude
+                    $project->kml_lng = current($firstSet);
+                    $project->kml_lat = next($firstSet);
+                }
+            }
+        } catch (\Exception $e) {
+            // Jika parsing gagal karena file corrupt, biarkan null atau log errornya
+        }
+
         $project->save();
 
-        return back()->with('success', 'File KML berhasil diupload');
+        return back()->with('success', 'File KML berhasil diupload dan koordinat jangkar berhasil diekstrak.');
     }
 
     public function viewKml($id)
