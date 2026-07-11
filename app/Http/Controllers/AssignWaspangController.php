@@ -27,21 +27,32 @@ class AssignWaspangController extends Controller
             })
             ->get()
             ->map(function ($waspang) {
-                $activeAssignments = $waspang->assignments
-                    ->unique('project_id')
-                    ->filter(function ($assignment) {
-                        $project = $assignment->project;
+                // 1. Ambil semua project unik yang pernah di-assign ke Waspang ini
+                $allUniqueAssignments = $waspang->assignments->unique('project_id');
 
-                        if (!$project) {
-                            return false;
-                        }
+                // 2. Filter project yang AKTIF (Belum Ready UT)
+                $activeAssignments = $allUniqueAssignments->filter(function ($assignment) {
+                    $project = $assignment->project;
+                    if (!$project) return false;
+                    
+                    return !$this->isProjectReadyUt($project);
+                })->values();
 
-                        return !$this->isProjectReadyUt($project);
-                    })
-                    ->values();
+                // 3. Filter project yang SELESAI (Sudah Ready UT / Complete)
+                $finishedAssignments = $allUniqueAssignments->filter(function ($assignment) {
+                    $project = $assignment->project;
+                    if (!$project) return false;
 
+                    return $this->isProjectReadyUt($project);
+                })->values();
+
+                // 4. Set variabel ke object waspang untuk dilempar ke Blade
                 $waspang->active_assignments = $activeAssignments;
-                $waspang->active_project_count = $activeAssignments->count();
+                $waspang->active_project_count = $activeAssignments->count(); // Total Run
+                $waspang->finished_project_count = $finishedAssignments->count(); // Total Done
+                
+                // Total akumulasi seluruh project (Aktif + Selesai)
+                $waspang->total_project_count = $allUniqueAssignments->count(); 
 
                 return $waspang;
             })
@@ -67,7 +78,6 @@ class AssignWaspangController extends Controller
             'search' => $search,
         ]);
     }
-    
 
     public function history(Request $request, $id)
     {
