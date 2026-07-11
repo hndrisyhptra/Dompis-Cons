@@ -13,6 +13,7 @@ use App\Models\Designator;
 use App\Models\ProjectActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -276,16 +277,7 @@ class DashboardController extends Controller
             'attentionProjects'
         ));
     }
-            return view('admin.dashboard', compact(
-                'totalLop', 'boqReady', 'belumBoq', 'assignedLop', 'unassignedLop',
-                'waitingApproval', 'completedApproval', 'onProgress', 'completionRate',
-                'totalEvidence', 'pendingEvidence', 'approvedEvidence', 'rejectedEvidence',
-                'totalBoqItem', 'totalBoqValue', 'materialItem', 'jasaItem',
-                'boqActualItem', 'boqActualRate', 'stageSummary', 'statsByBatch',
-                'statsByBranch', 'statsByProgram', 'waspangStats', 'attentionProjects'
-            ));
-            abort(403);
-        }
+    }
 
     public function show($id)
     {
@@ -325,7 +317,7 @@ class DashboardController extends Controller
             'sto' => $request->sto,
             'mitra_name' => $request->mitra_name,
             'jenis_eksekusi' => $request->jenis_eksekusi,
-            'status' => 'active',
+            'status_project' => 'active',
         ]);
 
         return back()->with('success', 'Project berhasil dibuat');
@@ -514,5 +506,135 @@ class DashboardController extends Controller
         );
 
         return view('admin.inbox.history', compact('assignments', 'search'));
+    }
+
+    /**
+     * MENU: REKAP PROGRESS ADMIN (Detail Kabel, Tiang, Pagination)
+     */
+    public function rekapProgress(Request $request)
+    {
+        // 1. Ambil list unik untuk filter dropdown
+        $programs = Project::whereNotNull('program')
+            ->where('program', '!=', '')
+            ->distinct()
+            ->orderBy('program', 'asc')
+            ->pluck('program');
+            
+        $branches = DB::table('lops')
+            ->whereNotNull('branch')
+            ->where('branch', '!=', '')
+            ->distinct()
+            ->orderBy('branch', 'asc')
+            ->pluck('branch');
+
+        // 2. Query Builder dengan Raw SQL Aggregation (Database Engine Level)
+        $query = DB::table('lops as l')
+            ->join('projects as p', 'l.project_id', '=', 'p.id_project')
+            ->leftJoin('boq_items as b', 'l.id_lop', '=', 'b.lop_id')
+            ->leftJoin('designators as d', 'b.designator_id', '=', 'd.id_designator')
+            ->select([
+                'l.id_lop',
+                'l.branch',
+                'l.sto',
+                'l.lop_name',
+                'p.program',
+                'p.id_project',
+                
+                // Agregasi KABEL
+                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'kabel' THEN IFNULL(b.quantity_plan, 0) ELSE 0 END) as kabel_plan"),
+                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'kabel' THEN IFNULL(b.quantity_actual, 0) ELSE 0 END) as kabel_actual"),
+
+                // Agregasi TIANG 
+                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'tiang' THEN IFNULL(b.quantity_plan, 0) ELSE 0 END) as tiang_plan"),
+                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'tiang' THEN IFNULL(b.quantity_actual, 0) ELSE 0 END) as tiang_actual"),
+            ]);
+
+        // Filter Dropdown Program & Branch
+        if ($request->filled('program')) {
+            $query->where('p.program', $request->program);
+        }
+        if ($request->filled('branch')) {
+            $query->where('l.branch', $request->branch);
+        }
+
+        $perPage = $request->input('per_page', 10);
+
+        // Grouping & Pagination
+        $lopsData = $query->groupBy(
+            'l.id_lop', 'l.branch', 'l.sto', 'l.lop_name', 'p.program', 'p.id_project'
+        )->paginate($perPage)->withQueryString();
+
+        // Ambil total data asli (Diperbaiki agar tidak tertimpa $lopsData->count() di bawah)
+        $totalSegments = $lopsData->total(); 
+
+        // 3. Tarik data riwayat relasi Project secara massal (Mencegah N+1)
+        $projectIds = $lopsData->pluck('id_project')->unique();
+        $projects = Project::with(['evidences', 'boqItems'])
+            ->whereIn('id_project', $projectIds)
+            ->get()
+            ->keyBy('id_project');
+
+        // 4. Kalkulasi Data Summary untuk Widget & View Table
+        $totalKabelPlan = 0;
+        $totalKabelActual = 0;
+        $totalTiangPlan = 0;
+        $totalTiangActual = 0;
+
+        $summaryStatus = ['selesai' => 0, 'sedang' => 0, 'rendah' => 0, 'belum' => 0];
+        $tableData = [];
+
+        // Menentukan nomor urut dinamis berdasarkan halaman aktif
+        $startNumber = ($lopsData->currentPage() - 1) * $lopsData->perPage();
+
+        foreach ($lopsData as $index => $lop) {
+            $totalKabelPlan += $lop->kabel_plan;
+            $totalKabelActual += $lop->kabel_actual;
+            $totalTiangPlan += $lop->tiang_plan;
+            $totalTiangActual += $lop->tiang_actual;
+
+            $persenKabel = $lop->kabel_plan > 0 ? ($lop->kabel_actual / $lop->kabel_plan) * 100 : 0;
+            $persenTiang = $lop->tiang_plan > 0 ? ($lop->tiang_actual / $lop->tiang_plan) * 100 : 0;
+
+            $projectProgress = 0;
+            if (isset($projects[$lop->id_project])) {
+                $summary = $projects[$lop->id_project]->progressSummary();
+                $projectProgress = $summary['progress'] ?? 0;
+            }
+
+            if ($projectProgress >= 100) { 
+                $summaryStatus['selesai']++; 
+            } elseif ($projectProgress >= 50) { 
+                $summaryStatus['sedang']++; 
+            } elseif ($projectProgress >= 1) { 
+                $summaryStatus['rendah']++; 
+            } else { 
+                $summaryStatus['belum']++; 
+            }
+
+            $tableData[] = [
+                'no' => $startNumber + $index + 1, 
+                'program' => $lop->program ?? '-',
+                'branch' => $lop->branch ?? '-',
+                'sto' => $lop->sto ?? '-',
+                'nama_lop' => $lop->lop_name ?? '-',
+                'kabel_plan' => $lop->kabel_plan,
+                'kabel_actual' => $lop->kabel_actual,
+                'kabel_persen' => $persenKabel,
+                'tiang_plan' => $lop->tiang_plan,
+                'tiang_actual' => $lop->tiang_actual,
+                'tiang_persen' => $persenTiang,
+            ];
+        }
+
+        $totalKabelPersen = $totalKabelPlan > 0 ? ($totalKabelActual / $totalKabelPlan) * 100 : 0;
+        $totalTiangPersen = $totalTiangPlan > 0 ? ($totalTiangActual / $totalTiangPlan) * 100 : 0;
+
+        // PERUBAHAN UTAMA: Arahkan return view ke folder Admin
+        return view('admin.dashboard.rekap_progress', compact(
+            'programs', 'branches', 'totalSegments',
+            'totalKabelPlan', 'totalKabelActual', 'totalKabelPersen',
+            'totalTiangPlan', 'totalTiangActual', 'totalTiangPersen',
+            'summaryStatus', 'tableData', 'lopsData'
+        ));
     }
 }

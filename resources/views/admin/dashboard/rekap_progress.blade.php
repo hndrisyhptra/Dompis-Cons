@@ -6,9 +6,8 @@
 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
     <div>
         <div class="flex items-center gap-2.5 mb-1">
-            <div class="w-2 h-6 bg-blue-600 rounded-full"></div>
             <h1 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                Dashboard PM
+                Rekap Progress
             </h1>
         </div>
         <p class="text-sm text-gray-500 dark:text-gray-400">
@@ -26,7 +25,7 @@
 
 {{-- Filter Panel Utama (Program & Branch) --}}
 <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-5 mb-8 shadow-xs">
-    <form method="GET" action="{{ route('dashboard.pm.index') }}" id="filterForm">
+    <form method="GET" action="{{ route('admin.rekap_progress') }}" id="filterForm">
         {{-- Input hidden agar ketika ganti filter, limit per_page tidak reset ke 10 --}}
         <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
 
@@ -76,7 +75,7 @@
             {{-- Reset Button --}}
             @if(request('program') || request('branch') || request('per_page'))
                 <div>
-                    <a href="{{ route('dashboard.pm.index') }}" 
+                    <a href="{{ route('admin.rekap_progress') }}" 
                        class="inline-flex items-center justify-center h-11 px-5 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors w-full sm:w-auto">
                         <i class="fa-solid fa-rotate-left mr-2"></i> Reset Filter
                     </a>
@@ -90,7 +89,10 @@
 <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
     {{-- Total Segmen --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center text-lg shadow-xs"><i class="fa-solid fa-layer-group"></i></div>
+        <div class="w-12 h-12 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center text-lg shadow-xs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark-icon lucide-bookmark">
+                <path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"/></svg>
+        </div>
         <div>
             <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Segmen</p>
             <h3 class="text-2xl font-black text-gray-900 dark:text-white mt-0.5">{{ $totalSegments }} <span class="text-xs font-medium text-gray-400">Segmen</span></h3>
@@ -99,7 +101,10 @@
     
     {{-- Total Panjang FO --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center text-lg shadow-xs"><i class="fa-solid fa-ruler"></i></div>
+        <div class="w-12 h-12 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center text-lg shadow-xs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-network-icon lucide-network">
+                <rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+        </div>
         <div>
             <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Target FO</p>
             <h3 class="text-xl font-black text-gray-900 dark:text-white mt-0.5">{{ number_format($totalKabelPlan, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">m</span></h3>
@@ -108,7 +113,10 @@
     
     {{-- Aktual Penarikan FO --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-amber-500 text-white rounded-xl flex items-center justify-center text-lg shadow-xs"><i class="fa-solid fa-cable-car"></i></div>
+        <div class="w-12 h-12 bg-amber-500 text-white rounded-xl flex items-center justify-center text-lg shadow-xs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-network-icon lucide-network">
+                <rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+        </div>
         <div class="w-full">
             <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Aktual FO</p>
             <div class="flex items-baseline justify-between gap-2 mt-0.5">
@@ -120,7 +128,9 @@
     
     {{-- Total Target Tiang --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 rounded-xl flex items-center justify-center text-lg shadow-xs"><i class="fa-solid fa-tower-broadcast"></i></div>
+        <div class="w-12 h-12 bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 rounded-xl flex items-center justify-center text-lg shadow-xs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utility-pole-icon lucide-utility-pole"><path d="M12 2v20"/><path d="M2 5h20"/><path d="M3 3v2"/><path d="M7 3v2"/><path d="M17 3v2"/><path d="M21 3v2"/><path d="m19 5-7 7-7-7"/></svg>
+        </div>
         <div>
             <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Target Tiang</p>
             <h3 class="text-xl font-black text-gray-900 dark:text-white mt-0.5">{{ number_format($totalTiangPlan, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">pcs</span></h3>
@@ -129,7 +139,9 @@
     
     {{-- Aktual Tanam Tiang --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-green-500 text-white rounded-xl flex items-center justify-center text-lg shadow-xs"><i class="fa-solid fa-mountain-sun"></i></div>
+        <div class="w-12 h-12 bg-green-500 text-white rounded-xl flex items-center justify-center text-lg shadow-xs">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utility-pole-icon lucide-utility-pole"><path d="M12 2v20"/><path d="M2 5h20"/><path d="M3 3v2"/><path d="M7 3v2"/><path d="M17 3v2"/><path d="M21 3v2"/><path d="m19 5-7 7-7-7"/></svg>
+        </div>
         <div class="w-full">
             <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Aktual Tiang</p>
             <div class="flex items-baseline justify-between gap-2 mt-0.5">
@@ -142,8 +154,9 @@
 
 {{-- Main Data Area --}}
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+    
     {{-- Data Table Segmen Proyek --}}
-    <div class="lg:col-span-2 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs overflow-hidden flex flex-col justify-between">
+    <div class="lg:col-span-2 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs overflow-hidden">
         
         {{-- Table Header & Per-Page Selector (Di Atas Tabel) --}}
         <div class="p-5 border-b border-gray-100 dark:border-gray-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -155,12 +168,12 @@
             <div class="flex items-center gap-2 self-end sm:self-auto">
                 <span class="text-xs text-gray-400 font-medium whitespace-nowrap">Tampilkan:</span>
                 <div class="relative w-28">
-                    <select onchange="window.location.href = this.value"
+                    <select onchange="updatePerPage(this.value)"
                             class="w-full h-8 pl-3 pr-8 appearance-none rounded-lg bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer py-0">
-                        <option value="{{ request()->fullUrlWithQuery(['per_page' => 10]) }}" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10 baris</option>
-                        <option value="{{ request()->fullUrlWithQuery(['per_page' => 20]) }}" {{ request('per_page') == 20 ? 'selected' : '' }}>20 baris</option>
-                        <option value="{{ request()->fullUrlWithQuery(['per_page' => 50]) }}" {{ request('per_page') == 50 ? 'selected' : '' }}>50 baris</option>
-                        <option value="{{ request()->fullUrlWithQuery(['per_page' => 100]) }}" {{ request('per_page') == 100 ? 'selected' : '' }}>100 baris</option>
+                        <option value="10" {{ request('per_page', 10) == 10 ? 'selected' : '' }}>10 baris</option>
+                        <option value="20" {{ request('per_page') == 20 ? 'selected' : '' }}>20 baris</option>
+                        <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50 baris</option>
+                        <option value="100" {{ request('per_page') == 100 ? 'selected' : '' }}>100 baris</option>
                     </select>
                     <div class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-gray-400 text-[10px]">
                         <i class="fa-solid fa-chevron-down"></i>
@@ -169,7 +182,7 @@
             </div>
         </div>
         
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto min-h-[300px]">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
                     <tr class="bg-gray-50 dark:bg-black/40 text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
@@ -185,9 +198,8 @@
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800 text-gray-700 dark:text-gray-300">
                     @forelse($tableData as $row)
                     <tr class="hover:bg-gray-50/70 dark:hover:bg-gray-950/40 transition-colors">
-                        {{-- Menggunakan pagination index agar nomor berlanjut di page berikutnya --}}
                         <td class="p-3.5 text-center text-gray-400 font-mono">
-                            {{ ($lopsData->currentPage() - 1) * $lopsData->perPage() + $loop->iteration }}
+                            {{ $row['no'] }}
                         </td>
                         <td class="p-3.5">
                             <div class="font-bold text-gray-900 dark:text-white">{{ $row['branch'] }}</div>
@@ -200,7 +212,7 @@
                         <td class="p-3.5">
                             <div class="space-y-1">
                                 <div class="flex items-center justify-between font-mono text-[10px]">
-                                    <span class="text-gray-400">{{ number_format($row['kabel_actual'], 0, ',', '.') }} m</span>
+                                    <span class="text-black-600">{{ number_format($row['kabel_actual'], 0, ',', '.') }} m</span>
                                     <span class="font-bold text-amber-600 dark:text-amber-400">{{ number_format($row['kabel_persen'], 1, ',', '.') }}%</span>
                                 </div>
                                 <div class="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
@@ -208,11 +220,11 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="p-3.5 text-right font-mono text-gray-900 dark:text-white">{{ number_format($row['tiang_plan'], 0, ',', '.') }} <span class="text-[10px] text-gray-400">pcs</span></td>
+                        <td class="p-3.5 text-center font-mono text-gray-900 dark:text-white">{{ number_format($row['tiang_plan'], 0, ',', '.') }} <span class="text-[10px] text-gray-400">pcs</span></td>
                         <td class="p-3.5">
                             <div class="space-y-1">
                                 <div class="flex items-center justify-between font-mono text-[10px]">
-                                    <span class="text-gray-400">{{ number_format($row['tiang_actual'], 0, ',', '.') }}pcs</span>
+                                    <span class="text-black-600">{{ number_format($row['tiang_actual'], 0, ',', '.') }} pcs</span>
                                     <span class="font-bold text-green-600 dark:text-green-400">{{ number_format($row['tiang_persen'], 1, ',', '.') }}%</span>
                                 </div>
                                 <div class="w-full bg-gray-100 dark:bg-gray-800 h-1.5 rounded-full overflow-hidden">
@@ -223,10 +235,10 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="p-8 text-center text-gray-400 dark:text-gray-500 font-medium">
-                            <div class="flex flex-col items-center justify-center gap-2">
-                                <i class="fa-regular fa-folder-open text-3xl text-gray-300 mb-1"></i>
-                                Tidak ada segmen data proyek yang cocok dengan kriteria filter.
+                        <td colspan="7" class="p-12 text-center text-gray-400 dark:text-gray-500 font-medium bg-gray-50/50 dark:bg-black/20">
+                            <div class="flex flex-col items-center justify-center gap-3">
+                                <i class="fa-regular fa-folder-open text-4xl text-gray-300 mb-1"></i>
+                                <span>Tidak ada segmen data proyek yang cocok dengan kriteria filter saat ini.</span>
                             </div>
                         </td>
                     </tr>
@@ -249,7 +261,7 @@
         {{-- Pagination Links (Di Bawah Tabel) --}}
         @if($lopsData->hasPages())
         <div class="p-4 border-t border-gray-100 dark:border-gray-800/80 bg-gray-50/50 dark:bg-black/10">
-            {{ $lopsData->links() }}
+            {{ $lopsData->onEachSide(1)->appends(request()->query())->links() }}
         </div>
         @endif
     </div>
@@ -423,6 +435,25 @@
             } 
         }
     });
+</script>
+
+<script>
+    // Fungsi untuk mengubah jumlah baris tanpa menghilangkan filter pencarian aktif
+    function updatePerPage(val) {
+        // Cari input per_page tersembunyi di form filter atas
+        const filterForm = document.getElementById('filterForm');
+        const perPageInput = filterForm.querySelector('input[name="per_page"]');
+        
+        if (perPageInput) {
+            perPageInput.value = val;
+            filterForm.submit(); // Submit ulang form beserta parameter yang aktif
+        } else {
+            // Fallback (jika form tidak ada)
+            const url = new URL(window.location.href);
+            url.searchParams.set('per_page', val);
+            window.location.href = url.href;
+        }
+    }
 </script>
 
 @endsection

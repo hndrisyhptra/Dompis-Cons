@@ -339,7 +339,7 @@
 
                 <div class="grid grid-cols-2 gap-2 pt-2 shrink-0">
                     <button type="button" onclick="closeUploadModal()" class="h-11 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-black transition">Batal</button>
-                    <button type="submit" class="h-11 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-md transition">Kirim Bukti</button>
+                    <button type="submit" class="h-11 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-md transition">Upload</button>
                 </div>
             </form>
         </div>

@@ -566,7 +566,6 @@
                             branch: @js($project->lop?->branch),
                             sto: @js($project->lop?->sto),
                             mitra_name: @js($project->mitra_name ?? $project->lop?->mitra_name),
-                            jenis_eksekusi: @js($project->execution_type),
                             status: @js($project->status_project),
                             latitude: @js($project->latitude),
                             longitude: @js($project->longitude),
@@ -574,6 +573,7 @@
                             boq_items: @js($project->boqItems->map(function($boq) {
                                 return [
                                     'id_boq' => $boq->id_boq,
+                                    'designator_id' => $boq->designator_id, /* INI YANG SEBELUMNYA KURANG */
                                     'designator' => $boq->designator,
                                     'item_name' => $boq->item_name,
                                     'unit' => $boq->unit,
@@ -582,7 +582,7 @@
                             }))
                         })"
                         class="h-11 px-6 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold hover:bg-gray-100 dark:hover:bg-gray-800">
-                    Edit
+                    Edit Project
                 </button>
 
                 <form method="POST"
@@ -975,22 +975,6 @@
 
                 </div>
 
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                        Jenis Eksekusi
-                    </label>
-
-                    <select name="jenis_eksekusi"
-                            id="jenis_eksekusi"
-                            class="w-full h-11 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
-                        <option value="">— Pilih jenis —</option>
-                        <option value="plan">PLAN</option>
-                        <option value="survey">SURVEY</option>
-                        <option value="ogp">OGP</option>
-                        <option value="finish">FINISH</option>
-                    </select>
-                </div>
-
                 <input type="hidden" name="status" id="status" value="active">
 
                 {{-- Designator BOQ Awal --}}
@@ -1230,291 +1214,336 @@ function closeAssignModal()
     });
 
 });
+</script>
 
-function openDetailModal(id)
-{
-    const modal = document.getElementById(id);
-
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-}
-
-function closeDetailModal(id)
-{
-    const modal = document.getElementById(id);
-
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-}
-
-function openImportModal()
-{
-    document.getElementById('importModal').classList.remove('hidden');
-    document.getElementById('importModal').classList.add('flex');
-}
-
-function closeImportModal()
-{
-    document.getElementById('importModal').classList.add('hidden');
-    document.getElementById('importModal').classList.remove('flex');
-}
-
-function openProjectModal()
-{
-    const modal = document.getElementById('projectModal');
-
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-
-    document.getElementById('projectModalTitle').innerText = 'Input LOP Baru';
-    document.getElementById('projectForm').action = "{{ route('projects.store') }}";
-    document.getElementById('projectMethod').value = 'POST';
-    document.getElementById('projectForm').reset();
-
-    if (document.getElementById('status')) {
-        document.getElementById('status').value = 'active';
-    }
-}
-
-function openEditProjectModal(project)
-{
-    document.getElementById('projectModal').classList.remove('hidden');
-    document.getElementById('projectModal').classList.add('flex');
-
-    document.getElementById('projectModalTitle').innerText = 'Edit Project & BOQ';
-    document.getElementById('projectForm').action = `/projects/update/${project.id}`;
-    document.getElementById('projectMethod').value = 'PUT';
-
-    document.getElementById('project_name').value = project.project_name ?? '';
-    document.getElementById('branch').value = project.branch ?? '';
-    document.getElementById('sto').value = project.sto ?? '';
-    document.getElementById('mitra_name').value = project.mitra_name ?? '';
-    document.getElementById('jenis_eksekusi').value = project.jenis_eksekusi ?? 'plan';
-    document.getElementById('latitude').value = project.latitude ?? '';
-    document.getElementById('longitude').value = project.longitude ?? '';
-    document.getElementById('location_address').value = project.location_address ?? '';
-
-    if (document.getElementById('status')) {
-        document.getElementById('status').value = project.status ?? 'active';
-    }
-
-    renderEditBoqItems(project.boq_items ?? []);
-}
-
-function renderEditBoqItems(items)
-{
-    const container = document.getElementById('designatorContainer');
-
-    container.innerHTML = '';
-
-    if (items.length === 0) {
-        addDesignatorRow();
-        return;
-    }
-
-    items.forEach((item) => {
-        const row = `
-            <div class="grid grid-cols-12 gap-2 designator-row">
-
-                <input type="hidden" name="existing_boq_id[]" value="${item.id_boq ?? ''}">
-
-                <input type="text"
-                       name="existing_designator[]"
-                       value="${item.designator ?? ''}"
-                       readonly
-                       class="col-span-12 sm:col-span-3 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
-
-                <input type="text"
-                       name="existing_item_name[]"
-                       value="${item.item_name ?? ''}"
-                       readonly
-                       class="col-span-12 sm:col-span-4 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
-
-                <input type="text"
-                       name="existing_unit[]"
-                       value="${item.unit ?? ''}"
-                       readonly
-                       class="col-span-5 sm:col-span-2 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
-
-                <input type="number"
-                       step="0.01"
-                       name="existing_qty[]"
-                       value="${item.quantity_plan ?? 0}"
-                       class="col-span-5 sm:col-span-2 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
-
-                <button type="button"
-                        onclick="removeDesignatorRow(this)"
-                        class="col-span-2 sm:col-span-1 h-10 rounded-xl text-gray-400 hover:text-red-500 text-xl">
-                    ×
-                </button>
-
-            </div>
-        `;
-
-        container.insertAdjacentHTML('beforeend', row);
-    });
-
-    addDesignatorRow();
-}
-
-function closeProjectModal()
-{
-    document.getElementById('projectModal').classList.add('hidden');
-    document.getElementById('projectModal').classList.remove('flex');
-}
-
-function fillDesignatorData(select)
-{
-    const row = select.closest('.designator-row');
-    const selected = select.options[select.selectedIndex];
-
-    row.querySelector('input[name="boq_item_name[]"]').value = selected.dataset.item || '';
-    row.querySelector('input[name="boq_unit[]"]').value = selected.dataset.unit || '';
-}
-
-    function addDesignatorRow()
-    {
-        const container = document.getElementById('designatorContainer');
-
-        const row = `
-            <div class="grid grid-cols-12 gap-2 designator-row">
-
-                <select name="designator_id[]"
-                        onchange="fillDesignatorData(this)"
-                        class="designator-select col-span-12 sm:col-span-4 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
-
-                    <option value="">Pilih designator</option>
-
-                    @foreach($designators as $designator)
-                        <option value="{{ $designator->id_designator }}"
-                                data-designator="{{ $designator->designator }}"
-                                data-item="{{ $designator->item_name }}"
-                                data-unit="{{ $designator->unit }}">
-                            {{ $designator->designator }} - {{ $designator->item_name }}
-                        </option>
-                    @endforeach
-
-                </select>
-
-                <input type="text"
-                    name="boq_item_name[]"
-                    placeholder="Item pekerjaan"
-                    readonly
-                    class="col-span-12 sm:col-span-4 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
-
-                <input type="text"
-                    name="boq_unit[]"
-                    placeholder="Satuan"
-                    readonly
-                    class="col-span-5 sm:col-span-2 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
-
-                <input type="number"
-                    step="1"
-                    name="boq_qty[]"
-                    placeholder="0"
-                    class="col-span-5 sm:col-span-1 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
-
-                <button type="button"
-                        onclick="removeDesignatorRow(this)"
-                        class="col-span-2 sm:col-span-1 h-10 rounded-xl text-gray-400 hover:text-red-500 text-xl">
-                    ×
-                </button>
-
-            </div>
-        `;
-
-        container.insertAdjacentHTML('beforeend', row);
-
-        const newRow = container.lastElementChild;
-        const newSelect = newRow.querySelector('.designator-select');
-
-        initSingleDesignatorSearch(newSelect);
-    }
-
-    function removeDesignatorRow(button)
-    {
-        const rows = document.querySelectorAll('.designator-row');
-
-        if (rows.length <= 1) {
-            const row = button.closest('.designator-row');
-
-            row.querySelector('select').value = '';
-            row.querySelector('input[name="boq_item_name[]"]').value = '';
-            row.querySelector('input[name="boq_unit[]"]').value = '';
-            row.querySelector('input[name="boq_qty[]"]').value = '';
-
-            return;
-        }
-
-        button.closest('.designator-row').remove();
-    }
-
-    // SEARCH ITEM DESIGNATOR SAAT PILIH ITEM DESIGNATOR
-    function initDesignatorSearch()
-    {
-        document.querySelectorAll('.designator-select').forEach(function(select) {
-            initSingleDesignatorSearch(select);
-        });
-    }
-
-        document.addEventListener('DOMContentLoaded', function () {
-        initDesignatorSearch();
-    });
-
-    function initSingleDesignatorSearch(select)
-    {
-        if (!select) {
-            return;
-        }
-
-        if (select.tomselect) {
-            return;
-        }
-
-        new TomSelect(select, {
-            create: false,
-            placeholder: 'Cari designator...',
-            maxOptions: 1000,
-            searchField: ['text'],
-            sortField: {
-                field: 'text',
-                direction: 'asc'
-            },
-            onChange: function () {
-                fillDesignatorData(select);
-            }
-        });
-    }
-
-    function openBoqModal(projectId, projectName)
-    {
-        const modal = document.getElementById('boqModal');
-
+<script>
+    function openDetailModal(id) {
+        const modal = document.getElementById(id);
         modal.classList.remove('hidden');
         modal.classList.add('flex');
-
-        document.getElementById('boq_project_id').value = projectId;
-        document.getElementById('boqProjectName').innerText = projectName;
-
-        initBoqDesignatorSearch();
     }
 
-    function closeBoqModal()
-    {
-        const modal = document.getElementById('boqModal');
-
+    function closeDetailModal(id) {
+        const modal = document.getElementById(id);
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
 
+    function openImportModal() {
+        document.getElementById('importModal').classList.remove('hidden');
+        document.getElementById('importModal').classList.add('flex');
+    }
+
+    function closeImportModal() {
+        document.getElementById('importModal').classList.add('hidden');
+        document.getElementById('importModal').classList.remove('flex');
+    }
+
+    function openProjectModal() {
+        const modal = document.getElementById('projectModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+
+        document.getElementById('projectModalTitle').innerText = 'Input LOP Baru';
+        document.getElementById('projectForm').action = "{{ route('projects.store') }}";
+        document.getElementById('projectMethod').value = 'POST';
+        document.getElementById('projectForm').reset();
+
+        if (document.getElementById('status')) {
+            document.getElementById('status').value = 'active';
+        }
+    }
+
+    function openEditProjectModal(project) {
+        document.getElementById('projectModal').classList.remove('hidden');
+        document.getElementById('projectModal').classList.add('flex');
+
+        document.getElementById('projectModalTitle').innerText = 'Edit Project & BOQ';
+        document.getElementById('projectForm').action = `/projects/update/${project.id}`;
+        document.getElementById('projectMethod').value = 'PUT';
+
+        document.getElementById('project_name').value = project.project_name ?? '';
+        document.getElementById('branch').value = project.branch ?? '';
+        document.getElementById('sto').value = project.sto ?? '';
+        document.getElementById('mitra_name').value = project.mitra_name ?? '';
+        document.getElementById('latitude').value = project.latitude ?? '';
+        document.getElementById('longitude').value = project.longitude ?? '';
+        document.getElementById('location_address').value = project.location_address ?? '';
+
+        if (document.getElementById('status')) {
+            document.getElementById('status').value = project.status ?? 'active';
+        }
+
+        renderEditBoqItems(project.boq_items ?? []);
+    }
+
+    // Fungsi Pengisi Data Master Designator ke Field Input
+    function fillDesignatorData(select) {
+        const row = select.closest('.designator-row');
+        const selected = select.options[select.selectedIndex];
+
+        // Mendukung input array untuk item baru (boq_item_name) dan edit lama (existing_item_name)
+        const itemNameInput = row.querySelector('input[name="boq_item_name[]"]') || row.querySelector('input[name="existing_item_name[]"]');
+        const unitInput = row.querySelector('input[name="boq_unit[]"]') || row.querySelector('input[name="existing_unit[]"]');
+
+        if (itemNameInput) itemNameInput.value = selected.dataset.item || '';
+        if (unitInput) unitInput.value = selected.dataset.unit || '';
+    }
+
+    // Merender Daftar BOQ yang sudah ada pada Modal Edit (Dilengkapi Dropdown TomSelect)
+    function renderEditBoqItems(items) {
+        const container = document.getElementById('designatorContainer');
+        container.innerHTML = '';
+
+        if (items.length === 0) {
+            addDesignatorRow();
+            return;
+        }
+
+        items.forEach((item) => {
+            const row = `
+                <div class="grid grid-cols-12 gap-2 designator-row items-center border-b border-gray-100 dark:border-gray-800 pb-2 mb-2">
+                    <input type="hidden" name="existing_boq_id[]" value="${item.id_boq ?? ''}">
+
+                    <div class="col-span-12 sm:col-span-4">
+                        <select name="existing_designator_id[]"
+                                onchange="fillDesignatorData(this)"
+                                class="designator-select-edit h-10 text-sm">
+                            <option value="${item.designator_id ?? ''}" 
+                                    data-item="${item.item_name ?? ''}" 
+                                    data-unit="${item.unit ?? ''}" 
+                                    selected>
+                                ${item.designator ?? ''} - ${item.item_name ?? ''}
+                            </option>
+                            @foreach($designators as $designator)
+                                <option value="{{ $designator->id_designator }}"
+                                        data-designator="{{ $designator->designator }}"
+                                        data-item="{{ $designator->item_name }}"
+                                        data-unit="{{ $designator->unit }}">
+                                    {{ $designator->designator }} - {{ $designator->item_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <input type="text"
+                           name="existing_item_name[]"
+                           value="${item.item_name ?? ''}"
+                           readonly
+                           class="col-span-12 sm:col-span-4 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800 focus:ring-0">
+
+                    <input type="text"
+                           name="existing_unit[]"
+                           value="${item.unit ?? ''}"
+                           readonly
+                           class="col-span-6 sm:col-span-2 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800 focus:ring-0 text-center">
+
+                    <input type="number"
+                           step="0.01"
+                           name="existing_qty[]"
+                           value="${item.quantity_plan ?? 0}"
+                           class="col-span-6 sm:col-span-2 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm text-center">
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', row);
+        });
+
+        // Inisialisasi TomSelect pada kolom dropdown edit
+        container.querySelectorAll('.designator-select-edit').forEach(select => {
+            initSingleDesignatorSearch(select);
+        });
+    }
+
+    // Fungsi Tambah Baris Designator Baru
+    function addDesignatorRow() {
+        const container = document.getElementById('designatorContainer');
+        const row = `
+            <div class="grid grid-cols-12 gap-2 designator-row mt-2">
+                <div class="col-span-12 sm:col-span-4">
+                    <select name="designator_id[]"
+                            onchange="fillDesignatorData(this)"
+                            class="designator-select h-10 text-sm">
+                        <option value="">Pilih designator baru...</option>
+                        @foreach($designators as $designator)
+                            <option value="{{ $designator->id_designator }}"
+                                    data-designator="{{ $designator->designator }}"
+                                    data-item="{{ $designator->item_name }}"
+                                    data-unit="{{ $designator->unit }}">
+                                {{ $designator->designator }} - {{ $designator->item_name }}
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <input type="text"
+                       name="boq_item_name[]"
+                       placeholder="Item pekerjaan"
+                       readonly
+                       class="col-span-12 sm:col-span-4 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
+
+                <input type="text"
+                       name="boq_unit[]"
+                       placeholder="Satuan"
+                       readonly
+                       class="col-span-5 sm:col-span-2 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800 text-center">
+
+                <input type="number"
+                       step="1"
+                       name="boq_qty[]"
+                       placeholder="Qty Plan"
+                       class="col-span-5 sm:col-span-1 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm text-center">
+
+                <button type="button"
+                        onclick="removeDesignatorRow(this)"
+                        class="col-span-2 sm:col-span-1 h-10 rounded-xl text-gray-400 hover:text-red-500 text-xl font-bold flex items-center justify-center">
+                    ×
+                </button>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', row);
+        const newRow = container.lastElementChild;
+        const newSelect = newRow.querySelector('.designator-select');
+        initSingleDesignatorSearch(newSelect);
+    }
+
+    function removeDesignatorRow(button) {
+        const rows = document.querySelectorAll('.designator-row');
+        if (rows.length <= 1) {
+            const row = button.closest('.designator-row');
+            if(row.querySelector('select').tomselect) {
+                row.querySelector('select').tomselect.clear();
+            }
+            row.querySelector('input[name="boq_item_name[]"]').value = '';
+            row.querySelector('input[name="boq_unit[]"]').value = '';
+            row.querySelector('input[name="boq_qty[]"]').value = '';
+            return;
+        }
+        button.closest('.designator-row').remove();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initDesignatorSearch();
+    });
+
+    function initDesignatorSearch() {
+        document.querySelectorAll('.designator-select').forEach(select => {
+            initSingleDesignatorSearch(select);
+        });
+    }
+
+    function initSingleDesignatorSearch(select) {
+        if (!select || select.tomselect) return;
+        new TomSelect(select, {
+            create: false,
+            placeholder: 'Ketik designator...',
+            maxOptions: 1000,
+            searchField: ['text'],
+            sortField: { field: 'text', direction: 'asc' },
+            onChange: function () { fillDesignatorData(select); }
+        });
+    }
+
+    function closeProjectModal() {
+        document.getElementById('projectModal').classList.add('hidden');
+        document.getElementById('projectModal').classList.remove('flex');
+    }
+
+    // ---------------------------------------------------------
+    // FUNGSI AKSI BARIS TABEL: EDIT & HAPUS DESIGNATOR
+    // ---------------------------------------------------------
+    function editBoqItem(idBoq, designator, plan) {
+        // Karena sistem edit sudah tergabung dalam Modal Utama "Edit Project", 
+        // Anda bisa langsung menampilkan alert instruksi atau otomatis memicu modal utama
+        alert("Silakan klik tombol 'Edit Project' berwarna putih di pojok kanan bawah modal detail ini untuk mengganti designator atau menyesuaikan volume plan.");
+    }
+
+    function deleteBoqItem(idBoq) {
+        if (!confirm('Peringatan: Yakin ingin menghapus item designator ini dari proyek? (Tindakan ini tidak bisa dibatalkan)')) {
+            return;
+        }
+
+        // Membuat form POST (spoofed menjadi DELETE) secara dinamis
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/projects/boq/${idBoq}`; // Menunjuk ke route destroyBoq yang baru kita buat
+
+        const csrfToken = document.createElement('input');
+        csrfToken.type = 'hidden';
+        csrfToken.name = '_token';
+        csrfToken.value = '{{ csrf_token() }}';
+
+        const methodOverride = document.createElement('input');
+        methodOverride.type = 'hidden';
+        methodOverride.name = '_method';
+        methodOverride.value = 'DELETE';
+
+        form.appendChild(csrfToken);
+        form.appendChild(methodOverride);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    // ---------------------------------------------------------
+    // KUMPULAN FUNGSI LAINNYA
+    // ---------------------------------------------------------
+    function getProjectLocation() {
+        if (!navigator.geolocation) {
+            alert('Browser tidak mendukung GPS / Geolocation');
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                document.getElementById('latitude').value = position.coords.latitude.toFixed(8);
+                document.getElementById('longitude').value = position.coords.longitude.toFixed(8);
+            },
+            function(error) {
+                alert('Gagal mengambil lokasi. Pastikan izin lokasi browser aktif.');
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    }
+
+    function openKmlModal(projectId, projectName) {
+        const modal = document.getElementById('kmlModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        document.getElementById('kmlForm').action = `/projects/${projectId}/upload-kml`;
+        document.getElementById('kmlProjectName').innerText = projectName;
+    }
+
+    function closeKmlModal() {
+        const modal = document.getElementById('kmlModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    function toggleMenu(id) {
+        document.querySelectorAll('[id^="menu-"]').forEach(menu => {
+            if(menu.id !== id) menu.classList.add('hidden');
+        });
+        document.getElementById(id).classList.toggle('hidden');
+    }
+
+    document.addEventListener('click', function(e){
+        if(!e.target.closest('.relative')){
+            document.querySelectorAll('[id^="menu-"]').forEach(menu=>{
+                menu.classList.add('hidden');
+            });
+        }
+    });
 </script>
 
 <script>
+    // WINDOW BOQ ITEMS SEEDER
     window.projectBoqItems = {
         @foreach($projects as $project)
             "{{ $project->id_project }}": [
                 @foreach($project->boqItems as $boq)
                     {
+                        id_boq: @js($boq->id_boq ?? null),
+                        designator_id: @js($boq->designator_id ?? null),
                         designator: @js($boq->designator ?? '-'),
                         item_name: @js($boq->item_name ?? '-'),
                         unit: @js($boq->unit ?? '-'),
@@ -1527,291 +1556,170 @@ function fillDesignatorData(select)
 </script>
 
 <script>
-    function openBoqModal(projectId, projectName)
-{
-    const modal = document.getElementById('boqModal');
-
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-
-    document.getElementById('boq_project_id').value = projectId;
-    document.getElementById('boqProjectName').innerText = projectName;
-
-    renderExistingBoq(projectId);
-
-    resetBoqRows();
-
-    setTimeout(() => {
-        initBoqDesignatorSearch();
-    }, 50);
-}
-
-function closeBoqModal()
-{
-    const modal = document.getElementById('boqModal');
-
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-}
-
-function renderExistingBoq(projectId)
-{
-    const list = document.getElementById('existingBoqList');
-    const count = document.getElementById('existingBoqCount');
-
-    const items = window.projectBoqItems[projectId] || [];
-
-    count.innerText = `${items.length} item`;
-
-    if (items.length === 0) {
-        list.innerHTML = `
-            <div class="p-4 text-sm text-gray-500 text-center">
-                Belum ada item designator pada project ini.
-            </div>
-        `;
-
-        return;
-    }
-
-    list.innerHTML = items.map((item) => {
-        return `
-            <div class="p-3 flex items-start justify-between gap-3">
-
-                <div class="min-w-0">
-
-                    <p class="text-sm font-bold text-gray-900 dark:text-white truncate">
-                        ${item.item_name}
-                    </p>
-
-                    <p class="text-xs text-gray-500 mt-0.5">
-                        ${item.designator} · ${item.unit}
-                    </p>
-
-                </div>
-
-                <span class="shrink-0 px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 text-[11px] font-bold">
-                    Plan ${item.quantity_plan}
-                </span>
-
-            </div>
-        `;
-    }).join('');
-}
-
-function resetBoqRows()
-{
-    const container = document.getElementById('boqContainer');
-    const rows = container.querySelectorAll('.boq-row');
-
-    rows.forEach((row, index) => {
-        if (index > 0) {
-            row.remove();
-        }
-    });
-
-    const firstRow = container.querySelector('.boq-row');
-
-    if (!firstRow) {
-        return;
-    }
-
-    const select = firstRow.querySelector('select');
-
-    if (select && select.tomselect) {
-        select.tomselect.clear();
-    } else if (select) {
-        select.value = '';
-    }
-
-    firstRow.querySelector('input[name="boq_item_name[]"]').value = '';
-    firstRow.querySelector('input[name="boq_unit[]"]').value = '';
-    firstRow.querySelector('input[name="boq_qty[]"]').value = '';
-}
-
-function fillBoqDesignatorData(select)
-{
-    const row = select.closest('.boq-row');
-    const selected = select.options[select.selectedIndex];
-
-    row.querySelector('input[name="boq_item_name[]"]').value = selected.dataset.item || '';
-    row.querySelector('input[name="boq_unit[]"]').value = selected.dataset.unit || '';
-}
-
-function addBoqRow()
-{
-    const container = document.getElementById('boqContainer');
-
-    const row = `
-        <div class="grid grid-cols-12 gap-2 boq-row">
-
-            <select name="designator_id[]"
-                    onchange="fillBoqDesignatorData(this)"
-                    class="boq-designator-select col-span-12 sm:col-span-4 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
-                <option value="">Cari designator...</option>
-
-                @foreach($designators as $designator)
-                    <option value="{{ $designator->id_designator }}"
-                            data-designator="{{ $designator->designator }}"
-                            data-item="{{ $designator->item_name }}"
-                            data-unit="{{ $designator->unit }}">
-                        {{ $designator->designator }} - {{ $designator->item_name }}
-                    </option>
-                @endforeach
-            </select>
-
-            <input type="text"
-                   name="boq_item_name[]"
-                   placeholder="Item pekerjaan"
-                   readonly
-                   class="col-span-12 sm:col-span-4 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
-
-            <input type="text"
-                   name="boq_unit[]"
-                   placeholder="Satuan"
-                   readonly
-                   class="col-span-5 sm:col-span-2 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
-
-            <input type="number"
-                   step="0.01"
-                   name="boq_qty[]"
-                   placeholder="0"
-                   class="col-span-5 sm:col-span-1 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
-
-            <button type="button"
-                    onclick="removeBoqRow(this)"
-                    class="col-span-2 sm:col-span-1 h-10 rounded-xl text-gray-400 hover:text-red-500 text-xl">
-                ×
-            </button>
-
-        </div>
-    `;
-
-    container.insertAdjacentHTML('beforeend', row);
-
-    const newRow = container.lastElementChild;
-    const newSelect = newRow.querySelector('.boq-designator-select');
-
-    initSingleBoqDesignatorSearch(newSelect);
-}
-
-function removeBoqRow(button)
-{
-    const rows = document.querySelectorAll('.boq-row');
-
-    if (rows.length <= 1) {
-        const row = button.closest('.boq-row');
-
-        const select = row.querySelector('select');
-
-        if (select.tomselect) {
-            select.tomselect.clear();
-        } else {
-            select.value = '';
-        }
-
-        row.querySelector('input[name="boq_item_name[]"]').value = '';
-        row.querySelector('input[name="boq_unit[]"]').value = '';
-        row.querySelector('input[name="boq_qty[]"]').value = '';
-
-        return;
-    }
-
-    button.closest('.boq-row').remove();
-}
-
-    function initSingleBoqDesignatorSearch(select)
-        {
-            if (!select) return;
-
-            if (select.tomselect) return;
-
-            new TomSelect(select, {
-                create: false,
-                placeholder: 'Cari designator...',
-                maxOptions: 1000,
-                searchField: ['text'],
-                sortField: {
-                    field: 'text',
-                    direction: 'asc'
-                },
-                onChange: function () {
-                    fillBoqDesignatorData(select);
-                }
-            });
-        }
-
-    function initBoqDesignatorSearch()
-    {
-        document.querySelectorAll('.boq-designator-select').forEach(function(select) {
-            initSingleBoqDesignatorSearch(select);
-        });
-    }
-
-    function getProjectLocation()
-    {
-        if (!navigator.geolocation) {
-            alert('Browser tidak mendukung GPS / Geolocation');
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                document.getElementById('latitude').value = position.coords.latitude.toFixed(8);
-                document.getElementById('longitude').value = position.coords.longitude.toFixed(8);
-            },
-            function(error) {
-                alert('Gagal mengambil lokasi. Pastikan izin lokasi browser aktif.');
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            }
-        );
-    }
-
-    function openKmlModal(projectId, projectName)
-    {
-        const modal = document.getElementById('kmlModal');
-
+    // FUNGSI MODAL BOQ (TAMBAH DESIGNATOR DARI LUAR)
+    function openBoqModal(projectId, projectName) {
+        const modal = document.getElementById('boqModal');
         modal.classList.remove('hidden');
         modal.classList.add('flex');
 
-        document.getElementById('kmlForm').action = `/projects/${projectId}/upload-kml`;
-        document.getElementById('kmlProjectName').innerText = projectName;
+        document.getElementById('boq_project_id').value = projectId;
+        document.getElementById('boqProjectName').innerText = projectName;
+
+        renderExistingBoq(projectId);
+        resetBoqRows();
+
+        setTimeout(() => {
+            initBoqDesignatorSearch();
+        }, 50);
     }
 
-    function closeKmlModal()
-    {
-        const modal = document.getElementById('kmlModal');
-
+    function closeBoqModal() {
+        const modal = document.getElementById('boqModal');
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
-</script>
 
-<script>
-function toggleMenu(id)
-{
-    document.querySelectorAll('[id^="menu-"]').forEach(menu => {
+    function renderExistingBoq(projectId) {
+        const list = document.getElementById('existingBoqList');
+        const count = document.getElementById('existingBoqCount');
+        const items = window.projectBoqItems[projectId] || [];
 
-        if(menu.id !== id){
-            menu.classList.add('hidden');
+        count.innerText = `${items.length} item`;
+
+        if (items.length === 0) {
+            list.innerHTML = `<div class="p-4 text-sm text-gray-500 text-center">Belum ada item designator pada project ini.</div>`;
+            return;
         }
 
-    });
+        list.innerHTML = items.map((item) => {
+            return `
+                <div class="p-3 flex items-start justify-between gap-3 border-b border-gray-100 dark:border-gray-800">
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold text-gray-900 dark:text-white truncate">${item.item_name}</p>
+                        <p class="text-xs text-gray-500 mt-0.5">${item.designator} · ${item.unit}</p>
+                    </div>
+                    <span class="shrink-0 px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 text-[11px] font-bold">
+                        Plan ${item.quantity_plan}
+                    </span>
+                </div>
+            `;
+        }).join('');
+    }
 
-    document.getElementById(id).classList.toggle('hidden');
-}
+    function resetBoqRows() {
+        const container = document.getElementById('boqContainer');
+        const rows = container.querySelectorAll('.boq-row');
 
-document.addEventListener('click', function(e){
+        rows.forEach((row, index) => {
+            if (index > 0) row.remove();
+        });
 
-    if(!e.target.closest('.relative')){
-        document.querySelectorAll('[id^="menu-"]').forEach(menu=>{
-            menu.classList.add('hidden');
+        const firstRow = container.querySelector('.boq-row');
+        if (!firstRow) return;
+
+        const select = firstRow.querySelector('select');
+        if (select && select.tomselect) {
+            select.tomselect.clear();
+        } else if (select) {
+            select.value = '';
+        }
+
+        firstRow.querySelector('input[name="boq_item_name[]"]').value = '';
+        firstRow.querySelector('input[name="boq_unit[]"]').value = '';
+        firstRow.querySelector('input[name="boq_qty[]"]').value = '';
+    }
+
+    function fillBoqDesignatorData(select) {
+        const row = select.closest('.boq-row');
+        const selected = select.options[select.selectedIndex];
+        row.querySelector('input[name="boq_item_name[]"]').value = selected.dataset.item || '';
+        row.querySelector('input[name="boq_unit[]"]').value = selected.dataset.unit || '';
+    }
+
+    function addBoqRow() {
+        const container = document.getElementById('boqContainer');
+        const row = `
+            <div class="grid grid-cols-12 gap-2 boq-row mt-2">
+                <select name="designator_id[]"
+                        onchange="fillBoqDesignatorData(this)"
+                        class="boq-designator-select col-span-12 sm:col-span-4 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+                    <option value="">Cari designator...</option>
+                    @foreach($designators as $designator)
+                        <option value="{{ $designator->id_designator }}"
+                                data-designator="{{ $designator->designator }}"
+                                data-item="{{ $designator->item_name }}"
+                                data-unit="{{ $designator->unit }}">
+                            {{ $designator->designator }} - {{ $designator->item_name }}
+                        </option>
+                    @endforeach
+                </select>
+
+                <input type="text"
+                       name="boq_item_name[]"
+                       placeholder="Item pekerjaan"
+                       readonly
+                       class="col-span-12 sm:col-span-4 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800">
+
+                <input type="text"
+                       name="boq_unit[]"
+                       placeholder="Satuan"
+                       readonly
+                       class="col-span-5 sm:col-span-2 h-10 rounded-xl border-gray-300 dark:border-gray-700 text-sm bg-gray-50 dark:bg-gray-800 text-center">
+
+                <input type="number"
+                       step="0.01"
+                       name="boq_qty[]"
+                       placeholder="0"
+                       class="col-span-5 sm:col-span-1 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm text-center">
+
+                <button type="button"
+                        onclick="removeBoqRow(this)"
+                        class="col-span-2 sm:col-span-1 h-10 rounded-xl text-gray-400 hover:text-red-500 text-xl font-bold flex items-center justify-center">
+                    ×
+                </button>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', row);
+        const newRow = container.lastElementChild;
+        const newSelect = newRow.querySelector('.boq-designator-select');
+        initSingleBoqDesignatorSearch(newSelect);
+    }
+
+    function removeBoqRow(button) {
+        const rows = document.querySelectorAll('.boq-row');
+        if (rows.length <= 1) {
+            const row = button.closest('.boq-row');
+            const select = row.querySelector('select');
+            if (select.tomselect) select.tomselect.clear();
+            else select.value = '';
+
+            row.querySelector('input[name="boq_item_name[]"]').value = '';
+            row.querySelector('input[name="boq_unit[]"]').value = '';
+            row.querySelector('input[name="boq_qty[]"]').value = '';
+            return;
+        }
+        button.closest('.boq-row').remove();
+    }
+
+    function initSingleBoqDesignatorSearch(select) {
+        if (!select || select.tomselect) return;
+        new TomSelect(select, {
+            create: false,
+            placeholder: 'Cari designator...',
+            maxOptions: 1000,
+            searchField: ['text'],
+            sortField: { field: 'text', direction: 'asc' },
+            onChange: function () { fillBoqDesignatorData(select); }
         });
     }
 
-});
+    function initBoqDesignatorSearch() {
+        document.querySelectorAll('.boq-designator-select').forEach(select => {
+            initSingleBoqDesignatorSearch(select);
+        });
+    }
 </script>
+
+
 

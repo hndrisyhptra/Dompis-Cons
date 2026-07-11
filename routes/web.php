@@ -59,12 +59,11 @@ Route::middleware(['auth'])->group(function () {
     
     /*
     |--------------------------------------------------------------------------
-    | DASHBOARD PM
+    | REKAP PROGRESS MENU ROLE ADMIN
     |--------------------------------------------------------------------------
     */
     
-    Route::get('/dashboard-pm', [DashboardPmController::class, 'index'])
-        ->name('dashboard.pm.index');
+   Route::get('/admin/rekap-progress', [DashboardController::class, 'rekapProgress'])->name('admin.rekap_progress');
         
     /*
     |--------------------------------------------------------------------------
@@ -143,6 +142,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('/boq/store', [ProjectController::class, 'storeBoq'])
         ->name('boq.store');
+    
+    // Route untuk menghapus item designator secara satuan
+    Route::delete('/projects/boq/{id}', [ProjectController::class, 'destroyBoq'])
+        ->name('projects.boq.destroy');
 
     /*
     |--------------------------------------------------------------------------
@@ -429,7 +432,7 @@ Route::middleware(['auth'])->group(function () {
 
     /*
 |--------------------------------------------------------------------------
-| DASHBOARD PM
+| DASHBOARD PM REAL ROLE PM
 |--------------------------------------------------------------------------
 */
 
@@ -457,7 +460,7 @@ Route::middleware(['auth'])->group(function () {
         return 'Halaman Assign Waspang (Under Construction)'; 
     })->name('assign.waspang');
 });
-    
+
 
 
 

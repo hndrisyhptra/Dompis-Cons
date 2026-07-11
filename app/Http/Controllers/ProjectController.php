@@ -87,9 +87,9 @@ class ProjectController extends Controller
             ->get();
 
         $totalProject = Project::count();
-        $activeProject = Project::where('status', 'active')->count();
-        $waitingUt = Project::where('status', 'waiting_ut')->count();
-        $completedProject = Project::where('status', 'completed')->count();
+        $activeProject = Project::where('status_project', 'active')->count();
+        $completedProject = Project::where('status_project', 'close')->count();
+        $waitingUt = Project::where('status_project', 'bast')->count();
 
         return view('admin.projects.index', compact(
             'projects',
@@ -205,7 +205,6 @@ class ProjectController extends Controller
             'sto' => $request->sto,
             'mitra_name' => $request->mitra_name,
             'jenis_eksekusi' => $request->jenis_eksekusi,
-            'status' => 'active',
             'latitude' => $request->latitude,
             'longitude' => $request->longitude,
             'location_address' => $request->location_address,
@@ -261,78 +260,92 @@ class ProjectController extends Controller
     {
         $project = Project::findOrFail($id);
 
+        // PERBAIKAN VALIDASI: customer_id dan status_project dilonggarkan
+        // agar tidak menyebabkan silent fail / gagal simpan
         $request->validate([
-            'customer_id' => 'required|exists:customers,id_customer',
+            'customer_id' => 'nullable|exists:customers,id_customer',
             'project_name' => 'required|string|max:255',
             'branch' => 'nullable|string|max:255',
             'sto' => 'nullable|string|max:20',
             'mitra_name' => 'nullable|string|max:100',
-            'jenis_eksekusi' => 'required|in:plan,survey,ogp,finish',
-            'status' => 'required|in:active,completed,waiting_ut',
+            'status_project' => 'nullable|in:init,active,close,bast',
         ]);
 
-        $project->update($request->only([
-            'customer_id',
-            'project_name',
-            'branch',
-            'sto',
-            'mitra_name',
-            'jenis_eksekusi',
-            'status',
-            'latitude',
-            'longitude',
-            'location_address',
-        ]));
+        // Cek apakah form mengirim parameter 'status_project' atau hanya 'status'
+        $status = $request->input('status_project') ?? $request->input('status') ?? $project->status_project;
 
-        // UPDATE BOQ LAMA
+        $project->update([
+            'customer_id' => $request->input('customer_id', $project->customer_id),
+            'project_name' => $request->project_name,
+            'branch' => $request->branch,
+            'sto' => $request->sto,
+            'mitra_name' => $request->mitra_name,
+            'status_project' => $status,
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
+            'location_address' => $request->location_address,
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | SINKRONISASI & UPDATE BOQ LAMA
+        |--------------------------------------------------------------------------
+        */
         if ($request->existing_boq_id) {
             foreach ($request->existing_boq_id as $index => $boqId) {
+                
+                $updateData = [
+                    'quantity_plan' => $request->existing_qty[$index] ?? 0,
+                ];
+
+                // Tangkap perubahan designator baru jika user mengubah dropdown
+                if (isset($request->existing_designator_id[$index]) && !empty($request->existing_designator_id[$index])) {
+                    $newDesignatorId = $request->existing_designator_id[$index];
+                    
+                    $designator = Designator::where('id_designator', $newDesignatorId)->first();
+
+                    if ($designator) {
+                        $updateData['designator_id'] = $designator->id_designator;
+                        $updateData['designator']    = $designator->designator;
+                        $updateData['item_name']     = $designator->item_name;
+                        $updateData['unit']          = $designator->unit;
+                    }
+                }
+
                 BoqItem::where('id_boq', $boqId)
                     ->where('project_id', $project->id_project)
-                    ->update([
-                        'quantity_plan' => $request->existing_qty[$index] ?? 0,
-                    ]);
+                    ->update($updateData);
             }
         }
 
-        // TAMBAH DESIGNATOR BARU DARI MODAL EDIT
+        /*
+        |--------------------------------------------------------------------------
+        | TAMBAH DESIGNATOR BARU DARI MODAL EDIT
+        |--------------------------------------------------------------------------
+        */
         if ($request->designator_id) {
-
-            // Ambil LOP otomatis (1 Project = 1 LOP)
             $lop = $project->lop;
 
             foreach ($request->designator_id as $index => $designatorId) {
+                if (!$designatorId) continue;
 
-                if (!$designatorId) {
-                    continue;
-                }
+                $designator = Designator::where('id_designator', $designatorId)->first();
+                if (!$designator) continue;
 
-                $designator = Designator::forCustomer($project->customer_id)
-                    ->where('id_designator', $designatorId)
-                    ->first();
-
-                if (!$designator) {
-                    continue;
-                }
-
-                // Hindari duplicate designator
-                $exists = BoqItem::where('lop_id', $lop?->id_lop)
+                // Cek duplicate BOQ di dalam project ini
+                $exists = BoqItem::where('project_id', $project->id_project)
                     ->where('designator_id', $designator->id_designator)
                     ->exists();
 
-                if ($exists) {
-                    continue;
-                }
+                if ($exists) continue;
 
                 BoqItem::create([
                     'project_id'      => $project->id_project,
                     'lop_id'          => $lop?->id_lop,
-
                     'designator_id'   => $designator->id_designator,
                     'designator'      => $designator->designator,
                     'item_name'       => $designator->item_name,
                     'unit'            => $designator->unit,
-
                     'quantity_plan'   => $request->boq_qty[$index] ?? 0,
                     'quantity_actual' => 0,
                 ]);
@@ -348,6 +361,21 @@ public function destroy($id)
         $project->delete();
 
         return back()->with('success', 'Project berhasil dihapus');
+    }
+
+// FUNGSI KHUSUS MENGHAPUS ITEM DESIGNATOR SATUAN
+    public function destroyBoq($id)
+    {
+        $boqItem = BoqItem::findOrFail($id);
+        
+        // Opsional: Cek jika BOQ sudah memiliki eviden, cegah penghapusan
+        if ($boqItem->quantity_actual > 0) {
+            return back()->with('error', 'Item ini tidak bisa dihapus karena sudah memiliki progres aktual lapangan.');
+        }
+
+        $boqItem->delete();
+
+        return back()->with('success', 'Item Designator berhasil dihapus dari project.');
     }
 
 public function importCsv(Request $request)
@@ -367,7 +395,7 @@ public function importCsv(Request $request)
             'sto',
             'mitra_name',
             'jenis_eksekusi',
-            'status',
+            'status_project',
         ];
 
         if ($header !== $requiredHeader) {
@@ -379,8 +407,13 @@ public function importCsv(Request $request)
             );
         }
 
-        $allowedJenis = ['plan', 'survey', 'ogp', 'finish'];
-        $allowedStatus = ['active', 'completed', 'waiting_ut'];
+        //$allowedJenis = ['plan', 'survey', 'ogp', 'finish'];
+        $allowedStatus = [
+            'init',
+            'active',
+            'close',
+            'bast'
+        ];
 
         $total = 0;
 
@@ -390,14 +423,14 @@ public function importCsv(Request $request)
                 continue;
             }
 
-            $jenisEksekusi = strtolower(trim($row[4]));
-            $status = strtolower(trim($row[5]));
+            //$jenisEksekusi = strtolower(trim($row[4]));
+            $statusProject = strtolower(trim($row[5]));
 
             if (!in_array($jenisEksekusi, $allowedJenis)) {
                 continue;
             }
 
-            if (!in_array($status, $allowedStatus)) {
+            if (!in_array($statusProject, $allowedStatus)) {
                 continue;
             }
 
@@ -407,8 +440,7 @@ public function importCsv(Request $request)
                 'branch' => trim($row[1]),
                 'sto' => trim($row[2]),
                 'mitra_name' => trim($row[3]),
-                'jenis_eksekusi' => $jenisEksekusi,
-                'status' => $status,
+                'status_project' => $statusProject,
             ]);
 
             $total++;
@@ -565,57 +597,97 @@ public function importCsv(Request $request)
         ])->find($evidence->project_id);
 
         if ($project) {
+
             $summary = $project->progressSummary();
 
             /*
             |--------------------------------------------------------------------------
-            | SINKRONISASI OTOMATIS STATUS TABEL LOPS
+            | UPDATE STATUS PROGRESS LOP
             |--------------------------------------------------------------------------
             */
-            $dbStatus = null;
+
             if (($summary['progress'] ?? 0) == 100) {
-                // Jika web mendeteksi 100%, paksa DB tabel lops menjadi finishing
-                $dbStatus = 'finishing';
+
+                Lop::where('project_id', $project->id_project)
+                    ->update([
+                        'status_progress' => 'finishing',
+                    ]);
+
+                /*
+                |--------------------------------------------------------------------------
+                | PROJECT CLOSE
+                |--------------------------------------------------------------------------
+                */
+
+                $project->update([
+                    'status_project' => 'close',
+                ]);
+
             } elseif ($evidence->stage == 'persiapan') {
-                // Jika tahapan persiapan di-approve (tapi belum 100%), naikkan ke instalasi
-                $dbStatus = 'instalasi';
+
+                Lop::where('project_id', $project->id_project)
+                    ->update([
+                        'status_progress' => 'instalasi',
+                    ]);
+
+                $project->update([
+                    'status_project' => 'active',
+                ]);
+
+            } elseif ($evidence->stage == 'instalasi') {
+
+                Lop::where('project_id', $project->id_project)
+                    ->update([
+                        'status_progress' => 'pengukuran',
+                    ]);
+
+                $project->update([
+                    'status_project' => 'active',
+                ]);
+
+            } elseif ($evidence->stage == 'pengukuran') {
+
+                Lop::where('project_id', $project->id_project)
+                    ->update([
+                        'status_progress' => 'finishing',
+                    ]);
+
+                $project->update([
+                    'status_project' => 'active',
+                ]);
+
             }
 
-            if ($dbStatus) {
-                Lop::where('project_id', $project->id_project)->update([
-                    'status_progress' => $dbStatus
-                ]);
-            }
-            // ------------------------------------------------------------------------
+            /*
+            |--------------------------------------------------------------------------
+            | PROJECT COMPLETE ACTIVITY
+            |--------------------------------------------------------------------------
+            */
 
             $alreadyCompleteLogged = ProjectActivityLog::where('project_id', $project->id_project)
                 ->where('activity_type', 'project_completed')
                 ->exists();
 
             if (($summary['progress'] ?? 0) == 100 && !$alreadyCompleteLogged) {
-                $project->update([
-                    'status' => 'completed',
-                ]);
 
                 ProjectActivityService::log([
-                    'project_id' => $project->id_project,
-                    'lop_id' => $lopId,
-                    'activity_type' => 'project_completed',
-                    'title' => 'Project Complete',
-                    'description' => 'Seluruh eviden wajib sudah approved. Project mencapai progress 100%.',
+                    'project_id'   => $project->id_project,
+                    'lop_id'       => $lopId,
+                    'activity_type'=> 'project_completed',
+                    'title'        => 'Project Complete',
+                    'description'  => 'Seluruh eviden wajib telah disetujui.',
                     'status_after' => 'completed',
                     'meta' => [
                         'progress' => 100,
-                        'stage' => $summary['stage'] ?? null,
                     ],
                 ]);
 
                 Notification::create([
-                    'user_id' => $evidence->uploaded_by,
-                    'project_id' => $evidence->project_id,
-                    'type' => 'ready_ut',
-                    'title' => 'Project Ready UT',
-                    'message' => 'Project "' . $evidence->project->project_name . '" siap uji terima.',
+                    'user_id'      => $evidence->uploaded_by,
+                    'project_id'   => $evidence->project_id,
+                    'type'         => 'ready_ut',
+                    'title'        => 'Project Ready UT',
+                    'message'      => 'Project "' . $evidence->project->project_name . '" telah selesai dan siap UT.',
                     'redirect_url' => route('waspang.projects.show', $evidence->project_id),
                 ]);
             }
@@ -702,7 +774,7 @@ public function importCsv(Request $request)
         Evidence::where('project_id', $request->project_id)
             ->where('status', 'pending')
             ->update([
-                'status' => $status,
+                'status_project' => $statusProject,
             ]);
 
         return back()->with('success', 'Bulk review eviden berhasil diproses');

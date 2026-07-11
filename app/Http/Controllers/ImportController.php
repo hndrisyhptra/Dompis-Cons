@@ -44,7 +44,7 @@ class ImportController extends Controller
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
         $request->validate([
-            'file' => 'required|mimes:xlsx,xls,csv',
+            'file' => 'required|file|extensions:xlsx,xls,csv',
         ]);
 
         $file = $request->file('file');
@@ -200,14 +200,18 @@ class ImportController extends Controller
             $pidForProject = $pid ?: $pidSap;
 
             $projectPayload = [
-                'pid' => $pidForProject,
-                'pid_sap' => $pidSap,
-                'project_name' => $namaLop,
-                'program' => $this->cleanValue($data['program'] ?? null),
-                'execution_type' => $executionType,
-                'status_project' => $statusProject,
-            ];
+                'pid'             => $pidForProject,
+                'pid_sap'         => $pidSap,
+                'project_name'    => $namaLop,
+                'program'         => $this->cleanValue($data['program'] ?? null),
 
+                'branch'          => $this->cleanValue($data['branch'] ?? null),
+                'sto'             => $this->cleanValue($data['sto'] ?? null),
+                'mitra_name'      => $this->cleanValue($data['mitra_name'] ?? null),
+
+                'execution_type'  => $executionType,
+                'status_project'  => $statusProject,
+            ];
             $project = Project::where('pid_sap', $pidSap)->first();
 
             if (!$project && $pid) {

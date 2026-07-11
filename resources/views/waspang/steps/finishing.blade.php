@@ -212,10 +212,34 @@
                             {{ $boq->item_name }}
                         </h3>
 
-                        <p class="text-xs text-gray-500 truncate">
+                        <div class="mt-1 space-y-1">
+
+                        <p class="text-xs text-gray-500">
                             {{ $boq->designator ?? '-' }}
-                            · Plan {{ $boq->quantity_plan }} {{ $boq->unit }}
                         </p>
+
+                        <div class="flex items-center justify-between text-[11px]">
+
+                            <span class="text-blue-600 font-semibold">
+                                Plan :
+                                <span class="font-bold">
+                                    {{ number_format($boq->quantity_plan) }}
+                                </span>
+                                {{ $boq->unit }}
+                            </span>
+
+                            <span class="text-green-600 font-semibold">
+                                Actual :
+                                <span class="font-bold">
+                                    {{ number_format($boq->quantity_actual ?? 0) }}
+                                </span>
+                                {{ $boq->unit }}
+                            </span>
+
+                        </div>
+
+                    </div>
+
                     </div>
 
                     <div class="flex items-center gap-2 shrink-0">

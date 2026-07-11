@@ -103,9 +103,9 @@
                                 ${project.program}
                             </span>
                             <h4 class="text-sm font-bold text-gray-900 mt-2 mb-1">${project.project_name}</h4>
-                            <p class="text-xs text-gray-500 mb-1"><b>ID LOP:</b> ${project.id_lop}</p>
-                            <p class="text-xs text-gray-500 mb-1"><b>STO / Branch:</b> ${project.sto} / ${project.branch}</p>
-                            <p class="text-xs text-gray-500 mb-2"><b>Status Progres:</b> <span class="capitalize text-indigo-600 font-semibold">${project.status_progress}</span></p>
+                            <p class="text-xs text-gray-500 mb-1"><b>ID IHLD:</b> ${project.id_ihld}</p>
+                            <p class="text-xs text-gray-500 mb-1"><b>Branch - STO:</b> ${project.branch} - ${project.sto}</p>
+                            <p class="text-xs text-gray-500 mb-2"><b>Status Progres:</b> <span class="capitalize text-indigo-600 font-semibold">${project.status_progress === 'finishing' ? 'Finish' : project.status_progress}</span></p>
                             <hr class="my-2 border-gray-100" />
                             
                             <div class="space-y-1.5">

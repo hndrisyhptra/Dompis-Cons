@@ -24,7 +24,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4c0-.5.2-1 .6-1.4C5 2.2 5.5 2 6 2h12c.5 0 1 .2 1.4.6.4.4.6.9.6 1.4v18l-4-2-4 2-4-2-4 2z"/></svg>
                 </div>
             </div>
-            <p class="text-xs text-gray-500 mt-3">Total segmen proyek terintegrasi SAP</p>
+            <p class="text-xs text-gray-500 mt-3">Total segmen proyek terintegrasi</p>
         </div>
 
         <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm transition hover:shadow-md">
