@@ -106,7 +106,7 @@
                 <rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
         </div>
         <div>
-            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Target FO</p>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Panjang FO</p>
             <h3 class="text-xl font-black text-gray-900 dark:text-white mt-0.5">{{ number_format($totalKabelPlan, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">m</span></h3>
         </div>
     </div>
@@ -118,7 +118,7 @@
                 <rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
         </div>
         <div class="w-full">
-            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Aktual FO</p>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Aktual Penarikan FO</p>
             <div class="flex items-baseline justify-between gap-2 mt-0.5">
                 <h3 class="text-xl font-black text-gray-900 dark:text-white">{{ number_format($totalKabelActual, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">m</span></h3>
                 <span class="text-xs font-extrabold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">{{ number_format($totalKabelPersen, 1, ',', '.') }}%</span>
@@ -132,7 +132,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utility-pole-icon lucide-utility-pole"><path d="M12 2v20"/><path d="M2 5h20"/><path d="M3 3v2"/><path d="M7 3v2"/><path d="M17 3v2"/><path d="M21 3v2"/><path d="m19 5-7 7-7-7"/></svg>
         </div>
         <div>
-            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Target Tiang</p>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Target Tiang</p>
             <h3 class="text-xl font-black text-gray-900 dark:text-white mt-0.5">{{ number_format($totalTiangPlan, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">pcs</span></h3>
         </div>
     </div>
@@ -143,7 +143,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utility-pole-icon lucide-utility-pole"><path d="M12 2v20"/><path d="M2 5h20"/><path d="M3 3v2"/><path d="M7 3v2"/><path d="M17 3v2"/><path d="M21 3v2"/><path d="m19 5-7 7-7-7"/></svg>
         </div>
         <div class="w-full">
-            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Aktual Tiang</p>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Aktual Tanam Tiang</p>
             <div class="flex items-baseline justify-between gap-2 mt-0.5">
                 <h3 class="text-xl font-black text-gray-900 dark:text-white">{{ number_format($totalTiangActual, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">pcs</span></h3>
                 <span class="text-xs font-extrabold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/60 px-1.5 py-0.5 rounded-md">{{ number_format($totalTiangPersen, 1, ',', '.') }}%</span>
@@ -266,59 +266,121 @@
         @endif
     </div>
 
-    {{-- Ringkasan Status Proyek (Donut & Analytics) --}}
-    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-5 flex flex-col justify-between shadow-xs">
-        <div>
-            <h2 class="font-bold text-gray-900 dark:text-white text-sm uppercase tracking-wider mb-6 flex items-center gap-2">
-                <i class="fa-solid fa-chart-pie text-blue-600"></i> Klasifikasi Progres
-            </h2>
-            <div class="w-44 h-44 mx-auto relative mb-6">
-                <canvas id="summaryDonut"></canvas>
+    {{-- SISI KANAN: Kumpulan Card Summary (lg:col-span-1) --}}
+    <div class="flex flex-col gap-6">
+        
+        {{-- CARD 1 BARU: Ringkasan Filter & Halaman Ini --}}
+        <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-5 shadow-xs">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-bold text-gray-900 dark:text-white text-sm uppercase tracking-wider flex items-center gap-2">
+                    <i class="fa-solid fa-cubes-stacked text-blue-600"></i> Summary Halaman Ini
+                </h2>
+                {{-- Indikator menyala jika filter sedang aktif --}}
+                @if(request('program') || request('branch'))
+                    <span class="relative flex h-3 w-3">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                    </span>
+                @endif
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3">
+                {{-- Total Segmen / Project (Dinamis) --}}
+                <div class="col-span-2 bg-blue-50/50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-800/30 flex justify-between items-center mb-1">
+                    <span class="text-xs font-bold text-blue-800 dark:text-blue-400 uppercase">Segmen Tampil</span>
+                    <span class="font-black text-xl text-blue-600 dark:text-blue-300">{{ number_format($filterSegments, 0, ',', '.') }}</span>
+                </div>
+                
+                {{-- Box Plan FO (Dinamis) --}}
+                <div class="bg-gray-50 dark:bg-gray-950/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800/50">
+                    <div class="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wide">Target FO</div>
+                    <div class="font-mono font-bold text-gray-900 dark:text-white mt-1 text-sm">
+                        {{ number_format($filterKabelPlan, 0, ',', '.') }} <span class="text-[10px] font-normal text-gray-400">m</span>
+                    </div>
+                </div>
+                
+                {{-- Box Aktual FO (Dinamis) --}}
+                <div class="bg-amber-50/30 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-100 dark:border-amber-900/30 relative overflow-hidden">
+                    <div class="text-[10px] text-amber-600 dark:text-amber-500 font-bold uppercase tracking-wide">Aktual FO</div>
+                    <div class="font-mono font-bold text-amber-600 dark:text-amber-400 mt-1 text-sm">
+                        {{ number_format($filterKabelActual, 0, ',', '.') }} <span class="text-[10px] font-normal opacity-70">m</span>
+                    </div>
+                    <div class="absolute right-0 bottom-0 opacity-10">
+                        <i class="fa-solid fa-chart-line text-3xl mb-[-5px] mr-[-5px]"></i>
+                    </div>
+                </div>
+
+                {{-- Box Plan Tiang (Dinamis) --}}
+                <div class="bg-gray-50 dark:bg-gray-950/50 p-3 rounded-xl border border-gray-100 dark:border-gray-800/50">
+                    <div class="text-[10px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wide">Target Tiang</div>
+                    <div class="font-mono font-bold text-gray-900 dark:text-white mt-1 text-sm">
+                        {{ number_format($filterTiangPlan, 0, ',', '.') }} <span class="text-[10px] font-normal text-gray-400">pcs</span>
+                    </div>
+                </div>
+                
+                {{-- Box Aktual Tiang (Dinamis) --}}
+                <div class="bg-green-50/30 dark:bg-green-950/20 p-3 rounded-xl border border-green-100 dark:border-green-900/30 relative overflow-hidden">
+                    <div class="text-[10px] text-green-600 dark:text-green-500 font-bold uppercase tracking-wide">Aktual Tiang</div>
+                    <div class="font-mono font-bold text-green-600 dark:text-green-400 mt-1 text-sm">
+                        {{ number_format($filterTiangActual, 0, ',', '.') }} <span class="text-[10px] font-normal opacity-70">pcs</span>
+                    </div>
+                    <div class="absolute right-0 bottom-0 opacity-10">
+                        <i class="fa-solid fa-chart-line text-3xl mb-[-5px] mr-[-5px]"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- CARD 2: Klasifikasi Progres (Donut Chart) --}}
+        <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-5 shadow-xs">
+            <div>
+                <h2 class="font-bold text-gray-900 dark:text-white text-sm uppercase tracking-wider mb-5 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-blue-600"></i> Klasifikasi Progres
+                </h2>
+                <div class="w-40 h-40 mx-auto relative mb-5">
+                    <canvas id="summaryDonut"></canvas>
+                </div>
+            </div>
+            
+            @php 
+                $totalAll = array_sum($summaryStatus);
+                $pSelesai = $totalAll > 0 ? round(($summaryStatus['selesai'] / $totalAll) * 100, 1) : 0;
+                $pSedang = $totalAll > 0 ? round(($summaryStatus['sedang'] / $totalAll) * 100, 1) : 0;
+                $pRendah = $totalAll > 0 ? round(($summaryStatus['rendah'] / $totalAll) * 100, 1) : 0;
+                $pBelum = $totalAll > 0 ? round(($summaryStatus['belum'] / $totalAll) * 100, 1) : 0;
+            @endphp
+            
+            <div class="text-xs space-y-2.5">
+                <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
+                    <span class="text-green-600 dark:text-green-400 font-semibold flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-sm bg-emerald-500 inline-block"></span> Selesai (&ge; 100%)
+                    </span> 
+                    <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['selesai'] }} <span class="text-[10px] text-gray-400 font-normal ml-1">({{ $pSelesai }}%)</span></span>
+                </div>
+                
+                <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
+                    <span class="text-amber-500 dark:text-amber-400 font-semibold flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-sm bg-amber-500 inline-block"></span> Sedang (50 - 99%)
+                    </span> 
+                    <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['sedang'] }} <span class="text-[10px] text-gray-400 font-normal ml-1">({{ $pSedang }}%)</span></span>
+                </div>
+                
+                <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
+                    <span class="text-orange-400 dark:text-orange-300 font-semibold flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-sm bg-orange-400 inline-block"></span> Rendah (1 - 49%)
+                    </span> 
+                    <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['rendah'] }} <span class="text-[10px] text-gray-400 font-normal ml-1">({{ $pRendah }}%)</span></span>
+                </div>
+                
+                <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
+                    <span class="text-red-500 dark:text-red-400 font-semibold flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-sm bg-red-500 inline-block"></span> Belum Mulai
+                    </span> 
+                    <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['belum'] }} <span class="text-[10px] text-gray-400 font-normal ml-1">({{ $pBelum }}%)</span></span>
+                </div>
             </div>
         </div>
         
-        @php 
-            $totalAll = array_sum($summaryStatus);
-            $pSelesai = $totalAll > 0 ? round(($summaryStatus['selesai'] / $totalAll) * 100, 1) : 0;
-            $pSedang = $totalAll > 0 ? round(($summaryStatus['sedang'] / $totalAll) * 100, 1) : 0;
-            $pRendah = $totalAll > 0 ? round(($summaryStatus['rendah'] / $totalAll) * 100, 1) : 0;
-            $pBelum = $totalAll > 0 ? round(($summaryStatus['belum'] / $totalAll) * 100, 1) : 0;
-        @endphp
-        
-        <div class="text-xs space-y-3">
-            <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
-                <span class="text-green-600 dark:text-green-400 font-semibold flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-md bg-emerald-500 inline-block"></span> Selesai (&ge; 100%)
-                </span> 
-                <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['selesai'] }} <span class="text-[10px] text-gray-400 font-normal">({{ $pSelesai }}%)</span></span>
-            </div>
-            
-            <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
-                <span class="text-amber-500 dark:text-amber-400 font-semibold flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-md bg-amber-500 inline-block"></span> Sedang (50 - 99%)
-                </span> 
-                <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['sedang'] }} <span class="text-[10px] text-gray-400 font-normal">({{ $pSedang }}%)</span></span>
-            </div>
-            
-            <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
-                <span class="text-orange-400 dark:text-orange-300 font-semibold flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-md bg-orange-400 inline-block"></span> Rendah (1 - 49%)
-                </span> 
-                <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['rendah'] }} <span class="text-[10px] text-gray-400 font-normal">({{ $pRendah }}%)</span></span>
-            </div>
-            
-            <div class="flex justify-between items-center bg-gray-50 dark:bg-gray-950/50 p-2.5 rounded-xl border border-gray-100 dark:border-gray-800/40">
-                <span class="text-red-500 dark:text-red-400 font-semibold flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-md bg-red-500 inline-block"></span> Belum Mulai
-                </span> 
-                <span class="font-bold font-mono text-gray-900 dark:text-white">{{ $summaryStatus['belum'] }} <span class="text-[10px] text-gray-400 font-normal">({{ $pBelum }}%)</span></span>
-            </div>
-            
-            <div class="pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center font-bold text-sm text-gray-900 dark:text-white px-1">
-                <span>TOTAL CAKUPAN</span> 
-                <span>{{ $totalSegments }} LOP</span>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -326,7 +388,7 @@
 <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
     {{-- Gauge FO --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 flex flex-col items-center justify-center shadow-xs">
-        <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Efisiensi Penarikan FO</h4>
+        <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Persentase Penarikan FO</h4>
         <div class="w-40 h-24 relative">
             <canvas id="gaugeFO"></canvas>
             <div class="absolute bottom-0 inset-x-0 text-center">
@@ -340,7 +402,7 @@
 
     {{-- Gauge Tiang --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 flex flex-col items-center justify-center shadow-xs">
-        <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Efisiensi Tanam Tiang</h4>
+        <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Persentase Tanam Tiang</h4>
         <div class="w-40 h-24 relative">
             <canvas id="gaugeTiang"></canvas>
             <div class="absolute bottom-0 inset-x-0 text-center">

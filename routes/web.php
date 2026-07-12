@@ -459,6 +459,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/assign-waspang', function() { 
         return 'Halaman Assign Waspang (Under Construction)'; 
     })->name('assign.waspang');
+
+    // Route untuk Rekap Progress PM (Menggunakan parameter query ?program=...)
+    Route::get('/rekap-progress', [DashboardPmController::class, 'rekapProgress'])->name('rekap_progress');
+
+    Route::get('/waspang-performance', [App\Http\Controllers\DashboardPmController::class, 'waspangPerformance'])
+        ->name('waspang.performance');
 });
 
 

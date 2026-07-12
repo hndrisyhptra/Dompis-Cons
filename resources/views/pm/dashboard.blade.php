@@ -5,7 +5,7 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Dashboard Monitoring</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Rangkuman performa konstruksi LOP, kinerja Waspang, dan anomali lapangan secara real-time.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Rangkuman performa konstruksi LOP, kinerja Waspang, dan kendala lapangan secara real-time.</p>
         </div>
         <div class="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-900 px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-500"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -24,7 +24,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V4c0-.5.2-1 .6-1.4C5 2.2 5.5 2 6 2h12c.5 0 1 .2 1.4.6.4.4.6.9.6 1.4v18l-4-2-4 2-4-2-4 2z"/></svg>
                 </div>
             </div>
-            <p class="text-xs text-gray-500 mt-3">Total segmen proyek terintegrasi</p>
+            <p class="text-xs text-gray-500 mt-3">Total segmen project</p>
         </div>
 
         <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm transition hover:shadow-md">
@@ -63,7 +63,7 @@
     </div>
 
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
-        <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Pipeline Progres Konstruksi</h2>
+        <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Flow Progres Konstruksi</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             @foreach($stageSummary as $stage)
                 <div class="p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/50 flex flex-col justify-between">
@@ -155,7 +155,7 @@
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
         <div class="flex items-center justify-between mb-4">
             <div>
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">LOP Butuh Perhatian (Anomali)</h2>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">LOP Butuh Perhatian</h2>
                 <p class="text-xs text-gray-400">Deteksi otomatis LOP yang belum ter-mapping PID atau mendeteksi berkas fisik berstatus Rejected.</p>
             </div>
             <span class="px-2.5 py-1 text-xs font-bold bg-red-50 text-red-700 border border-red-100 rounded-xl">High Priority Alert</span>
@@ -183,7 +183,7 @@
                                 </span>
                             </td>
                             <td class="py-3 text-right">
-                                <a href="{{ route('pm.rekap.progress', ['branch' => $item->branch]) }}" class="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
+                                <a href="{{ route('pm.rekap_progress', ['branch' => $item->branch]) }}" class="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">
                                     Audit LOP
                                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                                 </a>
@@ -192,7 +192,7 @@
                     @empty
                         <tr>
                             <td colspan="5" class="py-6 text-center text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50/30 dark:bg-emerald-950/20 rounded-xl">
-                                🎉 Bagus! Seluruh LOP terpetakan dengan aman tanpa anomali berkas fisik/reject.
+                                🎉 Bagus! Seluruh LOP terpetakan dengan aman tanpa kendala berkas fisik/reject.
                             </td>
                         </tr>
                     @endforelse

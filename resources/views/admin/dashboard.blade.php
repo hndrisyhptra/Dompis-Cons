@@ -304,206 +304,101 @@
         {{-- STATISTICS TABLES --}}
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
             @foreach($sections as $title => $items)
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                    <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
-                        <h2 class="text-sm font-black text-slate-900 dark:text-white">
-                            {{ $title }}
-                        </h2>
-                        <p class="text-xs text-slate-500 mt-1">
-                            Total, assignment, review, dan completion.
-                        </p>
+                {{-- Card dikunci tinggi maksimalnya (max-h-[400px]) dan diatur sebagai flex column --}}
+                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm flex flex-col max-h-[400px]">
+                    
+                    {{-- HEADER STATIC (TETAP DI ATAS) --}}
+                    <div class="px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-white">
+                                {{ $title }}
+                            </h2>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                {{ $items->count() }} Data
+                            </span>
+                        </div>
                     </div>
 
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-xs">
-                            <thead class="bg-slate-50 dark:bg-slate-800">
-                                <tr class="text-slate-500">
-                                    <th class="px-4 py-3 text-left">Nama</th>
-                                    <th class="px-3 py-3 text-center">Total</th>
-                                    <th class="px-3 py-3 text-center">Assign</th>
-                                    <th class="px-3 py-3 text-center">Review</th>
-                                    <th class="px-3 py-3 text-center">Done</th>
-                                    <th class="px-3 py-3 text-center">%</th>
+                    {{-- SCROLLABLE CONTAINER MURNI TAILWIND (SCROLL KHUSUS PER CARD) --}}
+                    <div class="overflow-y-auto overflow-x-auto flex-1 
+                                [&::-webkit-scrollbar]:w-1 
+                                [&::-webkit-scrollbar]:h-1 
+                                [&::-webkit-scrollbar-track]:bg-transparent 
+                                [&::-webkit-scrollbar-thumb]:bg-slate-200 
+                                dark:[&::-webkit-scrollbar-thumb]:bg-slate-800 
+                                [&::-webkit-scrollbar-thumb]:rounded-full 
+                                hover:[&::-webkit-scrollbar-thumb]:bg-slate-300
+                                dark:hover:[&::-webkit-scrollbar-thumb]:bg-slate-700">
+                        
+                        <table class="w-full text-[11px] border-collapse">
+                            <thead class="bg-slate-50/70 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 sticky top-0 z-10 backdrop-blur-xs">
+                                <tr class="text-slate-400 font-bold uppercase tracking-tight text-[10px]">
+                                    <th class="px-4 py-2 text-left">Nama</th>
+                                    <th class="px-2 py-2 text-center w-12">Total</th>
+                                    <th class="px-2 py-2 text-center w-12">Assign</th>
+                                    <th class="px-2 py-2 text-center w-12">Review</th>
+                                    <th class="px-2 py-2 text-center w-12">Done</th>
+                                    <th class="px-3 py-2 text-center w-14">%</th>
                                 </tr>
                             </thead>
 
-                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60">
                                 @forelse($items as $item)
                                     @php
                                         $percent = $item['percent'] ?? 0;
                                     @endphp
 
-                                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">
-                                        <td class="px-4 py-3 min-w-[140px]">
-                                            <div class="font-black text-slate-900 dark:text-white">
+                                    <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors duration-150">
+                                        <td class="px-4 py-2.5 min-w-[130px]">
+                                            <div class="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[140px]" title="{{ $item['label'] }}">
                                                 {{ $item['label'] }}
                                             </div>
-
-                                            <div class="mt-1 h-1.5 w-24 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div class="mt-1 h-1 w-20 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                                 <div class="h-full bg-emerald-500 rounded-full"
-                                                     style="width: {{ min($percent, 100) }}%">
+                                                    style="width: {{ min($percent, 100) }}%">
                                                 </div>
                                             </div>
                                         </td>
 
-                                        <td class="px-3 py-3 text-center font-bold text-slate-700 dark:text-slate-200">
+                                        <td class="px-2 py-2.5 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
                                             {{ $item['total'] }}
                                         </td>
 
-                                        <td class="px-3 py-3 text-center">
-                                            <span class="inline-flex px-2 py-1 rounded-full bg-blue-50 text-blue-700 font-black">
+                                        <td class="px-2 py-2.5 text-center">
+                                            <span class="inline-block w-7 py-0.5 rounded text-center bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-mono font-bold">
                                                 {{ $item['assigned'] }}
                                             </span>
                                         </td>
 
-                                        <td class="px-3 py-3 text-center">
-                                            <span class="inline-flex px-2 py-1 rounded-full bg-amber-50 text-amber-700 font-black">
+                                        <td class="px-2 py-2.5 text-center">
+                                            <span class="inline-block w-7 py-0.5 rounded text-center bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-mono font-bold">
                                                 {{ $item['waiting'] }}
                                             </span>
                                         </td>
 
-                                        <td class="px-3 py-3 text-center">
-                                            <span class="inline-flex px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 font-black">
+                                        <td class="px-2 py-2.5 text-center">
+                                            <span class="inline-block w-7 py-0.5 rounded text-center bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-mono font-bold">
                                                 {{ $item['completed'] }}
                                             </span>
                                         </td>
 
-                                        <td class="px-3 py-3 text-center font-black text-slate-900 dark:text-white">
+                                        <td class="px-3 py-2.5 text-center font-mono font-black text-slate-900 dark:text-white">
                                             {{ $percent }}%
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-3 py-8 text-center text-slate-500">
-                                            Belum ada data.
+                                        <td colspan="6" class="px-4 py-8 text-center text-slate-400 italic">
+                                            Belum ada data statistik.
                                         </td>
                                     </tr>
                                 @endforelse
                             </tbody>
                         </table>
                     </div>
+
                 </div>
             @endforeach
-        </div>
-
-        {{-- WASPANG + ATTENTION --}}
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
-
-            {{-- Waspang Performance --}}
-            <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-                <h2 class="text-lg font-black text-slate-900 dark:text-white">
-                    Waspang Performance
-                </h2>
-
-                <p class="text-sm text-slate-500 mt-1">
-                    Distribusi assignment per Waspang.
-                </p>
-
-                <div class="mt-5 space-y-3">
-                    @forelse($waspangStats ?? [] as $waspang)
-                        @php
-                            $maxAssign = max(($waspangStats ?? collect())->max('total_assignment') ?? 1, 1);
-                            $percent = round(($waspang->total_assignment / $maxAssign) * 100);
-                        @endphp
-
-                        <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
-                            <div class="flex items-center justify-between gap-3">
-                                <div>
-                                    <p class="text-sm font-black text-slate-900 dark:text-white">
-                                        {{ $waspang->name ?? $waspang->username ?? '-' }}
-                                    </p>
-
-                                    <p class="text-xs text-slate-500">
-                                        {{ $waspang->username ?? '-' }}
-                                    </p>
-                                </div>
-
-                                <span class="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-black">
-                                    {{ $waspang->total_assignment }} project
-                                </span>
-                            </div>
-
-                            <div class="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                                <div class="h-full rounded-full bg-blue-600"
-                                     style="width: {{ $percent }}%">
-                                </div>
-                            </div>
-                        </div>
-                    @empty
-                        <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 p-6 text-center">
-                            <p class="text-sm text-slate-500">
-                                Belum ada data Waspang.
-                            </p>
-                        </div>
-                    @endforelse
-                </div>
-            </div>
-
-            {{-- Attention Projects --}}
-            <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-                <h2 class="text-lg font-black text-slate-900 dark:text-white">
-                    Project Butuh Perhatian
-                </h2>
-
-                <p class="text-sm text-slate-500 mt-1">
-                    LOP yang belum BOQ, belum assign, atau memiliki evidence rejected.
-                </p>
-
-                <div class="mt-5 space-y-3">
-                    @forelse($attentionProjects ?? [] as $lop)
-                        @php
-                            $project = $lop->project;
-                            $hasBoq = $project?->boqItems?->count() > 0;
-                            $hasAssign = $project?->assignment;
-                            $hasRejected = $project?->evidences?->where('status', 'rejected')->count() > 0;
-                        @endphp
-
-                        <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="min-w-0">
-                                    <p class="text-sm font-black text-slate-900 dark:text-white truncate">
-                                        {{ $lop->lop_name ?? $project?->project_name ?? '-' }}
-                                    </p>
-
-                                    <p class="text-xs text-slate-500 mt-1">
-                                        {{ $project?->pid_sap ?? '-' }} · {{ $lop->branch ?? '-' }} · {{ $lop->sto ?? '-' }}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div class="flex flex-wrap gap-2 mt-3">
-                                @if(!$hasBoq)
-                                    <span class="px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-[11px] font-black">
-                                        Belum BOQ
-                                    </span>
-                                @endif
-
-                                @if(!$hasAssign)
-                                    <span class="px-3 py-1 rounded-full bg-red-50 text-red-700 text-[11px] font-black">
-                                        Belum Assign
-                                    </span>
-                                @endif
-
-                                @if($hasRejected)
-                                    <span class="px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-[11px] font-black">
-                                        Evidence Rejected
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-                    @empty
-                        <div class="rounded-3xl bg-emerald-50 border border-emerald-100 p-6 text-center">
-                            <p class="text-sm font-black text-emerald-700">
-                                Tidak ada project prioritas.
-                            </p>
-                            <p class="text-xs text-emerald-600 mt-1">
-                                Semua data dalam kondisi aman.
-                            </p>
-                        </div>
-                    @endforelse
-                </div>
-            </div>
-
         </div>
 
     </div>
