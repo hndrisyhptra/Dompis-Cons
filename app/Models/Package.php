@@ -19,4 +19,10 @@ class Package extends Model
     {
         return $this->hasMany(DesignatorPackagePrice::class, 'package_id', 'id_package');
     }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class, 'customer_id', 'id_customer');
+    }
+    
 }

@@ -12,7 +12,7 @@
                 Harga Designator
             </h1>
             <p class="text-sm text-gray-500 dark:text-gray-400">
-                Kelola harga designator berdasarkan package
+                Kelola harga designator berdasarkan package tiap customer
             </p>
         </div>
 
@@ -47,12 +47,22 @@
         </div>
     @endif
 
-    {{-- Search --}}
+    {{-- Search & Filter --}}
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
 
         <form method="GET"
               action="{{ route('designator-prices.index') }}"
               class="flex flex-col sm:flex-row gap-3">
+
+            <select name="customer_id" 
+                    class="sm:w-48 h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+                <option value="">Semua Customer</option>
+                @foreach($customers as $c)
+                    <option value="{{ $c->id_customer }}" {{ request('customer_id') == $c->id_customer ? 'selected' : '' }}>
+                        {{ $c->customer_name }}
+                    </option>
+                @endforeach
+            </select>
 
             <input type="text"
                    name="search"
@@ -64,7 +74,7 @@
                 Cari
             </button>
 
-            @if(!empty($search))
+            @if(!empty($search) || request()->has('customer_id'))
                 <a href="{{ route('designator-prices.index') }}"
                    class="h-10 px-4 inline-flex items-center justify-center rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold">
                     Reset
@@ -84,6 +94,9 @@
 
                 <thead class="bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
                     <tr>
+                        <th class="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-300">
+                            Customer
+                        </th>
                         <th class="px-4 py-3 text-left font-bold text-gray-600 dark:text-gray-300">
                             Designator
                         </th>
@@ -110,6 +123,10 @@
                     @forelse($prices as $price)
 
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-800">
+
+                            <td class="px-4 py-3 font-bold text-indigo-700 dark:text-indigo-400 whitespace-nowrap">
+                                {{ $price->package->customer->customer_code ?? '-' }}
+                            </td>
 
                             <td class="px-4 py-3 font-bold text-gray-900 dark:text-white whitespace-nowrap">
                                 {{ $price->designator->designator ?? '-' }}
@@ -150,7 +167,7 @@
                             </td>
 
                            <td class="px-4 py-3 text-right font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                                {{ $price->price }}
+                                {{ number_format($price->price, 2, ',', '.') }}
                             </td>
 
                             <td class="px-4 py-3">
@@ -160,6 +177,7 @@
                                     <button type="button"
                                             onclick="openEditPriceModal({
                                                 id: '{{ $price->id_price }}',
+                                                customer_id: '{{ $price->package->customer_id ?? '' }}',
                                                 designator_id: '{{ $price->designator_id }}',
                                                 package_id: '{{ $price->package_id }}',
                                                 price: '{{ $price->price }}'
@@ -188,7 +206,7 @@
                     @empty
 
                         <tr>
-                            <td colspan="6" class="px-4 py-8 text-center text-gray-500">
+                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">
                                 Belum ada data harga designator.
                             </td>
                         </tr>
@@ -265,7 +283,7 @@
 
 </div>
 
-{{-- MODAL PRICE --}}
+{{-- MODAL TAMBAH/EDIT PRICE --}}
 <div id="priceModal"
      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
 
@@ -277,7 +295,7 @@
                     Tambah Harga
                 </h2>
                 <p class="text-sm text-gray-500">
-                    Pilih designator dan package
+                    Pilih customer, designator, dan package
                 </p>
             </div>
 
@@ -296,55 +314,46 @@
 
                 <div>
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Designator
+                        Pilih Customer <span class="text-red-500">*</span>
                     </label>
-
-                    <select
-                        id="designator_id"
-                        name="designator_id"
-                        required
-                        class="select2-dark mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                        <option value="">Pilih Designator</option>
-
-                        @foreach($designators as $designator)
-                            <option value="{{ $designator->id_designator }}">
-                                {{ $designator->designator }} - {{ $designator->item_name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div>
-                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Package
-                    </label>
-
-                    <select name="package_id"
-                            id="package_id"
-                            required
+                    <select id="modal_customer_id" onchange="updateDependentDropdowns()" required
                             class="mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
-                        <option value="">Pilih Package</option>
-
-                        @foreach($packages as $package)
-                            <option value="{{ $package->id_package }}">
-                                {{ $package->package_code }} - {{ $package->package_name }}
-                            </option>
+                        <option value="">-- Pilih Customer --</option>
+                        @foreach($customers as $c)
+                            <option value="{{ $c->id_customer }}">{{ $c->customer_name }}</option>
                         @endforeach
                     </select>
                 </div>
 
                 <div>
                     <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Price
+                        Designator <span class="text-red-500">*</span>
                     </label>
 
-                    <input type="number"
-                           name="price"
-                           id="price"
-                           required
-                           min="0"
-                           step="0.01"
-                           placeholder="contoh: 7098"
+                    <select id="designator_id" name="designator_id" required disabled
+                            class="select2-dark mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Pilih Customer Terlebih Dahulu</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Package <span class="text-red-500">*</span>
+                    </label>
+
+                    <select name="package_id" id="package_id" required disabled
+                            class="mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+                        <option value="">Pilih Customer Terlebih Dahulu</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Price <span class="text-red-500">*</span>
+                    </label>
+
+                    <input type="number" name="price" id="price" required min="0" step="0.01"
+                           placeholder="contoh: 7098.50"
                            class="mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
                 </div>
 
@@ -401,21 +410,40 @@
 
             <div class="p-5 space-y-4">
 
-                <input type="file"
-                       name="file"
-                       accept=".csv,.txt"
-                       required
-                       class="block w-full text-sm border border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer bg-white dark:bg-gray-950 dark:text-gray-300
-                              file:mr-3 file:py-2.5 file:px-4 file:rounded-l-xl file:border-0 file:text-sm file:font-bold
-                              file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        Pilih Customer <span class="text-red-500">*</span>
+                    </label>
+                    <select name="customer_id" required
+                            class="mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+                        <option value="">-- Pilih Customer --</option>
+                        @foreach($customers as $c)
+                            <option value="{{ $c->id_customer }}">{{ $c->customer_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        File CSV / TXT <span class="text-red-500">*</span>
+                    </label>
+                    <input type="file"
+                           name="file"
+                           accept=".csv,.txt"
+                           required
+                           class="mt-1 block w-full text-sm border border-gray-300 dark:border-gray-700 rounded-xl cursor-pointer bg-white dark:bg-gray-950 dark:text-gray-300
+                                  file:mr-3 file:py-2.5 file:px-4 file:rounded-l-xl file:border-0 file:text-sm file:font-bold
+                                  file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                </div>
 
                 <div class="rounded-xl bg-gray-50 dark:bg-gray-950 border border-gray-100 dark:border-gray-800 p-3">
-                    <p class="text-xs text-gray-500 leading-relaxed">
-                        Header CSV:
-                        <span class="font-mono text-gray-700 dark:text-gray-300">
-                            designator,package_code,price
-                        </span>
+                    <p class="text-xs text-gray-500 leading-relaxed font-semibold">
+                        Header CSV yang didukung:
                     </p>
+                    <p class="font-mono text-[11px] text-gray-700 dark:text-gray-300 mt-1">
+                        designator,package_code,price,type
+                    </p>
+                    <p class="text-[10px] text-gray-400 mt-1">* Kolom <span class="font-mono">type</span> opsional (isi: material/jasa) untuk mencegah ambiguitas harga pada designator yang ter-split.</p>
                 </div>
 
             </div>
@@ -441,6 +469,9 @@
 </div>
 
 <script>
+// Load data master dari backend untuk JS logic
+const allDesignators = @json($designators);
+const allPackages = @json($packages);
 
 function initDesignatorSelect()
 {
@@ -450,33 +481,63 @@ function initDesignatorSelect()
 
     $('#designator_id').select2({
         width: '100%',
-        dropdownParent: $('#priceModal'), // Memaksa dropdown masuk ke dalam Modal bertema Dark
-        placeholder: 'Cari Designator...',
+        dropdownParent: $('#priceModal'),
+        placeholder: 'Pilih Designator...',
         allowClear: true,
         containerCssClass: 'mt-1'
     });
 }
 
+function updateDependentDropdowns(selectedDesig = '', selectedPkg = '') {
+    const customerId = document.getElementById('modal_customer_id').value;
+    const pkgSelect = document.getElementById('package_id');
+    const desigSelect = $('#designator_id');
+
+    pkgSelect.innerHTML = '<option value="">Pilih Package</option>';
+    desigSelect.empty().append('<option value="">Pilih Designator</option>');
+
+    if (!customerId) {
+        pkgSelect.disabled = true;
+        desigSelect.prop('disabled', true);
+        desigSelect.trigger('change');
+        return;
+    }
+
+    pkgSelect.disabled = false;
+    desigSelect.prop('disabled', false);
+
+    // Filter packages
+    const filteredPkgs = allPackages.filter(p => p.customer_id == customerId);
+    filteredPkgs.forEach(p => {
+        let opt = new Option(`${p.package_code} - ${p.package_name}`, p.id_package, false, p.id_package == selectedPkg);
+        pkgSelect.appendChild(opt);
+    });
+
+    // Filter designators
+    const filteredDesigs = allDesignators.filter(d => d.customer_id == customerId);
+    filteredDesigs.forEach(d => {
+        let typeBadge = d.type ? ` (${d.type.toUpperCase()})` : '';
+        let opt = new Option(`${d.designator} - ${d.item_name}${typeBadge}`, d.id_designator, false, d.id_designator == selectedDesig);
+        desigSelect.append(opt);
+    });
+
+    desigSelect.trigger('change');
+}
+
 function openPriceModal()
 {
-    // 1. TAMPILKAN MODAL TERLEBIH DAHULU (PENTING!)
-    // Agar element modal sudah ada di layar saat dideteksi oleh Select2
     document.getElementById('priceModal').classList.remove('hidden');
     document.getElementById('priceModal').classList.add('flex');
 
-    // 2. Set Informasi Form
     document.getElementById('priceModalTitle').innerText = 'Tambah Harga';
     document.getElementById('priceForm').action = "{{ route('designator-prices.store') }}";
     document.getElementById('priceMethod').value = 'POST';
 
-    // 3. Reset Form Konten bawaan HTML
     document.getElementById('priceForm').reset();
+    document.getElementById('modal_customer_id').value = "";
+    updateDependentDropdowns();
 
-    // 4. JALANKAN INIT SELECT2 SETELAH MODAL TERBUKA
     initDesignatorSelect();
-
-    // 5. Kosongkan nilai Select2 secara aman tanpa merusak UI-nya
-    $('#designator_id').val(null).trigger('change.select2');
 }
 
 function openEditPriceModal(item)
@@ -485,11 +546,17 @@ function openEditPriceModal(item)
     document.getElementById('priceModal').classList.add('flex');
 
     document.getElementById('priceModalTitle').innerText = 'Edit Harga';
+    // Sesuaikan penamaan route update (misal: /designator-prices/{id} atau update/{id})
     document.getElementById('priceForm').action = `/designator-prices/update/${item.id}`;
     document.getElementById('priceMethod').value = 'PUT';
 
-    document.getElementById('designator_id').value = item.designator_id ?? '';
-    document.getElementById('package_id').value = item.package_id ?? '';
+    document.getElementById('modal_customer_id').value = item.customer_id;
+    
+    initDesignatorSelect();
+    
+    // Trigger update dropdown dengan select values
+    updateDependentDropdowns(item.designator_id, item.package_id);
+
     document.getElementById('price').value = item.price ?? '';
 }
 

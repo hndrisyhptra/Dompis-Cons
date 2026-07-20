@@ -9,6 +9,7 @@ use App\Models\Designator;
 use App\Models\Evidence;
 use App\Models\ProjectAssignment;
 use App\Models\ImportLog;
+use App\Models\Customer;
 use App\Models\Package as PackageModel;
 use App\Models\DesignatorPackagePrice;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -657,6 +658,10 @@ class ImportController extends Controller
 
     public function boqIndex()
     {
+        // 1. Tarik data untuk dropdown UI (Mencegah Error Undefined Variable)
+        $customers = \App\Models\Customer::active()->get();
+        $packages = \App\Models\Package::all();
+
         $lastImport = ImportLog::with('uploader')
             ->where('type', 'boq')
             ->latest()
@@ -670,36 +675,41 @@ class ImportController extends Controller
             ->get();
 
         return view('admin.import.boq', compact(
-            'lastImport',
-            'importLogs'
+            'customers', 
+            'packages', 
+            'importLogs', 
+            'lastImport'
         ));
     }
+
     public function importBoq(Request $request)
     {
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
+        
+        // 1. Validasi Layer 1: Pastikan Customer & Package dari dropdown UI terkirim
         $request->validate([
             'file' => 'required|mimes:xlsx,xls',
             'mapping_by' => 'required|in:pid,id_ihld,lop_name',
+            'customer_id' => 'required|exists:customers,id_customer',
+            'package_id' => 'required|exists:packages,id_package',
         ]);
 
         $file = $request->file('file');
         $fileName = $file->getClientOriginalName();
 
-        $reader = new Xlsx();
-
+        $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
         $reader->setReadDataOnly(true);
-
         $reader->setReadEmptyCells(false);
 
         $spreadsheet = $reader->load($file->getRealPath());
-
         $sheet = $spreadsheet->getActiveSheet();
-
         $sheetName = strtoupper(trim($sheet->getTitle()));
 
-        $package = PackageModel::whereRaw('UPPER(package_name) = ?', [$sheetName])
-            ->orWhereRaw('UPPER(package_code) = ?', [$sheetName])
+        // 2. Kunci Package berdasarkan input dropdown Admin, bukan hanya nama sheet
+        // (Bisa gunakan PackageModel atau Package, sesuaikan dengan nama model Anda)
+        $package = \App\Models\Package::where('id_package', $request->package_id)
+            ->where('customer_id', $request->customer_id)
             ->first();
 
         if (!$package) {
@@ -708,7 +718,7 @@ class ImportController extends Controller
                     'file_name' => $fileName,
                     'sheet_name' => $sheetName,
                     'status' => 'failed',
-                    'error_message' => "Package {$sheetName} belum ada di master package.",
+                    'error_message' => "Package tidak valid atau tidak sesuai dengan Customer yang dipilih.",
                     'total_headers' => 0,
                     'matched_lop' => 0,
                     'unmapped_lop' => 0,
@@ -721,275 +731,241 @@ class ImportController extends Controller
                     'volume_items' => 0,
                     'invalid_rows' => [],
                 ])
-                ->with('error', "Package {$sheetName} belum ada di master package.");
+                ->with('error', "Package tidak valid atau tidak sesuai dengan Customer yang dipilih.");
         }
 
         $highestRow = $sheet->getHighestRow();
         $highestColumn = $sheet->getHighestColumn();
-        $highestColumnIndex = Coordinate::columnIndexFromString($highestColumn);
+        $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
 
         DB::beginTransaction();
 
         try {
+            $imported = 0;
+            $updated = 0;
+            $skipped = 0;
+            $unmappedLop = 0;
+            $unmappedDesignator = 0;
+            $priceMissing = 0;
+            $matchedLop = 0;
+            $volumeItems = 0;
+            $existingBoqHeaders = 0;
 
-        $imported = 0;
-        $updated = 0;
-        $skipped = 0;
+            $matchedHeaders = [];
+            $unmatchedHeaders = [];
+            $existingHeaders = [];
+            $invalidRows = [];
 
-        $unmappedLop = 0;
-        $unmappedDesignator = 0;
-        $priceMissing = 0;
-        $matchedLop = 0;
-        $volumeItems = 0;
+            for ($col = 2; $col <= $highestColumnIndex; $col++) {
 
-        // Ini yang akan dipakai untuk card "Data Sudah Ada"
-        $existingBoqHeaders = 0;
+                $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
+                $headerValue = trim((string) $sheet->getCell($columnLetter . '1')->getValue());
 
-        $matchedHeaders = [];
-        $unmatchedHeaders = [];
-        $existingHeaders = [];
-        $invalidRows = [];
-
-        for ($col = 2; $col <= $highestColumnIndex; $col++) {
-
-            $columnLetter = Coordinate::stringFromColumnIndex($col);
-
-            $headerValue = trim(
-                (string) $sheet->getCell($columnLetter . '1')->getValue()
-            );
-
-            if ($headerValue === '') {
-                continue;
-            }
-
-            switch ($request->mapping_by) {
-
-                case 'pid':
-
-                    $project = Project::where('pid', $headerValue)
-                        ->orWhere('pid_sap', $headerValue)
-                        ->first();
-
-                    $lop = $project
-                        ? Lop::where('project_id', $project->id_project)->first()
-                        : null;
-
-                    break;
-
-                case 'id_ihld':
-
-                    $lop = Lop::where('id_ihld', $headerValue)->first();
-
-                    break;
-
-                case 'lop_name':
-
-                    $lop = Lop::whereRaw(
-                        'LOWER(TRIM(lop_name)) = ?',
-                        [strtolower(trim($headerValue))]
-                    )->first();
-
-                    break;
-
-                default:
-
-                    $lop = null;
-
-            }
-
-            if (!$lop) {
-                $unmappedLop++;
-                $unmatchedHeaders[] = $headerValue;
-
-                $invalidRows[] = [
-                    'type' => 'PID / ID IHLD / LOP tidak match',
-                    'header' => $headerValue,
-                    'row' => '-',
-                    'designator' => '-',
-                    'qty' => '-',
-                    'reason' => 'Header kolom tidak ditemukan di data PID/ID IHLD/LOP',
-                ];
-
-                continue;
-            }
-
-            $matchedLop++;
-            $matchedHeaders[] = $headerValue;
-
-            /*
-            |--------------------------------------------------------------------------
-            | Hitung header yang sudah punya BOQ
-            |--------------------------------------------------------------------------
-            | Ini menghitung PID SAP / Nama LOP yang sudah pernah memiliki BOQ.
-            | Bukan menghitung jumlah item designator.
-            |--------------------------------------------------------------------------
-            */
-            $hasExistingBoq = BoqItem::where('lop_id', $lop->id_lop)->exists();
-
-            if ($hasExistingBoq) {
-                $existingBoqHeaders++;
-                $existingHeaders[] = $headerValue;
-            }
-
-            if (!$lop->package_id) {
-                $lop->update([
-                    'package_id' => $package->id_package,
-                ]);
-            }
-
-            $projectCustomerId = Project::where('id_project', $lop->project_id)
-                ->value('customer_id');
-
-            for ($row = 2; $row <= $highestRow; $row++) {
-
-                $baseDesignator = strtoupper(
-                    trim((string) $sheet->getCell('A' . $row)->getValue())
-                );
-
-                $qty = $sheet->getCell($columnLetter . $row)->getCalculatedValue();
-                $qty = is_numeric($qty) ? (float) $qty : 0;
-
-                if ($baseDesignator === '' || $qty <= 0) {
-                    $skipped++;
+                if ($headerValue === '') {
                     continue;
                 }
 
-                $volumeItems++;
+                switch ($request->mapping_by) {
+                    case 'pid':
+                        $project = Project::where('pid', $headerValue)
+                            ->orWhere('pid_sap', $headerValue)
+                            ->first();
+                        $lop = $project ? Lop::where('project_id', $project->id_project)->first() : null;
+                        break;
+                    case 'id_ihld':
+                        $lop = Lop::where('id_ihld', $headerValue)->first();
+                        break;
+                    case 'lop_name':
+                        $lop = Lop::whereRaw('LOWER(TRIM(lop_name)) = ?', [strtolower(trim($headerValue))])->first();
+                        break;
+                    default:
+                        $lop = null;
+                }
 
-                $designators = Designator::forCustomer($projectCustomerId)
-                    ->where(function ($query) use ($baseDesignator) {
-                        $query->where('pair_code', $baseDesignator)
-                            ->orWhere('designator', $baseDesignator);
-                    })
-                    ->get();
-
-                if ($designators->count() == 0) {
-                    $unmappedDesignator++;
-
+                if (!$lop) {
+                    $unmappedLop++;
+                    $unmatchedHeaders[] = $headerValue;
                     $invalidRows[] = [
-                        'type' => 'Designator tidak ditemukan',
+                        'type' => 'PID / ID IHLD / LOP tidak match',
                         'header' => $headerValue,
-                        'row' => $row,
-                        'designator' => $baseDesignator,
-                        'qty' => $qty,
-                        'reason' => 'Designator tidak ada di master designator / pair_code',
+                        'row' => '-',
+                        'designator' => '-',
+                        'qty' => '-',
+                        'reason' => 'Header kolom tidak ditemukan di data PID/ID IHLD/LOP',
                     ];
-
                     continue;
                 }
 
-                foreach ($designators as $designator) {
+                // 3. LAYER 2 PROTECTION: Cek apakah LOP ini benar milik Customer yang dipilih
+                $projectCustomerId = Project::where('id_project', $lop->project_id)->value('customer_id');
 
-                    $price = DesignatorPackagePrice::where('designator_id', $designator->id_designator)
-                        ->where('package_id', $package->id_package)
-                        ->first();
+                if ($projectCustomerId != $request->customer_id) {
+                    $unmappedLop++;
+                    $unmatchedHeaders[] = $headerValue;
+                    $invalidRows[] = [
+                        'type' => 'Customer Mismatch (Data Bocor)',
+                        'header' => $headerValue,
+                        'row' => '-',
+                        'designator' => '-',
+                        'qty' => '-',
+                        'reason' => "PID/IHLD ini milik Customer lain (bukan milik Customer di Dropdown).",
+                    ];
+                    continue; // Skip kolom/project ini agar tidak tertukar!
+                }
 
-                    $unitPrice = $price?->price ?? 0;
+                $matchedLop++;
+                $matchedHeaders[] = $headerValue;
 
-                    if (!$price) {
-                        $priceMissing++;
+                $hasExistingBoq = BoqItem::where('lop_id', $lop->id_lop)->exists();
+                if ($hasExistingBoq) {
+                    $existingBoqHeaders++;
+                    $existingHeaders[] = $headerValue;
+                }
 
-                        $invalidRows[] = [
-                            'type' => 'Harga package kosong',
-                            'header' => $headerValue,
-                            'row' => $row,
-                            'designator' => $designator->designator,
-                            'qty' => $qty,
-                            'reason' => "Harga {$designator->designator} untuk {$package->package_name} belum ada",
-                        ];
-                    }
+                if (!$lop->package_id) {
+                    $lop->update([
+                        'package_id' => $package->id_package,
+                    ]);
+                }
 
-                    $totalPrice = $qty * $unitPrice;
+                for ($row = 2; $row <= $highestRow; $row++) {
 
-                    $existing = BoqItem::where('lop_id', $lop->id_lop)
-                        ->where(function ($q) use ($designator) {
-                            $q->where('designator_id', $designator->id_designator)
-                                ->orWhere('designator', $designator->designator);
-                        })
-                        ->first();
+                    $baseDesignator = strtoupper(
+                        trim((string) $sheet->getCell('A' . $row)->getValue())
+                    );
 
-                    if ($existing) {
+                    $qty = $sheet->getCell($columnLetter . $row)->getCalculatedValue();
+                    $qty = is_numeric($qty) ? (float) $qty : 0;
+
+                    if ($baseDesignator === '' || $qty <= 0) {
                         $skipped++;
                         continue;
                     }
 
-                    BoqItem::create([
-                        'project_id' => $lop->project_id,
-                        'lop_id' => $lop->id_lop,
-                        'designator_id' => $designator->id_designator,
-                        'designator' => $designator->designator,
-                        'item_name' => $designator->item_name,
-                        'unit' => $designator->unit,
-                        'quantity_plan' => $qty,
-                        'quantity_actual' => 0,
-                        'unit_price' => $unitPrice,
-                        'total_price' => $totalPrice,
-                    ]);
+                    $volumeItems++;
 
-                    $imported++;
+                    // 4. VIRTUAL SPLIT: Cari designator khusus untuk Customer ini saja
+                    $designators = Designator::forCustomer($projectCustomerId)
+                        ->where(function ($query) use ($baseDesignator) {
+                            $query->where('pair_code', $baseDesignator)
+                                ->orWhere('designator', $baseDesignator);
+                        })
+                        ->get();
+
+                    if ($designators->count() == 0) {
+                        $unmappedDesignator++;
+                        $invalidRows[] = [
+                            'type' => 'Designator tidak ditemukan',
+                            'header' => $headerValue,
+                            'row' => $row,
+                            'designator' => $baseDesignator,
+                            'qty' => $qty,
+                            'reason' => 'Designator tidak ada di master designator / pair_code',
+                        ];
+                        continue;
+                    }
+
+                    foreach ($designators as $designator) {
+
+                        $price = DesignatorPackagePrice::where('designator_id', $designator->id_designator)
+                            ->where('package_id', $package->id_package)
+                            ->first();
+
+                        $unitPrice = $price?->price ?? 0;
+
+                        if (!$price) {
+                            $priceMissing++;
+                            $invalidRows[] = [
+                                'type' => 'Harga package kosong',
+                                'header' => $headerValue,
+                                'row' => $row,
+                                'designator' => $designator->designator,
+                                'qty' => $qty,
+                                'reason' => "Harga {$designator->designator} untuk {$package->package_name} belum ada",
+                            ];
+                        }
+
+                        $totalPrice = $qty * $unitPrice;
+
+                        $existing = BoqItem::where('lop_id', $lop->id_lop)
+                            ->where(function ($q) use ($designator) {
+                                $q->where('designator_id', $designator->id_designator)
+                                    ->orWhere('designator', $designator->designator);
+                            })
+                            ->first();
+
+                        if ($existing) {
+                            $skipped++;
+                            continue;
+                        }
+
+                        BoqItem::create([
+                            'project_id' => $lop->project_id,
+                            'lop_id' => $lop->id_lop,
+                            'designator_id' => $designator->id_designator,
+                            'designator' => $designator->designator,
+                            'item_name' => $designator->item_name,
+                            'unit' => $designator->unit,
+                            'quantity_plan' => $qty,
+                            'quantity_actual' => 0,
+                            'unit_price' => $unitPrice,
+                            'total_price' => $totalPrice,
+                        ]);
+
+                        $imported++;
+                    }
                 }
             }
-        }
 
-        DB::commit();
+            DB::commit();
 
-        ImportLog::create([
-            'type' => 'boq',
-            'file_name' => $fileName,
-            'uploaded_by' => auth()->user()->id_user ?? auth()->id(),
-            'total_rows' => max($highestRow - 1, 0),
-            'imported' => $imported,
-            'updated' => $updated,
-            'skipped' => $skipped,
-            'status' => 'success',
-        ]);
-
-        return back()
-            ->with('import_result', [
+            ImportLog::create([
+                'type' => 'boq',
                 'file_name' => $fileName,
-                'sheet_name' => $sheetName,
-                'package_name' => $package->package_name ?? $sheetName,
-                'mapping_by' => $request->mapping_by,
-
+                'uploaded_by' => auth()->user()->id_user ?? auth()->id(),
                 'total_rows' => max($highestRow - 1, 0),
-                'total_headers' => count($matchedHeaders) + count($unmatchedHeaders),
-                'matched_lop' => $matchedLop,
-                'unmapped_lop' => $unmappedLop,
-
-                // Ini untuk card Data Sudah Ada
-                'existing_boq_headers' => $existingBoqHeaders,
-
-                'volume_items' => $volumeItems,
                 'imported' => $imported,
                 'updated' => $updated,
                 'skipped' => $skipped,
+                'status' => 'success',
+            ]);
 
-                'unmapped_designator' => $unmappedDesignator,
-                'price_missing' => $priceMissing,
-
-                'matched_headers' => array_slice($matchedHeaders, 0, 10),
-                'unmatched_headers' => array_slice($unmatchedHeaders, 0, 10),
-                'existing_headers' => array_slice($existingHeaders, 0, 10),
-                'invalid_rows' => array_slice($invalidRows, 0, 10),
-            ])
-            ->with(
-                'success',
-                "Import BOQ selesai. Match LOP {$matchedLop}, Tidak Match {$unmappedLop}, Data Sudah Ada {$existingBoqHeaders}, Data Baru {$imported}, Designator Tidak Ketemu {$unmappedDesignator}."
-            );
-
-        }
-            catch (\Throwable $e){
-
-                DB::rollBack();
-
-                \Log::error($e);
-
-                return back()->with(
-                    'error',
-                    'Import BOQ gagal : '.$e->getMessage()
+            return back()
+                ->with('import_result', [
+                    'file_name' => $fileName,
+                    'sheet_name' => $sheetName,
+                    'package_name' => $package->package_name,
+                    'mapping_by' => $request->mapping_by,
+                    'total_rows' => max($highestRow - 1, 0),
+                    'total_headers' => count($matchedHeaders) + count($unmatchedHeaders),
+                    'matched_lop' => $matchedLop,
+                    'unmapped_lop' => $unmappedLop,
+                    'existing_boq_headers' => $existingBoqHeaders,
+                    'volume_items' => $volumeItems,
+                    'imported' => $imported,
+                    'updated' => $updated,
+                    'skipped' => $skipped,
+                    'unmapped_designator' => $unmappedDesignator,
+                    'price_missing' => $priceMissing,
+                    'matched_headers' => array_slice($matchedHeaders, 0, 10),
+                    'unmatched_headers' => array_slice($unmatchedHeaders, 0, 10),
+                    'existing_headers' => array_slice($existingHeaders, 0, 10),
+                    'invalid_rows' => array_slice($invalidRows, 0, 10),
+                ])
+                ->with(
+                    'success',
+                    "Import BOQ selesai. Match LOP {$matchedLop}, Tidak Match {$unmappedLop}, Data Sudah Ada {$existingBoqHeaders}, Data Baru {$imported}, Designator Tidak Ketemu {$unmappedDesignator}."
                 );
 
-            }
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error($e);
+
+            return back()->with(
+                'error',
+                'Import BOQ gagal : ' . $e->getMessage()
+            );
+        }
     }
 
     public function dataBoq(Request $request)

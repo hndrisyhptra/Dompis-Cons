@@ -31,6 +31,11 @@ class Customer extends Model
         return $this->hasMany(Designator::class, 'customer_id', 'id_customer');
     }
 
+    public function packages()
+    {
+        return $this->hasMany(Package::class, 'customer_id', 'id_customer');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

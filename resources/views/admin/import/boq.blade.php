@@ -451,36 +451,56 @@
                                    onchange="showSelectedFile(this)">
                         </label>
 
+                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-black text-slate-500 uppercase mb-2">
+                                    Pilih Customer
+                                </label>
+                                <select name="customer_id" id="customer_id" required
+                                        class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm"
+                                        onchange="updatePackageDropdown()">
+                                    <option value="">-- Pilih Customer --</option>
+                                    @foreach($customers as $customer)
+                                        <option value="{{ $customer->id_customer }}">{{ $customer->customer_name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-black text-slate-500 uppercase mb-2">
+                                    Pilih Package
+                                </label>
+                                <select name="package_id" id="package_id" required
+                                        class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm disabled:opacity-50" disabled>
+                                    <option value="">-- Pilih Package --</option>
+                                </select>
+                            </div>
+                        </div>
                         <div>
                             <label class="block text-xs font-black text-slate-500 uppercase mb-2">
                                 Mapping Header BOQ
                             </label>
-
-                            <select name="mapping_by"
-                                    required
+                            <select name="mapping_by" required
                                     class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm">
                                 <option value="pid">By PID SAP</option>
-                                 <option value="id_ihld">ID IHLD</option>
+                                <option value="id_ihld">ID IHLD</option>
                                 <option value="lop_name">By Nama LOP</option>
                             </select>
                         </div>
 
-                        <button id="uploadButton"
-                                class="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-lg shadow-blue-700/20">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rocket-icon lucide-rocket"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/>
-                                    <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/>
-                                </svg>
-                            <span>Start Upload</span>
-                        </button>
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <button id="uploadButton" type="submit"
+                                    class="flex-1 inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-lg shadow-blue-700/20">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rocket-icon lucide-rocket"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>
+                                <span>Start Upload</span>
+                            </button>
 
-                        <a href="{{ route('admin.import.boq.template') }}"
-                               class="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download-icon lucide-download">
-                                    <path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>
-                                </svg>
+                            <button type="button" onclick="downloadTemplateWithParams()"
+                                   class="flex-1 inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download-icon lucide-download"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
                                 <span>Download Template</span>
-                            </a>
-                            
+                            </button>
+                        </div>
                     </form>
                 </div>
 
@@ -668,6 +688,50 @@
         setTimeout(() => setProgress(45, 'stepValidating'), 900);
         setTimeout(() => setProgress(70, 'stepMatching'), 1600);
         setTimeout(() => setProgress(95, 'stepComplete'), 2300);
+    }
+</script>
+
+<script>
+    // Menyuntikkan data packages dari backend ke JavaScript
+    const allPackages = @json($packages);
+
+    function updatePackageDropdown() {
+        const customerId = document.getElementById('customer_id').value;
+        const packageSelect = document.getElementById('package_id');
+        
+        // Reset dropdown
+        packageSelect.innerHTML = '<option value="">-- Pilih Package --</option>';
+        
+        if (!customerId) {
+            packageSelect.disabled = true;
+            return;
+        }
+
+        packageSelect.disabled = false;
+
+        // Filter package berdasarkan customer_id
+        const filteredPackages = allPackages.filter(pkg => pkg.customer_id == customerId);
+        
+        filteredPackages.forEach(pkg => {
+            const option = document.createElement('option');
+            option.value = pkg.id_package;
+            option.textContent = `${pkg.package_code} - ${pkg.package_name}`;
+            packageSelect.appendChild(option);
+        });
+    }
+
+    function downloadTemplateWithParams() {
+        const customerId = document.getElementById('customer_id').value;
+        const packageId = document.getElementById('package_id').value;
+
+        if (!customerId || !packageId) {
+            alert('Silakan pilih Customer dan Package terlebih dahulu untuk mendownload template yang sesuai.');
+            return;
+        }
+
+        // Redirect ke route download dengan query string
+        const url = `{{ route('admin.import.boq.template') }}?customer_id=${customerId}&package_id=${packageId}`;
+        window.location.href = url;
     }
 </script>
 
