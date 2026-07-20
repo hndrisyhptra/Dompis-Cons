@@ -407,7 +407,7 @@
 
 </div>
 
-{{-- MODAL IMPORT --}}
+{{-- MODAL IMPORT DESIGNATOR --}}
 <div id="importDesignatorModal"
     class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
 
@@ -437,14 +437,39 @@
 
             <div class="p-5 space-y-4">
                 
+                <!-- KATEGORI PROJECT (TOGGLE) -->
                 <div>
-                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Pilih Customer <span class="text-red-500">*</span>
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Kategori Project <span class="text-red-500">*</span>
                     </label>
-                    <select name="customer_id" required
-                            class="mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+                    
+                    <div class="flex items-center gap-6 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950/50">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="import_project_type" value="internal" checked onchange="toggleImportCustomerType()" 
+                                   class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300">
+                            <span class="text-sm font-bold text-gray-700 dark:text-gray-300">TIF (Internal)</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="import_project_type" value="external" onchange="toggleImportCustomerType()" 
+                                   class="w-4 h-4 text-amber-500 focus:ring-amber-500 border-gray-300">
+                            <span class="text-sm font-bold text-gray-700 dark:text-gray-300">Eksternal Bisnis (Exbis)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- HIDDEN INPUT: Ini yang dibaca oleh Controller (Required) -->
+                <input type="hidden" name="customer_id" id="import_hidden_customer_id" value="1">
+
+                <!-- DROPDOWN EXTERNAL (Hidden by Default) -->
+                <div id="import_external_wrapper" class="hidden">
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 block">
+                        Pilih Customer Exbis <span class="text-red-500">*</span>
+                    </label>
+                    <select id="import_customer_id_select" onchange="updateImportHiddenCustomerId()"
+                            class="w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-2 focus:ring-blue-500">
                         <option value="">-- Pilih Customer --</option>
-                        @foreach($customers as $c)
+                        @foreach(\App\Models\Customer::where('id_customer', '!=', 1)->active()->get() as $c)
                             <option value="{{ $c->id_customer }}">{{ $c->customer_name }}</option>
                         @endforeach
                     </select>
@@ -482,7 +507,7 @@
                     Batal
                 </button>
 
-                <button class="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
+                <button type="submit" class="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
                     Upload
                 </button>
 
@@ -495,6 +520,9 @@
 </div>
 
 <script>
+    /* =========================================
+       LOGIKA UNTUK MODAL TAMBAH & EDIT
+    ========================================= */
     function openDesignatorModal()
     {
         document.getElementById('designatorModal').classList.remove('hidden');
@@ -517,7 +545,6 @@
         document.getElementById('designatorModal').classList.add('flex');
 
         document.getElementById('designatorModalTitle').innerText = 'Edit Designator';
-        // Sesuaikan dengan penamaan parameter route update di web.php Anda, biasanya id_designator atau id
         document.getElementById('designatorForm').action = `/designators/${item.id}`; 
         document.getElementById('designatorMethod').value = 'PUT';
 
@@ -536,10 +563,41 @@
         document.getElementById('designatorModal').classList.remove('flex');
     }
 
+    /* =========================================
+       LOGIKA UNTUK MODAL IMPORT (DENGAN TOGGLE)
+    ========================================= */
+    function toggleImportCustomerType() {
+        const type = document.querySelector('input[name="import_project_type"]:checked').value;
+        const wrapper = document.getElementById('import_external_wrapper');
+        const select = document.getElementById('import_customer_id_select');
+        const hiddenInput = document.getElementById('import_hidden_customer_id');
+
+        if (type === 'external') {
+            wrapper.classList.remove('hidden');
+            select.required = true;
+            hiddenInput.value = select.value; // set empty/terpilih
+        } else {
+            wrapper.classList.add('hidden');
+            select.required = false;
+            select.value = ""; 
+            hiddenInput.value = "1"; // TIF
+        }
+    }
+
+    function updateImportHiddenCustomerId() {
+        const select = document.getElementById('import_customer_id_select');
+        const hiddenInput = document.getElementById('import_hidden_customer_id');
+        hiddenInput.value = select.value;
+    }
+
     function openImportDesignatorModal()
     {
         document.getElementById('importDesignatorModal').classList.remove('hidden');
         document.getElementById('importDesignatorModal').classList.add('flex');
+        
+        // Reset toggle ke posisi awal (TIF) setiap kali modal dibuka
+        document.querySelector('input[name="import_project_type"][value="internal"]').checked = true;
+        toggleImportCustomerType();
     }
 
     function closeImportDesignatorModal()
@@ -548,5 +606,6 @@
         document.getElementById('importDesignatorModal').classList.remove('flex');
     }
 </script>
+
 
 @endsection

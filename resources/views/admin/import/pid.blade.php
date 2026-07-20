@@ -455,6 +455,49 @@
                                    onchange="showSelectedFile(this)">
                         </label>
 
+                        <!-- KATEGORI PROJECT (TOGGLE) -->
+                        <div class="mb-2">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                Kategori Project <span class="text-red-500">*</span>
+                            </label>
+                            
+                            <div class="flex items-center gap-6 p-3 rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-slate-950">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="project_type" value="internal" checked onchange="toggleCustomerSelect()" 
+                                           class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300">
+                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Default</span>
+                                </label>
+
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="project_type" value="external" onchange="toggleCustomerSelect()" 
+                                           class="w-4 h-4 text-amber-500 focus:ring-amber-500 border-gray-300">
+                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Eksternal Bisnis (Exbis)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- DROPDOWN EXTERNAL (Hidden by Default) -->
+                        <div id="external_customer_wrapper" class="mb-4 hidden">
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                                Pilih Customer Exbis <span class="text-red-500">*</span>
+                            </label>
+                            
+                            <!-- Hidden input untuk menampung default value TIF -->
+                            <input type="hidden" name="customer_id" id="hidden_customer_id" value="1">
+
+                            <select id="customer_id_select" onchange="updateHiddenCustomerId()"
+                                    class="w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-2 focus:ring-blue-500">
+                                <option value="">-- Pilih Customer Exbis --</option>
+                                {{-- Loop customer selain TIF (id != 1) --}}
+                                @foreach(\App\Models\Customer::where('id_customer', '!=', 1)->active()->get() as $c)
+                                    <option value="{{ $c->id_customer }}">{{ $c->customer_name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-[10px] text-amber-600 mt-1 font-semibold">
+                                *PID/Project akan disesuaikan dengan Eksternal Bisnis yang dipilih.
+                            </p>
+                        </div>
+
                         <div class="flex flex-col sm:flex-row gap-3">
                             <button id="uploadButton"
                                     class="inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-lg shadow-blue-700/20">
@@ -668,6 +711,38 @@
         setTimeout(() => setProgress(75, 'stepFinalizing'), 1600);
         setTimeout(() => setProgress(95, 'stepComplete'), 2300);
     }
+</script>
+<script>
+    function toggleCustomerSelect() {
+        const type = document.querySelector('input[name="project_type"]:checked').value;
+        const wrapper = document.getElementById('external_customer_wrapper');
+        const select = document.getElementById('customer_id_select');
+        const hiddenInput = document.getElementById('hidden_customer_id');
+        
+        if (type === 'external') {
+            // Tampilkan dropdown Exbis
+            wrapper.classList.remove('hidden');
+            select.required = true;
+            select.value = ""; // Paksa user untuk memilih
+            hiddenInput.value = ""; // Kosongkan agar validasi controller bereaksi jika tidak dipilih
+        } else {
+            // Sembunyikan dropdown, set default ke TIF
+            wrapper.classList.add('hidden');
+            select.required = false;
+            hiddenInput.value = "1"; // Otomatis kirim ID TIF
+        }
+    }
+
+    function updateHiddenCustomerId() {
+        const select = document.getElementById('customer_id_select');
+        const hiddenInput = document.getElementById('hidden_customer_id');
+        hiddenInput.value = select.value;
+    }
+
+    // Jalankan sekali saat halaman dimuat
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleCustomerSelect();
+    });
 </script>
 
 @endsection

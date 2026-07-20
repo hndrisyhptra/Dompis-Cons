@@ -144,10 +144,16 @@ class DesignatorController extends Controller
         $imported = 0;
         $updated = 0;
         $skipped = 0;
+        $rowNumber = 1; // Header adalah baris 1
+        
+        // Array penampung baris-baris yang error
+        $validationErrors = [];
 
         DB::beginTransaction();
         try {
             while (($row = fgetcsv($file, 10000, $delimiter)) !== false) {
+                $rowNumber++; // Naikkan nomor baris setiap kali loop
+
                 if (count($row) === 1 && ($row[0] === null || trim($row[0]) === '')) {
                     continue;
                 }
@@ -166,18 +172,32 @@ class DesignatorController extends Controller
                     continue;
                 }
 
+                // AMBIL DATA & CEK KOLOM KOSONG
+                $itemName = $this->cleanValue($data['item_name'] ?? null);
+                $unitValue = $this->cleanValue($data['unit'] ?? null);
+
+                $missingCols = [];
+                if ($itemName === null) $missingCols[] = 'item_name';
+                if ($unitValue === null) $missingCols[] = 'unit';
+
+                // Jika ada kolom mandatory yang kosong, catat ke dalam array error
+                if (!empty($missingCols)) {
+                    $validationErrors[] = "Baris {$rowNumber} (Desg: {$designatorCode}) -> kolom " . implode(' & ', $missingCols) . " kosong";
+                    continue; // Lewati proses simpan untuk baris ini, lanjut cari error di baris lain
+                }
+
                 $csvType = strtolower($this->cleanValue($data['type'] ?? '') ?? '');
                 
                 // Logika Penentuan Type (Mendukung Virtual Split)
                 $typesToProcess = [];
                 if (in_array($csvType, ['material', 'jasa'])) {
-                    $typesToProcess[] = $csvType; // Type sudah jelas dari CSV
+                    $typesToProcess[] = $csvType; 
                 } else {
                     $guessedType = $this->guessType($designatorCode);
                     if ($guessedType) {
-                        $typesToProcess[] = $guessedType; // Type ditebak dari prefix M-/J- (TIF)
+                        $typesToProcess[] = $guessedType; 
                     } else {
-                        // AUTO VIRTUAL SPLIT: Jika tidak ada M-/J- (seperti Mitratel), pecah jadi 2!
+                        // AUTO VIRTUAL SPLIT
                         $typesToProcess = ['material', 'jasa'];
                     }
                 }
@@ -192,8 +212,8 @@ class DesignatorController extends Controller
                 // Looping tipe (Bisa 1 kali untuk TIF, bisa 2 kali untuk Mitratel yang auto-split)
                 foreach ($typesToProcess as $type) {
                     $payload = [
-                        'item_name'         => $this->cleanValue($data['item_name'] ?? null),
-                        'unit'              => $this->cleanValue($data['unit'] ?? null),
+                        'item_name'         => $itemName, // Data sudah pasti terisi (lolos validasi di atas)
+                        'unit'              => $unitValue, // Data sudah pasti terisi
                         'type'              => $type,
                         'pair_code'         => $pairCode,
                         'progress_category' => $progressCategory,
@@ -217,21 +237,44 @@ class DesignatorController extends Controller
                     }
                 }
             }
+
+            // CEK APAKAH ADA ERROR SEBELUM DISIMPAN PERMANEN
+            if (count($validationErrors) > 0) {
+                // Batalkan semua query ke database
+                DB::rollBack();
+                fclose($file);
+                
+                // Susun pesan peringatan yang mudah dibaca Admin
+                $errorMsg = "Import dibatalkan! Silakan lengkapi CSV Anda terlebih dahulu: ";
+                $errorMsg .= implode(' | ', array_slice($validationErrors, 0, 5)); // Tampilkan max 5 error pertama
+                
+                if (count($validationErrors) > 5) {
+                    $errorMsg .= " | ...dan " . (count($validationErrors) - 5) . " baris lainnya.";
+                }
+
+                return back()->with('error', $errorMsg);
+            }
+
+            // Jika bersih tanpa error, simpan permanen!
             DB::commit();
+            
         } catch (\Exception $e) {
             DB::rollBack();
             fclose($file);
             Log::error('Import Designator Gagal: ' . $e->getMessage());
-            return back()->with('error', 'Terjadi kesalahan sistem saat mengimport data.');
-        }
+            // Menampilkan error MySQL asli ke layar (sangat membantu untuk Debugging)
+            return back()->with('error', 'Sistem error: ' . $e->getMessage());
 
+            // DEBUG TAMPIL PESAN ERROR ASLINYA KE LAYAR
+            //return back()->with('error', 'Gagal: ' . $e->getMessage());
+        }
         fclose($file);
 
         return back()->with(
             'success',
             "Import selesai. {$imported} baris baru (termasuk virtual split), {$updated} diperbarui, {$skipped} dilewati."
         );
-    }
+    }    
 
     public function toggleFinishing($id)
     {

@@ -451,31 +451,58 @@
                                    onchange="showSelectedFile(this)">
                         </label>
 
-                       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-black text-slate-500 uppercase mb-2">
-                                    Pilih Customer
+                       <!-- KATEGORI PROJECT (TOGGLE) -->
+                        <div class="mb-4">
+                            <label class="block text-xs font-black text-slate-500 uppercase mb-2">
+                                Kategori Project <span class="text-red-500">*</span>
+                            </label>
+                            
+                            <div class="flex items-center gap-6 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="project_type" value="internal" checked onchange="toggleCustomerType()" 
+                                           class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-slate-300">
+                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Default</span>
                                 </label>
-                                <select name="customer_id" id="customer_id" required
-                                        class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm"
-                                        onchange="updatePackageDropdown()">
+
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="project_type" value="external" onchange="toggleCustomerType()" 
+                                           class="w-4 h-4 text-amber-500 focus:ring-amber-500 border-slate-300">
+                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Eksternal Bisnis (Exbis)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- HIDDEN INPUT: Ini yang akan dibaca oleh Controller -->
+                        <input type="hidden" name="customer_id" id="final_customer_id" value="1">
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <!-- DROPDOWN EXTERNAL (Hidden by Default) -->
+                            <div id="wrapper_customer_exbis" class="hidden">
+                                <label class="block text-xs font-black text-slate-500 uppercase mb-2">
+                                    Pilih Customer Exbis <span class="text-red-500">*</span>
+                                </label>
+                                <select id="select_customer_exbis" onchange="updateCustomerAndPackages()"
+                                        class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm focus:ring-2 focus:ring-blue-500">
                                     <option value="">-- Pilih Customer --</option>
-                                    @foreach($customers as $customer)
-                                        <option value="{{ $customer->id_customer }}">{{ $customer->customer_name }}</option>
+                                    {{-- Hanya tampilkan customer selain TIF (ID 1) --}}
+                                    @foreach(\App\Models\Customer::where('id_customer', '!=', 1)->active()->get() as $c)
+                                        <option value="{{ $c->id_customer }}">{{ $c->customer_name }}</option>
                                     @endforeach
                                 </select>
                             </div>
 
-                            <div>
+                            <!-- DROPDOWN PACKAGE -->
+                            <div id="wrapper_package" class="md:col-span-2 transition-all"> 
                                 <label class="block text-xs font-black text-slate-500 uppercase mb-2">
-                                    Pilih Package
+                                    Pilih Package <span class="text-red-500">*</span>
                                 </label>
                                 <select name="package_id" id="package_id" required
-                                        class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm disabled:opacity-50" disabled>
+                                        class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm disabled:opacity-50">
                                     <option value="">-- Pilih Package --</option>
                                 </select>
                             </div>
                         </div>
+
                         <div>
                             <label class="block text-xs font-black text-slate-500 uppercase mb-2">
                                 Mapping Header BOQ
@@ -690,49 +717,86 @@
         setTimeout(() => setProgress(95, 'stepComplete'), 2300);
     }
 </script>
-
 <script>
-    // Menyuntikkan data packages dari backend ke JavaScript
-    const allPackages = @json($packages);
+    // PERBAIKAN: Memanggil data langsung dari Model agar tidak bergantung pada Controller
+    const allPackages = @json(\App\Models\Package::all() ?? []); 
+
+    function toggleCustomerType() {
+        try {
+            const typeRadio = document.querySelector('input[name="project_type"]:checked');
+            if (!typeRadio) return; // Keamanan tambahan
+            
+            const type = typeRadio.value;
+            const wrapperExbis = document.getElementById('wrapper_customer_exbis');
+            const selectExbis = document.getElementById('select_customer_exbis');
+            const wrapperPackage = document.getElementById('wrapper_package');
+            const finalCustomerId = document.getElementById('final_customer_id');
+
+            if (type === 'external') {
+                wrapperExbis.classList.remove('hidden');
+                wrapperPackage.classList.remove('md:col-span-2');
+                selectExbis.required = true;
+                finalCustomerId.value = selectExbis.value; 
+            } else {
+                wrapperExbis.classList.add('hidden');
+                wrapperPackage.classList.add('md:col-span-2');
+                selectExbis.required = false;
+                selectExbis.value = ""; 
+                finalCustomerId.value = "1"; 
+            }
+
+            updatePackageDropdown();
+        } catch (error) {
+            console.error("Error pada toggleCustomerType:", error);
+        }
+    }
+
+    function updateCustomerAndPackages() {
+        try {
+            const selectExbis = document.getElementById('select_customer_exbis');
+            const finalCustomerId = document.getElementById('final_customer_id');
+            
+            finalCustomerId.value = selectExbis.value;
+            updatePackageDropdown();
+        } catch (error) {
+            console.error("Error pada updateCustomerAndPackages:", error);
+        }
+    }
 
     function updatePackageDropdown() {
-        const customerId = document.getElementById('customer_id').value;
-        const packageSelect = document.getElementById('package_id');
-        
-        // Reset dropdown
-        packageSelect.innerHTML = '<option value="">-- Pilih Package --</option>';
-        
-        if (!customerId) {
-            packageSelect.disabled = true;
-            return;
+        try {
+            const activeCustomerId = document.getElementById('final_customer_id').value;
+            const packageSelect = document.getElementById('package_id');
+            
+            // Reset isi dropdown package
+            packageSelect.innerHTML = '<option value="">-- Pilih Package --</option>';
+            
+            // Jika ID customer kosong, matikan package
+            if (!activeCustomerId || activeCustomerId === "") {
+                packageSelect.disabled = true;
+                return;
+            }
+
+            packageSelect.disabled = false;
+
+            // Filter data package
+            const filteredPackages = allPackages.filter(pkg => pkg.customer_id == activeCustomerId);
+            
+            filteredPackages.forEach(pkg => {
+                const option = document.createElement('option');
+                option.value = pkg.id_package;
+                option.textContent = `${pkg.package_code} - ${pkg.package_name}`;
+                packageSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error("Error pada updatePackageDropdown:", error);
         }
-
-        packageSelect.disabled = false;
-
-        // Filter package berdasarkan customer_id
-        const filteredPackages = allPackages.filter(pkg => pkg.customer_id == customerId);
-        
-        filteredPackages.forEach(pkg => {
-            const option = document.createElement('option');
-            option.value = pkg.id_package;
-            option.textContent = `${pkg.package_code} - ${pkg.package_name}`;
-            packageSelect.appendChild(option);
-        });
     }
 
-    function downloadTemplateWithParams() {
-        const customerId = document.getElementById('customer_id').value;
-        const packageId = document.getElementById('package_id').value;
-
-        if (!customerId || !packageId) {
-            alert('Silakan pilih Customer dan Package terlebih dahulu untuk mendownload template yang sesuai.');
-            return;
-        }
-
-        // Redirect ke route download dengan query string
-        const url = `{{ route('admin.import.boq.template') }}?customer_id=${customerId}&package_id=${packageId}`;
-        window.location.href = url;
-    }
+    // Jalankan inisialisasi
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleCustomerType();
+    });
 </script>
 
 @endsection

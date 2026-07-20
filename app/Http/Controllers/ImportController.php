@@ -44,9 +44,15 @@ class ImportController extends Controller
     {
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
+        
+        // --- 1. TAMBAHKAN VALIDASI CUSTOMER ID DISINI ---
         $request->validate([
             'file' => 'required|file|extensions:xlsx,xls,csv',
+            'customer_id' => 'required|exists:customers,id_customer',
         ]);
+
+        $customerId = $request->customer_id; // Tangkap dari form
+        // ------------------------------------------------
 
         $file = $request->file('file');
         $fileName = $file->getClientOriginalName();
@@ -55,8 +61,7 @@ class ImportController extends Controller
         $filePath = $file->getRealPath();
         
         try {
-            // Gunakan IOFactory::createReader untuk mendeteksi tipe file murni secara dinamis
-            $reader = IOFactory::createReaderForFile($filePath);
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($filePath);
             $reader->setReadDataOnly(true);
             $spreadsheet = $reader->load($filePath);
         } catch (\Exception $e) {
@@ -68,12 +73,12 @@ class ImportController extends Controller
 
         $highestRow = $sheet->getHighestRow();
         $highestColumn = $sheet->getHighestColumn();
-        $highestColumnIndex = Coordinate::columnIndexFromString($highestColumn);
+        $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
 
         $headers = [];
 
         for ($col = 1; $col <= $highestColumnIndex; $col++) {
-            $columnLetter = Coordinate::stringFromColumnIndex($col);
+            $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
 
             $header = strtolower(
                 trim((string) $sheet->getCell($columnLetter . '1')->getValue())
@@ -131,7 +136,7 @@ class ImportController extends Controller
             $data = [];
 
             for ($col = 1; $col <= $highestColumnIndex; $col++) {
-                $columnLetter = Coordinate::stringFromColumnIndex($col);
+                $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
                 $headerName = $headers[$col] ?? null;
 
                 if (!$headerName) {
@@ -193,37 +198,34 @@ class ImportController extends Controller
                 $statusProject = 'active';
             }
 
-            /*
-            | PID di file boleh kosong.
-            | Karena mandatory utama adalah PID SAP + Nama LOP,
-            | maka pid project fallback ke PID SAP agar create project tetap aman.
-            */
             $pidForProject = $pid ?: $pidSap;
 
+            // --- 2. SUNTIKKAN CUSTOMER ID KE DATABASE ---
             $projectPayload = [
+                'customer_id'     => $customerId, // <- Otomatis mengikat ke dropdown yang dipilih
                 'pid'             => $pidForProject,
                 'pid_sap'         => $pidSap,
                 'project_name'    => $namaLop,
                 'program'         => $this->cleanValue($data['program'] ?? null),
-
                 'branch'          => $this->cleanValue($data['branch'] ?? null),
                 'sto'             => $this->cleanValue($data['sto'] ?? null),
                 'mitra_name'      => $this->cleanValue($data['mitra_name'] ?? null),
-
                 'execution_type'  => $executionType,
                 'status_project'  => $statusProject,
             ];
-            $project = Project::where('pid_sap', $pidSap)->first();
+            // --------------------------------------------
+
+            $project = \App\Models\Project::where('pid_sap', $pidSap)->first();
 
             if (!$project && $pid) {
-                $project = Project::where('pid', $pid)->first();
+                $project = \App\Models\Project::where('pid', $pid)->first();
             }
 
             if ($project) {
                 $project->update($projectPayload);
                 $projectUpdated++;
             } else {
-                $project = Project::create($projectPayload);
+                $project = \App\Models\Project::create($projectPayload);
                 $projectImported++;
             }
 
@@ -248,13 +250,13 @@ class ImportController extends Controller
             $lop = null;
 
             if ($idIhld) {
-                $lop = Lop::where('project_id', $project->id_project)
+                $lop = \App\Models\Lop::where('project_id', $project->id_project)
                     ->where('id_ihld', $idIhld)
                     ->first();
             }
 
             if (!$lop) {
-                $lop = Lop::where('project_id', $project->id_project)
+                $lop = \App\Models\Lop::where('project_id', $project->id_project)
                     ->whereRaw('LOWER(TRIM(lop_name)) = ?', [
                         strtolower(trim($namaLop))
                     ])
@@ -265,12 +267,12 @@ class ImportController extends Controller
                 $lop->update($lopPayload);
                 $lopUpdated++;
             } else {
-                Lop::create($lopPayload);
+                \App\Models\Lop::create($lopPayload);
                 $lopImported++;
             }
         }
 
-        ImportLog::create([
+        \App\Models\ImportLog::create([
             'type' => 'pid',
             'file_name' => $fileName,
             'uploaded_by' => auth()->user()->id_user ?? auth()->id(),
