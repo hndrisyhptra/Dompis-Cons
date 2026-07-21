@@ -267,7 +267,7 @@ class DesignatorController extends Controller
 
             // DEBUG TAMPIL PESAN ERROR ASLINYA KE LAYAR
             //return back()->with('error', 'Gagal: ' . $e->getMessage());
-        }
+       }
         fclose($file);
 
         return back()->with(

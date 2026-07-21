@@ -380,7 +380,7 @@
 
 </div>
 
-{{-- MODAL IMPORT --}}
+{{-- MODAL IMPORT PRICE --}}
 <div id="importPriceModal"
      class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
 
@@ -392,7 +392,7 @@
                     Import Harga Designator
                 </h2>
                 <p class="text-sm text-gray-500">
-                    Upload CSV harga per package
+                    Pilih paket lalu upload CSV harganya
                 </p>
             </div>
 
@@ -410,17 +410,55 @@
 
             <div class="p-5 space-y-4">
 
+                <!-- KATEGORI PROJECT (TOGGLE) -->
                 <div>
-                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Pilih Customer <span class="text-red-500">*</span>
+                    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                        Kategori Project <span class="text-red-500">*</span>
                     </label>
-                    <select name="customer_id" required
-                            class="mt-1 w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm">
+                    
+                    <div class="flex items-center gap-6 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-950/50">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="import_price_type" value="internal" checked onchange="toggleImportPriceCustomer()" 
+                                   class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300">
+                            <span class="text-sm font-bold text-gray-700 dark:text-gray-300">TIF (Internal)</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="import_price_type" value="external" onchange="toggleImportPriceCustomer()" 
+                                   class="w-4 h-4 text-amber-500 focus:ring-amber-500 border-gray-300">
+                            <span class="text-sm font-bold text-gray-700 dark:text-gray-300">Eksternal Bisnis</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- HIDDEN INPUT: Dibaca oleh Controller untuk Customer ID -->
+                <input type="hidden" name="customer_id" id="import_price_hidden_customer_id" value="1">
+
+                <!-- DROPDOWN EXTERNAL CUSTOMER (Hidden by Default) -->
+                <div id="import_price_external_wrapper" class="hidden">
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 block">
+                        Pilih Customer Exbis <span class="text-red-500">*</span>
+                    </label>
+                    <select id="import_price_customer_id_select" onchange="updateImportPriceHiddenId()"
+                            class="w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-2 focus:ring-blue-500">
                         <option value="">-- Pilih Customer --</option>
-                        @foreach($customers as $c)
+                        @foreach(\App\Models\Customer::where('id_customer', '!=', 1)->active()->get() as $c)
                             <option value="{{ $c->id_customer }}">{{ $c->customer_name }}</option>
                         @endforeach
                     </select>
+                </div>
+
+                <!-- DROPDOWN PACKAGE -->
+                <div>
+                    <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1 block">
+                        Pilih Package <span class="text-red-500">*</span>
+                    </label>
+                    <select name="package_id" id="import_package_id" required
+                            class="w-full h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 text-sm focus:ring-2 focus:ring-blue-500">
+                        <option value="">-- Pilih Package --</option>
+                        <!-- Opsi akan dirender via JS -->
+                    </select>
+                    <p class="text-[10px] text-gray-500 mt-1">Seluruh harga di CSV akan diikat ke paket ini.</p>
                 </div>
 
                 <div>
@@ -440,26 +478,23 @@
                     <p class="text-xs text-gray-500 leading-relaxed font-semibold">
                         Header CSV yang didukung:
                     </p>
-                    <p class="font-mono text-[11px] text-gray-700 dark:text-gray-300 mt-1">
-                        designator,package_code,price,type
+                    <p class="font-mono text-[11px] font-bold text-indigo-600 dark:text-indigo-400 mt-1">
+                        designator,price,type
                     </p>
-                    <p class="text-[10px] text-gray-400 mt-1">* Kolom <span class="font-mono">type</span> opsional (isi: material/jasa) untuk mencegah ambiguitas harga pada designator yang ter-split.</p>
+                    <p class="text-[10px] text-gray-400 mt-1">* Kolom <span class="font-mono">type</span> opsional (isi: material/jasa).</p>
                 </div>
 
             </div>
 
             <div class="flex justify-end gap-3 px-5 py-4 border-t border-gray-200 dark:border-gray-800">
-
                 <button type="button"
                         onclick="closeImportPriceModal()"
                         class="h-10 px-4 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold">
                     Batal
                 </button>
-
                 <button class="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold">
                     Upload
                 </button>
-
             </div>
 
         </form>
@@ -467,6 +502,69 @@
     </div>
 
 </div>
+
+<!-- SCRIPT JS UNTUK MODAL IMPORT HARGA -->
+<script>
+    function loadImportPackages(customerId) {
+        const pkgSelect = document.getElementById('import_package_id');
+        pkgSelect.innerHTML = '<option value="">-- Pilih Package --</option>';
+
+        if (!customerId) return;
+
+        // allPackages sudah dideklarasikan sebelumnya di index.blade.php
+        const filteredPkgs = allPackages.filter(p => p.customer_id == customerId);
+        filteredPkgs.forEach(p => {
+            let opt = new Option(`${p.package_code} - ${p.package_name}`, p.id_package);
+            pkgSelect.appendChild(opt);
+        });
+    }
+
+    function toggleImportPriceCustomer() {
+        const type = document.querySelector('input[name="import_price_type"]:checked').value;
+        const wrapper = document.getElementById('import_price_external_wrapper');
+        const select = document.getElementById('import_price_customer_id_select');
+        const hiddenInput = document.getElementById('import_price_hidden_customer_id');
+
+        if (type === 'external') {
+            wrapper.classList.remove('hidden');
+            select.required = true;
+            hiddenInput.value = select.value; 
+            loadImportPackages(select.value); // Load package sesuai dropdown
+        } else {
+            wrapper.classList.add('hidden');
+            select.required = false;
+            select.value = ""; 
+            hiddenInput.value = "1"; // TIF
+            loadImportPackages(1); // Load package TIF
+        }
+    }
+
+    function updateImportPriceHiddenId() {
+        const select = document.getElementById('import_price_customer_id_select');
+        const hiddenInput = document.getElementById('import_price_hidden_customer_id');
+        hiddenInput.value = select.value;
+        loadImportPackages(select.value); // Reload package saat customer exbis diganti
+    }
+
+    function openImportPriceModal()
+    {
+        document.getElementById('importPriceModal').classList.remove('hidden');
+        document.getElementById('importPriceModal').classList.add('flex');
+        
+        // Reset toggle ke posisi awal (TIF) setiap modal dibuka
+        const internalRadio = document.querySelector('input[name="import_price_type"][value="internal"]');
+        if(internalRadio) {
+            internalRadio.checked = true;
+            toggleImportPriceCustomer();
+        }
+    }
+
+    function closeImportPriceModal()
+    {
+        document.getElementById('importPriceModal').classList.add('hidden');
+        document.getElementById('importPriceModal').classList.remove('flex');
+    }
+</script>
 
 <script>
 // Load data master dari backend untuk JS logic
@@ -558,24 +656,6 @@ function openEditPriceModal(item)
     updateDependentDropdowns(item.designator_id, item.package_id);
 
     document.getElementById('price').value = item.price ?? '';
-}
-
-function closePriceModal()
-{
-    document.getElementById('priceModal').classList.add('hidden');
-    document.getElementById('priceModal').classList.remove('flex');
-}
-
-function openImportPriceModal()
-{
-    document.getElementById('importPriceModal').classList.remove('hidden');
-    document.getElementById('importPriceModal').classList.add('flex');
-}
-
-function closeImportPriceModal()
-{
-    document.getElementById('importPriceModal').classList.add('hidden');
-    document.getElementById('importPriceModal').classList.remove('flex');
 }
 </script>
 

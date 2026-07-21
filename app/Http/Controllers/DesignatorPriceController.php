@@ -106,13 +106,15 @@ class DesignatorPriceController extends Controller
         $request->validate([
             'file'        => 'required|mimes:csv,txt',
             'customer_id' => 'required|exists:customers,id_customer',
+            'package_id'  => 'required|exists:packages,id_package', // <-- Tambahan validasi package_id
         ]);
 
         $customerId = $request->customer_id;
+        $packageId  = $request->package_id; // <-- Ambil langsung dari request dropdown
+        
         $filePath = $request->file('file')->getRealPath();
         $file = fopen($filePath, 'r');
 
-        // Deteksi delimiter otomatis (, atau ;)
         $firstLine = fgets($file);
         $delimiter = (strpos($firstLine, ';') !== false) ? ';' : ',';
         rewind($file);
@@ -127,10 +129,14 @@ class DesignatorPriceController extends Controller
         $imported = 0;
         $updated = 0;
         $skipped = 0;
+        $rowNumber = 1;
+
+        $validationErrors = [];
 
         DB::beginTransaction();
         try {
             while (($row = fgetcsv($file, 10000, $delimiter)) !== false) {
+                $rowNumber++;
 
                 if (count($row) === 1 && ($row[0] === null || trim($row[0]) === '')) {
                     continue;
@@ -144,32 +150,22 @@ class DesignatorPriceController extends Controller
                 $data = array_combine($header, $row);
 
                 $designatorCode = strtoupper($this->cleanValue($data['designator'] ?? null) ?? '');
-                $packageCode    = strtoupper($this->cleanValue($data['package_code'] ?? null) ?? '');
                 $priceValue     = $this->cleanNumber($data['price'] ?? null);
-                
-                // Cek apakah user mendefinisikan type (material/jasa) di CSV untuk membedakan harga split
-                $type = strtolower($this->cleanValue($data['type'] ?? '') ?? '');
+                $type           = strtolower($this->cleanValue($data['type'] ?? '') ?? '');
 
-                if (!$designatorCode || !$packageCode || $priceValue === null) {
-                    $skipped++;
+                $missingCols = [];
+                if (empty($designatorCode)) $missingCols[] = 'designator';
+                if ($priceValue === null) $missingCols[] = 'price (angka tidak valid)';
+
+                if (!empty($missingCols)) {
+                    $validationErrors[] = "Baris {$rowNumber} -> kolom " . implode(', ', $missingCols) . " kosong/salah";
                     continue;
                 }
 
-                // Ambil paket yang sesuai dengan kode dan customer yang dipilih
-                $package = Package::where('package_code', $packageCode)
-                    ->where('customer_id', $customerId)
-                    ->first();
-
-                if (!$package) {
-                    $skipped++;
-                    continue;
-                }
-
-                // Query pencarian designator
-                $designatorQuery = Designator::where('designator', $designatorCode)
+                // Query pencarian designator berdasarkan customer_id
+                $designatorQuery = \App\Models\Designator::where('designator', $designatorCode)
                     ->where('customer_id', $customerId);
 
-                // Jika kolom type diisi di CSV (material/jasa), filter pencariannya
                 if ($type && in_array($type, ['material', 'jasa'])) {
                     $designatorQuery->where('type', $type);
                 }
@@ -177,26 +173,25 @@ class DesignatorPriceController extends Controller
                 $designators = $designatorQuery->get();
 
                 if ($designators->isEmpty()) {
-                    $skipped++;
+                    $validationErrors[] = "Baris {$rowNumber} -> Designator '{$designatorCode}' tidak ditemukan di Master Customer";
                     continue;
                 }
 
-                // Proteksi Ambiguitas: Jika 1 kode punya > 1 baris (contoh: Mitratel split jadi material & jasa),
-                // dan user TIDAK menyertakan kolom type di CSV, maka SKIP (mencegah harga tertimpa ganda dengan nilai sama)
+                // Proteksi Ambiguitas
                 if ($designators->count() > 1 && empty($type)) {
-                    $skipped++;
+                    $validationErrors[] = "Baris {$rowNumber} -> '{$designatorCode}' butuh kolom 'type' (material/jasa) karena ada 2 data di Master";
                     continue;
                 }
 
                 foreach ($designators as $designator) {
-                    $existing = DesignatorPackagePrice::where('designator_id', $designator->id_designator)
-                        ->where('package_id', $package->id_package)
+                    $existing = \App\Models\DesignatorPackagePrice::where('designator_id', $designator->id_designator)
+                        ->where('package_id', $packageId) // <-- Langsung gunakan variabel dari dropdown
                         ->first();
 
-                    DesignatorPackagePrice::updateOrCreate(
+                    \App\Models\DesignatorPackagePrice::updateOrCreate(
                         [
                             'designator_id' => $designator->id_designator,
-                            'package_id'    => $package->id_package,
+                            'package_id'    => $packageId,
                         ],
                         [
                             'price' => $priceValue,
@@ -210,19 +205,34 @@ class DesignatorPriceController extends Controller
                     }
                 }
             }
+
+            if (count($validationErrors) > 0) {
+                DB::rollBack();
+                fclose($file);
+                
+                $errorMsg = "Import dibatalkan! Silakan perbaiki CSV Anda: ";
+                $errorMsg .= implode(' | ', array_slice($validationErrors, 0, 4));
+                
+                if (count($validationErrors) > 4) {
+                    $errorMsg .= " | ...dan " . (count($validationErrors) - 4) . " error lainnya.";
+                }
+
+                return back()->with('error', $errorMsg);
+            }
+
             DB::commit();
         } catch (\Exception $e) {
             DB::rollBack();
             fclose($file);
             Log::error('Import Harga Designator Gagal: ' . $e->getMessage());
-            return back()->with('error', 'Terjadi kesalahan sistem saat mengimport harga data.');
+            return back()->with('error', 'Sistem error: ' . $e->getMessage());
         }
 
         fclose($file);
 
         return back()->with(
             'success',
-            "Import harga selesai. {$imported} data baru, {$updated} diperbarui, {$skipped} dilewati."
+            "Import harga selesai. {$imported} data baru, {$updated} diperbarui, {$skipped} baris dilewati."
         );
     }
 
