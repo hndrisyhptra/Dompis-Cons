@@ -11,23 +11,29 @@
             [
                 'number' => 1,
                 'type' => 'otdr',
-                'title' => 'Pengukuran OTDR',
-                'desc' => 'Upload foto hasil pengukuran OTDR.',
+                'title' => 'Eviden OTDR',
+                'desc' => 'Upload foto layar alat hasil pengukuran OTDR.',
             ],
             [
                 'number' => 2,
-                'type' => 'opm',
-                'title' => 'Pengukuran OPM',
-                'desc' => 'Upload foto hasil pengukuran OPM dan isi nama ODP pada catatan.',
+                'type' => 'otdr_sor', // <-- INI TIPE BARU KHUSUS FILE SOR
+                'title' => 'File (.SOR)',
+                'desc' => 'Upload file mentah berformat .sor dari alat ukur.',
             ],
             [
                 'number' => 3,
-                'type' => 'kedalaman',
-                'title' => 'Pengukuran Kedalaman Galian',
-                'desc' => 'Upload foto pengukuran kedalaman galian.',
+                'type' => 'opm',
+                'title' => 'Eviden OPM',
+                'desc' => 'Upload foto hasil pengukuran OPM dan isi nama ODP pada catatan.',
             ],
             [
                 'number' => 4,
+                'type' => 'kedalaman',
+                'title' => 'Eviden Kedalaman Galian',
+                'desc' => 'Upload foto pengukuran kedalaman galian.',
+            ],
+            [
+                'number' => 5,
                 'title' => 'Eviden Pengukuran Lainnya',
                 'type' => 'lainnya',
                 'desc' => 'Review foto hasil pengukuran lainnya.',
@@ -258,31 +264,33 @@
                         @if($photos->count() > 0)
 
                             <div class="grid grid-cols-3 gap-2 mb-3">
-
                                 @foreach($photos as $photo)
+                                    <div class="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
 
-                                    <div class="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
+                                        {{-- JIKA INI ADALAH FILE SOR --}}
+                                        @if($item['type'] == 'otdr_sor' || str_ends_with(strtolower($photo->file_path), '.sor'))
+                                            <div class="flex flex-col items-center justify-center p-2 w-full h-full bg-indigo-50">
+                                                <div class="w-10 h-10 bg-indigo-200 text-indigo-700 rounded-lg flex items-center justify-center font-black mb-1">SOR</div>
+                                                <p class="text-[8px] font-bold text-gray-600 truncate w-full text-center mt-1 px-1" title="{{ basename($photo->file_path) }}">
+                                                    {{ basename($photo->file_path) }}
+                                                </p>
+                                            </div>
+                                        @else
+                                            {{-- JIKA INI ADALAH FOTO NORMAL --}}
+                                            <img src="{{ asset('storage/' . $photo->file_path) }}" class="w-full h-full object-cover">
+                                        @endif
 
-                                        <img src="{{ asset('storage/' . $photo->file_path) }}"
-                                             class="w-full h-full object-cover">
-
+                                        {{-- TOMBOL DELETE (SAMA UNTUK KEDUANYA) --}}
                                         @if($photo->status != 'approved')
-                                            <form method="POST"
-                                                  action="{{ route('waspang.evidence.delete', $photo->id_evidence) }}"
-                                                  class="absolute top-1 right-1">
-                                                @csrf
-                                                @method('DELETE')
-
-                                                <button class="w-6 h-6 rounded-full bg-black/70 text-white text-xs">
+                                            <form method="POST" action="{{ route('waspang.evidence.delete', $photo->id_evidence) }}" class="absolute top-1 right-1 z-10">
+                                                @csrf @method('DELETE')
+                                                <button class="w-6 h-6 rounded-full bg-black/70 hover:bg-black text-white text-xs font-black transition">
                                                     ×
                                                 </button>
                                             </form>
                                         @endif
-
                                     </div>
-
                                 @endforeach
-
                             </div>
 
                         @else
@@ -387,14 +395,14 @@
                             </p>
                         </div>
 
-                        <input type="file" id="photoInput" accept="image/*" multiple class="hidden">
+                        <input type="file" id="photoInput" accept="image/*,.sor" multiple class="hidden">
                     </label>
 
-                    {{-- PREVIEW MULTIPLE FOTO --}}
+                    {{-- PREVIEW MULTIPLE FOTO & FILE --}}
                     <div id="previewWrapper" class="mt-3 hidden animate-fade-in">
                         <div class="flex items-center justify-between mb-2">
                             <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
-                                Preview Foto (<span id="photoCount">0</span>)
+                                Preview Upload (<span id="photoCount">0</span>)
                             </p>
 
                             <button type="button" id="clearAllPhotos" class="text-[11px] font-bold text-red-600 hover:text-red-700 transition">
@@ -402,6 +410,7 @@
                             </button>
                         </div>
 
+                        <!-- container preview -->
                         <div id="previewContainer" class="grid grid-cols-3 gap-2"></div>
                     </div>
                 </div>
@@ -436,9 +445,12 @@
 @section('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-let selectedFiles = [];
+// Pastikan array selalu bersih saat halaman dimuat
+window.selectedFiles = [];
+window.currentUploadType = 'image';
 
-function openUploadModal(type, title) {
+// FUNGSI BUKA MODAL
+window.openUploadModal = function(type, title) {
     document.getElementById('uploadModal').classList.remove('hidden');
     document.getElementById('uploadModal').classList.add('flex');
 
@@ -448,10 +460,10 @@ function openUploadModal(type, title) {
 
     const descriptionInput = document.getElementById('descriptionInput');
     const opmNoteInfo = document.getElementById('opmNoteInfo');
+    const photoInput = document.getElementById('photoInput');
 
     descriptionInput.value = '';
 
-    // Kondisi khusus untuk tipe pengukuran OPM
     if (type === 'opm') {
         descriptionInput.placeholder = 'Isi nama ODP, contoh: ODP-BDG-FAT-001 *wajib';
         opmNoteInfo.classList.remove('hidden');
@@ -460,78 +472,118 @@ function openUploadModal(type, title) {
         opmNoteInfo.classList.add('hidden');
     }
 
+    if (type === 'otdr_sor') {
+        photoInput.setAttribute('accept', '.sor');
+        window.currentUploadType = 'sor';
+    } else {
+        photoInput.setAttribute('accept', 'image/*');
+        window.currentUploadType = 'image';
+    }
+
     clearAllPhotosAction();
 
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function(position) {
             document.getElementById('latitude').value = position.coords.latitude;
             document.getElementById('longitude').value = position.coords.longitude;
-        }, function(err) {
-            console.warn("GPS Lock Bypass: ", err.message);
-        }, { enableHighAccuracy: true });
+        }, function(err) {}, { enableHighAccuracy: true });
     }
 }
 
-function closeUploadModal() {
+// FUNGSI TUTUP MODAL
+window.closeUploadModal = function() {
     document.getElementById('uploadModal').classList.add('hidden');
     document.getElementById('uploadModal').classList.remove('flex');
 }
 
-document.getElementById('photoInput').addEventListener('change', async function(e) {
-    const files = Array.from(e.target.files);
-    for (const file of files) {
-        if (!file.type.startsWith('image/')) continue;
-        const compressed = await compressImage(file, 1280, 0.75);
-        selectedFiles.push({
-            file: compressed,
-            url: URL.createObjectURL(compressed)
-        });
-    }
-    renderEvidencePreview();
-    document.getElementById('photoInput').value = '';
-});
+// ==============================================================================
+// PERBAIKAN BUG DOUBLE UPLOAD:
+// Menggunakan .onchange dan .onsubmit untuk mencegah event listener tertumpuk
+// ==============================================================================
 
-function renderEvidencePreview() {
+const photoInputElement = document.getElementById('photoInput');
+if (photoInputElement) {
+    photoInputElement.onchange = async function(e) {
+        const files = Array.from(e.target.files);
+        
+        for (const file of files) {
+            if (window.currentUploadType === 'sor') {
+                if (!file.name.toLowerCase().endsWith('.sor')) {
+                    Swal.fire('Format Salah', 'Harap pilih file berekstensi .sor', 'error');
+                    continue;
+                }
+                window.selectedFiles.push({ file: file, url: null, is_sor: true, name: file.name });
+            } else {
+                if (!file.type.startsWith('image/')) continue;
+                const compressed = await window.compressImage(file, 1280, 0.75);
+                window.selectedFiles.push({ file: compressed, url: URL.createObjectURL(compressed), is_sor: false, name: file.name });
+            }
+        }
+        
+        renderEvidencePreview();
+        document.getElementById('photoInput').value = '';
+    };
+}
+
+window.renderEvidencePreview = function() {
     const container = document.getElementById('previewContainer');
     const wrapper = document.getElementById('previewWrapper');
     const countLabel = document.getElementById('photoCount');
     container.innerHTML = '';
 
-    if (selectedFiles.length === 0) {
+    if (window.selectedFiles.length === 0) {
         wrapper.classList.add('hidden');
         return;
     }
 
     wrapper.classList.remove('hidden');
-    countLabel.innerText = selectedFiles.length;
+    countLabel.innerText = window.selectedFiles.length;
 
-    selectedFiles.forEach((item, index) => {
+    window.selectedFiles.forEach((item, index) => {
         const card = document.createElement('div');
-        card.className = 'relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-200 shadow-xs';
-        card.innerHTML = `
-            <img src="${item.url}" class="w-full h-full object-cover">
-            <button type="button" onclick="removeEvidencePhoto(${index})" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 text-white text-xs font-black flex items-center justify-center transition hover:bg-black">×</button>
-            <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] px-1.5 py-0.5 truncate font-medium">${formatFileSize(item.file.size)}</div>
-        `;
+        card.className = 'relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-200 shadow-sm flex items-center justify-center';
+        
+        if (item.is_sor) {
+            card.innerHTML = `
+                <div class="flex flex-col items-center p-2 text-center">
+                    <div class="w-8 h-8 bg-indigo-100 text-indigo-700 rounded-lg flex items-center justify-center font-black mb-1">SOR</div>
+                    <p class="text-[8px] font-bold text-gray-600 truncate w-full px-1">${item.name}</p>
+                </div>
+                <button type="button" onclick="removeEvidencePhoto(${index})" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 text-white text-xs font-black flex items-center justify-center transition hover:bg-black z-10">×</button>
+            `;
+        } else {
+            card.innerHTML = `
+                <img src="${item.url}" class="w-full h-full object-cover">
+                <button type="button" onclick="removeEvidencePhoto(${index})" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 text-white text-xs font-black flex items-center justify-center transition hover:bg-black">×</button>
+            `;
+        }
         container.appendChild(card);
     });
 }
 
-function removeEvidencePhoto(index) {
-    if (selectedFiles[index]) URL.revokeObjectURL(selectedFiles[index].url);
-    selectedFiles.splice(index, 1);
+window.removeEvidencePhoto = function(index) {
+    if (window.selectedFiles[index] && !window.selectedFiles[index].is_sor) {
+        URL.revokeObjectURL(window.selectedFiles[index].url);
+    }
+    window.selectedFiles.splice(index, 1);
     renderEvidencePreview();
 }
 
-function clearAllPhotosAction() {
-    selectedFiles.forEach(item => URL.revokeObjectURL(item.url));
-    selectedFiles = [];
+window.clearAllPhotosAction = function() {
+    window.selectedFiles.forEach(item => {
+        if (!item.is_sor) URL.revokeObjectURL(item.url);
+    });
+    window.selectedFiles = [];
     renderEvidencePreview();
 }
 
-document.getElementById('clearAllPhotos').addEventListener('click', clearAllPhotosAction);
+// Hapus Foto Massal
+const btnClear = document.getElementById('clearAllPhotos');
+if(btnClear) {
+    btnClear.onclick = clearAllPhotosAction;
+}
 
-function compressImage(file, maxWidth = 1280, quality = 0.75) {
+window.compressImage = function(file, maxWidth = 1280, quality = 0.75) {
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -556,55 +608,70 @@ function compressImage(file, maxWidth = 1280, quality = 0.75) {
     });
 }
 
-function formatFileSize(bytes) {
-    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
+// PROSES SUBMIT
+const uploadFormElement = document.getElementById('uploadForm');
+if (uploadFormElement) {
+    uploadFormElement.onsubmit = function(e) {
+        e.preventDefault();
 
-document.getElementById('uploadForm').addEventListener('submit', function(e) {
-    e.preventDefault();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.innerHTML;
+        
+        // Disable tombol seketika saat diklik
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = 'Memproses...';
 
-    const evidenceType = document.getElementById('upload_evidence_type').value;
-    const description = document.getElementById('descriptionInput').value.trim();
+        const evidenceType = document.getElementById('upload_evidence_type').value;
+        const description = document.getElementById('descriptionInput').value.trim();
 
-    if (selectedFiles.length === 0) {
-        Swal.fire({ title: 'Pilih Foto!', text: 'Mohon lampirkan minimal 1 foto fisik bukti pengukuran.', icon: 'warning', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
-        return;
-    }
-
-    // Validasi wajib isi catatan khusus untuk tipe OPM
-    if (evidenceType === 'opm' && description === '') {
-        Swal.fire({ title: 'Catatan Wajib!', text: 'Nama ODP wajib ditulis pada catatan untuk jenis Pengukuran OPM.', icon: 'error', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('_token', document.querySelector('input[name="_token"]').value);
-    formData.append('stage', 'pengukuran');
-    formData.append('evidence_type', evidenceType);
-    formData.append('latitude', document.getElementById('latitude').value);
-    formData.append('longitude', document.getElementById('longitude').value);
-    formData.append('description', description);
-
-    selectedFiles.forEach(item => formData.append('photos[]', item.file));
-
-    fetch(e.target.action, {
-        method: 'POST',
-        body: formData,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-    .then(response => {
-        if (response.ok) {
-            closeUploadModal();
-            Swal.fire({ title: 'Berhasil Disimpan!', text: 'Eviden progress pengukuran berhasil diperbarui.', icon: 'success', showConfirmButton: false, timer: 1500, timerProgressBar: true, customClass: { popup: 'rounded-3xl' } })
-            .then(() => window.location.reload());
-        } else {
-            Swal.fire({ title: 'Gagal Memproses!', text: 'Terjadi kesalahan sistem atau kegalaran validasi backend.', icon: 'error', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
+        if (window.selectedFiles.length === 0) {
+            Swal.fire({ title: 'Pilih File/Foto!', text: 'Mohon lampirkan minimal 1 foto/file.', icon: 'warning', confirmButtonColor: '#1D4ED8' });
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            return;
         }
-    })
-    .catch(() => {
-        Swal.fire({ title: 'Gangguan Jaringan!', text: 'Gagal menghubungi server. Pastikan koneksi internet di lapangan stabil.', icon: 'warning', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
-    });
-});
+
+        if (evidenceType === 'opm' && description === '') {
+            Swal.fire({ title: 'Catatan Wajib!', text: 'Nama ODP wajib ditulis untuk pengukuran OPM.', icon: 'error', confirmButtonColor: '#1D4ED8' });
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('_token', document.querySelector('input[name="_token"]').value);
+        formData.append('stage', 'pengukuran');
+        formData.append('evidence_type', evidenceType);
+        formData.append('latitude', document.getElementById('latitude').value);
+        formData.append('longitude', document.getElementById('longitude').value);
+        formData.append('description', description);
+
+        window.selectedFiles.forEach(item => {
+            formData.append('photos[]', item.file, item.name); 
+        });
+
+        fetch(e.target.action, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(response => {
+            if (response.ok) {
+                closeUploadModal();
+                Swal.fire({ title: 'Berhasil Disimpan!', text: 'Eviden berhasil diupload.', icon: 'success', showConfirmButton: false, timer: 1500 })
+                .then(() => window.location.reload());
+            } else {
+                Swal.fire({ title: 'Gagal Memproses!', text: 'Terjadi kesalahan sistem di server.', icon: 'error', confirmButtonColor: '#1D4ED8' });
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+        })
+        .catch(() => {
+            Swal.fire({ title: 'Gangguan Jaringan!', text: 'Gagal menghubungi server.', icon: 'warning', confirmButtonColor: '#1D4ED8' });
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        });
+    };
+}
 </script>
 @endsection

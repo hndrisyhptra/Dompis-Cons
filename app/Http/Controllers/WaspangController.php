@@ -637,7 +637,9 @@ class WaspangController extends Controller
             'stage' => 'required|in:persiapan,instalasi,pengukuran,finishing',
             'evidence_type' => 'required|string|max:100',
             'photos' => 'required|array',
-            'photos.*' => 'image|mimes:jpg,jpeg,png,webp|max:4096',
+            // HAPUS VALIDASI 'image' AGAR BISA TERIMA FILE SELAIN GAMBAR
+            // Mimes diperluas untuk menerima file sor (biasanya terbaca sbg octet-stream/txt)
+            'photos.*' => 'required|max:8192', 
             'description' => 'nullable|string',
             'latitude' => 'nullable',
             'longitude' => 'nullable',
@@ -651,7 +653,16 @@ class WaspangController extends Controller
         $lopId = \App\Models\Lop::where('project_id', $project->id_project)->value('id_lop');
 
         foreach ($request->file('photos') as $photo) {
-            $filename = now()->format('Ymd_His') . '_' . uniqid() . '.jpg';
+            
+            // DETEKSI EKSTENSI ASLI FILE
+            $originalExtension = strtolower($photo->getClientOriginalExtension());
+            $isSor = ($originalExtension === 'sor');
+            
+            // JIKA FILE ADALAH GAMBAR JPG/PNG YANG SUDAH DIKOMPRES DI JS, EKSTENSINYA BIASANYA KOSONG/BLOB, KITA FORCE JADI .jpg
+            $extension = $isSor ? 'sor' : ($originalExtension ?: 'jpg');
+            
+            // NAMA FILE DINAMIS
+            $filename = now()->format('Ymd_His') . '_' . uniqid() . '.' . $extension;
 
             $path = $photo->storeAs(
                 "evidences/{$projectFolder}/{$stage}/{$type}",
@@ -681,7 +692,7 @@ class WaspangController extends Controller
                 'evidence_id' => $evidence->id_evidence,
                 'activity_type' => 'upload_evidence',
                 'title' => 'Upload Eviden',
-                'description' => 'Waspang upload eviden: ' . $evidenceLabel,
+                'description' => 'Waspang upload eviden: ' . $evidenceLabel . ($isSor ? ' [File SOR]' : ''),
                 'stage' => $evidence->stage,
                 'status_after' => 'pending',
                 'meta' => [
@@ -723,12 +734,9 @@ class WaspangController extends Controller
                     foreach ($items as $index => $item) {
                         $plan = (float)$item->quantity_plan;
 
-                        // 🔍 BAGIAN UTAMA YANG DIUBAH:
-                        // Jika baris loop ini adalah baris material terakhir, tampung SEMUA sisa over-volume input aktual
                         if ($index === $totalItems - 1) {
                             $actual = $remaining;
                         } else {
-                            // Jika bukan baris terakhir, alokasikan bertahap sesuai batas nominal plan baris tersebut
                             $actual = min($plan, $remaining);
                         }
 
@@ -760,7 +768,7 @@ class WaspangController extends Controller
                     ]);
                     
                 } else {
-                    // KONDISI B: JIKA BUKAN KABEL / TIANG (Simpan langsung nilainya secara utuh)
+                    // KONDISI B: JIKA BUKAN KABEL / TIANG
                     $actualValue = $request->quantity_actual !== null ? (float)$request->quantity_actual : 0;
 
                     \App\Models\BoqItem::where('id_boq', $request->boq_item_id)

@@ -482,7 +482,8 @@ public function importCsv(Request $request)
                       $lopQ->where('sto', 'like', "%{$search}%")
                            ->orWhere('branch', 'like', "%{$search}%")
                            ->orWhere('mitra_name', 'like', "%{$search}%")
-                           ->orWhere('program_sap', 'like', "%{$search}%");
+                           ->orWhere('program_sap', 'like', "%{$search}%")
+                           ->orWhere('id_ihld', 'like', "%{$search}%");
                   })
                   ->orWhereHas('assignment.waspang', function ($waspangQ) use ($search) {
                       $waspangQ->where('name', 'like', "%{$search}%");
