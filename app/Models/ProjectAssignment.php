@@ -17,6 +17,7 @@ class ProjectAssignment extends Model
     protected $fillable = [
     'project_id',
     'waspang_id',
+    'teknisi_id',
     'assigned_by',
     ];
 
@@ -33,5 +34,10 @@ class ProjectAssignment extends Model
     public function admin()
     {
         return $this->belongsTo(User::class, 'assigned_by', 'id_user');
+    }
+
+    public function teknisi()
+    {
+        return $this->belongsTo(User::class, 'teknisi_id', 'id_user');
     }
 }

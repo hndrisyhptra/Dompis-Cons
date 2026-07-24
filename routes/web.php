@@ -13,6 +13,7 @@ use App\Http\Controllers\PackageController;
 use App\Http\Controllers\DesignatorPriceController;
 use App\Http\Controllers\AssignWaspangController;
 use App\Http\Controllers\DashboardPmController;
+use App\Http\Controllers\TeknisiPt2Controller;
 
 
 
@@ -468,7 +469,31 @@ Route::middleware(['auth'])->group(function () {
 });
 
 
+  /*
+|--------------------------------------------------------------------------
+| ROLE TEKNISI
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->prefix('teknisi/pt2')->name('teknisi.pt2.')->group(function () {
+    
+    Route::get('/dashboard', [TeknisiPt2Controller::class, 'index'])->name('dashboard');
+    Route::get('/inbox', [TeknisiPt2Controller::class, 'inbox'])->name('index'); 
+    
+    // Step 1: Survey & Mode
+    Route::get('/survey/{project_id}', [TeknisiPt2Controller::class, 'step1'])->name('step1');
+    Route::post('/survey/{project_id}', [TeknisiPt2Controller::class, 'storeStep1'])->name('step1.store');
+    
+});
 
+ /*
+|--------------------------------------------------------------------------
+| ROLE SDI
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->prefix('sdi')->name('sdi.')->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\SdiController::class, 'index'])->name('index');
+    Route::post('/golive/{id}', [\App\Http\Controllers\SdiController::class, 'storeGoLive'])->name('golive.store');
+});
 
 /*
 |--------------------------------------------------------------------------

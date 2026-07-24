@@ -102,15 +102,34 @@
 {{-- Project Table List --}}
 <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
 
-    <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+    {{-- HEADER TABEL: Judul & Dropdown Per Page --}}
+    <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-base font-black text-gray-900 dark:text-white">Daftar Project</h2>
             <p class="text-xs text-gray-500 mt-1">Monitoring progress, assignment, evidence dan KML</p>
         </div>
 
-        <span class="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
-            {{ method_exists($projects, 'total') ? $projects->total() : $projects->count() }} Project
-        </span>
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+            {{-- DROPDOWN JUMLAH BARIS --}}
+            <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
+                <span class="font-medium">Tampilkan</span>
+                <select onchange="window.location.href=this.value" 
+                        class="bg-transparent border-none text-gray-900 dark:text-white text-xs font-bold focus:ring-0 cursor-pointer p-0 pr-5">
+                    @foreach([10, 20, 50, 100] as $val)
+                        <option value="{{ request()->fullUrlWithQuery(['per_page' => $val, 'page' => 1]) }}" 
+                            {{ request('per_page', 10) == $val ? 'selected' : '' }}>
+                            {{ $val }}
+                        </option>
+                    @endforeach
+                </select>
+                <span class="font-medium">Baris</span>
+            </div>
+            
+            {{-- TOTAL DATA --}}
+            <span class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 text-xs font-bold whitespace-nowrap">
+                Total: {{ $projects->total() }} Data
+            </span>
+        </div>
     </div>
 
     <div class="overflow-x-auto">
@@ -144,11 +163,29 @@
                         $stageLabel = $summary['stageLabel'];
 
                         $evidences = $project->evidences ?? collect();
-                        $waspang = optional($project->assignment)->waspang;
+                       
+                        $assignmentData = $project->assignment;
+                        $assignedUser = null;
+                        $assignedRoleBadge = '';
+
+                        if ($assignmentData) {
+                            if ($assignmentData->waspang_id) {
+                                $assignedUser = $assignmentData->waspang ?? \App\Models\User::find($assignmentData->waspang_id);
+                                $assignedRoleBadge = 'Waspang';
+                            } elseif ($assignmentData->teknisi_id) {
+                                $assignedUser = \App\Models\User::find($assignmentData->teknisi_id);
+                                $assignedRoleBadge = 'Teknisi';
+                            }
+                        }
 
                         $pendingCount = $evidences->where('status', 'pending')->count();
                         $approvedCount = $evidences->where('status', 'approved')->count();
                         $rejectedCount = $evidences->where('status', 'rejected')->count();
+
+                        // Deteksi program (ambil dari lops jika di model project tidak ada)
+                        $programName = $project->program ?? optional($project->lops->first())->program_sap ?? '';
+                        $isPT2 = (str_replace(' ', '', strtoupper($programName)) === 'PT2');
+                        $labelRole = $isPT2 ? 'Teknisi' : 'Waspang';
 
                         if ($progress == 100) {
                             $stageBadge = 'bg-green-100 text-green-700';
@@ -196,9 +233,9 @@
                         </td>
 
                         <td class="px-5 py-4">
-                            @if($waspang)
-                                <p class="font-bold text-gray-900 dark:text-white">{{ $waspang->name }}</p>
-                                <p class="text-xs text-green-600 font-bold">Assigned</p>
+                            @if($assignedUser)
+                                <p class="font-bold text-gray-900 dark:text-white">{{ $assignedUser->name }}</p>
+                                <p class="text-xs text-green-600 font-bold">Assigned ({{ $assignedRoleBadge }})</p>
                             @else
                                 <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-bold">
                                     Belum diassign
@@ -255,119 +292,93 @@
                             </div>
                         </td>
 
-                       <td class="px-5 py-4 text-center">
-
-                        <div class="relative inline-block text-left">
+                    <td class="px-5 py-4 text-center">
+                        <div class="action-menu-container inline-block text-left">
 
                             <button type="button"
-                                    onclick="toggleMenu('menu-{{ $project->id_project }}')"
-                                    class="w-9 h-9 rounded-xl flex items-center justify-center transition-colors duration-200
-                                        text-gray-600 hover:bg-gray-200 hover:text-gray-900
-                                        dark:text-white dark:hover:bg-gray-400 dark:hover:text-gray-100">
-
-                                <svg xmlns="http://www.w3.org/2000/svg"
-                                    class="w-5 h-5"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor">
-                                    <path stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        stroke-width="2"
-                                        d="M12 5h.01M12 12h.01M12 19h.01"/>
+                                    onclick="toggleMenu(event, 'menu-{{ $project->id_project }}', this)"
+                                    class="w-9 h-9 rounded-xl flex items-center justify-center transition-colors duration-200 text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:text-white dark:hover:bg-gray-400 dark:hover:text-gray-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5h.01M12 12h.01M12 19h.01"/>
                                 </svg>
-
                             </button>
 
+                            {{-- MENU DROPDOWN (Ubah ke Fixed dan Dikelompokkan) --}}
                             <div id="menu-{{ $project->id_project }}"
-                                class="hidden absolute right-0 mt-2 w-52 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-xl z-50">
+                                class="action-menu-dropdown hidden fixed w-56 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl z-[9999] overflow-hidden">
+                                
+                                <div class="flex flex-col text-left py-2">
+                                    <button type="button" onclick="openDetailModal('detail-modal-{{ $project->id_project }}')"
+                                            class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-800 hover:text-blue-700 transition-colors">
+                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0x" />
+                                        </svg>
+                                        <span class="font-semibold">Detail Project</span>
+                                    </button>
+                                    <a href="{{ route('admin.projects.tracking', $project->id_project) }}"
+                                    class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-800 hover:text-blue-700 transition-colors">
+                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25A7.5 7.5 0 1119.5 10.5z" />
+                                        </svg>
+                                        <span class="font-semibold">Tracking Progress</span>
+                                    </a>
 
-                                <div class="py-2 space-y-0.5">
+                                    <button type="button" onclick="openAssignModal('{{ $project->id_project }}', @js($project->project_name), @js($programName))"
+                                            class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-gray-800 hover:text-amber-700 transition-colors">
+                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                                        </svg>
+                                        <span class="font-semibold">{{ $assignedUser ? 'Reassign ' . $labelRole : 'Assign ' . $labelRole }}</span>
+                                    </button>
+                                    
+                                    <button type="button" onclick="openKmlModal('{{ $project->id_project }}', @js($project->project_name))"
+                                            class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+                                        </svg>
+                                        <span class="font-semibold">Upload KML</span>
+                                    </button>
+                                    @if($project->kml_file)
+                                        <a href="{{ route('projects.view-kml', $project->id_project) }}"
+                                        class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
+                                            </svg>
+                                            <span class="font-semibold">View KML</span>
+                                        </a>
+                                    @endif
 
-                        <button type="button"
-                                onclick="openDetailModal('detail-modal-{{ $project->id_project }}')"
-                                class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
-                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0x" />
-                            </svg>
-                            <span>Detail Project</span>
-                        </button>
+                                    <button type="button" onclick="openEditProjectModal({ id:'{{ $project->id_project }}' })"
+                                            class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                                         <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                                        </svg>
+                                        <span class="font-semibold">Edit Data</span>
+                                    </button>
+                                    <form method="POST" action="{{ route('projects.destroy',$project->id_project) }}" class="m-0">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" onclick="return confirm('Hapus project ini?')"
+                                                class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
+                                             <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                            </svg>
+                                            <span class="font-semibold">Delete Project</span>
+                                        </button>
+                                    </form>
 
-                        <button type="button"
-                                onclick="openAssignModal('{{ $project->id_project }}', @js($project->project_name))"
-                                class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
-                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                            </svg>
-                            <span>{{ $waspang ? 'Reassign Waspang' : 'Assign Waspang' }}</span>
-                        </button>
-
-                        <button type="button"
-                                onclick="openKmlModal('{{ $project->id_project }}', @js($project->project_name))"
-                                class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
-                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
-                            </svg>
-                            <span>Upload KML</span>
-                        </button>
-
-                        @if($project->kml_file)
-                            <a href="{{ route('projects.view-kml', $project->id_project) }}"
-                            class="block px-4 py-2 text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
-                                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z" />
-                                </svg>
-                                <span>View KML</span>
-                            </a>
-                        @endif
-
-                        <a href="{{ route('admin.projects.tracking', $project->id_project) }}"
-                        class="block px-4 py-2 text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
-                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25A7.5 7.5 0 1119.5 10.5z" />
-                            </svg>
-                            <span>Tracking</span>
-                        </a>
-
-                        <button type="button"
-                                onclick="openEditProjectModal({ id:'{{ $project->id_project }}' })"
-                                class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors">
-                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                            </svg>
-                            <span>Edit</span>
-                        </button>
-
-                        <hr class="my-1 border-gray-200 dark:border-gray-700" />
-
-                        <form method="POST" action="{{ route('projects.destroy',$project->id_project) }}">
-                            @csrf
-                            @method('DELETE')
-
-                            <button type="submit"
-                                    onclick="return confirm('Hapus project ini?')"
-                                    class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md transition-colors">
-                                <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                                </svg>
-                                <span>Delete</span>
-                            </button>
-                        </form>
-
-                    </div>
-
-        </div>
-
-    </div>
-
-</td>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
                     </tr>
                 @empty
                     <tr>
                         <td colspan="6" class="px-6 py-12 text-center">
                             <div class="mx-auto w-14 h-14 rounded-3xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-2xl mb-3">
-                                📂
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-icon lucide-trash"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                             </div>
                             <p class="font-black text-gray-900 dark:text-white">Belum ada project</p>
                             <p class="text-sm text-gray-500 mt-1">Data project akan tampil di sini setelah upload/import PID.</p>
@@ -387,7 +398,24 @@
         $progress = $summary['progress'];
         $stageLabel = $summary['stageLabel'];
         $evidences = $project->evidences ?? collect();
-        $waspang = optional($project->assignment)->waspang;
+        
+        $assignmentData = $project->assignment;
+        $assignedUser = null;
+        $assignedRoleBadge = '';
+
+        if ($assignmentData) {
+            if ($assignmentData->waspang_id) {
+                $assignedUser = $assignmentData->waspang ?? \App\Models\User::find($assignmentData->waspang_id);
+                $assignedRoleBadge = 'Waspang';
+            } elseif ($assignmentData->teknisi_id) {
+                $assignedUser = \App\Models\User::find($assignmentData->teknisi_id);
+                $assignedRoleBadge = 'Teknisi';
+            }
+        }
+
+        $programName = $project->program ?? optional($project->lops->first())->program_sap ?? '';
+        $isPT2 = (str_replace(' ', '', strtoupper($programName)) === 'PT2');
+        $labelRole = $isPT2 ? 'Teknisi' : 'Waspang';
 
         if ($progress == 100) {
             $stageBadge = 'bg-green-100 text-green-700';
@@ -463,9 +491,10 @@
                     </div>
 
                     <div>
-                        <p class="text-xs uppercase text-gray-400 font-semibold">Nama Waspang</p>
+                        <p class="text-xs uppercase text-gray-400 font-semibold">Ditugaskan Kepada</p>
                         <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">
-                            {{ $waspang->name ?? 'Belum diassign' }}
+                            {{ $assignedUser->name ?? 'Belum diassign' }} 
+                            @if($assignedUser) <span class="text-xs font-normal text-gray-500">({{ $assignedRoleBadge }})</span> @endif
                         </p>
                     </div>
                 </div>
@@ -554,9 +583,9 @@
 
             <div class="flex flex-col sm:flex-row justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
                 <button type="button"
-                        onclick="openAssignModal('{{ $project->id_project }}', @js($project->project_name))"
+                        onclick="openAssignModal('{{ $project->id_project }}', @js($project->project_name), @js($programName))"
                         class="h-11 px-6 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-bold hover:bg-gray-100 dark:hover:bg-gray-800">
-                    👷 {{ $waspang ? 'Reassign Waspang' : 'Assign Waspang' }}
+                    👷 {{ $assignedUser ? 'Reassign ' . $labelRole : 'Assign ' . $labelRole }}
                 </button>
 
                 <button type="button"
@@ -601,157 +630,103 @@
         </div>
     </div>
 @endforeach
+{{-- PAGINATION LINK SAJA --}}
+    @if($projects->hasPages())
+        <div class="px-5 py-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+            {{ $projects->links() }}
+        </div>
+    @endif
 
-@if($projects->hasPages())
-    <div class="mt-6">
-        {{ $projects->links() }}
-    </div>
-@endif
+</div>
 
 {{-- ASSIGN MODAL --}}
-<div id="assignModal"
-     class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-3 sm:p-4">
-
+<div id="assignModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-3 sm:p-4">
     <div class="bg-white dark:bg-gray-900 w-full max-w-lg max-h-[90vh] rounded-2xl overflow-hidden flex flex-col">
-
         <div class="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-200 dark:border-gray-800">
-
             <div class="min-w-0">
-                <h2 class="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
-                    Assign Waspang
-                </h2>
-
+                <h2 class="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Assign Waspang & Teknisi</h2>
                 <p id="assignProjectName" class="text-sm text-gray-500 mt-1 truncate"></p>
+                {{-- Indikator Tipe Kebutuhan (Otomatis dari JS) --}}
+                <span id="assignRoleNeeded" class="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded"></span>
             </div>
-
-            <button type="button"
-                    onclick="closeAssignModal()"
-                    class="shrink-0 w-10 h-10 rounded-xl border border-gray-300 dark:border-gray-700 flex items-center justify-center text-2xl leading-none hover:bg-gray-100 dark:hover:bg-gray-800">
-                ×
-            </button>
-
+            <button type="button" onclick="closeAssignModal()" class="shrink-0 w-10 h-10 rounded-xl border border-gray-300 dark:border-gray-700 flex items-center justify-center text-2xl leading-none hover:bg-gray-100 dark:hover:bg-gray-800">×</button>
         </div>
 
-        <form method="POST"
-              action="{{ route('projects.assign') }}"
-              class="flex flex-col min-h-0">
+        <form method="POST" action="{{ route('projects.assign') }}" class="flex flex-col min-h-0">
             @csrf
-
             <input type="hidden" name="project_id" id="project_id">
-
+            
             <div class="px-5 py-4 overflow-y-auto">
-
-                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Pilih waspang yang akan ditugaskan untuk proyek ini:
-                </p>
-
                 <div class="relative mb-4">
-                    <input type="text"
-                        id="searchWaspangAssign"
-                        placeholder="Cari nama waspang..."
+                    <input type="text" 
+                        id="searchWaspangAssign" 
+                        oninput="searchAssignUser(this.value)"
+                        placeholder="Cari nama pengguna..." 
                         class="w-full h-11 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 pl-10 pr-4 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none">
-
-                    <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                        🔍
-                    </div>
+                    
+                    <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</div>
                 </div>
 
-                <div class="space-y-3">
-
-                    @foreach($waspangs as $waspangUser)
-
+                <div class="space-y-3" id="assignUserList">
+                    {{-- Loop dari variabel gabungan Waspang & Teknisi --}}
+                    @foreach($assignableUsers as $user)
                         @php
-                            $activeCount = $waspangUser->assignments
-                            ->unique('project_id')
-                            ->count();
-                            $isBusy = $activeCount >= 3;
-
-                            $initials = strtoupper(
-                                collect(explode(' ', $waspangUser->name))
-                                    ->map(fn($word) => substr($word, 0, 1))
-                                    ->take(2)
-                                    ->implode('')
-                            );
+                            // (Mencari berdasarkan waspang_id ATAU teknisi_id):
+                            $activeCount = \App\Models\ProjectAssignment::where('waspang_id', $user->id_user)
+                                            ->orWhere('teknisi_id', $user->id_user)
+                                            ->distinct('project_id')
+                                            ->count();
+                            $isBusy = $activeCount >= 10;
+                            $initials = strtoupper(collect(explode(' ', $user->name))->map(fn($word) => substr($word, 0, 1))->take(2)->implode(''));
                         @endphp
 
-                        <label class="block cursor-pointer assign-waspang-item"
-                            data-name="{{ strtolower($waspangUser->name) }}"
+                        <label class="block cursor-pointer assign-user-item" 
+                            data-name="{{ strtolower($user->name) }}" 
+                            data-role="{{ $user->role }}" {{-- Penting untuk filter JS --}}
                             data-project-count="{{ $activeCount }}">
 
-                            <input type="radio"
-                                   name="waspang_id"
-                                   value="{{ $waspangUser->id_user }}"
-                                   class="peer sr-only"
-                                   required>
+                            {{-- Name diubah jadi assigned_user_id --}}
+                            <input type="radio" name="assigned_user_id" value="{{ $user->id_user }}" class="peer sr-only" required>
 
                             <div class="rounded-2xl border border-gray-200 dark:border-gray-800 p-4 transition peer-checked:border-blue-500 peer-checked:bg-blue-50">
-
                                 <div class="flex items-center gap-3">
-
                                     <div class="w-11 h-11 rounded-full bg-blue-700 text-white flex items-center justify-center text-sm font-bold shrink-0">
                                         {{ $initials }}
                                     </div>
-
                                     <div class="min-w-0 flex-1">
                                         <h3 class="text-sm sm:text-base font-bold text-gray-900 dark:text-white truncate">
-                                            {{ $waspangUser->name }}
+                                            {{ $user->name }}
                                         </h3>
-
-                                        <p class="text-xs sm:text-sm text-gray-500">
-                                            {{ $activeCount }} proyek aktif
+                                        <p class="text-xs sm:text-sm text-gray-500 flex items-center gap-2">
+                                            {{-- Menampilkan Badge Role --}}
+                                            <span class="font-bold {{ $user->role == 'teknisi' ? 'text-purple-600' : 'text-blue-600' }}">
+                                                {{ ucfirst($user->role) }}
+                                            </span>
+                                            • {{ $activeCount }} proyek aktif
                                         </p>
                                     </div>
-
                                     @if($isBusy)
-                                        <span class="shrink-0 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">
-                                            Overload
-                                        </span>
+                                        <span class="shrink-0 px-3 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">Overload</span>
                                     @else
-                                        <span class="shrink-0 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
-                                            Idle
-                                        </span>
+                                        <span class="shrink-0 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">Idle</span>
                                     @endif
-
                                 </div>
-
                             </div>
-
                         </label>
-
                     @endforeach
 
-                    <div id="emptyWaspangSearch"
-                        class="hidden rounded-xl border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500">
-                        Waspang tidak ditemukan.
+                    <div id="emptyUserSearch" class="hidden rounded-xl border border-dashed border-gray-300 p-4 text-center text-sm text-gray-500">
+                        Pengguna tidak ditemukan.
                     </div>
-
                 </div>
-
-                <div class="mt-4 rounded-2xl bg-gray-100 dark:bg-gray-800 p-4 text-sm text-gray-600 dark:text-gray-400">
-                    Waspang yang dipilih akan dapat melihat LOP ini di dashboard mereka.
-                </div>
-
             </div>
 
             <div class="grid grid-cols-2 gap-3 px-5 py-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-
-                <button type="button"
-                        onclick="closeAssignModal()"
-                        class="h-11 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800">
-                    Batal
-                </button>
-
-                <button type="submit"
-                        class="h-11 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black">
-                    Assignment
-                </button>
-
+                <button type="button" onclick="closeAssignModal()" class="h-11 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800">Batal</button>
+                <button type="submit" class="h-11 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black">Assignment</button>
             </div>
-
         </form>
-
     </div>
-
 </div>
 
 {{-- IMPORT CSV MODAL --}}
@@ -1143,32 +1118,58 @@
 @endsection
 
 <script>
-function openAssignModal(projectId, projectName)
-    {
-        const modal = document.getElementById('assignModal');
-
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-
-        document.getElementById('project_id').value = projectId;
-        document.getElementById('assignProjectName').innerText = projectName;
-
-        // RESET SEARCH
-        const searchInput = document.getElementById('searchWaspangAssign');
-        const items = document.querySelectorAll('.assign-waspang-item');
-        const emptyState = document.getElementById('emptyWaspangSearch');
-
-        if (searchInput) {
-            searchInput.value = '';
-        }
+function searchAssignUser(keyword) {
+        let filter = keyword.toLowerCase();
+        let items = document.querySelectorAll('.assign-user-item');
+        let hasVisible = false;
+        
+        // Cek indikator teks untuk mengetahui apakah butuh Teknisi atau Waspang
+        let neededText = document.getElementById('assignRoleNeeded').innerText || '';
+        let neededRole = neededText.includes('Teknisi') ? 'teknisi' : 'waspang';
 
         items.forEach(item => {
-            item.classList.remove('hidden');
+            let name = item.getAttribute('data-name');
+            name = name ? name.toLowerCase() : '';
+            let role = item.getAttribute('data-role');
+            
+            // Logika: Jika Role-nya cocok DAN namanya mengandung huruf yang diketik
+            if (role === neededRole && name.includes(filter)) {
+                item.style.display = 'block'; 
+                hasVisible = true;
+            } else {
+                item.style.display = 'none';
+            }
         });
 
+        // Tampilkan peringatan "Kosong" jika tidak ada yang cocok
+        let emptyState = document.getElementById('emptyUserSearch');
         if (emptyState) {
-            emptyState.classList.add('hidden');
+            emptyState.style.display = hasVisible ? 'none' : 'block';
         }
+    }
+
+    // FUNGSI 2: Buka Modal
+    function openAssignModal(projectId, projectName, program) {
+        document.getElementById('project_id').value = projectId;
+        document.getElementById('assignProjectName').innerText = projectName;
+        
+        // Deteksi program PT2
+        let prog = program ? String(program).toUpperCase().replace(/\s/g, "") : '';
+        let isPT2 = (prog === 'PT2');
+
+        // Ubah teks indikator
+        document.getElementById('assignRoleNeeded').innerText = isPT2 ? 'Project ini membutuhkan: Teknisi' : 'Project ini membutuhkan: Waspang';
+
+        // Bersihkan kolom pencarian setiap kali modal dibuka
+        let searchInput = document.getElementById('searchWaspangAssign');
+        if(searchInput) searchInput.value = '';
+
+        // Panggil fungsi search dengan keyword kosong untuk me-reset daftar list (menyesuaikan role)
+        searchAssignUser('');
+
+        // Tampilkan Modal
+        document.getElementById('assignModal').classList.remove('hidden');
+        document.getElementById('assignModal').classList.add('flex');
     }
 
 function closeAssignModal()
@@ -1519,12 +1520,54 @@ function closeAssignModal()
         modal.classList.remove('flex');
     }
 
-    function toggleMenu(id) {
-        document.querySelectorAll('[id^="menu-"]').forEach(menu => {
-            if(menu.id !== id) menu.classList.add('hidden');
+    function toggleMenu(event, menuId, btnElement) {
+        event.stopPropagation(); // Mencegah klik menyebar ke window
+        
+        let menu = document.getElementById(menuId);
+        let isHidden = menu.classList.contains('hidden');
+        
+        // 1. Tutup semua dropdown menu yang sedang terbuka
+        document.querySelectorAll('.action-menu-dropdown').forEach(el => {
+            el.classList.add('hidden');
         });
-        document.getElementById(id).classList.toggle('hidden');
+        
+        if (isHidden) {
+            // 2. Tampilkan menu
+            menu.classList.remove('hidden');
+            
+            // 3. Ambil koordinat tombol yang di-klik
+            let rect = btnElement.getBoundingClientRect();
+            
+            // 4. Hitung ruang layar yang tersedia
+            let menuHeight = menu.offsetHeight;
+            let spaceBelow = window.innerHeight - rect.bottom;
+            
+            // 5. Jika ruang di bawah sempit, buka ke ATAS. Jika luas, buka ke BAWAH.
+            if (spaceBelow < menuHeight && rect.top > menuHeight) {
+                menu.style.top = (rect.top - menuHeight - 5) + 'px'; // Buka ke Atas
+            } else {
+                menu.style.top = (rect.bottom + 5) + 'px'; // Buka ke Bawah
+            }
+            
+            // 6. Rata Kanan dengan tombol
+            menu.style.left = (rect.right - menu.offsetWidth) + 'px';
+        }
     }
+
+        // TUTUP MENU SAAT KLIK DI LUAR
+        window.addEventListener('click', function(e) {
+            if (!e.target.closest('.action-menu-container')) {
+                document.querySelectorAll('.action-menu-dropdown').forEach(el => el.classList.add('hidden'));
+            }
+        });
+
+        // TUTUP MENU SAAT TABEL DI-SCROLL (Agar menu fixed tidak melayang tertinggal)
+        let tableContainer = document.querySelector('.overflow-x-auto');
+        if(tableContainer) {
+            tableContainer.addEventListener('scroll', function() {
+                document.querySelectorAll('.action-menu-dropdown').forEach(el => el.classList.add('hidden'));
+            });
+        }
 
     document.addEventListener('click', function(e){
         if(!e.target.closest('.relative')){

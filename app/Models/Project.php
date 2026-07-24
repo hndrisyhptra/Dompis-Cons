@@ -190,4 +190,14 @@ class Project extends Model
     {
         return $this->hasMany(\App\Models\ProjectIssue::class, 'project_id', 'id_project');
     }
+
+    public function pt2Survey()
+    {
+        return $this->hasOne(Pt2Survey::class, 'project_id', 'id_project');
+    }
+
+    public function pt2Mancore()
+    {
+        return $this->hasOne(Pt2Mancore::class, 'project_id', 'id_project');
+    }
 }

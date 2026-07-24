@@ -1,24 +1,18 @@
 <aside class="hidden lg:flex lg:flex-col w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 min-h-screen">
 
+    {{-- Header / Logo --}}
     <div class="h-16 px-5 flex items-center border-b border-gray-200 dark:border-gray-800">
-
         <div class="flex items-center gap-3">
-
-            <div class="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold">
-                D
-            </div>
-
+            <img src="{{ asset('images/logo-dompis-cons.png') }}" alt="Logo" class="w-9 h-9">
             <div>
-                <h1 class="text-base font-bold text-gray-900 dark:text-white">
-                    Dompis Cons
+                <h1 class="text-base font-black tracking-tight text-gray-900 dark:text-white">
+                    DOMPIS <span class="text-blue-600">Cons</span>
                 </h1>
                 <p class="text-xs text-gray-500">
                     Admin Project
                 </p>
             </div>
-
         </div>
-
     </div>
 
     <nav class="flex-1 p-4 space-y-1">
@@ -173,61 +167,71 @@
                 </svg>
             </button>
 
-            <div x-show="open"
-                x-transition
-                class="mt-2 ml-5 pl-3 border-l border-gray-200 dark:border-gray-700 space-y-1">
+                <div x-show="open"
+                    x-transition
+                    class="mt-2 ml-5 pl-3 border-l border-gray-200 dark:border-gray-700 space-y-1">
 
-                <a href="{{ route('projects.index', ['program' => 'OSP']) }}"
-                class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                {{ $activeProgram == 'OSP' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                    <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                        OSP
-                    </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Fiber</span>
-                </a>
+                    <a href="{{ route('projects.index', ['program' => 'OSP']) }}"
+                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                    {{ $activeProgram == 'OSP' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                        <span class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                            OSP
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Fiber</span>
+                    </a>
 
-                <a href="{{ route('projects.index', ['program' => 'NODE B']) }}"
-                class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                {{ $activeProgram == 'NODE B' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                    <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
-                        NODE B
-                    </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Site</span>
-                </a>
+                    <a href="{{ route('projects.index', ['program' => 'NODE B']) }}"
+                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                    {{ $activeProgram == 'NODE B' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                        <span class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                            NODE B
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Site</span>
+                    </a>
 
-                <a href="{{ route('projects.index', ['program' => 'HEM']) }}"
-                class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                {{ $activeProgram == 'HEM' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                    <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                        HEM
-                    </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">HEM</span>
-                </a>
+                    <a href="{{ route('projects.index', ['program' => 'HEM']) }}"
+                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                    {{ $activeProgram == 'HEM' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                        <span class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                            HEM
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">HEM</span>
+                    </a>
 
-                <a href="{{ route('projects.index', ['program' => 'OLO']) }}"
-                class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                {{ $activeProgram == 'OLO' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                    <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                        OLO
-                    </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">Partner</span>
-                </a>
+                    <a href="{{ route('projects.index', ['program' => 'OLO']) }}"
+                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                    {{ $activeProgram == 'OLO' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                        <span class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                            OLO
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">Partner</span>
+                    </a>
 
-                <a href="{{ route('projects.index', ['program' => 'Konstruksi Eksternal']) }}"
-                class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                {{ $activeProgram == 'Konstruksi Eksternal' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                    <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
-                        Eksternal
-                    </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700">Exbis</span>
-                </a>
+                    <a href="{{ route('projects.index', ['program' => 'Konstruksi Eksternal']) }}"
+                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                    {{ $activeProgram == 'Konstruksi Eksternal' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                        <span class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                            Eksternal
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700">Exbis</span>
+                    </a>
 
-            </div>
+                    <a href="{{ route('projects.index', ['program' => 'PT 2']) }}"
+                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                    {{ $activeProgram == 'PT 2' ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                        <span class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
+                            PT 2
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">Swakelola</span>
+                    </a>
+
+                </div>
         </div>
 
         @php

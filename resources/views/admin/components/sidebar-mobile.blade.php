@@ -5,13 +5,10 @@
 
 
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold">
-                D
-            </div>
-
+            <img src="{{ asset('images/logo-dompis-cons.png') }}" alt="Logo" class="w-9 h-9">
             <div>
-                <h1 class="text-base font-bold text-gray-900 dark:text-white">
-                    Dompis Cons
+                <h1 class="text-base font-black tracking-tight text-gray-900 dark:text-white">
+                    DOMPIS <span class="text-blue-600">Cons</span>
                 </h1>
                 <p class="text-xs text-gray-500">
                     Admin Project
@@ -232,6 +229,16 @@
                     </span>
                     <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700">External</span>
                 </a>
+
+                <a href="{{ route('projects.index', ['program' => 'PT 2']) }}"
+                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                    {{ $activeProgram == 'PT 2' ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                        <span class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
+                            PT 2
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">Swakelola</span>
+                    </a>
 
             </div>
         </div>

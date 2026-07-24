@@ -30,6 +30,14 @@ class DashboardController extends Controller
             return redirect()->route('pm.dashboard'); // Dialihkan ke Controller Mandiri PM
         }
 
+        if ($role == 'teknisi') {
+            return redirect()->route('teknisi.pt2.dashboard');
+        }
+
+        if ($role == 'sdi') {
+            return redirect()->route('sdi.index'); // Atau sdi.dashboard jika namanya itu
+        }
+
         if ($role == 'admin') {
             $lops = Lop::with([
             'project.assignment',

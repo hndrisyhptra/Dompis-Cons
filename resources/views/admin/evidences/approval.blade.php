@@ -61,7 +61,7 @@
         <div>
             <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Filter Program (SAP)</label>
             <select name="program" onchange="this.form.submit()" {{ request('search') ? 'disabled' : '' }} class="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs font-semibold outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300 disabled:bg-slate-100 disabled:opacity-50">
-                <option value="">Semua Program SAP</option>
+                <option value="">Semua Program</option>
                 @foreach($availablePrograms as $p)
                     <option value="{{ $p }}" {{ request('program') == $p ? 'selected' : '' }}>{{ $p }}</option>
                 @endforeach

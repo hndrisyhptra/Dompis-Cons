@@ -45,19 +45,16 @@ class ImportController extends Controller
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
         
-        // --- 1. TAMBAHKAN VALIDASI CUSTOMER ID DISINI ---
         $request->validate([
             'file' => 'required|file|extensions:xlsx,xls,csv',
             'customer_id' => 'required|exists:customers,id_customer',
         ]);
 
-        $customerId = $request->customer_id; // Tangkap dari form
-        // ------------------------------------------------
+        $customerId = $request->customer_id; 
 
         $file = $request->file('file');
         $fileName = $file->getClientOriginalName();
 
-        // --- AWAL PERBAIKAN LOGIKA DETEKSI OTOMATIS SPREADSHEET ---
         $filePath = $file->getRealPath();
         
         try {
@@ -69,8 +66,7 @@ class ImportController extends Controller
         }
         
         $sheet = $spreadsheet->getActiveSheet();
-        // --- AKHIR PERBAIKAN LOGIKA ---
-
+        
         $highestRow = $sheet->getHighestRow();
         $highestColumn = $sheet->getHighestColumn();
         $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
@@ -79,20 +75,11 @@ class ImportController extends Controller
 
         for ($col = 1; $col <= $highestColumnIndex; $col++) {
             $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
-
-            $header = strtolower(
-                trim((string) $sheet->getCell($columnLetter . '1')->getValue())
-            );
-
+            $header = strtolower(trim((string) $sheet->getCell($columnLetter . '1')->getValue()));
             $headers[$col] = $header;
         }
 
-        $requiredHeaders = [
-            'pid_sap',
-            'id_ihld',
-            'nama_lop',
-        ];
-
+        $requiredHeaders = ['pid_sap', 'id_ihld', 'nama_lop'];
         $missingHeaders = [];
 
         foreach ($requiredHeaders as $requiredHeader) {
@@ -134,15 +121,11 @@ class ImportController extends Controller
         for ($row = 2; $row <= $highestRow; $row++) {
 
             $data = [];
-
             for ($col = 1; $col <= $highestColumnIndex; $col++) {
                 $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
                 $headerName = $headers[$col] ?? null;
 
-                if (!$headerName) {
-                    continue;
-                }
-
+                if (!$headerName) continue;
                 $data[$headerName] = $sheet->getCell($columnLetter . $row)->getValue();
             }
 
@@ -150,38 +133,44 @@ class ImportController extends Controller
             $pidSap = $this->cleanValue($data['pid_sap'] ?? null);
             $namaLop = $this->cleanValue($data['nama_lop'] ?? null);
             $idIhld = $this->cleanValue($data['id_ihld'] ?? null);
+            
+            // NORMALISASI PROGRAM
+            $rawProgram = $this->cleanValue($data['program'] ?? null);
+            $programFormatted = $rawProgram;
+            if ($rawProgram) {
+                $progUpper = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $rawProgram)); // Hapus spasi dan dash sementara
+                if (in_array($progUpper, ['PT2', 'PT02'])) {
+                    $programFormatted = 'PT 2';
+                } elseif (in_array($progUpper, ['NODEB', 'NODE0B'])) {
+                    $programFormatted = 'NODE B';
+                }
+            }
 
             $rowErrors = [];
+            if (!$pidSap) $rowErrors[] = 'PID SAP wajib diisi';
+            if (!$namaLop) $rowErrors[] = 'Nama LOP wajib diisi';
 
-            if (!$pidSap) {
-                $rowErrors[] = 'PID SAP wajib diisi';
-            }
-
-            if (!$namaLop) {
-                $rowErrors[] = 'Nama LOP wajib diisi';
-            }
-
+            // PENGECUALIAN DUPLIKASI KHUSUS PT 2 (Multi IHLD = PID Boleh Muncul Berkali-kali, Asalkan IHLD beda)
             if ($pidSap) {
                 $pidSapKey = strtolower(trim($pidSap));
+                $ihldKey = strtolower(trim($idIhld));
+                $trackerKey = $programFormatted === 'PT 2' ? $pidSapKey . '_' . $ihldKey : $pidSapKey;
 
-                if (isset($pidSapTracker[$pidSapKey])) {
-                    $rowErrors[] = 'PID SAP duplikat di file, sama dengan row ' . $pidSapTracker[$pidSapKey];
+                if (isset($pidSapTracker[$trackerKey])) {
+                    $rowErrors[] = 'Duplikat di file pada row ' . $pidSapTracker[$trackerKey];
                 } else {
-                    $pidSapTracker[$pidSapKey] = $row;
+                    $pidSapTracker[$trackerKey] = $row;
                 }
             }
 
             if (!empty($rowErrors)) {
                 $skipped++;
-
                 $invalidRows[] = [
                     'row' => $row,
-                    'pid' => $pid,
                     'pid_sap' => $pidSap,
                     'nama_lop' => $namaLop,
                     'reason' => implode(', ', $rowErrors),
                 ];
-
                 continue;
             }
 
@@ -189,52 +178,45 @@ class ImportController extends Controller
 
             $executionType = $this->cleanValue($data['execution_type'] ?? 'kemitraan') ?: 'kemitraan';
             $statusProject = $this->cleanValue($data['status_project'] ?? 'active') ?: 'active';
-
-            if (!in_array($executionType, ['kemitraan', 'swakelola', 'turnkey'])) {
-                $executionType = 'kemitraan';
-            }
-
-            if (!in_array($statusProject, ['init', 'active', 'close', 'bast'])) {
-                $statusProject = 'active';
-            }
+            if (!in_array($executionType, ['kemitraan', 'swakelola', 'turnkey'])) $executionType = 'kemitraan';
+            if (!in_array($statusProject, ['init', 'active', 'close', 'bast'])) $statusProject = 'active';
 
             $pidForProject = $pid ?: $pidSap;
 
-            // --- 2. SUNTIKKAN CUSTOMER ID KE DATABASE ---
+            // 1. UPDATE/CREATE PROJECT (Meskipun baris beda, PID SAP sama = 1 Project)
             $projectPayload = [
-                'customer_id'     => $customerId, // <- Otomatis mengikat ke dropdown yang dipilih
+                'customer_id'     => $customerId,
                 'pid'             => $pidForProject,
                 'pid_sap'         => $pidSap,
                 'project_name'    => $namaLop,
-                'program'         => $this->cleanValue($data['program'] ?? null),
+                'program'         => $programFormatted, // Program yg sudah dinormalisasi
                 'branch'          => $this->cleanValue($data['branch'] ?? null),
                 'sto'             => $this->cleanValue($data['sto'] ?? null),
                 'mitra_name'      => $this->cleanValue($data['mitra_name'] ?? null),
                 'execution_type'  => $executionType,
                 'status_project'  => $statusProject,
             ];
-            // --------------------------------------------
 
             $project = \App\Models\Project::where('pid_sap', $pidSap)->first();
-
             if (!$project && $pid) {
                 $project = \App\Models\Project::where('pid', $pid)->first();
             }
 
             if ($project) {
                 $project->update($projectPayload);
-                $projectUpdated++;
+                $projectUpdated++; // Ini mungkin akan bertambah terus jika multi-IHLD, tak masalah.
             } else {
                 $project = \App\Models\Project::create($projectPayload);
                 $projectImported++;
             }
 
+            // 2. INSERT KE TABEL LOP (Tabel Utama)
             $lopPayload = [
-                'project_id' => $project->id_project,
+                'project_id' => $project->id_project, // Sesuaikan primary key
                 'id_ihld' => $idIhld,
                 'lop_name' => $namaLop,
                 'pid_sap' => $pidSap,
-                'program_sap' => $this->cleanValue($data['program'] ?? null),
+                'program_sap' => $programFormatted, // Program yg sudah dinormalisasi
                 'tematik' => $this->cleanValue($data['tematik'] ?? null),
                 'sto' => $this->cleanValue($data['sto'] ?? null),
                 'branch' => $this->cleanValue($data['branch'] ?? null),
@@ -248,18 +230,15 @@ class ImportController extends Controller
             ];
 
             $lop = null;
-
             if ($idIhld) {
-                $lop = \App\Models\Lop::where('project_id', $project->id_project)
+                $lop = \App\Models\Lop::where('project_id', $project->id_project) // sesuaikan primary key
                     ->where('id_ihld', $idIhld)
                     ->first();
             }
 
             if (!$lop) {
                 $lop = \App\Models\Lop::where('project_id', $project->id_project)
-                    ->whereRaw('LOWER(TRIM(lop_name)) = ?', [
-                        strtolower(trim($namaLop))
-                    ])
+                    ->whereRaw('LOWER(TRIM(lop_name)) = ?', [strtolower(trim($namaLop))])
                     ->first();
             }
 

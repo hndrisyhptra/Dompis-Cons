@@ -61,10 +61,12 @@ class ProjectController extends Controller
             });
         }
 
-        $projects = $query
-            ->latest('updated_at')
-            ->paginate(10)
-            ->withQueryString();
+            $perPage = $request->input('per_page', 10);
+            $projects = $query
+                ->latest('updated_at')
+                ->paginate($perPage) // <-- Gunakan variabel $perPage
+                ->onEachSide(1)      // <-- membatasi angka pagination
+                ->withQueryString();
 
         $programs = Project::whereNotNull('program')
             ->where('program', '!=', '')
@@ -78,9 +80,7 @@ class ProjectController extends Controller
             ->orderBy('branch')
             ->pluck('branch');
 
-        $waspangs = User::with('assignments')
-            ->where('role', 'waspang')
-            ->get();
+        $assignableUsers = User::whereIn('role', ['waspang', 'teknisi'])->get();
 
         $designators = Designator::forCustomer(Customer::defaultId())
             ->orderBy('designator')
@@ -95,7 +95,7 @@ class ProjectController extends Controller
             'projects',
             'programs',
             'branches',
-            'waspangs',
+            'assignableUsers',
             'designators',
             'totalProject',
             'activeProject',
@@ -107,62 +107,94 @@ class ProjectController extends Controller
     {
         $request->validate([
             'project_id' => 'required',
-            'waspang_id' => 'required',
+            'assigned_user_id' => 'required|exists:users,id_user', // Menggunakan nama universal
         ]);
 
         $oldAssignment = ProjectAssignment::where('project_id', $request->project_id)->first();
+        $targetUser = User::where('id_user', $request->assigned_user_id)->first();
 
-         ProjectAssignment::updateOrCreate(
-            [
-                'project_id' => $request->project_id
-            ],
-            [
-                'waspang_id' => $request->waspang_id,
-                'assigned_by' => auth()->user()->id_user,
-            ]
+        // Siapkan data yang akan di-update
+        $dataToUpdate = [
+            'assigned_by' => auth()->user()->id_user,
+        ];
+        
+        // Pengecekan otomatis!
+        if ($targetUser->role === 'teknisi') {
+            $dataToUpdate['teknisi_id'] = $targetUser->id_user;
+            $dataToUpdate['waspang_id'] = null; // Menghapus waspang jika sebelumnya ada
+        } else {
+            $dataToUpdate['waspang_id'] = $targetUser->id_user;
+            $dataToUpdate['teknisi_id'] = null; // Menghapus teknisi jika sebelumnya ada
+        }
+
+        ProjectAssignment::updateOrCreate(
+            ['project_id' => $request->project_id],
+            $dataToUpdate
         );
 
         $lop = Lop::where('project_id', $request->project_id)->first();
-        $waspang = User::where('id_user', $request->waspang_id)->first();
+
+        // LOGGING DINAMIS
+        $roleTitle = ucfirst($targetUser->role); // 'Teknisi' atau 'Waspang'
+        $isReassign = ($oldAssignment && ($oldAssignment->waspang_id || $oldAssignment->teknisi_id));
 
         ProjectActivityService::log([
             'project_id' => $request->project_id,
             'lop_id' => $lop?->id_lop,
-            'target_user_id' => $request->waspang_id,
-            'activity_type' => $oldAssignment ? 'reassign_waspang' : 'assign_waspang',
-            'title' => $oldAssignment ? 'Reassign Waspang' : 'Assign Waspang',
-            'description' => 'Project di-assign ke Waspang ' . ($waspang?->name ?? '-'),
-            'status_before' => $oldAssignment ? 'assigned' : 'unassigned',
+            'target_user_id' => $targetUser->id_user,
+            'activity_type' => $isReassign ? 'reassign_'.$targetUser->role : 'assign_'.$targetUser->role,
+            'title' => $isReassign ? "Reassign {$roleTitle}" : "Assign {$roleTitle}",
+            'description' => "Project di-assign ke {$roleTitle} " . $targetUser->name,
+            'status_before' => $isReassign ? 'assigned' : 'unassigned',
             'status_after' => 'assigned',
             'meta' => [
-                'old_waspang_id' => $oldAssignment?->waspang_id,
-                'new_waspang_id' => $request->waspang_id,
-                'new_waspang_name' => $waspang?->name,
+                "old_{$targetUser->role}_id" => $targetUser->role === 'teknisi' ? $oldAssignment?->teknisi_id : $oldAssignment?->waspang_id,
+                "new_{$targetUser->role}_id" => $targetUser->id_user,
+                "new_{$targetUser->role}_name" => $targetUser->name,
             ],
         ]);
 
-        return back()->with('success', 'Waspang berhasil di-assign');
+        return back()->with('success', 'Assignment berhasil disimpan');
     }
 
     public function removeAssign($project)
     {
         $oldAssignment = ProjectAssignment::where('project_id', $project)->first();
 
+        // Hapus Assignment
         ProjectAssignment::where('project_id', $project)->delete();
+        
+        $lop_id = Lop::where('project_id', $project)->value('id_lop');
 
-        ProjectActivityService::log([
-            'project_id' => $project,
-            'lop_id' => Lop::where('project_id', $project)->value('id_lop'),
-            'target_user_id' => $oldAssignment?->waspang_id,
-            'activity_type' => 'remove_assignment',
-            'title' => 'Assignment Dihapus',
-            'description' => 'Assignment Waspang dihapus dari project.',
-            'status_before' => 'assigned',
-            'status_after' => 'unassigned',
-            'meta' => [
-                'old_waspang_id' => $oldAssignment?->waspang_id,
-            ],
-        ]);
+        // Logging Hapus Waspang
+        if ($oldAssignment && $oldAssignment->waspang_id) {
+            ProjectActivityService::log([
+                'project_id' => $project,
+                'lop_id' => $lop_id,
+                'target_user_id' => $oldAssignment->waspang_id,
+                'activity_type' => 'remove_assignment',
+                'title' => 'Assignment Waspang Dihapus',
+                'description' => 'Assignment Waspang dihapus dari project.',
+                'status_before' => 'assigned',
+                'status_after' => 'unassigned',
+                'meta' => ['old_waspang_id' => $oldAssignment->waspang_id],
+            ]);
+        }
+
+        // Logging Hapus Teknisi
+        if ($oldAssignment && $oldAssignment->teknisi_id) {
+            ProjectActivityService::log([
+                'project_id' => $project,
+                'lop_id' => $lop_id,
+                'target_user_id' => $oldAssignment->teknisi_id,
+                'activity_type' => 'remove_teknisi_assignment',
+                'title' => 'Assignment Teknisi Dihapus',
+                'description' => 'Assignment Teknisi dihapus dari project.',
+                'status_before' => 'assigned',
+                'status_after' => 'unassigned',
+                'meta' => ['old_teknisi_id' => $oldAssignment->teknisi_id],
+            ]);
+        }
 
         return back()->with('success', 'Assignment berhasil dihapus');
     }
@@ -529,7 +561,7 @@ public function importCsv(Request $request)
             });
         }
 
-        $projects = $query->latest('updated_at')->paginate(12)->withQueryString();
+        $projects = $query->latest('updated_at')->paginate(10)->withQueryString();
 
         // Data pendukung komponen dropdown select
         $availableBranches = \App\Models\Lop::whereNotNull('branch')->distinct()->pluck('branch');
