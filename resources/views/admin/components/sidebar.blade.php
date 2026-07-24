@@ -587,4 +587,12 @@
 
     </nav>
 
+    {{-- Footer Sidebar (Opsional, info role) --}}
+    <div class="p-4 border-t border-gray-200 dark:border-gray-800">
+        <div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0"></div>
+            <span class="text-xs font-bold text-gray-600 dark:text-gray-400">Admin Access Active</span>
+        </div>
+    </div>
+
 </aside>

@@ -102,7 +102,7 @@
         <h2 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Aksi Cepat</h2>
         <div class="grid grid-cols-2 gap-3">
             {{-- Mengarah ke Route Teknisi --}}
-            <a href="{{ route('teknisi.pt2.index') }}" class="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs hover:border-blue-200 transition active:scale-[0.98]">
+            <a href="{{ route('teknisi.pt2.inbox') }}" class="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs hover:border-blue-200 transition active:scale-[0.98]">
                 <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-2.5">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5l3 3 3-3m-3 3v-6m10.125-3H17.25m3 0v1.125c0 .621-.504 1.125-1.125 1.125H3.75A1.125 1.125 0 012.625 11.25V5.25m17.625 0A1.125 1.125 0 0019.125 4.125H4.875A1.125 1.125 0 003.75 5.25m17.625 0v11.25c0 .621-.504 1.125-1.125 1.125H3.75a1.125 1.125 0 01-1.125-1.125V5.25" />

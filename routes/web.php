@@ -476,12 +476,17 @@ Route::middleware(['auth'])->group(function () {
 */
 Route::middleware(['auth'])->prefix('teknisi/pt2')->name('teknisi.pt2.')->group(function () {
     
-    Route::get('/dashboard', [TeknisiPt2Controller::class, 'index'])->name('dashboard');
-    Route::get('/inbox', [TeknisiPt2Controller::class, 'inbox'])->name('index'); 
+    // UBAH: name('dashboard') menjadi name('index')
+    Route::get('/dashboard', [TeknisiPt2Controller::class, 'index'])->name('index');
+    
+    Route::get('/inbox', [TeknisiPt2Controller::class, 'inbox'])->name('inbox');
     
     // Step 1: Survey & Mode
     Route::get('/survey/{project_id}', [TeknisiPt2Controller::class, 'step1'])->name('step1');
-    Route::post('/survey/{project_id}', [TeknisiPt2Controller::class, 'storeStep1'])->name('step1.store');
+    Route::post('/survey/{project_id}', [TeknisiPt2Controller::class, 'storeStep1'])->name('storeStep1');
+    // Lanjutan Step 1: Eviden Survey
+    Route::get('/survey/{project_id}/eviden', [TeknisiPt2Controller::class, 'step1Eviden'])->name('step1Eviden');
+    Route::post('/survey/{project_id}/eviden', [TeknisiPt2Controller::class, 'storeStep1Eviden'])->name('storeStep1Eviden');
     
 });
 
