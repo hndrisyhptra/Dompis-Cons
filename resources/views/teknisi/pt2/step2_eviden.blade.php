@@ -3,10 +3,10 @@
 @section('content')
 <div class="min-h-screen max-w-md mx-auto bg-[#f8fafc] pb-24 font-sans">
     
-{{-- Header STEPPER --}}
-    @include('teknisi.partials.stepper', ['title' => 'Step 1 - Eviden Survey (Mode '.$mode.')'])
+    {{-- Header STEPPER --}}
+    @include('teknisi.partials.stepper', ['title' => 'Step 2 - Progress Instalasi'])
 
-    {{-- PROJECT INFO CARD - Badge Style --}}
+    {{-- PROJECT INFO CARD --}}
     <div class="px-4 mt-3">
         <div class="bg-white rounded-xl border border-gray-200/80 p-3 shadow-xs">
             <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Nama LOP</p>
@@ -18,10 +18,6 @@
                     <span class="text-gray-400 mr-1 font-normal">STO:</span>
                     <span class="font-mono">{{ $project->lop?->sto ?? '-' }}</span>
                 </span>
-                <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
-                    <span class="text-gray-400 mr-1 font-normal">Branch:</span>
-                    <span>{{ $project->lop?->branch ?? '-' }}</span>
-                </span>
             </div>
         </div>
     </div>
@@ -31,20 +27,18 @@
             <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-xs font-bold">{{ session('success') }}</div>
         @endif
 
-        <form id="evidenForm" action="{{ route('teknisi.pt2.storeStep1Eviden', $project->id_project) }}" method="POST" enctype="multipart/form-data">
+        <form id="evidenForm" action="{{ route('teknisi.pt2.storeStep2Eviden', $project->id_project) }}" method="POST" enctype="multipart/form-data">
             @csrf
 
             <div class="space-y-3">
                 @foreach($requiredEvidences as $key => $label)
                     @php
-                        // Cek apakah ada foto yg sudah tersimpan untuk kategori ini
                         $uploaded = isset($existingEvidences[$key]) ? $existingEvidences[$key] : collect();
                         $hasUploaded = $uploaded->count() > 0;
                     @endphp
 
                     <details class="group bg-white border border-slate-200 rounded-2xl shadow-sm [&_summary::-webkit-details-marker]:hidden transition-all duration-300 {{ $hasUploaded ? 'open' : '' }}">
                         
-                        {{-- Header Akordeon --}}
                         <summary id="summary-{{ $key }}" class="flex items-center justify-between p-4 cursor-pointer rounded-2xl transition {{ $hasUploaded ? 'bg-green-50/50' : '' }}">
                             <div class="flex items-center gap-3">
                                 <div id="icon-{{ $key }}" class="w-8 h-8 rounded-full flex items-center justify-center text-sm {{ $hasUploaded ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400' }}">
@@ -71,16 +65,16 @@
                             </div>
                         </summary>
 
-                        {{-- Konten Body --}}
                         <div class="p-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
                             
                             {{-- Area Klik Tambah Foto Baru --}}
                             <label class="relative flex flex-col items-center justify-center w-full h-20 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-white hover:bg-slate-50 transition">
                                 <span class="text-xs font-bold text-slate-500">+ Tambah Foto Baru</span>
+                                {{-- PERHATIKAN PENAMBAHAN ID PADA INPUT --}}
                                 <input type="file" id="input-{{ $key }}" name="evidences[{{ $key }}][]" multiple accept="image/*" class="hidden" onchange="handleFileSelect(this, '{{ $key }}')">
                             </label>
 
-                            {{-- Grid Preview Foto Baru (Hanya JS) --}}
+                            {{-- Grid Preview Foto Baru --}}
                             <div id="preview-{{ $key }}" class="grid grid-cols-3 gap-2 mt-3 empty:hidden"></div>
 
                             {{-- Grid Review Foto Lama (Database) --}}
@@ -91,8 +85,6 @@
                                         @foreach($uploaded as $ev)
                                             <div class="relative rounded-xl overflow-hidden border border-slate-200 aspect-square shadow-sm">
                                                 <img src="{{ asset('storage/' . $ev->file_path) }}" class="w-full h-full object-cover">
-                                                
-                                                {{-- Tombol Hapus (Submit ke form hapus di luar form utama) --}}
                                                 <button type="button" onclick="event.preventDefault(); document.getElementById('form-delete-{{ $ev->id_evidence }}').submit();" class="absolute top-1 right-1 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center text-xs font-black shadow-md">✕</button>
                                             </div>
                                         @endforeach
@@ -105,19 +97,20 @@
                 @endforeach
             </div>
 
-            {{-- Tombol Lanjut Step 2 --}}
+            {{-- TOMBOL SUBMIT FORM --}}
             <button type="submit" id="btnSubmit" disabled 
                 class="w-full h-12 bg-gray-300 text-gray-500 cursor-not-allowed font-black rounded-xl mt-8 shadow-sm transition-all flex items-center justify-center gap-2">
-                <span>Upload Baru & Lanjut Step 2</span>
+                <span>Upload Baru & Lanjut Step 3</span>
             </button>
 
-            {{-- Tombol Skip (Jika sudah ada yg tersimpan dan gak mau nambah foto lagi) --}}
-            <a href="{{ route('teknisi.pt2.step2Eviden', $project->id_project) }}" class="block w-full h-11 bg-white border-2 border-slate-200 text-slate-600 text-center leading-[2.5rem] font-bold rounded-xl mt-3 active:scale-95 transition">
-                Lewati (Lanjut Step 2) →
+            {{-- TOMBOL SKIP / LEWATI --}}
+            <a href="{{ route('teknisi.pt2.step3Eviden', $project->id_project) }}" 
+               class="block w-full h-11 bg-white border-2 border-slate-200 text-slate-600 text-center leading-[2.5rem] font-bold rounded-xl mt-3 active:scale-95 transition">
+                Lewati (Lanjut Step 3) →
             </a>
         </form>
 
-        {{-- Form Tersembunyi untuk Hapus Eviden --}}
+        {{-- Form Hapus Eviden Database --}}
         @foreach($requiredEvidences as $key => $label)
             @if(isset($existingEvidences[$key]))
                 @foreach($existingEvidences[$key] as $ev)
@@ -131,9 +124,6 @@
 
     </div>
 </div>
-
-{{-- BOTTOM NAV --}}
-    @include('teknisi.partials.bottom-nav', ['active' => 'home'])
 
 <script>
     const requiredKeys = @json(array_keys($requiredEvidences));

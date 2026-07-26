@@ -481,12 +481,30 @@ Route::middleware(['auth'])->prefix('teknisi/pt2')->name('teknisi.pt2.')->group(
     
     Route::get('/inbox', [TeknisiPt2Controller::class, 'inbox'])->name('inbox');
     
-    // Step 1: Survey & Mode
+    // Step 1: Survey & Pilih Mode
     Route::get('/survey/{project_id}', [TeknisiPt2Controller::class, 'step1'])->name('step1');
     Route::post('/survey/{project_id}', [TeknisiPt2Controller::class, 'storeStep1'])->name('storeStep1');
     // Lanjutan Step 1: Eviden Survey
     Route::get('/survey/{project_id}/eviden', [TeknisiPt2Controller::class, 'step1Eviden'])->name('step1Eviden');
     Route::post('/survey/{project_id}/eviden', [TeknisiPt2Controller::class, 'storeStep1Eviden'])->name('storeStep1Eviden');
+    // Route untuk Hapus Eviden
+    Route::delete('/eviden/{id}', [\App\Http\Controllers\TeknisiPt2Controller::class, 'deleteEvidence'])->name('deleteEvidence');
+
+    // Step 2: Eviden Progress Instalasi
+    Route::get('/survey/{project_id}/step2', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step2Eviden'])->name('step2Eviden');
+    Route::post('/survey/{project_id}/step2', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep2Eviden'])->name('storeStep2Eviden');
+
+    // Step 3: Eviden Finishing (Redaman ODP)
+    Route::get('/survey/{project_id}/step3', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step3Eviden'])->name('step3Eviden');
+    Route::post('/survey/{project_id}/step3', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep3Eviden'])->name('storeStep3Eviden');
+
+    // Step 4: Dismantle Material
+    Route::get('/survey/{project_id}/step4', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step4Eviden'])->name('step4Eviden');
+    Route::post('/survey/{project_id}/step4', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep4Eviden'])->name('storeStep4Eviden');
+
+    // Step 5: Mancore & Submit Approval
+    Route::get('/survey/{project_id}/step5', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step5'])->name('step5');
+    Route::post('/survey/{project_id}/step5', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep5'])->name('storeStep5');
     
 });
 

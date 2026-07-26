@@ -31,7 +31,7 @@ class DashboardController extends Controller
         }
 
         if ($role == 'teknisi') {
-            return redirect()->route('teknisi.pt2.dashboard');
+            return redirect()->route('teknisi.pt2.index');
         }
 
         if ($role == 'sdi') {
