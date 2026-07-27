@@ -769,27 +769,48 @@ class WaspangController extends Controller
                     
                 } else {
                     // KONDISI B: JIKA BUKAN KABEL / TIANG
-                    $actualValue = $request->quantity_actual !== null ? (float)$request->quantity_actual : 0;
+                    
+                    // PERBAIKAN: Hanya update jika request benar-benar mengirimkan quantity_actual
+                    if ($request->has('quantity_actual') && $request->quantity_actual !== null) {
+                        
+                        $actualValue = (float)$request->quantity_actual;
 
-                    \App\Models\BoqItem::where('id_boq', $request->boq_item_id)
-                        ->update([
-                            'quantity_actual' => $actualValue
+                        \App\Models\BoqItem::where('id_boq', $request->boq_item_id)
+                            ->update([
+                                'quantity_actual' => $actualValue
+                            ]);
+
+                        \App\Services\ProjectActivityService::log([
+                            'project_id' => $project->id_project,
+                            'lop_id' => $lopId,
+                            'activity_type' => 'upload_evidence_regular',
+                            'title' => 'Update Kuantitas Aktual',
+                            'description' => 'Waspang mengupdate kuantitas aktual item: ' . ($designator->designator ?? '') . ' menjadi ' . $actualValue,
+                            'stage' => $stage,
+                            'status_after' => 'pending',
+                            'meta' => [
+                                'boq_item_id' => $request->boq_item_id,
+                                'quantity_actual' => $actualValue,
+                            ],
                         ]);
-
-                    \App\Services\ProjectActivityService::log([
-                        'project_id' => $project->id_project,
-                        'lop_id' => $lopId,
-                        'activity_type' => 'upload_evidence_regular',
-                        'title' => 'Upload Eviden Pendukung',
-                        'description' => 'Waspang mengupdate kuantitas aktual item pendukung: ' . ($designator->designator ?? '') . ' sebesar ' . $actualValue,
-                        'stage' => $stage,
-                        'status_after' => 'pending',
-                        'meta' => [
-                            'boq_item_id' => $request->boq_item_id,
-                            'quantity_actual' => $actualValue,
-                            'info' => 'Item reguler (Non-KPI Utama)',
-                        ],
-                    ]);
+                    } 
+                    else {
+                        // Jika tidak ada quantity_actual (seperti di Step Finishing), 
+                        // maka HANYA catat log upload fotonya saja TANPA mereset quantity jadi 0.
+                        \App\Services\ProjectActivityService::log([
+                            'project_id' => $project->id_project,
+                            'lop_id' => $lopId,
+                            'activity_type' => 'upload_evidence_regular',
+                            'title' => 'Upload Eviden Pendukung',
+                            'description' => 'Waspang mengupload foto tambahan untuk item: ' . ($designator->designator ?? ''),
+                            'stage' => $stage,
+                            'status_after' => 'pending',
+                            'meta' => [
+                                'boq_item_id' => $request->boq_item_id,
+                                'info' => 'Upload foto tanpa mengubah quantity',
+                            ],
+                        ]);
+                    }
                 }
             }
         }
