@@ -707,6 +707,7 @@ class WaspangController extends Controller
             ]);
         }
 
+        // UPDATE QUANTITY ACTUAL (Tanpa Cascade, Langsung Tembak ID)
         if ($request->boq_item_id) {
             $boqItem = \App\Models\BoqItem::where('id_boq', $request->boq_item_id)->first();
             
@@ -715,102 +716,47 @@ class WaspangController extends Controller
                     ->where('id_designator', $boqItem->designator_id)
                     ->first();
 
-                $category = $designator ? trim(strtoupper($designator->progress_category)) : '';
-
-                // KONDISI A: JIKA KATEGORI ADALAH KABEL ATAU TIANG (Gunakan Aturan Cascade Tanpa Limit Akhir)
-                if (in_array($category, ['KABEL', 'TIANG']) && $request->quantity_actual !== null) {
+                // PERBAIKAN UTAMA: Semua Kategori (Kabel, Tiang, Aksesoris) diproses sama persis.
+                // Hanya update quantity jika input 'quantity_actual' dikirimkan dari form (Step Instalasi).
+                if ($request->has('quantity_actual') && $request->quantity_actual !== null) {
                     
-                    $items = \App\Models\BoqItem::query()
-                        ->join('designators', 'designators.id_designator', '=', 'boq_items.designator_id')
-                        ->where('boq_items.lop_id', $boqItem->lop_id)
-                        ->whereRaw("UPPER(TRIM(designators.progress_category)) = ?", [$category])
-                        ->orderByDesc('boq_items.quantity_plan')
-                        ->select('boq_items.*')
-                        ->get();
+                    $actualValue = (float)$request->quantity_actual;
 
-                    $remaining = (float)$request->quantity_actual;
-                    $totalItems = $items->count();
+                    \App\Models\BoqItem::where('id_boq', $request->boq_item_id)
+                        ->update([
+                            'quantity_actual' => $actualValue
+                        ]);
 
-                    foreach ($items as $index => $item) {
-                        $plan = (float)$item->quantity_plan;
-
-                        if ($index === $totalItems - 1) {
-                            $actual = $remaining;
-                        } else {
-                            $actual = min($plan, $remaining);
-                        }
-
-                        \App\Models\BoqItem::where('id_boq', $item->id_boq)
-                            ->update([
-                                'quantity_actual' => $actual
-                            ]);
-
-                        $remaining -= $actual;
-                        if ($remaining <= 0) {
-                            $remaining = 0;
-                        }
-                    }
-
-                    // Log aktivitas KPI Utama
                     \App\Services\ProjectActivityService::log([
                         'project_id' => $project->id_project,
                         'lop_id' => $lopId,
                         'activity_type' => 'update_quantity_actual',
-                        'title' => 'Update Quantity Actual (' . $category . ')',
-                        'description' => 'Waspang update kuantitas aktual terdistribusi untuk kategori ' . $category,
+                        'title' => 'Update Kuantitas Aktual',
+                        'description' => 'Waspang mengupdate kuantitas aktual item: ' . ($designator->designator ?? '') . ' menjadi ' . $actualValue,
                         'stage' => $stage,
                         'status_after' => 'updated',
                         'meta' => [
                             'boq_item_id' => $request->boq_item_id,
-                            'quantity_actual' => $request->quantity_actual,
-                            'progress_category' => $category
+                            'quantity_actual' => $actualValue,
                         ],
                     ]);
-                    
-                } else {
-                    // KONDISI B: JIKA BUKAN KABEL / TIANG
-                    
-                    // PERBAIKAN: Hanya update jika request benar-benar mengirimkan quantity_actual
-                    if ($request->has('quantity_actual') && $request->quantity_actual !== null) {
-                        
-                        $actualValue = (float)$request->quantity_actual;
-
-                        \App\Models\BoqItem::where('id_boq', $request->boq_item_id)
-                            ->update([
-                                'quantity_actual' => $actualValue
-                            ]);
-
-                        \App\Services\ProjectActivityService::log([
-                            'project_id' => $project->id_project,
-                            'lop_id' => $lopId,
-                            'activity_type' => 'upload_evidence_regular',
-                            'title' => 'Update Kuantitas Aktual',
-                            'description' => 'Waspang mengupdate kuantitas aktual item: ' . ($designator->designator ?? '') . ' menjadi ' . $actualValue,
-                            'stage' => $stage,
-                            'status_after' => 'pending',
-                            'meta' => [
-                                'boq_item_id' => $request->boq_item_id,
-                                'quantity_actual' => $actualValue,
-                            ],
-                        ]);
-                    } 
-                    else {
-                        // Jika tidak ada quantity_actual (seperti di Step Finishing), 
-                        // maka HANYA catat log upload fotonya saja TANPA mereset quantity jadi 0.
-                        \App\Services\ProjectActivityService::log([
-                            'project_id' => $project->id_project,
-                            'lop_id' => $lopId,
-                            'activity_type' => 'upload_evidence_regular',
-                            'title' => 'Upload Eviden Pendukung',
-                            'description' => 'Waspang mengupload foto tambahan untuk item: ' . ($designator->designator ?? ''),
-                            'stage' => $stage,
-                            'status_after' => 'pending',
-                            'meta' => [
-                                'boq_item_id' => $request->boq_item_id,
-                                'info' => 'Upload foto tanpa mengubah quantity',
-                            ],
-                        ]);
-                    }
+                } 
+                else {
+                    // Jika form tidak mengirimkan quantity_actual (contoh saat di Step Finishing), 
+                    // maka HANYA catat log upload fotonya saja, JANGAN UBAH quantity yang ada di DB.
+                    \App\Services\ProjectActivityService::log([
+                        'project_id' => $project->id_project,
+                        'lop_id' => $lopId,
+                        'activity_type' => 'upload_evidence_regular',
+                        'title' => 'Upload Eviden Pendukung',
+                        'description' => 'Waspang mengupload foto tambahan untuk item: ' . ($designator->designator ?? ''),
+                        'stage' => $stage,
+                        'status_after' => 'pending',
+                        'meta' => [
+                            'boq_item_id' => $request->boq_item_id,
+                            'info' => 'Upload foto tanpa mengubah quantity',
+                        ],
+                    ]);
                 }
             }
         }
