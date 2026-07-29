@@ -669,9 +669,10 @@ public function importCsv(Request $request)
 
             } elseif ($evidence->stage == 'instalasi') {
 
+                // PERBAIKAN: Diubah dari 'pengukuran' menjadi 'finishing' agar sesuai ENUM MySQL
                 Lop::where('project_id', $project->id_project)
                     ->update([
-                        'status_progress' => 'pengukuran',
+                        'status_progress' => 'finishing', 
                     ]);
 
                 $project->update([

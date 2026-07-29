@@ -529,9 +529,9 @@ class TeknisiPt2Controller extends Controller
         }
 
         // 3. Ubah status Project untuk dikirim ke Admin / PM
-        // Sesuaikan 'pending_approval' dengan status sistem Anda (misal: 'pending_pm' atau 'review_sdi')
+        // Sesuaikan 'waiting_ut' dengan status sistem Anda (misal: 'pending_pm' atau 'review_sdi')
         $project->update([
-            'status_project' => 'pending_approval' 
+            'status' => 'waiting_ut' 
         ]);
 
         // 4. Redirect kembali ke Inbox dengan pesan sukses besar

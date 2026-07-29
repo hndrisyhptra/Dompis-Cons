@@ -3,29 +3,41 @@
     $survey = $project->pt2Survey;
     $evidences = \App\Models\Evidence::where('project_id', $project->id_project)->get();
     
-    // 2. CEK KELENGKAPAN PER STEP YANG BENAR
+    // 2. DETEKSI REJECTED EVIDENCES PER STEP
+    // Cek apakah ada foto dengan status 'rejected' di masing-masing stage
+    $step1Rejected = $evidences->where('stage', 'persiapan')->where('status', 'rejected')->isNotEmpty();
+    
+    $step2Rejected = $evidences->where('stage', 'instalasi')->where('status', 'rejected')->isNotEmpty();
+    
+    // Step 3 hanya mencari yang tipe redaman atau foto lainnya
+    $step3Rejected = $evidences->where('stage', 'finishing')
+                               ->whereIn('evidence_type', ['redaman_port', 'foto_lainnya'])
+                               ->where('status', 'rejected')
+                               ->isNotEmpty();
+                               
+    // Step 4 mencari yang selain redaman/foto lainnya (Dismantle ODP/Splitter)
+    $step4Rejected = $evidences->where('stage', 'finishing')
+                               ->whereNotIn('evidence_type', ['redaman_port', 'foto_lainnya'])
+                               ->where('status', 'rejected')
+                               ->isNotEmpty();
+
+    // 3. CEK KELENGKAPAN DATA (EKSISTENSI)
     $hasSurvey = $survey ? true : false;
-    
-    // Step 1: Eviden Persiapan
-    $hasEvSurvey = $evidences->where('stage', 'persiapan')->count() > 0;
-    
-    // Step 2: Eviden Instalasi
-    $hasEvInstalasi = $evidences->where('stage', 'instalasi')->count() > 0;
-    
-    // Step 3: Eviden Redaman (Disimpan di stage finishing dengan tipe redaman_port)
-    $hasEvRedaman = $evidences->where('stage', 'finishing')->where('evidence_type', 'redaman_port')->count() > 0;
-    
-    // Step 4: Cek apakah ada record di tabel dismantles
+    $hasEvSurvey = $evidences->where('stage', 'persiapan')->isNotEmpty();
+    $hasEvInstalasi = $evidences->where('stage', 'instalasi')->isNotEmpty();
+    $hasEvRedaman = $evidences->where('stage', 'finishing')->where('evidence_type', 'redaman_port')->isNotEmpty();
     $hasDismantle = \Illuminate\Support\Facades\DB::table('dismantles')->where('project_id', $project->id_project)->exists();
     
-    // 3. LOGIKA CENTANG
-    $step1Done = $hasSurvey && $hasEvSurvey; 
-    $step2Done = $hasEvInstalasi; 
-    $step3Done = $hasEvRedaman;
-    $step4Done = $hasDismantle; 
-    $step5Done = $project->status_project === 'pending_approval' || $project->is_golive; 
+    // 4. LOGIKA CENTANG SELESAI (Syarat: Data Ada & TIDAK ADA YANG DIREJECT)
+    $step1Done = $hasSurvey && $hasEvSurvey && !$step1Rejected; 
+    $step2Done = $hasEvInstalasi && !$step2Rejected; 
+    $step3Done = $hasEvRedaman && !$step3Rejected;
+    $step4Done = $hasDismantle && !$step4Rejected; 
+    
+    // Asumsi Step 5 selesai jika status project sudah dikirim ke Admin/Golive
+    $step5Done = in_array($project->status, ['waiting_ut', 'completed', 'close']) || in_array($project->status_project, ['pending_approval', 'close', 'bast']);
 
-    // 4. DETEKSI HALAMAN AKTIF
+    // 5. DETEKSI HALAMAN AKTIF
     $route = Route::currentRouteName();
     $isStep1 = in_array($route, ['teknisi.pt2.step1', 'teknisi.pt2.step1Eviden']);
     $isStep2 = $route === 'teknisi.pt2.step2Eviden';
@@ -33,7 +45,7 @@
     $isStep4 = $route === 'teknisi.pt2.step4Eviden'; 
     $isStep5 = $route === 'teknisi.pt2.step5';       
 
-    // 5. LOGIKA TOMBOL BACK
+    // 6. LOGIKA TOMBOL BACK
     $backUrl = route('teknisi.pt2.inbox'); 
     
     if ($route === 'teknisi.pt2.step1Eviden') {
@@ -53,7 +65,6 @@
     
     {{-- HEADER KEMBALI & JUDUL --}}
     <div class="flex items-center gap-3">
-        {{-- TOMBOL BACK DINAMIS --}}
         <a href="{{ $backUrl }}" 
             class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white text-2xl font-medium backdrop-blur-sm transition active:scale-95">
             ‹
@@ -74,46 +85,55 @@
             {{-- STEP 1: SURVEY --}}
             <a href="{{ route('teknisi.pt2.step1', $project->id_project) }}" class="z-10 block transition hover:scale-110">
                 <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all shadow-sm
-                    {{ $step1Done ? 'bg-green-100 text-green-700' : ($isStep1 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200') }}">
-                    {{ $step1Done ? '✓' : '1' }}
+                    {{ $step1Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500' : 
+                       ($step1Done ? 'bg-green-100 text-green-700' : 
+                       ($isStep1 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200')) }}">
+                    {{ $step1Rejected ? '!' : ($step1Done ? '✓' : '1') }}
                 </div>
-                <p class="mt-2 text-[9px] font-bold {{ $step1Done || $isStep1 ? 'text-white' : 'text-blue-300' }}">Survey</p>
+                <p class="mt-2 text-[9px] font-bold {{ $step1Rejected ? 'text-red-300' : ($step1Done || $isStep1 ? 'text-white' : 'text-blue-300') }}">Survey</p>
             </a>
 
             {{-- STEP 2: PROGRESS --}}
             <a href="{{ route('teknisi.pt2.step2Eviden', $project->id_project) }}" class="z-10 block transition hover:scale-110">
                 <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all shadow-sm
-                    {{ $step2Done ? 'bg-green-100 text-green-700' : ($isStep2 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200') }}">
-                    {{ $step2Done ? '✓' : '2' }}
+                    {{ $step2Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500' : 
+                       ($step2Done ? 'bg-green-100 text-green-700' : 
+                       ($isStep2 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200')) }}">
+                    {{ $step2Rejected ? '!' : ($step2Done ? '✓' : '2') }}
                 </div>
-                <p class="mt-2 text-[9px] font-bold {{ $step2Done || $isStep2 ? 'text-white' : 'text-blue-300' }}">Progress</p>
+                <p class="mt-2 text-[9px] font-bold {{ $step2Rejected ? 'text-red-300' : ($step2Done || $isStep2 ? 'text-white' : 'text-blue-300') }}">Progress</p>
             </a>
 
             {{-- STEP 3: FINISH --}}
             <a href="{{ route('teknisi.pt2.step3Eviden', $project->id_project) }}" class="z-10 block transition hover:scale-110">
                 <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all shadow-sm
-                    {{ $step3Done ? 'bg-green-100 text-green-700' : ($isStep3 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200') }}">
-                    {{ $step3Done ? '✓' : '3' }}
+                    {{ $step3Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500' : 
+                       ($step3Done ? 'bg-green-100 text-green-700' : 
+                       ($isStep3 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200')) }}">
+                    {{ $step3Rejected ? '!' : ($step3Done ? '✓' : '3') }}
                 </div>
-                <p class="mt-2 text-[9px] font-bold {{ $step3Done || $isStep3 ? 'text-white' : 'text-blue-300' }}">Finish</p>
+                <p class="mt-2 text-[9px] font-bold {{ $step3Rejected ? 'text-red-300' : ($step3Done || $isStep3 ? 'text-white' : 'text-blue-300') }}">Finish</p>
             </a>
 
-            {{-- STEP 4: UKUR --}}
+            {{-- STEP 4: UKUR (DISMANTLE) --}}
             <a href="{{ route('teknisi.pt2.step4Eviden', $project->id_project) }}" class="z-10 block transition hover:scale-110">
                 <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all shadow-sm
-                    {{ $step4Done ? 'bg-green-100 text-green-700' : ($isStep4 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200') }}">
-                    {{ $step4Done ? '✓' : '4' }}
+                    {{ $step4Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500' : 
+                       ($step4Done ? 'bg-green-100 text-green-700' : 
+                       ($isStep4 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200')) }}">
+                    {{ $step4Rejected ? '!' : ($step4Done ? '✓' : '4') }}
                 </div>
-                <p class="mt-2 text-[9px] font-bold {{ $step4Done || $isStep4 ? 'text-white' : 'text-blue-300' }}">Ukur</p>
+                <p class="mt-2 text-[9px] font-bold {{ $step4Rejected ? 'text-red-300' : ($step4Done || $isStep4 ? 'text-white' : 'text-blue-300') }}">Dismantle</p>
             </a>
 
             {{-- STEP 5: SUBMIT --}}
             <a href="{{ route('teknisi.pt2.step5', $project->id_project) }}" class="z-10 block transition hover:scale-110">
                 <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all shadow-sm
-                    {{ $step5Done ? 'bg-green-100 text-green-700' : ($isStep5 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200') }}">
+                    {{ $step5Done ? 'bg-green-100 text-green-700' : 
+                       ($isStep5 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200') }}">
                     {{ $step5Done ? '✓' : '5' }}
                 </div>
-                <p class="mt-2 text-[9px] font-bold {{ $step5Done || $isStep5 ? 'text-white' : 'text-blue-300' }}">Submit</p>
+                <p class="mt-2 text-[9px] font-bold {{ $step5Done || $isStep5 ? 'text-white' : 'text-blue-300' }}">Mancore</p>
             </a>
 
         </div>

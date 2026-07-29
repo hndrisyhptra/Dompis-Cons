@@ -508,6 +508,29 @@ Route::middleware(['auth'])->prefix('teknisi/pt2')->name('teknisi.pt2.')->group(
     
 });
 
+    // PROFILE TEKNISI
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/teknisi/profil', function () {
+            return view('teknisi.profile');
+        })->name('teknisi.profil');
+    });
+
+    // ROUTE KHUSUS APPROVAL PT2 OLEH ADMIN
+    Route::prefix('admin/pt2')->name('admin.pt2.')->middleware(['auth'])->group(function () {
+        Route::get('/approval', [App\Http\Controllers\AdminPt2Controller::class, 'index'])->name('approval');
+        Route::get('/review/{id}', [App\Http\Controllers\AdminPt2Controller::class, 'review'])->name('review');
+
+        Route::get('/{id}/instalasi', [App\Http\Controllers\AdminPt2Controller::class, 'reviewInstalasi'])->name('instalasi');
+        Route::get('/{id}/redaman', [App\Http\Controllers\AdminPt2Controller::class, 'reviewRedaman'])->name('redaman');
+        Route::get('/{id}/dismantle', [App\Http\Controllers\AdminPt2Controller::class, 'reviewDismantle'])->name('dismantle');
+        Route::get('/{id}/mancore', [App\Http\Controllers\AdminPt2Controller::class, 'reviewMancore'])->name('mancore');
+
+        Route::post('/survey/{id}/approve', [App\Http\Controllers\AdminPt2Controller::class, 'approveSurvey'])->name('survey.approve');
+        Route::post('/survey/{id}/reject', [App\Http\Controllers\AdminPt2Controller::class, 'rejectSurvey'])->name('survey.reject');
+        Route::post('/survey/{id}/reset', [App\Http\Controllers\AdminPt2Controller::class, 'resetSurvey'])->name('survey.reset');
+
+    });
+
  /*
 |--------------------------------------------------------------------------
 | ROLE SDI

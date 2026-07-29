@@ -26,6 +26,9 @@
         @if(session('success'))
             <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-xs font-bold">{{ session('success') }}</div>
         @endif
+        @if(session('error'))
+            <div class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs font-bold">{{ session('error') }}</div>
+        @endif
 
         <div class="mb-5 bg-blue-50 border border-blue-100 p-4 rounded-2xl flex items-start gap-3">
             <span class="text-xl">💡</span>
@@ -41,13 +44,19 @@
                 @foreach($allEvidences as $key => $label)
                     @php
                         $uploaded = isset($existingEvidences[$key]) ? $existingEvidences[$key] : collect();
-                        $hasUploaded = $uploaded->count() > 0;
+                        
+                        // Pisahkan status foto
+                        $validUploaded = $uploaded->whereIn('status', ['pending', 'approved']);
+                        $rejectedUploaded = $uploaded->where('status', 'rejected');
+                        
+                        $hasValid = $validUploaded->count() > 0;
+                        $hasRejected = $rejectedUploaded->count() > 0;
                         $isRequired = array_key_exists($key, $requiredEvidences);
                     @endphp
 
-                    <details id="details-{{ $key }}" class="group bg-white border border-slate-200 rounded-2xl shadow-sm [&_summary::-webkit-details-marker]:hidden transition-all duration-300 {{ $hasUploaded ? 'open' : '' }}">
+                    <details id="details-{{ $key }}" class="group bg-white border border-slate-200 rounded-2xl shadow-sm [&_summary::-webkit-details-marker]:hidden transition-all duration-300 {{ ($hasValid || $hasRejected) ? 'open' : '' }}">
                         
-                        <summary id="summary-{{ $key }}" class="flex items-center justify-between p-4 cursor-pointer rounded-2xl transition">
+                        <summary id="summary-{{ $key }}" data-rejected="{{ $hasRejected ? 'true' : 'false' }}" class="flex items-center justify-between p-4 cursor-pointer rounded-2xl transition">
                             <div class="flex items-center gap-3">
                                 <div id="icon-{{ $key }}" class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-slate-100 text-slate-400">
                                     📷
@@ -75,13 +84,21 @@
 
                             <div id="preview-{{ $key }}" class="grid grid-cols-4 gap-2 mt-3 empty:hidden"></div>
 
-                            @if($hasUploaded)
+                            @if($uploaded->count() > 0)
                                 <div class="mt-4 pt-3 border-t border-slate-200">
                                     <p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Tersimpan di Database</p>
                                     <div class="grid grid-cols-4 gap-2">
                                         @foreach($uploaded as $ev)
-                                            <div class="relative rounded-xl overflow-hidden border border-slate-200 aspect-square shadow-sm">
+                                            <div class="relative rounded-xl overflow-hidden border {{ $ev->status == 'rejected' ? 'border-red-500 border-2 shadow-red-200' : 'border-slate-200' }} aspect-square shadow-sm">
                                                 <img src="{{ asset('storage/' . $ev->file_path) }}" class="w-full h-full object-cover">
+                                                
+                                                {{-- BADGE DITOLAK / APPROVED --}}
+                                                @if($ev->status == 'rejected')
+                                                    <div class="absolute bottom-0 inset-x-0 bg-red-600 text-white text-[8px] text-center py-1 font-black">DITOLAK</div>
+                                                @elseif($ev->status == 'approved')
+                                                    <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[8px] text-center py-1 font-black">APPROVED</div>
+                                                @endif
+
                                                 <button type="button" onclick="event.preventDefault(); document.getElementById('form-delete-{{ $ev->id_evidence }}').submit();" class="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md">✕</button>
                                             </div>
                                         @endforeach
@@ -126,7 +143,11 @@
     
     let serverData = {
         @foreach($allEvidences as $key => $label)
-            '{{ $key }}': {{ isset($existingEvidences[$key]) ? $existingEvidences[$key]->count() : 0 }},
+            @php
+                // HANYA MENGHITUNG YANG STATUSNYA PENDING / APPROVED
+                $validCount = isset($existingEvidences[$key]) ? $existingEvidences[$key]->whereIn('status', ['pending', 'approved'])->count() : 0;
+            @endphp
+            '{{ $key }}': {{ $validCount }},
         @endforeach
     };
 
@@ -143,7 +164,6 @@
         checkFormValidity();
     });
 
-    // MESIN KOMPRES GAMBAR
     function compressImage(file, maxWidth = 1280, quality = 0.75) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -167,15 +187,12 @@
         });
     }
 
-    // Fungsi ASYNC agar menunggu file dikompres semua dulu
     async function handleFileSelect(inputElement, key) {
         let files = Array.from(inputElement.files);
         if (files.length === 0) return;
 
-        // Munculkan tulisan loading
         document.getElementById('loading-' + key).classList.remove('hidden');
 
-        // Proses kompres semua foto (Looping)
         for (let file of files) {
             if (file.type.startsWith('image/')) {
                 const compressedFile = await compressImage(file, 1280, 0.7); 
@@ -184,8 +201,6 @@
         }
         
         inputElement.value = '';
-        
-        // Sembunyikan loading
         document.getElementById('loading-' + key).classList.add('hidden');
         renderPreviews(key);
     }
@@ -210,7 +225,7 @@
                 div.className = 'relative rounded-xl overflow-hidden border border-blue-200 border-2 aspect-square';
                 div.innerHTML = `
                     <img src="${e.target.result}" class="w-full h-full object-cover">
-                    <div class="absolute bottom-0 inset-x-0 bg-blue-600 text-white text-[7px] text-center py-0.5">Baru</div>
+                    <div class="absolute bottom-0 inset-x-0 bg-blue-600 text-white text-[7px] text-center py-0.5 font-bold">BARU</div>
                     <button type="button" onclick="removeNewFile('${key}', ${index})" class="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md hover:bg-red-700">✕</button>
                 `;
                 previewContainer.appendChild(div);
@@ -229,46 +244,64 @@
         let total = uploadedData[key] + serverData[key];
         let isPort = (key === 'redaman_port');
         
+        let summary = document.getElementById('summary-' + key);
+        let icon = document.getElementById('icon-' + key);
+        let countText = document.getElementById('count-' + key);
+        let hasRejected = summary.getAttribute('data-rejected') === 'true';
+
         let state = 'empty'; 
         let msg = '';
         
         if (isPort) {
-            if (total === 0) { state = 'empty'; msg = 'Belum ada foto dipilih'; }
+            if (total === 0) { 
+                state = 'empty'; 
+                msg = hasRejected ? 'Ada foto ditolak! Wajib upload ulang.' : 'Belum ada foto dipilih'; 
+            }
             else {
                 if (targetPortCount == '16') {
                     if (total == 16) { state = 'complete'; msg = '✅ 16 / 16 foto siap'; }
                     else if (total > 16) { state = 'over'; msg = '❌ Kelebihan ' + (total-16) + ' foto!'; }
-                    else { state = 'partial'; msg = '⚠️ ' + total + ' / 16 foto (Kurang '+(16-total)+')'; }
+                    else { state = 'partial'; msg = hasRejected ? '🚨 ' + total + ' / 16 (Ada yg ditolak)' : '⚠️ ' + total + ' / 16 foto (Kurang '+(16-total)+')'; }
                 } 
                 else if (targetPortCount == '8') {
                     if (total == 8) { state = 'complete'; msg = '✅ 8 / 8 foto siap'; }
                     else if (total > 8) { state = 'over'; msg = '❌ Kelebihan ' + (total-8) + ' foto!'; }
-                    else { state = 'partial'; msg = '⚠️ ' + total + ' / 8 foto (Kurang '+(8-total)+')'; }
+                    else { state = 'partial'; msg = hasRejected ? '🚨 ' + total + ' / 8 (Ada yg ditolak)' : '⚠️ ' + total + ' / 8 foto (Kurang '+(8-total)+')'; }
                 }
                 else { // 8_atau_16
                     if (total == 8 || total == 16) { state = 'complete'; msg = '✅ ' + total + ' foto siap'; }
                     else if (total > 16) { state = 'over'; msg = '❌ Kelebihan foto!'; }
-                    else { state = 'partial'; msg = '⚠️ ' + total + ' foto (Harus pas 8 atau 16)'; }
+                    else { state = 'partial'; msg = hasRejected ? '🚨 ' + total + ' foto (Ada yg ditolak)' : '⚠️ ' + total + ' foto (Harus pas 8 atau 16)'; }
                 }
             }
         } else {
-            if (total === 0) { state = 'empty'; msg = 'Belum ada foto (Opsional)'; }
+            if (total === 0) { 
+                state = 'empty'; 
+                msg = hasRejected ? 'Foto sebelumnya ditolak.' : 'Belum ada foto (Opsional)'; 
+            }
             else { state = 'complete'; msg = '✅ ' + total + ' foto siap'; }
         }
 
-        let summary = document.getElementById('summary-' + key);
-        let icon = document.getElementById('icon-' + key);
-        let countText = document.getElementById('count-' + key);
+        // --- STYLING LOGIC ---
+        // Jika statusnya empty atau partial TAPI memiliki foto yang direject, ubah menjadi MERAH PERINGATAN
+        if ((state === 'empty' || state === 'partial') && hasRejected) {
+             summary.className = 'flex items-center justify-between p-4 cursor-pointer rounded-2xl transition bg-red-50/50 border border-red-200';
+             icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-sm bg-red-100 text-red-600';
+             icon.innerText = '🚨';
+             countText.className = 'text-[10px] font-bold mt-0.5 text-red-600';
+        } else {
+             // Styling normal bawaan sistem
+             summary.className = 'flex items-center justify-between p-4 cursor-pointer rounded-2xl transition ' + 
+                 (state === 'complete' ? 'bg-green-50/50' : (state === 'partial' ? 'bg-amber-50/50' : (state === 'over' ? 'bg-red-50/50' : '')));
+             
+             icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-sm ' + 
+                 (state === 'complete' ? 'bg-green-100 text-green-600' : (state === 'partial' ? 'bg-amber-100 text-amber-600' : (state === 'over' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400')));
+             icon.innerText = (state === 'complete' ? '✅' : (state === 'partial' ? '⚠️' : (state === 'over' ? '❌' : '📷')));
+             
+             countText.className = 'text-[10px] font-medium mt-0.5 ' + 
+                 (state === 'complete' ? 'text-green-600' : (state === 'partial' ? 'text-amber-600' : (state === 'over' ? 'text-red-600' : 'text-slate-400')));
+        }
         
-        summary.className = 'flex items-center justify-between p-4 cursor-pointer rounded-2xl transition ' + 
-            (state === 'complete' ? 'bg-green-50/50' : (state === 'partial' ? 'bg-amber-50/50' : (state === 'over' ? 'bg-red-50/50' : '')));
-        
-        icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-sm ' + 
-            (state === 'complete' ? 'bg-green-100 text-green-600' : (state === 'partial' ? 'bg-amber-100 text-amber-600' : (state === 'over' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400')));
-        icon.innerText = (state === 'complete' ? '✅' : (state === 'partial' ? '⚠️' : (state === 'over' ? '❌' : '📷')));
-        
-        countText.className = 'text-[10px] font-medium mt-0.5 ' + 
-            (state === 'complete' ? 'text-green-600' : (state === 'partial' ? 'text-amber-600' : (state === 'over' ? 'text-red-600' : 'text-slate-400')));
         countText.innerText = msg;
     }
 

@@ -19,13 +19,11 @@
             <p class="text-xs font-bold text-gray-900 leading-snug break-words mb-2.5">
                 {{ $project->project_name }}
             </p>
-            
             <div class="flex flex-wrap items-center gap-1.5">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
                     <span class="text-gray-400 mr-1 font-normal">STO:</span>
                     <span class="font-mono">{{ $project->lop?->sto ?? '-' }}</span>
                 </span>
-
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
                     <span class="text-gray-400 mr-1 font-normal">Branch:</span>
                     <span>{{ $project->lop?->branch ?? '-' }}</span>

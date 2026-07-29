@@ -9,6 +9,9 @@
         @if(session('success'))
             <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-xs font-bold">{{ session('success') }}</div>
         @endif
+        @if(session('error'))
+            <div class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs font-bold">{{ session('error') }}</div>
+        @endif
 
         <div class="mb-5 bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-start gap-3">
             <span class="text-xl">🛠️</span>
@@ -46,8 +49,50 @@
                             <label class="block text-xs font-black text-slate-600 mb-1">QTY ODP <span class="text-red-500">*</span></label>
                             <input type="number" name="odp_qty" value="{{ $odpData->qty ?? '1' }}" min="1" class="w-24 h-10 px-3 border border-slate-200 rounded-lg text-sm mb-4">
                             
-                            {{-- Modul Foto --}}
-                            @include('teknisi.partials.upload_box', ['key' => 'odp', 'label' => 'Foto ODP Dibongkar'])
+                            {{-- Panggil Modul Foto dengan Logic Rejected --}}
+                            @php
+                                $key = 'odp';
+                                $uploaded = isset($existingEvidences[$key]) ? $existingEvidences[$key] : collect();
+                                $validUploaded = $uploaded->whereIn('status', ['pending', 'approved']);
+                                $rejectedUploaded = $uploaded->where('status', 'rejected');
+                            @endphp
+                            
+                            <div class="w-full">
+                                <label class="block text-xs font-black text-slate-600 mb-2">Foto ODP Dibongkar <span class="text-red-500">*</span></label>
+                                
+                                {{-- Area Upload (Berubah merah jika ditolak) --}}
+                                <label id="upload-box-{{ $key }}" class="relative flex flex-col items-center justify-center w-full h-16 border-2 border-dashed rounded-xl cursor-pointer transition 
+                                    {{ $rejectedUploaded->count() > 0 && $validUploaded->count() == 0 ? 'bg-red-50 border-red-300' : 'bg-white border-slate-300 hover:bg-slate-50' }}">
+                                    
+                                    <span id="label-btn-{{ $key }}" class="text-xs font-bold 
+                                        {{ $rejectedUploaded->count() > 0 && $validUploaded->count() == 0 ? 'text-red-600' : 'text-slate-500' }}">
+                                        {!! $rejectedUploaded->count() > 0 && $validUploaded->count() == 0 ? '⚠️ Ditolak! Upload Ulang' : '+ Tambah Foto' !!}
+                                    </span>
+                                    
+                                    <input type="file" id="input-{{ $key }}" name="evidences[{{ $key }}][]" multiple accept="image/*" class="hidden" onchange="handleFileSelect(this, '{{ $key }}')">
+                                    <div id="loading-{{ $key }}" class="hidden absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center text-[10px] font-bold text-blue-600">Compressing...</div>
+                                </label>
+
+                                <div id="preview-{{ $key }}" class="grid grid-cols-3 gap-2 mt-3 empty:hidden"></div>
+
+                                {{-- Render Foto dari Database --}}
+                                @if($uploaded->count() > 0)
+                                    <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-200">
+                                        @foreach($uploaded as $ev)
+                                            <div class="relative rounded-xl overflow-hidden border {{ $ev->status == 'rejected' ? 'border-red-500 border-2 shadow-red-200' : 'border-slate-200' }} aspect-square">
+                                                <img src="{{ asset('storage/' . $ev->file_path) }}" class="w-full h-full object-cover">
+                                                @if($ev->status == 'rejected')
+                                                    <div class="absolute bottom-0 inset-x-0 bg-red-600 text-white text-[8px] text-center py-1 font-black">DITOLAK</div>
+                                                @elseif($ev->status == 'approved')
+                                                    <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[8px] text-center py-1 font-black">APPROVED</div>
+                                                @endif
+                                                <button type="button" onclick="event.preventDefault(); document.getElementById('form-delete-{{ $ev->id_evidence }}').submit();" class="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md">✕</button>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+
                         </div>
                     </div>
                 </div>
@@ -66,6 +111,11 @@
                             @php
                                 $spData = $dismantles->where('item_name', 'Splitter ' . str_replace('_', ':', $sp))->first();
                                 $isChecked = $spData ? true : false;
+                                
+                                $key = 'splitter_'.$sp;
+                                $uploaded = isset($existingEvidences[$key]) ? $existingEvidences[$key] : collect();
+                                $validUploaded = $uploaded->whereIn('status', ['pending', 'approved']);
+                                $rejectedUploaded = $uploaded->where('status', 'rejected');
                             @endphp
                             
                             <div class="border border-slate-100 rounded-xl p-3">
@@ -81,7 +131,41 @@
                                     <input type="number" name="qty_splitter_{{ $sp }}" id="qty_{{ $sp }}" value="{{ $spData->qty ?? '1' }}" min="1" class="w-20 h-9 px-2 border border-slate-200 rounded-lg text-sm mb-3">
                                     
                                     {{-- Modul Foto --}}
-                                    @include('teknisi.partials.upload_box', ['key' => 'splitter_'.$sp, 'label' => 'Foto '.$label])
+                                    <div class="w-full">
+                                        <label class="block text-[10px] font-black text-slate-600 mb-1">Foto {{ $label }} <span class="text-red-500">*</span></label>
+                                        
+                                        <label id="upload-box-{{ $key }}" class="relative flex flex-col items-center justify-center w-full h-12 border-2 border-dashed rounded-xl cursor-pointer transition
+                                            {{ $rejectedUploaded->count() > 0 && $validUploaded->count() == 0 ? 'bg-red-50 border-red-300' : 'bg-white border-slate-300 hover:bg-slate-50' }}">
+                                            
+                                            <span id="label-btn-{{ $key }}" class="text-[10px] font-bold 
+                                                {{ $rejectedUploaded->count() > 0 && $validUploaded->count() == 0 ? 'text-red-600' : 'text-slate-500' }}">
+                                                {!! $rejectedUploaded->count() > 0 && $validUploaded->count() == 0 ? '⚠️ Ditolak! Upload Ulang' : '+ Tambah Foto' !!}
+                                            </span>
+                                            
+                                            <input type="file" id="input-{{ $key }}" name="evidences[{{ $key }}][]" multiple accept="image/*" class="hidden" onchange="handleFileSelect(this, '{{ $key }}')">
+                                            <div id="loading-{{ $key }}" class="hidden absolute inset-0 bg-white/80 rounded-xl flex items-center justify-center text-[10px] font-bold text-blue-600">Wait...</div>
+                                        </label>
+
+                                        <div id="preview-{{ $key }}" class="grid grid-cols-3 gap-2 mt-2 empty:hidden"></div>
+
+                                        {{-- Render Foto dari Database --}}
+                                        @if($uploaded->count() > 0)
+                                            <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-100">
+                                                @foreach($uploaded as $ev)
+                                                    <div class="relative rounded-lg overflow-hidden border {{ $ev->status == 'rejected' ? 'border-red-500 border-2 shadow-red-200' : 'border-slate-200' }} aspect-square">
+                                                        <img src="{{ asset('storage/' . $ev->file_path) }}" class="w-full h-full object-cover">
+                                                        @if($ev->status == 'rejected')
+                                                            <div class="absolute bottom-0 inset-x-0 bg-red-600 text-white text-[7px] text-center py-0.5 font-black">DITOLAK</div>
+                                                        @elseif($ev->status == 'approved')
+                                                            <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[7px] text-center py-0.5 font-black">APPROVED</div>
+                                                        @endif
+                                                        <button type="button" onclick="event.preventDefault(); document.getElementById('form-delete-{{ $ev->id_evidence }}').submit();" class="absolute top-1 right-1 w-4 h-4 bg-red-600 text-white rounded-full flex items-center justify-center text-[8px] font-black shadow-md">✕</button>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+
                                 </div>
                             </div>
                         @endforeach
@@ -116,9 +200,14 @@
 {{-- JAVASCRIPT LOGIC --}}
 <script>
     const allKeys = @json($allKeys);
+    
+    // SERVER DATA: HANYA MENGHITUNG FOTO YANG STATUSNYA PENDING ATAU APPROVED
     let serverData = {
         @foreach($allKeys as $key)
-            '{{ $key }}': {{ isset($existingEvidences[$key]) ? $existingEvidences[$key]->count() : 0 }},
+            @php
+                $validCount = isset($existingEvidences[$key]) ? $existingEvidences[$key]->whereIn('status', ['pending', 'approved'])->count() : 0;
+            @endphp
+            '{{ $key }}': {{ $validCount }},
         @endforeach
     };
 
@@ -152,7 +241,6 @@
         checkFormValidity();
     }
 
-    // KOMPRES & RENDER FOTO
     function compressImage(file, maxWidth = 1280, quality = 0.75) {
         return new Promise((resolve) => {
             const reader = new FileReader();
@@ -211,6 +299,7 @@
                 div.className = 'relative rounded-xl overflow-hidden border border-blue-200 border-2 aspect-square';
                 div.innerHTML = `
                     <img src="${e.target.result}" class="w-full h-full object-cover">
+                    <div class="absolute bottom-0 inset-x-0 bg-blue-600 text-white text-[8px] text-center py-0.5 font-bold">BARU</div>
                     <button type="button" onclick="removeNewFile('${key}', ${index})" class="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md">✕</button>
                 `;
                 previewContainer.appendChild(div);
@@ -221,13 +310,17 @@
         document.getElementById('input-' + key).files = dataTransfer.files;
         uploadedData[key] = newFilesStore[key].length;
         
-        // Update Teks Label Upload (Hijau jika ada foto)
+        // Update Teks Label & Style Kotak Upload (Menghilangkan status merah jika ada foto baru)
         let labelBtn = document.getElementById('label-btn-' + key);
+        let uploadBox = document.getElementById('upload-box-' + key);
         let total = uploadedData[key] + serverData[key];
+        
         if (total > 0) {
+            uploadBox.className = "relative flex flex-col items-center justify-center w-full h-12 border-2 border-dashed rounded-xl cursor-pointer transition bg-green-50 border-green-300";
             labelBtn.className = "text-xs font-bold text-green-600";
             labelBtn.innerText = "✅ " + total + " Foto Siap";
         } else {
+            uploadBox.className = "relative flex flex-col items-center justify-center w-full h-12 border-2 border-dashed rounded-xl cursor-pointer transition bg-white border-slate-300 hover:bg-slate-50";
             labelBtn.className = "text-xs font-bold text-slate-500";
             labelBtn.innerText = "+ Tambah Foto";
         }
@@ -244,7 +337,7 @@
         if (odpVal !== 'none') {
             isAnyDismantle = true;
             let qty = document.querySelector('input[name="odp_qty"]').value;
-            let totalFoto = uploadedData['odp'] + serverData['odp'];
+            let totalFoto = uploadedData['odp'] + serverData['odp']; // Ingat: serverData sekarang hanya berisi yang VALID
             if (!qty || qty < 1 || totalFoto === 0) isValid = false;
         }
 

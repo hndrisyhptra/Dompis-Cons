@@ -48,29 +48,39 @@
     {{-- LIST CARDS PROJECT LOP --}}
     <div class="px-4 mt-4 space-y-4">
         @forelse($projects as $project)
-            @php
+           @php
                 $survey = $project->pt2Survey;
                 $mancore = $project->pt2Mancore ?? null;
                 $evidences = $project->evidences ?? collect();
 
-                // DETEKSI PROGRESS PT 2 (Step 1 - 5)
+                // DETEKSI PROGRESS PT 2 (Sesuai dengan Stepper PT 2)
                 $step1Done = $survey ? true : false;
-                $step2Done = $evidences->where('stage', 'instalasi')->where('evidence_type', 'progress_boq')->count() > 0; 
-                $step3Done = $evidences->where('stage', 'finishing')->count() > 0;
-                $step4Done = $evidences->where('stage', 'dismantle')->count() > 0; 
+                
+                // Step 2: Cukup cek apakah ada foto di stage 'instalasi' (Tanpa progress_boq)
+                $step2Done = $evidences->where('stage', 'instalasi')->count() > 0; 
+                
+                // Step 3: Redaman (Di stage finishing dengan tipe spesifik 'redaman_port')
+                $step3Done = $evidences->where('stage', 'finishing')->where('evidence_type', 'redaman_port')->count() > 0;
+                
+                // Step 4: Dismantle (Cek apakah sudah tersimpan di tabel dismantles)
+                $step4Done = \Illuminate\Support\Facades\DB::table('dismantles')->where('project_id', $project->id_project)->exists(); 
+                
+                // Step 5: Mancore
                 $step5Done = $mancore ? true : false;
 
                 $isKendala = $survey && $survey->has_kendala == 1;
                 $isGoLive = $project->is_golive;
 
-                // Hitung persentase kasar untuk UI
+                // Hitung persentase untuk UI (Berdasarkan 5 Step Mutlak)
                 $doneStep = 0;
                 if ($step1Done) $doneStep++;
                 if ($step2Done) $doneStep++;
                 if ($step3Done) $doneStep++;
-                if ($step5Done) $doneStep++; // Asumsi dismantle opsional, step wajib ada 4
+                if ($step4Done) $doneStep++;
+                if ($step5Done) $doneStep++;
 
-                $progress = ($isGoLive || $step5Done) ? 100 : round(($doneStep / 4) * 100);
+                // Progress Maksimal 100% (5/5)
+                $progress = ($isGoLive || $step5Done) ? 100 : round(($doneStep / 5) * 100);
                 $allStepDone = ($progress === 100);
 
                 // DYNAMIC TEMPLATE DESIGN STYLES
@@ -78,6 +88,24 @@
                 $progressColor = $allStepDone ? 'bg-emerald-500' : ($isKendala ? 'bg-rose-500' : 'bg-blue-600');
                 
                 $lastUpdate = $project->updated_at;
+
+                // LOGIKA TOMBOL DINAMIS (Mencari step apa yang belum diselesaikan)
+                $nextStepUrl = '';
+                $nextStepText = '';
+                
+                if (!$step2Done) {
+                    $nextStepUrl = route('teknisi.pt2.step2Eviden', $project->id_project);
+                    $nextStepText = 'Lanjut Step 2 →';
+                } elseif (!$step3Done) {
+                    $nextStepUrl = route('teknisi.pt2.step3Eviden', $project->id_project);
+                    $nextStepText = 'Lanjut Step 3 →';
+                } elseif (!$step4Done) {
+                    $nextStepUrl = route('teknisi.pt2.step4Eviden', $project->id_project);
+                    $nextStepText = 'Lanjut Step 4 →';
+                } else {
+                    $nextStepUrl = url('teknisi/pt2/survey/'.$project->id_project.'/step5');
+                    $nextStepText = 'Lanjut Step 5 →';
+                }
             @endphp
 
             <div class="bg-white border border-slate-100 border-l-[4px] {{ $borderColor }} rounded-3xl p-4 shadow-xs relative overflow-hidden">
@@ -104,13 +132,13 @@
                         {{ $step1Done ? '✓ 1. Survey' : '○ 1. Survey' }}
                     </span>
                     <span class="px-2 py-0.5 rounded-md border {{ $step2Done ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-400' }}">
-                        {{ $step2Done ? '✓ 2. Prog. Instal' : '○ 2. Prog. Instal' }}
+                        {{ $step2Done ? '✓ 2. Instalasi' : '○ 2. Instalasi' }}
                     </span>
                     <span class="px-2 py-0.5 rounded-md border {{ $step3Done ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-400' }}">
-                        {{ $step3Done ? '✓ 3. Fin. Instal' : '○ 3. Fin. Instal' }}
+                        {{ $step3Done ? '✓ 3. Finish' : '○ 3. Finish' }}
                     </span>
                     <span class="px-2 py-0.5 rounded-md border {{ $step4Done ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-slate-50 border-slate-200 text-slate-400' }}">
-                        {{ $step4Done ? '✓ 4. Dismantle' : '○ 4. Dismantle (Ops)' }}
+                        {{ $step4Done ? '✓ 4. Dismantle' : '○ 4. Dismantle' }}
                     </span>
                     <span class="px-2 py-0.5 rounded-md border {{ $step5Done ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-400' }}">
                         {{ $step5Done ? '✓ 5. Mancore' : '○ 5. Mancore' }}
@@ -149,12 +177,24 @@
                 {{-- ACTION BUTTONS --}}
                 <div class="mt-3.5 pt-1">
                     @if($isGoLive)
-                        <div class="h-10 w-full flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 text-xs font-black">
-                            🎉 Project Telah Selesai (Go Live)
+                        {{-- JIKA SUDAH GO LIVE --}}
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="col-span-2 h-10 flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 text-[11px] font-black">
+                                🎉 Project Go Live
+                            </div>
+                            <a href="{{ route('teknisi.pt2.step1', $project->id_project) }}" class="h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-black transition active:scale-[0.98]">
+                                Detail
+                            </a>
                         </div>
                     @elseif($step5Done)
-                        <div class="h-10 w-full flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200 text-xs font-black">
-                            ⏳ Menunggu Approval SDI
+                        {{-- JIKA STEP 5 SELESAI TAPI BELUM GO LIVE (MENUNGGU SDI) --}}
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="col-span-2 h-10 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200 text-[11px] font-black">
+                                ⏳ Menunggu Approval SDI
+                            </div>
+                            <a href="{{ route('teknisi.pt2.step1', $project->id_project) }}" class="h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-black transition active:scale-[0.98]">
+                                Review Data
+                            </a>
                         </div>
                     @else
                         {{-- Logika Tombol Dinamis berdasarkan Step yang belum selesai --}}
@@ -168,14 +208,14 @@
                             {{-- JIKA STEP 1 SELESAI, BISA LANJUT STEP BERIKUTNYA --}}
                             <div class="grid grid-cols-2 gap-2">
                                 <a href="{{ route('teknisi.pt2.step1', $project->id_project) }}"
-                                class="h-10 flex items-center justify-center rounded-xl bg-slate-100 text-slate-700 text-xs font-black transition active:scale-[0.98]">
+                                class="h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black transition active:scale-[0.98]">
                                     Lihat Data Survey
                                 </a>
                                 
-                                {{-- TOMBOL LANJUT STEP 2 (Menuju Halaman Upload Eviden) --}}
-                                <a href="{{ route('teknisi.pt2.step1Eviden', $project->id_project) }}"
+                                {{-- TOMBOL LANJUT STEP DINAMIS --}}
+                                <a href="{{ $nextStepUrl }}"
                                 class="h-10 flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md transition active:scale-[0.98]">
-                                    Lanjut Step 2 →
+                                    {{ $nextStepText }}
                                 </a>
                             </div>
                         @endif

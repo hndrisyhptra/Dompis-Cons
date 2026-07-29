@@ -106,10 +106,10 @@
                 <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Step 2 Instalasi</h2>
                 <p class="text-[11px] text-gray-500">Tap item untuk melihat foto/riwayat & upload</p>
             </div>
-            @if($instalasiUploadedComplete)
+            @if($instalasiUploadedComplete ?? false)
                 <span class="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">Complete</span>
             @else
-                <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">{{ $boqUploaded }}/{{ $boqTotal }} Item</span>
+                <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">{{ $boqUploaded ?? 0 }}/{{ $boqTotal ?? 0 }} Item</span>
             @endif
         </div>
 
@@ -140,18 +140,22 @@
                                         $designatorUpper = strtoupper($boq->designator);
                                         $relationCategory = strtoupper(trim($boq->progress_category ?? ($boq->designatorData?->progress_category ?? '')));
                                         
-                                        // Penanda warna: Biru untuk Kabel/Tiang (KPI Utama), Slate untuk item lainnya
                                         $isKpi = in_array($relationCategory, ['KABEL', 'TIANG']) || str_contains($designatorUpper, 'KABEL') || str_contains($designatorUpper, 'TIANG');
                                         
-                                        $bgClass = $isKpi ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300';
+                                        $bgClass = $isKpi ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-700';
                                     @endphp
 
-                                    {{-- Sekarang semua jenis item tanpa terkecuali akan menampilkan nilai aktualnya di card luar --}}
                                     <p class="flex items-center gap-1">
                                         Aktual: 
                                         <span class="font-black px-1.5 py-0.5 rounded-md {{ $bgClass }}">
                                             {{ number_format($boq->quantity_actual ?? 0, 0, ',', '.') }} {{ $boq->unit }}
                                         </span>
+                                        {{-- Indikator Kecil di Luar Jika Ada Reason --}}
+                                        @if($boq->actual_reason)
+                                            <span class="px-1.5 py-0.5 bg-red-50 border border-red-100 text-red-600 rounded text-[9px] font-bold" title="Lihat Alasan">
+                                                <i class="fa-solid fa-info-circle"></i> Reason
+                                            </span>
+                                        @endif
                                     </p>
                                     
                                     <p class="text-[10px] font-medium text-gray-400">{{ $photos->count() }} Eviden</p>
@@ -173,6 +177,17 @@
 
                     {{-- CARD EXPAND AREA --}}
                     <div x-show="open" x-transition class="border-t border-gray-50 bg-gray-50/30 p-4 space-y-3">
+                        
+                        {{-- BLOK INFO REASON ACTUAL 0 (Fitur Baru) --}}
+                        @if($boq->actual_reason)
+                            <div class="rounded-xl border border-red-100 bg-red-50/80 p-3 text-xs text-red-700 leading-relaxed shadow-sm">
+                                <p class="font-black mb-0.5 flex items-center gap-1">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> Alasan Kuantitas Aktual (0):
+                                </p>
+                                <p class="text-red-600 font-medium">{{ $boq->actual_reason }}</p>
+                            </div>
+                        @endif
+
                         @if($reviewNote)
                             <div class="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs text-red-700 leading-relaxed">
                                 <p class="font-bold mb-0.5"><i class="fa-solid fa-circle-exclamation mr-1"></i> Catatan Revisi Admin:</p>
@@ -214,7 +229,7 @@
 
     {{-- BOTTOM ACTION BUTTON --}}
     <div class="px-4 mt-6">
-        @if($instalasiUploadedComplete)
+        @if($instalasiUploadedComplete ?? false)
             <a href="{{ route('waspang.projects.pengukuran', $project->id_project) }}" class="h-11 w-full rounded-xl bg-blue-700 text-white inline-flex items-center justify-center text-sm font-bold shadow-sm hover:bg-blue-800 transition">
                 Next Step 3 - Pengukuran <i class="fa-solid fa-chevron-right ml-2 text-xs"></i>
             </a>
@@ -229,22 +244,13 @@
     <div id="uploadModal" class="hidden fixed inset-0 z-[9999] bg-black/60 px-4 flex items-center justify-center backdrop-blur-xs animate-fade-in">
         <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
-            {{-- HEADER MODAL (WARNA BIRU MODERN) --}}
+            {{-- HEADER MODAL --}}
             <div class="bg-blue-700 text-white px-5 py-4 flex items-start justify-between shrink-0">
                 <div>
-                    <h2 class="text-lg font-black tracking-tight">
-                        Upload Eviden & Qty Actual
-                    </h2>
-                    <p id="selectedBoqName" class="text-xs text-blue-100 mt-1 font-medium break-all line-clamp-1">
-                        item BOQ
-                    </p>
+                    <h2 class="text-lg font-black tracking-tight">Upload Eviden & Qty Actual</h2>
+                    <p id="selectedBoqName" class="text-xs text-blue-100 mt-1 font-medium break-all line-clamp-1">item BOQ</p>
                 </div>
-
-                <button type="button"
-                        onclick="closeUploadModal()"
-                        class="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 text-white font-black text-lg flex items-center justify-center transition">
-                    ×
-                </button>
+                <button type="button" onclick="closeUploadModal()" class="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 text-white font-black text-lg flex items-center justify-center transition">×</button>
             </div>
 
             {{-- FORM SUBMIT --}}
@@ -270,12 +276,35 @@
                     </div>
                 </div>
 
-                {{-- AREA DROPZONE SELECT/UPLOAD FOTO (KEREN & MODERN) --}}
-                <div class="text-xs">
-                    <label class="text-xs font-black text-gray-600 block mb-1.5">
-                        Pilih Eviden / Multiple Select
+                {{-- AREA INPUT REASON JIKA ACTUAL = 0 --}}
+                <div id="reasonBox" class="hidden text-xs bg-red-50 border border-red-100 rounded-2xl p-3 animate-fade-in shadow-inner">
+                    <label class="text-xs font-black text-red-700 block mb-2">
+                        <i class="fa-solid fa-triangle-exclamation mr-1"></i> Nilai Aktual 0. Pilih Alasan: <span class="text-red-500">*</span>
                     </label>
+                    <div class="flex flex-col gap-2">
+                        <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-red-200 cursor-pointer hover:bg-red-50 transition">
+                            <input type="radio" name="reason_option" value="Stok Material Kosong" class="accent-red-600 w-3.5 h-3.5">
+                            <span class="font-bold text-gray-700">Stok Material Kosong</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-red-200 cursor-pointer hover:bg-red-50 transition">
+                            <input type="radio" name="reason_option" value="Tidak Diperlukan di Lapangan" class="accent-red-600 w-3.5 h-3.5">
+                            <span class="font-bold text-gray-700">Tidak Diperlukan di Lapangan</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-red-200 cursor-pointer hover:bg-red-50 transition">
+                            <input type="radio" name="reason_option" value="Perubahan Rute / Desain" class="accent-red-600 w-3.5 h-3.5">
+                            <span class="font-bold text-gray-700">Perubahan Rute / Desain</span>
+                        </label>
+                        <label class="flex items-center gap-2 p-2 bg-white rounded-xl border border-red-200 cursor-pointer hover:bg-red-50 transition">
+                            <input type="radio" name="reason_option" value="Lainnya" class="accent-red-600 w-3.5 h-3.5">
+                            <span class="font-bold text-gray-700">Lainnya... (Ketik Manual)</span>
+                        </label>
+                    </div>
+                    <textarea id="textReasonLainnya" rows="2" placeholder="Tulis alasan spesifik..." class="hidden mt-2 w-full rounded-xl border border-red-200 px-3 py-2 text-xs focus:ring-2 focus:ring-red-100 focus:border-red-500 outline-none transition resize-none"></textarea>
+                </div>
 
+                {{-- AREA DROPZONE SELECT/UPLOAD FOTO --}}
+                <div class="text-xs">
+                    <label class="text-xs font-black text-gray-600 block mb-1.5">Pilih Eviden / Multiple Select</label>
                     <label class="flex flex-col items-center justify-center w-full min-h-[125px] border-2 border-dashed border-blue-300 rounded-2xl bg-blue-50/40 cursor-pointer hover:bg-blue-50 transition p-4">
                         <div class="text-center">
                             <div class="mx-auto w-11 h-11 rounded-xl bg-blue-700 text-white flex items-center justify-center text-xl font-black shadow-sm">
@@ -283,68 +312,32 @@
                                     <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/>
                                 </svg>
                             </div>
-
-                            <p class="mt-2.5 text-xs font-black text-blue-800">
-                                Pilih Eviden Progress
-                            </p>
-
-                            <p class="text-[10px] text-gray-400 mt-0.5">
-                                JPG, PNG, WEBP · Auto Compress
-                            </p>
+                            <p class="mt-2.5 text-xs font-black text-blue-800">Pilih Eviden Progress</p>
+                            <p class="text-[10px] text-gray-400 mt-0.5">JPG, PNG, WEBP · Auto Compress</p>
                         </div>
-
-                        <input
-                            type="file"
-                            id="photoInput"
-                            accept="image/*"
-                            multiple
-                            class="hidden">
+                        <input type="file" id="photoInput" accept="image/*" multiple class="hidden">
                     </label>
 
-                    {{-- PREVIEW MULTIPLE FOTO YANG AKAN DIUPLOAD --}}
+                    {{-- PREVIEW MULTIPLE FOTO --}}
                     <div id="previewWrapper" class="mt-3 hidden animate-fade-in">
                         <div class="flex items-center justify-between mb-2">
-                            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
-                                Preview Foto (<span id="photoCount">0</span>)
-                            </p>
-
-                            <button type="button"
-                                    id="clearAllPhotos"
-                                    class="text-[11px] font-bold text-red-600 hover:text-red-700 transition">
-                                Hapus Semua
-                            </button>
+                            <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Preview Foto (<span id="photoCount">0</span>)</p>
+                            <button type="button" id="clearAllPhotos" class="text-[11px] font-bold text-red-600 hover:text-red-700 transition">Hapus Semua</button>
                         </div>
-
-                        <div id="previewContainer" class="grid grid-cols-3 gap-2">
-                            {{-- Element preview item disuntikkan secara dinamis lewat Javascript --}}
-                        </div>
+                        <div id="previewContainer" class="grid grid-cols-3 gap-2"></div>
                     </div>
                 </div>
 
-                {{-- INPUT CATATAN / DESKRIPSI --}}
+                {{-- INPUT CATATAN --}}
                 <div class="text-xs">
-                    <label class="text-xs font-black text-gray-600 block">
-                        Catatan Tambahan Progress <span class="text-gray-400">(Opsional)</span>
-                    </label>
-
-                    <textarea name="description"
-                              rows="3"
-                              placeholder="Contoh: Penarikan kabel span ke-4 selesai dilakukan..."
-                              class="mt-1.5 w-full rounded-2xl border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-700 outline-none transition resize-none"></textarea>
+                    <label class="text-xs font-black text-gray-600 block">Catatan Tambahan Progress <span class="text-gray-400">(Opsional)</span></label>
+                    <textarea name="description" rows="2" placeholder="Contoh: Penarikan span ke-4 selesai..." class="mt-1.5 w-full rounded-2xl border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-700 outline-none transition resize-none"></textarea>
                 </div>
 
                 {{-- ACTION BUTTONS --}}
                 <div class="grid grid-cols-2 gap-2 pt-2 shrink-0">
-                    <button type="button"
-                            onclick="closeUploadModal()"
-                            class="h-11 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-black transition">
-                        Batal
-                    </button>
-
-                    <button type="submit"
-                            class="h-11 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-md transition">
-                        Upload
-                    </button>
+                    <button type="button" onclick="closeUploadModal()" class="h-11 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-black transition">Batal</button>
+                    <button type="submit" class="h-11 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-md transition">Upload</button>
                 </div>
             </form>
         </div>
@@ -353,48 +346,76 @@
     @include('waspang.partials.bottom-nav', ['active' => 'inbox'])
 </div>
 @endsection
+
 @section('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-// Container State Global untuk menampung data file uploader secara independen
-const issueUploaders = {};
-let selectedFiles = []; // Khusus menampung array file eviden progress
+let selectedFiles = []; 
 
-/**
- * ==========================================
- * CONTROLLER UTAMA: MODAL UPLOAD EVIDEN
- * ==========================================
- */
+// ELEMENT UI LOGIC REASON
+const inputActual = document.getElementById('quantity_actual');
+const reasonBox = document.getElementById('reasonBox');
+const reasonRadios = document.getElementsByName('reason_option');
+const textLainnya = document.getElementById('textReasonLainnya');
+
+inputActual.addEventListener('input', function() {
+    if (this.value === '0') {
+        reasonBox.classList.remove('hidden');
+        reasonBox.classList.add('block');
+    } else {
+        reasonBox.classList.add('hidden');
+        reasonBox.classList.remove('block');
+        resetReasonForm();
+    }
+});
+
+reasonRadios.forEach(radio => {
+    radio.addEventListener('change', function() {
+        if (this.value === 'Lainnya') {
+            textLainnya.classList.remove('hidden');
+            textLainnya.required = true;
+        } else {
+            textLainnya.classList.add('hidden');
+            textLainnya.required = false;
+        }
+    });
+});
+
+function resetReasonForm() {
+    reasonRadios.forEach(r => r.checked = false);
+    textLainnya.classList.add('hidden');
+    textLainnya.value = '';
+}
+
 function openUploadModal(boqId, boqName, quantityPlan, unit, quantityActual) {
     document.getElementById('uploadModal').classList.remove('hidden');
     document.getElementById('uploadModal').classList.add('flex');
 
-    // Suntik data teks pendukung acuan kerja
     document.getElementById('boq_item_id').value = boqId;
     document.getElementById('selectedBoqName').innerText = boqName;
     document.getElementById('planQuantity').innerText = quantityPlan;
     document.getElementById('planUnit').innerText = unit;
     
-    // Konversi float aman untuk indikator aktual saat ini
     document.getElementById('currentActualQuantity').innerText = quantityActual ? parseFloat(quantityActual) : '0';
-    
-    // Set satuan dinamis ke teks label
     document.querySelectorAll('.span-unit').forEach(span => span.innerText = unit);
     
-    // Tampilkan nilai lama di form input jika sudah pernah diisi
     document.getElementById('quantity_actual').value = quantityActual ? quantityActual : '';
 
-    // Reset list unggahan foto setiap kali modal baru dibuka
+    if (document.getElementById('quantity_actual').value === '0') {
+        reasonBox.classList.remove('hidden');
+        reasonBox.classList.add('block');
+    } else {
+        reasonBox.classList.add('hidden');
+        reasonBox.classList.remove('block');
+    }
+    resetReasonForm();
     clearAllPhotosAction();
 
-    // Tarik metadata Geolocation koordinat waspang di lapangan
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function(position) {
             document.getElementById('latitude').value = position.coords.latitude;
             document.getElementById('longitude').value = position.coords.longitude;
-        }, function(error) {
-            console.warn("Gagal mendapatkan koordinat GPS: ", error.message);
-        }, { enableHighAccuracy: true });
+        }, function(error) {}, { enableHighAccuracy: true });
     }
 }
 
@@ -403,25 +424,15 @@ function closeUploadModal() {
     document.getElementById('uploadModal').classList.remove('flex');
 }
 
-/**
- * LOGIKA PREVIEW & RESET MULTIPLE FOTO EVIDEN
- */
 document.getElementById('photoInput').addEventListener('change', async function(e) {
     const files = Array.from(e.target.files);
-    
     for (const file of files) {
         if (!file.type.startsWith('image/')) continue;
-        
-        // Kompres gambar otomatis ke lebar maks 1280px dengan kualitas 75%
         const compressed = await compressImage(file, 1280, 0.75);
-        selectedFiles.push({
-            file: compressed,
-            url: URL.createObjectURL(compressed)
-        });
+        selectedFiles.push({ file: compressed, url: URL.createObjectURL(compressed) });
     }
-    
     renderEvidencePreview();
-    document.getElementById('photoInput').value = ''; // Reset pointer element
+    document.getElementById('photoInput').value = '';
 });
 
 function renderEvidencePreview() {
@@ -444,22 +455,15 @@ function renderEvidencePreview() {
         card.className = 'relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-200 shadow-xs';
         card.innerHTML = `
             <img src="${item.url}" class="w-full h-full object-cover">
-            <button type="button" onclick="removeEvidencePhoto(${index})" 
-                    class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 text-white text-xs font-black flex items-center justify-center transition hover:bg-black">
-                ×
-            </button>
-            <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] px-1.5 py-0.5 truncate font-medium">
-                ${formatFileSize(item.file.size)}
-            </div>
+            <button type="button" onclick="removeEvidencePhoto(${index})" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 text-white text-xs font-black flex items-center justify-center transition hover:bg-black">×</button>
+            <div class="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[9px] px-1.5 py-0.5 truncate font-medium">${formatFileSize(item.file.size)}</div>
         `;
         container.appendChild(card);
     });
 }
 
 function removeEvidencePhoto(index) {
-    if (selectedFiles[index]) {
-        URL.revokeObjectURL(selectedFiles[index].url);
-    }
+    if (selectedFiles[index]) URL.revokeObjectURL(selectedFiles[index].url);
     selectedFiles.splice(index, 1);
     renderEvidencePreview();
 }
@@ -472,21 +476,32 @@ function clearAllPhotosAction() {
 
 document.getElementById('clearAllPhotos').addEventListener('click', clearAllPhotosAction);
 
-/**
- * PROSES SUBMIT FETCH FORM EVIDEN & AKTUAL VIA AJAX
- */
 document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
     if (selectedFiles.length === 0) {
-        Swal.fire({ 
-            title: 'Pilih Foto!', 
-            text: 'Mohon lampirkan minimal 1 foto fisik sebagai bukti progress lapangan.', 
-            icon: 'warning', 
-            confirmButtonColor: '#1D4ED8', 
-            customClass: { popup: 'rounded-3xl' } 
-        });
+        Swal.fire({ title: 'Pilih Foto!', text: 'Mohon lampirkan minimal 1 foto fisik sebagai bukti progress lapangan.', icon: 'warning', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
         return;
+    }
+
+    const qtyActualValue = document.getElementById('quantity_actual').value;
+    let finalReason = '';
+
+    if (qtyActualValue === '0') {
+        const checkedOption = document.querySelector('input[name="reason_option"]:checked');
+        if (!checkedOption) {
+            Swal.fire({ title: 'Alasan Kosong!', text: 'Karena Quantity Actual 0, Anda wajib memilih alasannya.', icon: 'warning', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
+            return; 
+        }
+        
+        finalReason = checkedOption.value;
+        if (finalReason === 'Lainnya') {
+            finalReason = textLainnya.value.trim();
+            if (finalReason === '') {
+                Swal.fire({ title: 'Alasan Kosong!', text: 'Silakan ketik alasan spesifik pada kolom teks yang tersedia.', icon: 'warning', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
+                return;
+            }
+        }
     }
 
     const formData = new FormData();
@@ -498,14 +513,10 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     formData.append('longitude', document.getElementById('longitude').value);
     formData.append('description', document.getElementsByName('description')[0].value);
     
-    const qtyActualValue = document.getElementById('quantity_actual').value;
-    if (qtyActualValue !== '') {
-        formData.append('quantity_actual', qtyActualValue);
-    }
+    if (qtyActualValue !== '') formData.append('quantity_actual', qtyActualValue);
+    if (finalReason !== '') formData.append('actual_reason', finalReason); 
 
-    selectedFiles.forEach((item) => {
-        formData.append('photos[]', item.file);
-    });
+    selectedFiles.forEach((item) => formData.append('photos[]', item.file));
 
     fetch(e.target.action, {
         method: 'POST',
@@ -515,43 +526,17 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     .then(response => {
         if (response.ok) {
             closeUploadModal();
-            Swal.fire({
-                title: 'Berhasil Disimpan!',
-                text: 'Eviden progress lapangan dan kuantitas aktual berhasil diperbarui.',
-                icon: 'success',
-                showConfirmButton: false,
-                timer: 1500,
-                timerProgressBar: true,
-                customClass: { popup: 'rounded-3xl' }
-            }).then(() => {
-                window.location.reload();
-            });
+            Swal.fire({ title: 'Berhasil Disimpan!', text: 'Eviden progress lapangan berhasil diperbarui.', icon: 'success', showConfirmButton: false, timer: 1500, timerProgressBar: true, customClass: { popup: 'rounded-3xl' } })
+            .then(() => window.location.reload());
         } else {
-            Swal.fire({ 
-                title: 'Gagal Memproses!', 
-                text: 'Terjadi kegagalan validasi atau status ENUM ditolak sistem.', 
-                icon: 'error', 
-                confirmButtonColor: '#1D4ED8', 
-                customClass: { popup: 'rounded-3xl' } 
-            });
+            Swal.fire({ title: 'Gagal Memproses!', text: 'Terjadi kegagalan validasi atau status ditolak sistem.', icon: 'error', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
         }
     })
     .catch(() => {
-        Swal.fire({ 
-            title: 'Gangguan Jaringan!', 
-            text: 'Gagal menghubungi server. Periksa kembali koneksi internet di lapangan.', 
-            icon: 'warning', 
-            confirmButtonColor: '#1D4ED8', 
-            customClass: { popup: 'rounded-3xl' } 
-        });
+        Swal.fire({ title: 'Gangguan Jaringan!', text: 'Gagal menghubungi server. Periksa kembali koneksi internet di lapangan.', icon: 'warning', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
     });
 });
 
-/**
- * ==========================================
- * UTILITIES GLOBAL ENGINE (IMAGE PROCESSING)
- * ==========================================
- */
 async function compressImage(file, maxWidth = 1280, quality = 0.75) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -559,27 +544,13 @@ async function compressImage(file, maxWidth = 1280, quality = 0.75) {
             const img = new Image();
             img.onload = () => {
                 const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                if (width > maxWidth) {
-                    height = Math.round((height * maxWidth) / width);
-                    width = maxWidth;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-
+                let width = img.width, height = img.height;
+                if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
+                canvas.width = width; canvas.height = height;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
-
                 canvas.toBlob((blob) => {
-                    const compressedFile = new File(
-                        [blob],
-                        file.name.replace(/\.[^/.]+$/, '') + '.jpg',
-                        { type: 'image/jpeg', lastModified: Date.now() }
-                    );
-                    resolve(compressedFile);
+                    resolve(new File([blob], file.name.replace(/\.[^/.]+$/, '') + '.jpg', { type: 'image/jpeg', lastModified: Date.now() }));
                 }, 'image/jpeg', quality);
             };
             img.src = event.target.result;
@@ -589,9 +560,7 @@ async function compressImage(file, maxWidth = 1280, quality = 0.75) {
 }
 
 function formatFileSize(bytes) {
-    if (bytes < 1024 * 1024) {
-        return Math.round(bytes / 1024) + ' KB';
-    }
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 </script>

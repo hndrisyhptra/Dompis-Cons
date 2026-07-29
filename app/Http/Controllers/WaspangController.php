@@ -390,7 +390,7 @@ class WaspangController extends Controller
 
         $revisionHistories = [];
         foreach ($materialBoqItems as $boq) {
-            $revisionHistories[$boq->id_boq] = EvidenceRevisionHistory::where('project_id', $project->id_project)
+            $revisionHistories[$boq->id_boq] = \App\Models\EvidenceRevisionHistory::where('project_id', $project->id_project)
                 ->where('stage', 'instalasi')
                 ->where('evidence_type', 'progress_boq')
                 ->whereHas('evidence', function ($q) use ($boq) {
@@ -548,8 +548,7 @@ class WaspangController extends Controller
         $uploaded = 0;
 
         foreach ($project->boqItems as $boq) {
-
-            $exists = Evidence::where('project_id', $project->id_project)
+            $exists = \App\Models\Evidence::where('project_id', $project->id_project)
                 ->where('stage', 'instalasi')
                 ->where('evidence_type', 'progress_boq')
                 ->where('boq_item_id', $boq->id_boq)
@@ -610,7 +609,12 @@ class WaspangController extends Controller
         $evidences = $project->evidences ?? collect();
         $boqItems = $project->boqItems ?? collect();
 
-        $boqTotal = $boqItems->count();
+        // PERBAIKAN BUG: Filter M- material agar variabel terdefinisi
+        $materialBoqItems = $boqItems->filter(function ($boq) {
+            return str_starts_with($boq->designator, 'M-');
+        });
+
+        $boqTotal = $materialBoqItems->count();
 
         if ($boqTotal == 0) {
             return false;
@@ -637,14 +641,13 @@ class WaspangController extends Controller
             'stage' => 'required|in:persiapan,instalasi,pengukuran,finishing',
             'evidence_type' => 'required|string|max:100',
             'photos' => 'required|array',
-            // HAPUS VALIDASI 'image' AGAR BISA TERIMA FILE SELAIN GAMBAR
-            // Mimes diperluas untuk menerima file sor (biasanya terbaca sbg octet-stream/txt)
             'photos.*' => 'required|max:8192', 
             'description' => 'nullable|string',
             'latitude' => 'nullable',
             'longitude' => 'nullable',
             'boq_item_id' => 'nullable',
             'quantity_actual' => 'nullable|numeric|min:0',
+            'actual_reason' => 'nullable|string', // TAMBAHAN VALIDASI REASON
         ]);
 
         $projectFolder = 'project-' . $project->id_project;
@@ -654,14 +657,10 @@ class WaspangController extends Controller
 
         foreach ($request->file('photos') as $photo) {
             
-            // DETEKSI EKSTENSI ASLI FILE
             $originalExtension = strtolower($photo->getClientOriginalExtension());
             $isSor = ($originalExtension === 'sor');
-            
-            // JIKA FILE ADALAH GAMBAR JPG/PNG YANG SUDAH DIKOMPRES DI JS, EKSTENSINYA BIASANYA KOSONG/BLOB, KITA FORCE JADI .jpg
             $extension = $isSor ? 'sor' : ($originalExtension ?: 'jpg');
             
-            // NAMA FILE DINAMIS
             $filename = now()->format('Ymd_His') . '_' . uniqid() . '.' . $extension;
 
             $path = $photo->storeAs(
@@ -707,7 +706,7 @@ class WaspangController extends Controller
             ]);
         }
 
-        // UPDATE QUANTITY ACTUAL (Tanpa Cascade, Langsung Tembak ID)
+        // UPDATE QUANTITY ACTUAL & REASON
         if ($request->boq_item_id) {
             $boqItem = \App\Models\BoqItem::where('id_boq', $request->boq_item_id)->first();
             
@@ -716,16 +715,24 @@ class WaspangController extends Controller
                     ->where('id_designator', $boqItem->designator_id)
                     ->first();
 
-                // PERBAIKAN UTAMA: Semua Kategori (Kabel, Tiang, Aksesoris) diproses sama persis.
-                // Hanya update quantity jika input 'quantity_actual' dikirimkan dari form (Step Instalasi).
                 if ($request->has('quantity_actual') && $request->quantity_actual !== null) {
                     
                     $actualValue = (float)$request->quantity_actual;
+                    
+                    // Siapkan array update
+                    $updateData = [
+                        'quantity_actual' => $actualValue
+                    ];
+
+                    // LOGIKA REASON: Jika 0 simpan alasan, jika > 0 kosongkan alasannya
+                    if ($actualValue == 0 && $request->has('actual_reason')) {
+                        $updateData['actual_reason'] = $request->actual_reason;
+                    } else {
+                        $updateData['actual_reason'] = null;
+                    }
 
                     \App\Models\BoqItem::where('id_boq', $request->boq_item_id)
-                        ->update([
-                            'quantity_actual' => $actualValue
-                        ]);
+                        ->update($updateData);
 
                     \App\Services\ProjectActivityService::log([
                         'project_id' => $project->id_project,
@@ -738,12 +745,11 @@ class WaspangController extends Controller
                         'meta' => [
                             'boq_item_id' => $request->boq_item_id,
                             'quantity_actual' => $actualValue,
+                            'actual_reason' => $updateData['actual_reason'], // Catat reason di log juga
                         ],
                     ]);
                 } 
                 else {
-                    // Jika form tidak mengirimkan quantity_actual (contoh saat di Step Finishing), 
-                    // maka HANYA catat log upload fotonya saja, JANGAN UBAH quantity yang ada di DB.
                     \App\Services\ProjectActivityService::log([
                         'project_id' => $project->id_project,
                         'lop_id' => $lopId,
