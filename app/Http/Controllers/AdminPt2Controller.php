@@ -156,4 +156,17 @@ class AdminPt2Controller extends Controller
         $project = Project::with(['lop', 'assignment.teknisi'])->findOrFail($id);
         return view('admin.pt2.mancore', compact('project'));
     }
+
+    public function sendToSdi($id)
+    {
+        $project = \App\Models\Project::findOrFail($id);
+
+        // Gunakan penetapan properti langsung dan ->save() 
+        // Ini akan menembus blokade $fillable pada Model Laravel
+        $project->status = 'waiting_ut';
+        $project->sdi_approval_status = 'pending';
+        $project->save();
+
+        return back()->with('success', 'Project berhasil dikirim! Menunggu proses Go-Live dari tim SDI.');
+    }
 }

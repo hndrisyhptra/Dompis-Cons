@@ -26,7 +26,12 @@ class Project extends Model
         'latitude',
         'longitude',
         'location_address',
-        'map_note'
+        'map_note',
+        'status',
+        'sdi_approval_status',
+        'is_golive',
+        'golive_evidence_path',
+        'golive_at'
     ];
 
     protected static function booted(): void

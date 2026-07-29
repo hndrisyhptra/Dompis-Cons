@@ -529,6 +529,8 @@ Route::middleware(['auth'])->prefix('teknisi/pt2')->name('teknisi.pt2.')->group(
         Route::post('/survey/{id}/reject', [App\Http\Controllers\AdminPt2Controller::class, 'rejectSurvey'])->name('survey.reject');
         Route::post('/survey/{id}/reset', [App\Http\Controllers\AdminPt2Controller::class, 'resetSurvey'])->name('survey.reset');
 
+        Route::post('/{id}/send-to-sdi', [App\Http\Controllers\AdminPt2Controller::class, 'sendToSdi'])->name('sendToSdi');
+
     });
 
  /*
@@ -540,6 +542,10 @@ Route::middleware(['auth'])->prefix('sdi')->name('sdi.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\SdiController::class, 'index'])->name('index');
     Route::post('/golive/{id}', [\App\Http\Controllers\SdiController::class, 'storeGoLive'])->name('golive.store');
 });
+// Route Khusus SDI Go-Live
+Route::post('/proses-golive-sdi-pt2/{id}', [\App\Http\Controllers\SdiController::class, 'submitGolive'])
+    ->name('sdi.eksekusi.golive')
+    ->middleware('auth');
 
 /*
 |--------------------------------------------------------------------------

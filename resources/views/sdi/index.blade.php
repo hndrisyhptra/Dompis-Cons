@@ -2,13 +2,6 @@
 
 @section('content')
 <div class="container mx-auto px-4 py-6">
-    
-    {{-- Notifikasi --}}
-    @if(session('success'))
-        <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
-            <span class="block sm:inline">{{ session('success') }}</span>
-        </div>
-    @endif
 
     {{-- Filter & Search Header --}}
     <div class="mb-6 bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -18,7 +11,7 @@
         </div>
         <form method="GET" action="{{ route('sdi.index') }}" class="w-full md:w-auto relative">
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari PID / Nama Project..." 
-                   class="w-full md:w-80 h-11 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 pl-10 pr-4 text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition">
+                   class="w-full md:w-80 h-11 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition">
             <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</div>
         </form>
     </div>
@@ -27,7 +20,7 @@
     <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden mb-12">
         <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-                <h2 class="text-base font-black text-gray-900 dark:text-white">Daftar Project PT 2</h2>
+                <h2 class="text-base font-black text-gray-900 dark:text-white">Antrean GOLIVE Project PT 2</h2>
             </div>
             <div class="flex items-center gap-3 w-full sm:w-auto">
                 <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
@@ -47,88 +40,63 @@
             <table class="min-w-full text-sm">
                 <thead class="bg-gray-50 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                        <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Project</th>
-                        <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Lokasi</th>
-                        <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Progress</th>
-                        <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Status UIM</th>
-                        <th class="px-5 py-3 text-center text-xs font-black uppercase text-gray-500">Aksi</th>
+                        <th class="px-5 py-3 text-left text-[11px] font-black uppercase text-gray-500 tracking-wider">Project & PID</th>
+                        <th class="px-5 py-3 text-left text-[11px] font-black uppercase text-gray-500 tracking-wider">Lokasi STO</th>
+                        <th class="px-5 py-3 text-left text-[11px] font-black uppercase text-gray-500 tracking-wider">Tanggal Send</th>
+                        <th class="px-5 py-3 text-left text-[11px] font-black uppercase text-gray-500 tracking-wider">Status</th>
+                        <th class="px-5 py-3 text-center text-[11px] font-black uppercase text-gray-500 tracking-wider">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                     @forelse($projects as $project)
-                        @php
-                            $summary = $project->progressSummary();
-                            $progress = $summary['progress'];
-                            $isComplete = ($progress == 100);
-                        @endphp
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
                             <td class="px-5 py-4 min-w-[220px]">
                                 <p class="font-black text-gray-900 dark:text-white leading-snug">{{ $project->project_name }}</p>
-                                <p class="text-xs text-gray-500 mt-1">PID: {{ $project->pid ?? '-' }}</p>
+                                <p class="text-xs font-mono text-gray-500 mt-1">PID: {{ $project->pid ?? '-' }}</p>
                             </td>
                             <td class="px-5 py-4">
                                 <p class="font-bold text-gray-800 dark:text-gray-100">{{ $project->lop?->branch ?? '-' }}</p>
                                 <p class="text-xs text-gray-500 mt-1">STO {{ $project->lop?->sto ?? '-' }}</p>
                             </td>
-                            <td class="px-5 py-4 min-w-[150px]">
-                                <div class="flex items-center justify-between mb-1">
-                                    <span class="text-xs font-bold text-gray-500">Progress</span>
-                                    <span class="text-sm font-black {{ $isComplete ? 'text-green-600' : 'text-amber-600' }}">{{ $progress }}%</span>
-                                </div>
-                                <div class="h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                                    <div class="h-full rounded-full {{ $isComplete ? 'bg-green-600' : 'bg-amber-500' }}" style="width: {{ $progress }}%"></div>
-                                </div>
+                            <td class="px-5 py-4">
+                                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    {{ \Carbon\Carbon::parse($project->updated_at)->format('d M Y') }}
+                                </p>
+                                <p class="text-xs text-gray-500 mt-0.5">{{ \Carbon\Carbon::parse($project->updated_at)->format('H:i') }} WIB</p>
                             </td>
                             <td class="px-5 py-4">
                                 @if($project->is_golive)
-                                    <span class="px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold flex items-center gap-1 w-max">
-                                        <span>✔️</span> GO LIVE
+                                    <span class="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center gap-1.5 w-max border border-emerald-200">
+                                        <span>✅</span> GOLIVE
                                     </span>
                                 @else
-                                    <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-600 text-xs font-bold">Menunggu</span>
+                                    <span class="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-700 text-xs font-bold flex items-center gap-1.5 w-max border border-amber-200">
+                                        <span class="animate-pulse">⏳</span> Waiting Approval
+                                    </span>
                                 @endif
                             </td>
                             <td class="px-5 py-4 text-center">
-                                <div class="action-menu-container inline-block text-left">
-                                    <button type="button" onclick="toggleMenu(event, 'menu-{{ $project->id_project }}', this)"
-                                            class="w-9 h-9 rounded-xl flex items-center justify-center transition-colors duration-200 text-gray-600 hover:bg-gray-200 hover:text-gray-900">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5h.01M12 12h.01M12 19h.01"/>
-                                        </svg>
+                                @if(!$project->is_golive)
+                                    {{-- TOMBOL PROSES GO-LIVE (Hanya jika belum golive) --}}
+                                    <button type="button" onclick="openGoLiveModal('{{ route('sdi.eksekusi.golive', $project->id_project) }}', '{{ $project->pid }}', '{{ $project->project_name }}')" 
+                                            class="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm inline-flex items-center gap-2">
+                                        Proses Go-Live 🚀
                                     </button>
-
-                                    <div id="menu-{{ $project->id_project }}" class="action-menu-dropdown hidden fixed w-48 rounded-2xl bg-white border border-gray-200 shadow-2xl z-[9999] overflow-hidden">
-                                        <div class="flex flex-col text-left py-2">
-                                            {{-- Aksi View Detail (Standar) --}}
-                                            <a href="{{ route('admin.projects.tracking', $project->id_project) }}" class="w-full px-4 py-2 text-sm flex items-center gap-3 text-gray-700 hover:bg-gray-100 transition-colors">
-                                                <span class="text-lg">📊</span><span class="font-semibold">Tracking Detail</span>
-                                            </a>
-                                            
-                                            <hr class="my-1.5 border-gray-100" />
-                                            
-                                            {{-- Aksi Eksekusi SDI (Hanya muncul jika Progress 100% dan Belum GoLive) --}}
-                                            @if($isComplete && !$project->is_golive)
-                                                <button type="button" onclick="openGoLiveModal('{{ $project->id_project }}', '{{ $project->pid }}')" class="w-full px-4 py-2 text-sm flex items-center gap-3 text-green-700 hover:bg-green-50 transition-colors">
-                                                    <span class="text-lg">🚀</span><span class="font-semibold">Update Go Live</span>
-                                                </button>
-                                            @elseif($project->is_golive)
-                                                <a href="{{ Storage::url($project->golive_evidence_path) }}" target="_blank" class="w-full px-4 py-2 text-sm flex items-center gap-3 text-blue-700 hover:bg-blue-50 transition-colors">
-                                                    <span class="text-lg">🖼️</span><span class="font-semibold">Lihat Eviden UIM</span>
-                                                </a>
-                                            @else
-                                                <div class="w-full px-4 py-2 text-xs flex items-center gap-2 text-red-500 bg-red-50">
-                                                    <span class="text-lg">🔒</span><span class="font-semibold">Belum Complete ({{ $progress }}%)</span>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
+                                @else
+                                    {{-- TOMBOL LIHAT EVIDEN (Jika sudah golive) --}}
+                                    <a href="{{ Storage::url($project->golive_evidence_path) }}" target="_blank" 
+                                       class="h-9 px-4 rounded-xl bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold transition shadow-sm inline-flex items-center gap-2">
+                                        Lihat Eviden 🖼️
+                                    </a>
+                                @endif
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-12 text-center">
-                                <p class="font-black text-gray-900">Belum ada project PT 2</p>
+                            <td colspan="5" class="px-6 py-16 text-center">
+                                <div class="text-4xl mb-3 opacity-30">📭</div>
+                                <p class="font-black text-gray-900 text-lg">Antrean Kosong</p>
+                                <p class="text-gray-500 text-sm mt-1">Belum ada project yang dikirim dari Admin ke SDI.</p>
                             </td>
                         </tr>
                     @endforelse
@@ -144,92 +112,154 @@
     </div>
 </div>
 
-{{-- MODAL UPLOAD GO LIVE --}}
-<div id="goLiveModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">
-    <div class="bg-white dark:bg-gray-900 w-full max-w-md rounded-2xl overflow-hidden flex flex-col shadow-2xl">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+{{-- MODAL PROSES GO LIVE INTERAKTIF --}}
+{{-- Hapus class hidden dan tambahkan m-auto pada modalContent untuk memastikan posisinya presisi --}}
+<div id="goLiveModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 opacity-0 transition-opacity duration-300">
+    <div class="bg-white dark:bg-gray-900 w-full max-w-md m-auto rounded-3xl overflow-hidden flex flex-col shadow-2xl transform scale-95 transition-transform duration-300" id="modalContent">
+        
+        <div class="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/50">
             <div>
-                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Upload Eviden UIM</h2>
-                <p id="goliveProjectPid" class="text-xs text-gray-500 mt-1"></p>
+                <h2 class="text-lg font-black text-gray-900 dark:text-white">Eksekusi Go-Live</h2>
+                <p id="goliveProjectName" class="text-xs font-bold text-blue-600 mt-1 truncate max-w-[250px]"></p>
             </div>
-            <button type="button" onclick="closeGoLiveModal()" class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center hover:bg-gray-200">×</button>
+            <button type="button" onclick="closeGoLiveModal()" class="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition font-black">✕</button>
         </div>
         
         <form id="goLiveForm" method="POST" enctype="multipart/form-data" class="flex flex-col">
             @csrf
-            <div class="p-5">
-                <div class="mb-4">
-                    <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Capture / Absen UIM</label>
-                    <div class="relative flex items-center justify-center w-full h-32 px-4 transition bg-white border-2 border-gray-300 border-dashed rounded-xl appearance-none hover:border-gray-400 focus:outline-none">
-                        <span class="flex items-center space-x-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                            <span class="font-medium text-gray-600">Pilih file gambar...</span>
-                        </span>
-                        <input type="file" name="golive_evidence" accept="image/*" class="absolute block w-full h-full opacity-0 cursor-pointer" required>
-                    </div>
-                    <p class="text-[10px] text-gray-500 mt-2">*Format: JPG, JPEG, PNG (Maks 5MB)</p>
+            <div class="p-6 space-y-6">
+                
+                {{-- 1. UPLOAD BUKTI UIM --}}
+                <div>
+                    <label class="flex items-center justify-between text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                        <span>1. Upload Capture UIM</span>
+                        <span class="text-red-500 text-[10px] uppercase tracking-wider bg-red-50 px-2 py-0.5 rounded">* Wajib</span>
+                    </label>
+                    <label class="relative flex flex-col items-center justify-center w-full h-32 px-4 transition bg-gray-50 border-2 border-gray-300 border-dashed rounded-2xl cursor-pointer hover:bg-gray-100 hover:border-blue-400">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <span id="uploadIcon" class="text-2xl mb-2">📸</span>
+                            <p id="uploadText" class="text-xs font-bold text-gray-500 text-center">Klik untuk memilih file bukti<br><span class="font-medium text-[10px]">(JPG, PNG, max 5MB)</span></p>
+                        </div>
+                        <input type="file" id="fileUim" name="golive_evidence" accept="image/*" class="hidden" onchange="validateForm()" required>
+                    </label>
                 </div>
+
+                <hr class="border-gray-100">
+
+                {{-- 2. TOGGLE GO LIVE --}}
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">2. Konfirmasi Status</label>
+                    
+                    <label class="flex items-center justify-between cursor-pointer p-4 rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 transition shadow-sm">
+                        <div>
+                            <p class="text-sm font-black text-gray-900">Ubah Status menjadi GO-LIVE</p>
+                            <p class="text-[10px] font-medium text-gray-500 mt-0.5">Dengan ini, data UIM dinyatakan sinkron.</p>
+                        </div>
+                        <div class="relative">
+                            {{-- Input Checkbox yang disembunyikan --}}
+                            <input type="checkbox" id="goliveToggle" class="sr-only peer" onchange="validateForm()" required>
+                            
+                            {{-- Desain Toggle Switch UI --}}
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                        </div>
+                    </label>
+                </div>
+
             </div>
-            <div class="px-5 py-4 bg-gray-50 dark:bg-gray-800 flex justify-end gap-2 border-t border-gray-200 dark:border-gray-700">
-                <button type="button" onclick="closeGoLiveModal()" class="px-4 py-2 rounded-xl text-sm font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-100">Batal</button>
-                <button type="submit" class="px-4 py-2 rounded-xl text-sm font-bold text-white bg-green-600 hover:bg-green-700 shadow-sm">Submit Go Live</button>
+            
+            <div class="px-6 py-5 bg-gray-50 dark:bg-gray-800 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700 rounded-b-3xl">
+                <button type="button" onclick="closeGoLiveModal()" class="h-11 px-5 rounded-xl text-sm font-bold text-gray-600 bg-white border border-gray-300 hover:bg-gray-100 transition">Batal</button>
+                
+                {{-- Tombol Submit (Secara default Disable/Abu-abu) --}}
+                <button type="submit" id="btnSubmitGolive" disabled class="h-11 px-6 rounded-xl text-sm font-bold text-white bg-gray-400 cursor-not-allowed transition-all shadow-sm flex items-center gap-2">
+                    Submit & Selesaikan
+                </button>
             </div>
         </form>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-    // FUNGSI TOGGLE MENU FIXED
-    function toggleMenu(event, menuId, btnElement) {
-        event.stopPropagation();
-        let menu = document.getElementById(menuId);
-        let isHidden = menu.classList.contains('hidden');
+    // SweetAlert Notifikasi Berhasil
+    @if(session('success'))
+        Swal.fire({
+            title: 'Berhasil Go-Live!',
+            text: "{{ session('success') }}",
+            icon: 'success',
+            confirmButtonColor: '#10b981',
+            customClass: { popup: 'rounded-3xl' }
+        });
+    @endif
+
+    // Fungsi Buka Modal (Dengan Animasi)
+    function openGoLiveModal(actionUrl, pid, projectName) {
+        document.getElementById('goliveProjectName').innerText = projectName + ' (PID: ' + (pid || '-') + ')';
         
-        document.querySelectorAll('.action-menu-dropdown').forEach(el => el.classList.add('hidden'));
+        // Form langsung mengambil URL utuh yang sudah di-generate sempurna oleh Laravel
+        document.getElementById('goLiveForm').action = actionUrl; 
         
-        if (isHidden) {
-            menu.classList.remove('hidden');
-            let rect = btnElement.getBoundingClientRect();
-            let menuHeight = menu.offsetHeight || 150; 
-            let spaceBelow = window.innerHeight - rect.bottom;
-            
-            if (spaceBelow < menuHeight && rect.top > menuHeight) {
-                menu.style.top = (rect.top - menuHeight - 5) + 'px'; 
-            } else {
-                menu.style.top = (rect.bottom + 5) + 'px';
-            }
-            menu.style.left = (rect.right - menu.offsetWidth) + 'px';
-        }
+        let modal = document.getElementById('goLiveModal');
+        let modalContent = document.getElementById('modalContent');
+        
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modal.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-95');
+        }, 10);
     }
 
-    window.addEventListener('click', function(e) {
-        if (!e.target.closest('.action-menu-container')) {
-            document.querySelectorAll('.action-menu-dropdown').forEach(el => el.classList.add('hidden'));
+    // Fungsi Tutup Modal
+    function closeGoLiveModal() {
+        let modal = document.getElementById('goLiveModal');
+        let modalContent = document.getElementById('modalContent');
+        
+        modal.classList.add('opacity-0');
+        modalContent.classList.add('scale-95');
+        
+        setTimeout(() => {
+            // PERBAIKAN: Kembalikan ke 'hidden'
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+            
+            document.getElementById('goLiveForm').reset();
+            resetUploadUI(); 
+            validateForm();  
+        }, 300); 
+    }
+
+    // Fungsi Interaktif saat File dipilih
+    document.getElementById('fileUim').addEventListener('change', function(e) {
+        let fileName = e.target.files[0]?.name;
+        if(fileName) {
+            document.getElementById('uploadIcon').innerText = '✅';
+            document.getElementById('uploadText').innerHTML = `<span class="text-emerald-600 font-bold">${fileName}</span><br><span class="text-[10px] text-gray-400">Siap diupload</span>`;
+        } else {
+            resetUploadUI();
         }
     });
 
-    let tableContainer = document.querySelector('.overflow-x-auto');
-    if(tableContainer) {
-        tableContainer.addEventListener('scroll', function() {
-            document.querySelectorAll('.action-menu-dropdown').forEach(el => el.classList.add('hidden'));
-        });
+    function resetUploadUI() {
+        document.getElementById('uploadIcon').innerText = '📸';
+        document.getElementById('uploadText').innerHTML = `Klik untuk memilih file bukti<br><span class="font-medium text-[10px]">(JPG, PNG, max 5MB)</span>`;
     }
 
-    // MODAL GO LIVE
-    function openGoLiveModal(projectId, pid) {
-        document.getElementById('goliveProjectPid').innerText = 'PID: ' + (pid || '-');
-        document.getElementById('goLiveForm').action = '/sdi/golive/' + projectId; // Sesuai dengan route
-        
-        let modal = document.getElementById('goLiveModal');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-    }
+    // Fungsi Validasi Toggle & File
+    function validateForm() {
+        let isToggled = document.getElementById('goliveToggle').checked;
+        let hasFile = document.getElementById('fileUim').files.length > 0;
+        let btn = document.getElementById('btnSubmitGolive');
 
-    function closeGoLiveModal() {
-        let modal = document.getElementById('goLiveModal');
-        modal.classList.remove('flex');
-        modal.classList.add('hidden');
-        document.getElementById('goLiveForm').reset();
+        // Tombol HANYA aktif jika file terisi DAN toggle tergeser ke kanan (ON)
+        if(isToggled && hasFile) {
+            btn.disabled = false;
+            btn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+            btn.classList.add('bg-emerald-600', 'hover:bg-emerald-700');
+        } else {
+            btn.disabled = true;
+            btn.classList.add('bg-gray-400', 'cursor-not-allowed');
+            btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-700');
+        }
     }
 </script>
 @endsection

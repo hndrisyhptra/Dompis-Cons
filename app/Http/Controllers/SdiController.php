@@ -19,57 +19,64 @@ use Illuminate\Support\Facades\Auth;
 
 class SdiController extends Controller
 {
+    // Menampilkan Daftar Project (Hanya yang dikirim Admin & Sudah GoLive)
     public function index(Request $request)
     {
-        $perPage = $request->input('per_page', 10);
+        // 1. Ambil data project beserta relasi LOP
+        $query = \App\Models\Project::with('lop')
+            ->where(function ($q) {
+                // KONDISI A: Menampilkan project yang dikirim Admin (Sedang antre)
+                $q->where(function ($sub) {
+                    $sub->where('status', 'waiting_ut')
+                        ->where('sdi_approval_status', 'pending');
+                })
+                // KONDISI B: ATAU menampilkan project yang sudah selesai di-GoLive
+                ->orWhere('is_golive', 1);
+            });
 
-        // Ambil khusus program PT2
-        $query = Project::with([
-            'lop', 'assignment.waspang', 'assignment.teknisi', 'evidences', 'boqItems'
-        ])->where(function ($q) {
-            $q->where('program', 'PT 2')
-              ->orWhere('program', 'PT2')
-              ->orWhere('program', 'like', '%PT 2%');
-        });
+        // (Opsional) Jika di sistem Anda SDI HANYA memegang program PT 2, aktifkan baris ini:
+        // $query->where('program', 'PT 2'); 
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('project_name', 'like', "%{$search}%")
-                  ->orWhere('pid', 'like', "%{$search}%");
+        // 2. Logika Pencarian (Search)
+        if ($request->search) {
+            $query->where(function ($q) use ($request) {
+                $q->where('project_name', 'like', '%' . $request->search . '%')
+                  ->orWhere('pid', 'like', '%' . $request->search . '%');
             });
         }
 
-        $projects = $query->latest('updated_at')
-            ->paginate($perPage)
-            ->onEachSide(1)
-            ->withQueryString();
-
+        // 3. Eksekusi query dengan Pagination
+        $projects = $query->latest('updated_at')->paginate($request->per_page ?? 10);
+        
         return view('sdi.index', compact('projects'));
     }
 
-    public function storeGoLive(Request $request, $id)
+    // Memproses Upload Eviden UIM dan Update Status Go-Live
+    public function submitGolive(Request $request, $id)
     {
         $request->validate([
             'golive_evidence' => 'required|image|mimes:jpeg,png,jpg|max:5120',
-        ], [
-            'golive_evidence.required' => 'Eviden / Capture UIM wajib diupload.',
-            'golive_evidence.image' => 'File harus berupa gambar (JPG/PNG).',
         ]);
 
         $project = Project::findOrFail($id);
 
         if ($request->hasFile('golive_evidence')) {
-            $path = $request->file('golive_evidence')->store('evidences/golive', 'public');
-            
+            $file = $request->file('golive_evidence');
+            $filename = 'UIM_' . time() . '_' . $project->id_project . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('evidences/golive', $filename, 'public');
+
+            // UPDATE MENGGUNAKAN STRUKTUR KOLOM DATABASE ANDA
             $project->update([
-                'is_golive' => true,
+                'is_golive' => 1,
                 'golive_evidence_path' => $path,
-                'golive_at' => now(),
-                'sdi_approval_status' => 'approved'
+                'golive_at' => now(), // Mencatat waktu go-live
+                'sdi_approval_status' => 'approved', // Ubah status sdi
+                'status_project' => 'close' // Project dinyatakan close/selesai secara fisik
             ]);
+
+            return back()->with('success', '🎉 Luar biasa! Project berhasil di-GoLive dan Eviden UIM telah tersimpan!');
         }
 
-        return back()->with('success', 'Project PID ' . $project->pid . ' berhasil diupdate menjadi GO LIVE.');
+        return back()->with('error', 'Gagal mengupload eviden. Silakan coba lagi.');
     }
 }

@@ -47,7 +47,7 @@
         <div class="p-4 flex items-center justify-between">
             <div>
                 <h2 class="text-base font-bold text-gray-900 dark:text-white">Step 4 — Dismantle</h2>
-                <p class="text-sm text-gray-500">Tinjau rincian material dan foto eviden penarikan dari lapangan.</p>
+                <p class="text-sm text-gray-500">Tinjau rincian material dan foto eviden dismantle.</p>
             </div>
             <span class="px-3 py-1 rounded-full text-xs font-bold {{ $step4Completed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }}">
                 {{ $step4Completed ? 'Approved' : 'Pending Review' }}
@@ -68,7 +68,7 @@
                             <th class="p-4 border-b border-gray-200 dark:border-gray-700">No</th>
                             <th class="p-4 border-b border-gray-200 dark:border-gray-700">Kategori</th>
                             <th class="p-4 border-b border-gray-200 dark:border-gray-700">Nama Item</th>
-                            <th class="p-4 border-b border-gray-200 dark:border-gray-700 text-center">Qty Ditarik</th>
+                            <th class="p-4 border-b border-gray-200 dark:border-gray-700 text-center">Qty</th>
                             <th class="p-4 border-b border-gray-200 dark:border-gray-700">Tanggal Input</th>
                         </tr>
                     </thead>

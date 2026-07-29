@@ -4,6 +4,10 @@
 @php
     $mancore = \Illuminate\Support\Facades\DB::table('pt2_mancores')->where('project_id', $project->id_project)->first();
     $step5Completed = $mancore ? true : false;
+    
+    // Logika Status Sesuai ENUM DB
+    $isWaitingSdi = $project->status == 'waiting_ut' && $project->sdi_approval_status == 'pending';
+    $isGoLive = $project->is_golive == 1;
 @endphp
 
 <div class="max-w-4xl mx-auto space-y-4 px-4 py-6">
@@ -32,10 +36,10 @@
         <div class="p-4 flex items-center justify-between">
             <div>
                 <h2 class="text-base font-bold text-gray-900 dark:text-white">Step 5 — Mancore</h2>
-                <p class="text-sm text-gray-500">Data update core pada sistem UIM.</p>
+                <p class="text-sm text-gray-500">Data update mancore untuk diserahkan ke tim SDI.</p>
             </div>
             <span class="px-3 py-1 rounded-full text-xs font-bold {{ $step5Completed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }}">
-                {{ $step5Completed ? 'Submitted' : 'Pending' }}
+                {{ $step5Completed ? 'Data Lengkap' : 'Pending' }}
             </span>
         </div>
     </div>
@@ -74,19 +78,87 @@
     </div>
 
     {{-- Footer Actions --}}
-    <div class="flex items-center justify-between pt-2">
+    <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-200 dark:border-gray-800">
         <a href="{{ route('admin.pt2.dismantle', $project->id_project) }}" class="text-sm font-bold text-gray-500 hover:text-gray-900 transition">← Step Dismantle</a>
         
-        {{-- Tombol Go-Live muncul di step terakhir --}}
-        @if($project->status == 'waiting_ut')
-        <form method="POST" action="#">
-            @csrf
-            <button type="button" class="h-10 px-5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold inline-flex items-center justify-center transition shadow-md">
-                Setujui & Go-Live
-            </button>
-        </form>
-        @endif
+        <div class="flex flex-wrap items-center gap-2">
+            
+            @if($isGoLive)
+                <span class="h-10 px-4 rounded-xl bg-emerald-100 text-emerald-700 text-sm font-bold inline-flex items-center justify-center border border-emerald-200">
+                    ✅ Sudah Go-Live
+                </span>
+                
+                {{-- TOMBOL GENERATE BERKAS: AKTIF --}}
+                <a href="#" class="h-10 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold inline-flex items-center justify-center transition shadow-md gap-2">
+                    📄 Generate Berkas
+                </a>
+
+            @elseif($isWaitingSdi)
+                <span class="h-10 px-4 rounded-xl bg-amber-100 text-amber-700 text-sm font-bold inline-flex items-center justify-center border border-amber-200">
+                    ⏳ Menunggu SDI
+                </span>
+
+                {{-- TOMBOL GENERATE BERKAS: DISABLE --}}
+                <button type="button" disabled class="h-10 px-5 rounded-xl bg-gray-200 text-gray-400 cursor-not-allowed text-sm font-bold inline-flex items-center justify-center border border-gray-300 gap-2">
+                    📄 Generate Berkas (Terkunci)
+                </button>
+
+            @else
+                {{-- TOMBOL KIRIM KE SDI --}}
+                <form id="formSendSdi" method="POST" action="{{ route('admin.pt2.sendToSdi', $project->id_project) }}">
+                    @csrf
+                    <button type="button" onclick="confirmSendSdi()" class="h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center transition shadow-md gap-2">
+                        Kirim ke SDI 🚀
+                    </button>
+                </form>
+
+                {{-- TOMBOL GENERATE BERKAS: DISABLE --}}
+                <button type="button" disabled class="h-10 px-5 rounded-xl bg-gray-200 text-gray-400 cursor-not-allowed text-sm font-bold inline-flex items-center justify-center border border-gray-300 gap-2">
+                    📄 Generate Berkas (Terkunci)
+                </button>
+            @endif
+
+        </div>
     </div>
 
 </div>
+
+{{-- SCRIPT DILETAKKAN DI DALAM SECTION CONTENT AGAR PASTI TER-LOAD --}}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    function confirmSendSdi() {
+        Swal.fire({
+            title: 'Kirim ke SDI?',
+            text: "Pastikan semua eviden Step 1 hingga 4 sudah divalidasi. Project akan dikirim ke dashboard SDI untuk proses persetujuan Go-Live UIM.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#2563eb',
+            cancelButtonColor: '#94a3b8',
+            confirmButtonText: 'Ya, Kirim Sekarang!',
+            cancelButtonText: 'Batal',
+            customClass: { popup: 'rounded-3xl' }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Loading state
+                Swal.fire({
+                    title: 'Memproses...',
+                    text: 'Mengirim data ke sistem SDI.',
+                    allowOutsideClick: false,
+                    didOpen: () => { Swal.showLoading() }
+                });
+                document.getElementById('formSendSdi').submit();
+            }
+        });
+    }
+
+    @if(session('success'))
+        Swal.fire({
+            title: 'Berhasil!',
+            text: "{{ session('success') }}",
+            icon: 'success',
+            confirmButtonColor: '#10b981',
+            customClass: { popup: 'rounded-3xl' }
+        });
+    @endif
+</script>
 @endsection
