@@ -16,7 +16,7 @@
             ],
             [
                 'number' => 2,
-                'type' => 'otdr_sor', // <-- INI TIPE BARU KHUSUS FILE SOR
+                'type' => 'otdr_sor',
                 'title' => 'File (.SOR)',
                 'desc' => 'Upload file mentah berformat .sor dari alat ukur.',
             ],
@@ -34,8 +34,8 @@
             ],
             [
                 'number' => 5,
-                'title' => 'Eviden Pengukuran Lainnya',
                 'type' => 'lainnya',
+                'title' => 'Eviden Pengukuran Lainnya',
                 'desc' => 'Review foto hasil pengukuran lainnya.',
             ],
         ];
@@ -57,56 +57,8 @@
         $pengukuranUploadedComplete = $pengukuranUploaded == $pengukuranTotal;
     @endphp
 
-    {{-- HEADER --}}
-    <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
-        <div class="flex items-center gap-3">
-            <a href="{{ route('waspang.projects.instalasi', $project->id_project) }}" 
-                class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-2xl font-medium transition active:scale-95">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left-icon lucide-chevron-left">
-                    <path d="m15 18-6-6 6-6"/>
-                </svg>
-            </a>
-            <h1 class="text-xl font-bold">Step 3 - Pengukuran</h1>
-        </div>
-
-        {{-- Stepper --}}
-        <div class="relative px-2 mt-4">
-            <div class="absolute top-4 left-10 right-10 h-1 bg-blue-300/60 rounded-full"></div>
-            <div class="relative grid grid-cols-4 text-center">
-                {{-- STEP 1 --}}
-                <a href="{{ route('waspang.projects.show', $project->id_project) }}">
-                    <div class="mx-auto w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold">✓</div>
-                    <p class="mt-2 text-xs text-blue-100">Persiapan</p>
-                </a>
-                {{-- STEP 2 --}}
-                <a href="{{ route('waspang.projects.instalasi', $project->id_project) }}">
-                    <div class="mx-auto w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold">✓</div>
-                    <p class="mt-2 text-xs text-blue-100">Instalasi</p>
-                </a>
-                {{-- STEP 3 (AKTIF) --}}
-                <a href="{{ route('waspang.projects.pengukuran', $project->id_project) }}">
-                    <div class="mx-auto w-8 h-8 rounded-full {{ $pengukuranUploadedComplete ? 'bg-green-100 text-green-700' : 'bg-white text-blue-700' }} flex items-center justify-center text-sm font-bold">
-                        {{ $pengukuranUploadedComplete ? '✓' : '3' }}
-                    </div>
-                    <p class="mt-2 text-xs font-bold text-white">Pengukuran</p>
-                </a>
-                {{-- STEP 4 --}}
-                @if($pengukuranUploadedComplete)
-                    <a href="{{ route('waspang.projects.finishing', $project->id_project) }}">
-                        <div class="mx-auto w-8 h-8 rounded-full {{ $finishingComplete ? 'bg-green-100 text-green-700' : 'bg-white text-blue-700' }} flex items-center justify-center text-sm font-bold">
-                            {{ $finishingComplete ? '✓' : '4' }}
-                        </div>
-                        <p class="mt-2 text-xs text-blue-100">Finishing</p>
-                    </a>
-                @else
-                    <div class="opacity-50">
-                        <div class="mx-auto w-8 h-8 rounded-full bg-blue-400 text-white flex items-center justify-center text-sm font-bold">4</div>
-                        <p class="mt-2 text-xs text-blue-200">Finishing</p>
-                    </div>
-                @endif
-            </div>
-        </div>
-</div>
+   {{-- HEADER --}}
+    @include('waspang.partials.stepper')
 
    {{-- Project Info --}}
     <div class="px-4 mt-4">
@@ -163,43 +115,46 @@
                         ->where('evidence_type', $item['type'])
                         ->sortByDesc('created_at');
 
-                    $firstPhoto = $photos->first();
-                    $status = optional($firstPhoto)->status;
+                    // Logika Status Group yang Konsisten
+                    $status = null;
+                    if ($photos->count() > 0) {
+                        if ($photos->where('status', 'rejected')->count() > 0) {
+                            $status = 'rejected';
+                        } elseif ($photos->where('status', 'pending')->count() > 0) {
+                            $status = 'pending';
+                        } else {
+                            $status = 'approved';
+                        }
+                    }
+
                     $isUploaded = $photos->count() > 0;
-
-                    $rejectedPhoto = $photos
-                        ->where('status', 'rejected')
-                        ->sortByDesc('created_at')
-                        ->first();
-
+                    $rejectedPhoto = $photos->where('status', 'rejected')->sortByDesc('created_at')->first();
                     $reviewNote = optional($rejectedPhoto)->review_note;
                 @endphp
 
-                <div x-data="{ open: false }"
-                     class="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                <div x-data="{ open: {{ $status == 'rejected' ? 'true' : 'false' }} }"
+                     class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs">
 
                     {{-- HEADER CARD --}}
                     <button type="button"
                             @click="open = !open"
-                            class="w-full p-4 flex items-center justify-between gap-3">
+                            class="w-full p-4 flex items-center justify-between gap-3 text-left">
 
                         <div class="flex items-center gap-3 min-w-0">
 
                             <div class="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0
-                                {{ $isUploaded ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">
-                                {{ $isUploaded ? '✓' : $item['number'] }}
+                                {{ $status == 'rejected' ? 'bg-red-50 text-red-600' : ($isUploaded ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400') }}">
+                                {{ $status == 'rejected' ? '!' : ($isUploaded ? '✓' : $item['number']) }}
                             </div>
 
                             <div class="text-left min-w-0">
 
-                                <h3 class="text-sm font-bold truncate">
+                                <h3 class="text-sm font-bold text-gray-900 tracking-tight">
                                     {{ $item['title'] }}
                                 </h3>
 
-                                <p class="text-xs text-gray-500 truncate">
-                                    {{ $photos->count() }} foto
-                                    ·
-                                    {{ $status ?? 'Belum upload' }}
+                                <p class="text-xs text-gray-500 truncate mt-0.5">
+                                    {{ $photos->count() }} {{ $item['type'] == 'otdr_sor' ? 'file' : 'foto' }}
                                 </p>
 
                             </div>
@@ -208,25 +163,15 @@
 
                         <div class="flex items-center gap-2 shrink-0">
 
-                            @if(!$status)
-                                <span class="px-2.5 py-1 rounded-lg bg-gray-100 text-gray-600 text-[11px] font-bold">
-                                    Belum
-                                </span>
-                            @elseif($status == 'approved')
-                                <span class="px-2.5 py-1 rounded-lg bg-green-100 text-green-700 text-[11px] font-bold">
-                                    Approved
-                                </span>
-                            @elseif($status == 'pending')
-                                <span class="px-2.5 py-1 rounded-lg bg-yellow-100 text-yellow-700 text-[11px] font-bold">
-                                    Pending
-                                </span>
-                            @else
-                                <span class="px-2.5 py-1 rounded-lg bg-red-100 text-red-700 text-[11px] font-bold">
-                                    Rejected
-                                </span>
-                            @endif
+                            <span class="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide
+                                {{ !$status ? 'bg-gray-100 text-gray-500' : '' }}
+                                {{ $status == 'approved' ? 'bg-green-100 text-green-700' : '' }}
+                                {{ $status == 'pending' ? 'bg-amber-100 text-amber-700' : '' }}
+                                {{ $status == 'rejected' ? 'bg-red-100 text-red-700' : '' }}">
+                                {{ $status ?? 'Belum' }}
+                            </span>
 
-                            <span class="text-xs text-gray-400" x-text="open ? '▲' : '▼'"></span>
+                            <i class="fa-solid text-[10px] text-gray-400 transition-transform" :class="open ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
 
                         </div>
 
@@ -235,26 +180,21 @@
                     {{-- DETAIL CARD --}}
                     <div x-show="open"
                          x-transition
-                         class="border-t border-gray-100 p-4">
+                         x-cloak
+                         class="border-t border-gray-50 bg-gray-50/30 p-4 space-y-3">
 
                         <p class="text-xs text-gray-500 mb-3">
                             {{ $item['desc'] }}
                         </p>
 
-                        @if($reviewNote)
-
-                            <div class="mb-3 rounded-xl border border-red-200 bg-red-50 p-3">
-
-                                <p class="text-[11px] font-bold text-red-700 mb-1">
-                                    Catatan Revisi Admin
-                                </p>
-
-                                <p class="text-xs text-red-700 leading-relaxed">
-                                    {{ $reviewNote }}
-                                </p>
-
+                        @if($status == 'rejected')
+                            <div class="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs text-red-700 leading-relaxed flex items-start gap-2">
+                                <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
+                                <div>
+                                    <p class="font-bold mb-0.5">Terdapat Eviden Ditolak</p>
+                                    <p>Ketuk pada item/foto bergaris merah di bawah untuk mengunggah ulang (replace) sesuai instruksi Admin.</p>
+                                </div>
                             </div>
-
                         @endif
 
                         @include('waspang.partials.revision-history', [
@@ -262,29 +202,63 @@
                         ])
 
                         @if($photos->count() > 0)
-
                             <div class="grid grid-cols-3 gap-2 mb-3">
                                 @foreach($photos as $photo)
-                                    <div class="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100 flex items-center justify-center">
+                                    <div class="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group flex items-center justify-center transition-all 
+                                        {{ $photo->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-gray-200' }}">
+
+                                        {{-- INDIKATOR ID FOTO (PERMANEN) --}}
+                                        <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-20 backdrop-blur-sm">
+                                            @if($photo->status == 'rejected')
+                                                <i class="fa-solid fa-circle-exclamation text-red-400"></i>
+                                            @elseif($photo->status == 'approved')
+                                                <i class="fa-solid fa-check-circle text-green-400"></i>
+                                            @endif
+                                            ID-{{ $photo->id_evidence }}
+                                        </div>
 
                                         {{-- JIKA INI ADALAH FILE SOR --}}
                                         @if($item['type'] == 'otdr_sor' || str_ends_with(strtolower($photo->file_path), '.sor'))
-                                            <div class="flex flex-col items-center justify-center p-2 w-full h-full bg-indigo-50">
-                                                <div class="w-10 h-10 bg-indigo-200 text-indigo-700 rounded-lg flex items-center justify-center font-black mb-1">SOR</div>
+                                            <div class="flex flex-col items-center justify-center p-2 w-full h-full {{ $photo->status == 'rejected' ? 'bg-red-50 opacity-80' : 'bg-indigo-50' }}">
+                                                <div class="w-10 h-10 rounded-lg flex items-center justify-center font-black mb-1 
+                                                    {{ $photo->status == 'rejected' ? 'bg-red-200 text-red-700' : 'bg-indigo-200 text-indigo-700' }}">
+                                                    SOR
+                                                </div>
                                                 <p class="text-[8px] font-bold text-gray-600 truncate w-full text-center mt-1 px-1" title="{{ basename($photo->file_path) }}">
                                                     {{ basename($photo->file_path) }}
                                                 </p>
                                             </div>
                                         @else
                                             {{-- JIKA INI ADALAH FOTO NORMAL --}}
-                                            <img src="{{ asset('storage/' . $photo->file_path) }}" class="w-full h-full object-cover">
+                                            <img src="{{ asset('storage/' . $photo->file_path) }}" 
+                                                 class="w-full h-full object-cover {{ $photo->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
                                         @endif
 
-                                        {{-- TOMBOL DELETE (SAMA UNTUK KEDUANYA) --}}
+                                        {{-- JIKA STATUS REJECTED, TAMPILKAN NOTE & FORM REPLACE --}}
+                                        @if($photo->status == 'rejected')
+                                            @if(!empty($photo->review_note))
+                                                <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[9px] p-1.5 text-center font-bold z-20 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2" title="{{ $photo->review_note }}">
+                                                    {{ $photo->review_note }}
+                                                </div>
+                                            @endif
+
+                                            {{-- OVERLAY GANTI FOTO / FILE --}}
+                                            <form method="POST" action="{{ route('waspang.evidence.replace', $photo->id_evidence) }}" enctype="multipart/form-data" 
+                                                  class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
+                                                @csrf
+                                                <label class="cursor-pointer bg-blue-600 text-white text-[10px] font-black px-3 py-2 rounded-xl shadow-lg hover:bg-blue-700 transition flex flex-col items-center gap-1">
+                                                    <i class="fa-solid fa-camera-rotate text-sm"></i>
+                                                    Upload Ulang
+                                                    <input type="file" name="file" class="hidden" onchange="this.form.submit()" accept="{{ $item['type'] == 'otdr_sor' ? '.sor' : 'image/*' }}">
+                                                </label>
+                                            </form>
+                                        @endif
+
+                                        {{-- TOMBOL DELETE --}}
                                         @if($photo->status != 'approved')
-                                            <form method="POST" action="{{ route('waspang.evidence.delete', $photo->id_evidence) }}" class="absolute top-1 right-1 z-10">
+                                            <form method="POST" action="{{ route('waspang.evidence.delete', $photo->id_evidence) }}" class="absolute top-1 right-1 z-20">
                                                 @csrf @method('DELETE')
-                                                <button class="w-6 h-6 rounded-full bg-black/70 hover:bg-black text-white text-xs font-black transition">
+                                                <button class="w-5 h-5 rounded-full bg-black/70 hover:bg-red-600 text-white text-xs flex items-center justify-center font-bold backdrop-blur-sm transition">
                                                     ×
                                                 </button>
                                             </form>
@@ -292,19 +266,16 @@
                                     </div>
                                 @endforeach
                             </div>
-
                         @else
-
                             <p class="text-xs text-gray-500 mb-3">
-                                Belum ada foto eviden.
+                                Belum ada eviden.
                             </p>
-
                         @endif
 
                         <button type="button"
                                 onclick="openUploadModal('{{ $item['type'] }}', '{{ addslashes($item['title']) }}')"
-                                class="h-9 w-full rounded-xl bg-blue-700 text-white text-xs font-bold">
-                            Upload / Update Eviden
+                                class="h-9 w-full rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold transition shadow-xs">
+                            <i class="fa-solid fa-camera mr-1"></i> Upload Tambahan
                         </button>
 
                     </div>
@@ -328,19 +299,16 @@
 
     {{-- NEXT BUTTON --}}
     <div class="px-4 mt-5">
-
-            <a href="{{ route('waspang.projects.finishing', $project->id_project) }}"
-               class="h-11 w-full rounded-2xl bg-blue-700 text-white inline-flex items-center justify-center text-sm font-bold">
-                Next Step 4 - Finishing
-            </a>
-
+        <a href="{{ route('waspang.projects.finishing', $project->id_project) }}"
+           class="h-11 w-full rounded-2xl bg-blue-700 text-white inline-flex items-center justify-center text-sm font-bold shadow-sm hover:bg-blue-800 transition">
+            Next Step 4 - Finishing <i class="fa-solid fa-chevron-right ml-2 text-xs"></i>
+        </a>
     </div>
 
-    {{-- MODAL UPLOAD OVERLAY (SERAGAM APPS VIEW) --}}
+    {{-- MODAL UPLOAD OVERLAY --}}
     <div id="uploadModal" class="hidden fixed inset-0 z-[9999] bg-black/60 px-4 flex items-center justify-center backdrop-blur-xs animate-fade-in">
         <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
-            {{-- HEADER MODAL (WARNA BIRU MODERN) --}}
             <div class="bg-blue-700 text-white px-5 py-4 flex items-start justify-between shrink-0">
                 <div>
                     <h2 id="uploadTitle" class="text-lg font-black tracking-tight">
@@ -358,7 +326,6 @@
                 </button>
             </div>
 
-            {{-- FORM SUBMIT AJAX --}}
             <form id="uploadForm" method="POST" action="{{ route('waspang.evidence.upload', $project->id_project) }}" class="flex flex-col min-h-0 overflow-y-auto p-5 space-y-4">
                 @csrf
                 <input type="hidden" name="stage" value="pengukuran">
@@ -366,13 +333,11 @@
                 <input type="hidden" name="latitude" id="latitude">
                 <input type="hidden" name="longitude" id="longitude">
 
-                {{-- BANNER INFORMASI KHUSUS OPM --}}
                 <div id="opmNoteInfo" class="hidden rounded-xl bg-amber-50 border border-amber-200 text-amber-800 p-3 text-xs leading-snug shrink-0 animate-fade-in">
                     <span class="font-bold block uppercase tracking-wider text-[10px] text-amber-600 mb-0.5">⚠️ Perhatian Khusus OPM:</span>
                     Nama ODP wajib diisi pada catatan. Contoh format: <span class="font-mono font-bold">ODP-BDG-FAT-001</span>.
                 </div>
 
-                {{-- AREA DROPZONE SELECT/UPLOAD FOTO --}}
                 <div class="text-xs">
                     <label class="text-xs font-black text-gray-600 block mb-1.5">
                         Pilih Eviden Pengukuran
@@ -387,18 +352,17 @@
                             </div>
 
                             <p class="mt-2.5 text-xs font-black text-blue-800">
-                                Pilih Eviden
+                                Pilih Eviden / File
                             </p>
 
                             <p class="text-[10px] text-gray-400 mt-0.5">
-                                JPG, PNG, WEBP · Auto Compress
+                                JPG, PNG, WEBP, SOR
                             </p>
                         </div>
 
                         <input type="file" id="photoInput" accept="image/*,.sor" multiple class="hidden">
                     </label>
 
-                    {{-- PREVIEW MULTIPLE FOTO & FILE --}}
                     <div id="previewWrapper" class="mt-3 hidden animate-fade-in">
                         <div class="flex items-center justify-between mb-2">
                             <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
@@ -410,12 +374,10 @@
                             </button>
                         </div>
 
-                        <!-- container preview -->
                         <div id="previewContainer" class="grid grid-cols-3 gap-2"></div>
                     </div>
                 </div>
 
-                {{-- INPUT CATATAN --}}
                 <div class="text-xs">
                     <label class="text-xs font-black text-gray-600 block">
                         Catatan / Detail Keterangan
@@ -424,7 +386,6 @@
                     <textarea name="description" id="descriptionInput" rows="3" placeholder="Catatan opsional..." class="mt-1.5 w-full rounded-2xl border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-700 outline-none transition resize-none"></textarea>
                 </div>
 
-                {{-- ACTION BUTTONS --}}
                 <div class="grid grid-cols-2 gap-2 pt-2 shrink-0">
                     <button type="button" onclick="closeUploadModal()" class="h-11 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-black transition">
                         Batal
@@ -445,11 +406,9 @@
 @section('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-// Pastikan array selalu bersih saat halaman dimuat
 window.selectedFiles = [];
 window.currentUploadType = 'image';
 
-// FUNGSI BUKA MODAL
 window.openUploadModal = function(type, title) {
     document.getElementById('uploadModal').classList.remove('hidden');
     document.getElementById('uploadModal').classList.add('flex');
@@ -490,16 +449,10 @@ window.openUploadModal = function(type, title) {
     }
 }
 
-// FUNGSI TUTUP MODAL
 window.closeUploadModal = function() {
     document.getElementById('uploadModal').classList.add('hidden');
     document.getElementById('uploadModal').classList.remove('flex');
 }
-
-// ==============================================================================
-// PERBAIKAN BUG DOUBLE UPLOAD:
-// Menggunakan .onchange dan .onsubmit untuk mencegah event listener tertumpuk
-// ==============================================================================
 
 const photoInputElement = document.getElementById('photoInput');
 if (photoInputElement) {
@@ -546,7 +499,7 @@ window.renderEvidencePreview = function() {
         if (item.is_sor) {
             card.innerHTML = `
                 <div class="flex flex-col items-center p-2 text-center">
-                    <div class="w-8 h-8 bg-indigo-100 text-indigo-700 rounded-lg flex items-center justify-center font-black mb-1">SOR</div>
+                    <div class="w-8 h-8 bg-indigo-100 text-indigo-700 rounded-lg flex items-center justify-center font-black mb-1 text-xs">SOR</div>
                     <p class="text-[8px] font-bold text-gray-600 truncate w-full px-1">${item.name}</p>
                 </div>
                 <button type="button" onclick="removeEvidencePhoto(${index})" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 text-white text-xs font-black flex items-center justify-center transition hover:bg-black z-10">×</button>
@@ -577,7 +530,6 @@ window.clearAllPhotosAction = function() {
     renderEvidencePreview();
 }
 
-// Hapus Foto Massal
 const btnClear = document.getElementById('clearAllPhotos');
 if(btnClear) {
     btnClear.onclick = clearAllPhotosAction;
@@ -608,7 +560,6 @@ window.compressImage = function(file, maxWidth = 1280, quality = 0.75) {
     });
 }
 
-// PROSES SUBMIT
 const uploadFormElement = document.getElementById('uploadForm');
 if (uploadFormElement) {
     uploadFormElement.onsubmit = function(e) {
@@ -617,7 +568,6 @@ if (uploadFormElement) {
         const submitBtn = e.target.querySelector('button[type="submit"]');
         const originalBtnText = submitBtn.innerHTML;
         
-        // Disable tombol seketika saat diklik
         submitBtn.disabled = true;
         submitBtn.innerHTML = 'Memproses...';
 

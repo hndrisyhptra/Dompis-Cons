@@ -580,19 +580,11 @@ public function importCsv(Request $request)
         $evidence = Evidence::with(['project', 'boqItem'])->findOrFail($id);
 
         $oldStatus = $evidence->status;
-
         $evidenceLabel = $this->evidenceLabel($evidence);
 
-        Evidence::where('project_id', $evidence->project_id)
-            ->where('stage', $evidence->stage)
-            ->where('evidence_type', $evidence->evidence_type)
-            ->when($evidence->boq_item_id, function ($query) use ($evidence) {
-                $query->where('boq_item_id', $evidence->boq_item_id);
-            })
-            ->update([
-                'status' => 'approved',
-                'review_note' => null,
-            ]);
+        $evidence->status = 'approved';
+        $evidence->review_note = null; // Kosongkan note saat di-approve
+        $evidence->save();
 
         $lopId = Lop::where('project_id', $evidence->project_id)->value('id_lop');
 
@@ -638,19 +630,12 @@ public function importCsv(Request $request)
             | UPDATE STATUS PROGRESS LOP
             |--------------------------------------------------------------------------
             */
-
             if (($summary['progress'] ?? 0) == 100) {
 
                 Lop::where('project_id', $project->id_project)
                     ->update([
                         'status_progress' => 'finishing',
                     ]);
-
-                /*
-                |--------------------------------------------------------------------------
-                | PROJECT CLOSE
-                |--------------------------------------------------------------------------
-                */
 
                 $project->update([
                     'status_project' => 'close',
@@ -669,7 +654,6 @@ public function importCsv(Request $request)
 
             } elseif ($evidence->stage == 'instalasi') {
 
-                // PERBAIKAN: Diubah dari 'pengukuran' menjadi 'finishing' agar sesuai ENUM MySQL
                 Lop::where('project_id', $project->id_project)
                     ->update([
                         'status_progress' => 'finishing', 
@@ -697,7 +681,6 @@ public function importCsv(Request $request)
             | PROJECT COMPLETE ACTIVITY
             |--------------------------------------------------------------------------
             */
-
             $alreadyCompleteLogged = ProjectActivityLog::where('project_id', $project->id_project)
                 ->where('activity_type', 'project_completed')
                 ->exists();
@@ -739,19 +722,11 @@ public function importCsv(Request $request)
         $evidence = Evidence::with(['project', 'boqItem'])->findOrFail($id);
 
         $oldStatus = $evidence->status;
-
         $evidenceLabel = $this->evidenceLabel($evidence);
 
-        Evidence::where('project_id', $evidence->project_id)
-            ->where('stage', $evidence->stage)
-            ->where('evidence_type', $evidence->evidence_type)
-            ->when($evidence->boq_item_id, function ($query) use ($evidence) {
-                $query->where('boq_item_id', $evidence->boq_item_id);
-            })
-            ->update([
-                'status' => 'rejected',
-                'review_note' => $request->review_note,
-            ]);
+        $evidence->status = 'rejected';
+        $evidence->review_note = $request->review_note;
+        $evidence->save();
 
         Notification::create([
             'user_id' => $evidence->uploaded_by,
@@ -792,6 +767,23 @@ public function importCsv(Request $request)
         ]);
 
         return back()->with('success', 'Eviden berhasil direject');
+    }
+
+    public function bulkApprove(Request $request)
+    {
+        $request->validate([
+            'evidence_ids' => 'required|array',
+            'evidence_ids.*' => 'exists:evidences,id_evidence',
+        ]);
+
+        // Update semua ID yang dikirim menjadi approved
+        \App\Models\Evidence::whereIn('id_evidence', $request->evidence_ids)
+            ->update([
+                'status' => 'approved',
+                'review_note' => null // Hapus note reject jika sebelumnya ada
+            ]);
+
+        return back()->with('success', count($request->evidence_ids) . ' Eviden berhasil di-approve sekaligus.');
     }
 
     public function bulkReviewEvidence(Request $request)
@@ -849,20 +841,47 @@ public function importCsv(Request $request)
 
     public function resetEvidence($id)
     {
-        $evidence = Evidence::findOrFail($id);
+        // 1. Cari eviden berdasarkan ID spesifik yang diklik
+        $evidence = Evidence::with(['project', 'boqItem'])->findOrFail($id);
 
-        Evidence::where('project_id', $evidence->project_id)
-            ->where('stage', $evidence->stage)
-            ->where('evidence_type', $evidence->evidence_type)
-            ->when($evidence->boq_item_id, function ($query) use ($evidence) {
-                $query->where('boq_item_id', $evidence->boq_item_id);
-            })
-            ->update([
-                'status' => 'pending',
-                'review_note' => null,
-            ]);
+        $oldStatus = $evidence->status;
+        $evidenceLabel = $this->evidenceLabel($evidence);
 
-        return back()->with('success', 'Status berhasil di atur ulang');
+        // 2. UPDATE HANYA PADA 1 ID INI SAJA (Jangan pakai where stage / evidence_type massal)
+        $evidence->update([
+            'status' => 'pending',
+            'review_note' => null,
+        ]);
+
+        // 3. Catat activity log & notifikasi (opsional, sesuaikan dengan kode Anda)
+        $lopId = Lop::where('project_id', $evidence->project_id)->value('id_lop');
+
+        ProjectActivityService::log([
+            'project_id' => $evidence->project_id,
+            'lop_id' => $lopId,
+            'evidence_id' => $evidence->id_evidence,
+            'activity_type' => 'reset_evidence',
+            'title' => 'Approval Eviden Dibatalkan',
+            'description' => 'Admin membatalkan approval pada eviden: ' . $evidenceLabel,
+            'stage' => $evidence->stage,
+            'status_before' => $oldStatus,
+            'status_after' => 'pending',
+            'meta' => [
+                'evidence_type' => $evidence->evidence_type,
+                'boq_item_id' => $evidence->boq_item_id,
+            ],
+        ]);
+
+        Notification::create([
+            'user_id' => $evidence->uploaded_by,
+            'project_id' => $evidence->project_id,
+            'type' => 'reject',
+            'title' => 'Approval Dibatalkan',
+            'message' => 'Status eviden ' . ucfirst($evidence->stage) . ' diubah kembali menjadi pending oleh Admin.',
+            'redirect_url' => route('waspang.projects.show', $evidence->project_id),
+        ]);
+
+        return back()->with('success', 'Status eviden berhasil diatur ulang menjadi pending.');
     }
 
     //STEP 2 - REVIEW INSTALASI

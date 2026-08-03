@@ -266,6 +266,11 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/waspang/projects/{id}/review-final', [WaspangController::class, 'reviewFinal'])
         ->name('waspang.projects.review_final');
+    
+    // Route untuk Replace Eviden (Update)
+    Route::post('/waspang/evidence/{id}/replace', [\App\Http\Controllers\WaspangController::class, 'replace'])
+        ->name('waspang.evidence.replace');
+    
 
 
     /*
@@ -330,6 +335,9 @@ Route::middleware(['auth'])->group(function () {
     // Route API eksekusi generate & stream ZIP file
     Route::get('/admin/projects/{id}/download-zip', [ProjectController::class, 'downloadZip'])
     ->name('admin.projects.download_zip');
+
+    Route::post('/admin/evidences/bulk-approve', [\App\Http\Controllers\ProjectController::class, 'bulkApprove'])
+    ->name('admin.evidences.bulk-approve');
 
 
     //WASPANG MOBILE

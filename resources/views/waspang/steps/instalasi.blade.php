@@ -1,4 +1,4 @@
-@extends('layouts.waspang') {{-- Sesuaikan dengan nama file layout utama mobile/waspang Anda --}}
+@extends('layouts.waspang')
 
 @section('content')
 <div class="min-h-screen max-w-md mx-auto bg-[#f7f6f2] pb-24">
@@ -19,61 +19,8 @@
         $instalasiUploadedComplete = $boqTotal > 0 && $boqUploaded == $boqTotal;
     @endphp
 
-    {{-- HEADER --}}
-    <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
-        <div class="flex items-center gap-3">
-            <a href="{{ route('waspang.projects.show', $project->id_project) }}"
-                class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-2xl font-medium transition active:scale-95">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left-icon lucide-chevron-left">
-                    <path d="m15 18-6-6 6-6"/>
-                </svg>
-            </a>
-            <h1 class="text-xl font-bold">Step 2 - Instalasi</h1>
-        </div>
-
-        {{-- Stepper --}}
-        <div class="relative px-2 mt-4">
-            <div class="absolute top-4 left-10 right-10 h-1 bg-blue-300/60 rounded-full"></div>
-            <div class="relative grid grid-cols-4 text-center">
-                {{-- STEP 1 --}}
-                <a href="{{ route('waspang.projects.show', $project->id_project) }}">
-                    <div class="mx-auto w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold">✓</div>
-                    <p class="mt-2 text-xs text-blue-100">Persiapan</p>
-                </a>
-                {{-- STEP 2 --}}
-                <a href="{{ route('waspang.projects.instalasi', $project->id_project) }}">
-                    <div class="mx-auto w-8 h-8 rounded-full {{ $instalasiUploadedComplete ? 'bg-green-100 text-green-700' : 'bg-white text-blue-700' }} flex items-center justify-center text-sm font-bold">
-                        {{ $instalasiUploadedComplete ? '✓' : '2' }}
-                    </div>
-                    <p class="mt-2 text-xs font-bold text-white">Instalasi</p>
-                </a>
-                {{-- STEP 3 --}}
-                @if($instalasiUploadedComplete)
-                    <a href="{{ route('waspang.projects.pengukuran', $project->id_project) }}">
-                        <div class="mx-auto w-8 h-8 rounded-full {{ $pengukuranComplete ? 'bg-green-100 text-green-700' : 'bg-white text-blue-700' }} flex items-center justify-center text-sm font-bold">{{ $pengukuranComplete ? '✓' : '3' }}</div>
-                        <p class="mt-2 text-xs text-blue-100">Pengukuran</p>
-                    </a>
-                @else
-                    <div class="opacity-50">
-                        <div class="mx-auto w-8 h-8 rounded-full bg-blue-400 text-white flex items-center justify-center text-sm font-bold">3</div>
-                        <p class="mt-2 text-xs text-blue-200">Pengukuran</p>
-                    </div>
-                @endif
-                {{-- STEP 4 --}}
-                @if($pengukuranComplete)
-                    <a href="{{ route('waspang.projects.finishing', $project->id_project) }}">
-                        <div class="mx-auto w-8 h-8 rounded-full {{ $finishingComplete ? 'bg-green-100 text-green-700' : 'bg-white text-blue-700' }} flex items-center justify-center text-sm font-bold">{{ $finishingComplete ? '✓' : '4' }}</div>
-                        <p class="mt-2 text-xs text-blue-100">Finishing</p>
-                    </a>
-                @else
-                    <div class="opacity-50">
-                        <div class="mx-auto w-8 h-8 rounded-full bg-blue-400 text-white flex items-center justify-center text-sm font-bold">4</div>
-                        <p class="mt-2 text-xs text-blue-200">Finishing</p>
-                    </div>
-                @endif
-            </div>
-        </div>
-    </div>
+    {{-- HEADER & STEPPER --}}
+    @include('waspang.partials.stepper')
 
     {{-- Project Info --}}
     <div class="px-4 mt-4">
@@ -118,18 +65,31 @@
                 @php
                     $photos = $evidences->where('stage', 'instalasi')->where('evidence_type', 'progress_boq')->where('boq_item_id', $boq->id_boq)->sortByDesc('created_at');
                     $firstPhoto = $photos->first();
-                    $status = optional($firstPhoto)->status;
+                    
+                    // Logika Status Group per BOQ
+                    $status = null;
+                    if ($photos->count() > 0) {
+                        if ($photos->where('status', 'rejected')->count() > 0) {
+                            $status = 'rejected';
+                        } elseif ($photos->where('status', 'pending')->count() > 0) {
+                            $status = 'pending';
+                        } else {
+                            $status = 'approved';
+                        }
+                    }
+
                     $isUploaded = $photos->count() > 0;
                     $rejectedPhoto = $photos->where('status', 'rejected')->sortByDesc('created_at')->first();
                     $reviewNote = optional($rejectedPhoto)->review_note;
                 @endphp
 
-                <div x-data="{ open: false }" class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs">
+                <div x-data="{ open: {{ $status == 'rejected' ? 'true' : 'false' }} }" class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs">
                     {{-- CARD HEADER TRIGGER BUTTON --}}
                     <button type="button" @click="open = !open" class="w-full p-4 flex items-center justify-between gap-3 text-left">
                         <div class="flex items-center gap-3 min-w-0">
-                            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 {{ $isUploaded ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400' }}">
-                                {{ $isUploaded ? '✓' : $loop->iteration }}
+                            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 
+                                {{ $status == 'rejected' ? 'bg-red-50 text-red-600' : ($isUploaded ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400') }}">
+                                {{ $status == 'rejected' ? '!' : ($isUploaded ? '✓' : $loop->iteration) }}
                             </div>
                             <div class="min-w-0">
                                 <h3 class="text-sm font-bold text-gray-900 tracking-tight">{{ $boq->designator }}</h3>
@@ -150,7 +110,6 @@
                                         <span class="font-black px-1.5 py-0.5 rounded-md {{ $bgClass }}">
                                             {{ number_format($boq->quantity_actual ?? 0, 0, ',', '.') }} {{ $boq->unit }}
                                         </span>
-                                        {{-- Indikator Kecil di Luar Jika Ada Reason --}}
                                         @if($boq->actual_reason)
                                             <span class="px-1.5 py-0.5 bg-red-50 border border-red-100 text-red-600 rounded text-[9px] font-bold" title="Lihat Alasan">
                                                 <i class="fa-solid fa-info-circle"></i> Reason
@@ -176,9 +135,9 @@
                     </button>
 
                     {{-- CARD EXPAND AREA --}}
-                    <div x-show="open" x-transition class="border-t border-gray-50 bg-gray-50/30 p-4 space-y-3">
+                    <div x-show="open" x-transition x-cloak class="border-t border-gray-50 bg-gray-50/30 p-4 space-y-3">
                         
-                        {{-- BLOK INFO REASON ACTUAL 0 (Fitur Baru) --}}
+                        {{-- BLOK INFO REASON ACTUAL 0 --}}
                         @if($boq->actual_reason)
                             <div class="rounded-xl border border-red-100 bg-red-50/80 p-3 text-xs text-red-700 leading-relaxed shadow-sm">
                                 <p class="font-black mb-0.5 flex items-center gap-1">
@@ -188,10 +147,13 @@
                             </div>
                         @endif
 
-                        @if($reviewNote)
-                            <div class="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs text-red-700 leading-relaxed">
-                                <p class="font-bold mb-0.5"><i class="fa-solid fa-circle-exclamation mr-1"></i> Catatan Revisi Admin:</p>
-                                {{ $reviewNote }}
+                        @if($status == 'rejected')
+                            <div class="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs text-red-700 leading-relaxed flex items-start gap-2">
+                                <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
+                                <div>
+                                    <p class="font-bold mb-0.5">Terdapat Eviden Ditolak</p>
+                                    <p>Ketuk pada foto bergaris merah di bawah untuk mengunggah ulang (replace) sesuai instruksi Admin.</p>
+                                </div>
                             </div>
                         @endif
 
@@ -200,12 +162,47 @@
                         @if($photos->count() > 0)
                             <div class="grid grid-cols-3 gap-2">
                                 @foreach($photos as $photo)
-                                    <div class="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100">
-                                        <img src="{{ asset('storage/' . $photo->file_path) }}" class="w-full h-full object-cover">
+                                    <div class="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group transition-all 
+                                        {{ $photo->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-gray-200' }}">
+                                        
+                                        {{-- INDIKATOR ID FOTO (PERMANEN) --}}
+                                        <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-10 backdrop-blur-sm">
+                                            @if($photo->status == 'rejected')
+                                                <i class="fa-solid fa-circle-exclamation text-red-400"></i>
+                                            @elseif($photo->status == 'approved')
+                                                <i class="fa-solid fa-check-circle text-green-400"></i>
+                                            @endif
+                                            ID-{{ $photo->id_evidence }}
+                                        </div>
+
+                                        <img src="{{ asset('storage/' . $photo->file_path) }}" 
+                                             class="w-full h-full object-cover {{ $photo->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
+                                        
+                                        {{-- JIKA STATUS REJECTED, TAMPILKAN NOTE & FORM REPLACE --}}
+                                        @if($photo->status == 'rejected')
+                                            @if(!empty($photo->review_note))
+                                                <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[9px] p-1.5 text-center font-bold z-10 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2" title="{{ $photo->review_note }}">
+                                                    {{ $photo->review_note }}
+                                                </div>
+                                            @endif
+                                            
+                                            {{-- OVERLAY GANTI FOTO --}}
+                                            <form method="POST" action="{{ route('waspang.evidence.replace', $photo->id_evidence) }}" enctype="multipart/form-data" 
+                                                  class="absolute inset-0 z-20 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
+                                                @csrf
+                                                <label class="cursor-pointer bg-blue-600 text-white text-[10px] font-black px-3 py-2 rounded-xl shadow-lg hover:bg-blue-700 transition flex flex-col items-center gap-1">
+                                                    <i class="fa-solid fa-camera-rotate text-sm"></i>
+                                                    Upload Ulang
+                                                    <input type="file" name="file" class="hidden" onchange="this.form.submit()" accept="image/*,.sor,application/pdf">
+                                                </label>
+                                            </form>
+                                        @endif
+                                        
+                                        {{-- TOMBOL HAPUS --}}
                                         @if($photo->status != 'approved')
-                                            <form method="POST" action="{{ route('waspang.evidence.delete', $photo->id_evidence) }}" class="absolute top-1 right-1">
+                                            <form method="POST" action="{{ route('waspang.evidence.delete', $photo->id_evidence) }}" class="absolute top-1 right-1 z-10">
                                                 @csrf @method('DELETE')
-                                                <button class="w-5 h-5 rounded-full bg-black/70 text-white text-xs flex items-center justify-center font-bold">×</button>
+                                                <button class="w-5 h-5 rounded-full bg-black/70 hover:bg-red-600 text-white text-xs flex items-center justify-center font-bold backdrop-blur-sm transition">×</button>
                                             </form>
                                         @endif
                                     </div>
@@ -217,7 +214,7 @@
 
                         <button type="button" onclick="openUploadModal('{{ $boq->id_boq }}', @js($boq->item_name), '{{ $boq->quantity_plan }}', '{{ $boq->unit }}', '{{ $boq->quantity_actual ?? '' }}')"
                                 class="h-9 w-full rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold transition shadow-xs">
-                            <i class="fa-solid fa-camera mr-1"></i> Upload / Update Eviden
+                            <i class="fa-solid fa-camera mr-1"></i> Upload Tambahan / Update Qty
                         </button>
                     </div>
                 </div>
@@ -244,7 +241,6 @@
     <div id="uploadModal" class="hidden fixed inset-0 z-[9999] bg-black/60 px-4 flex items-center justify-center backdrop-blur-xs animate-fade-in">
         <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
-            {{-- HEADER MODAL --}}
             <div class="bg-blue-700 text-white px-5 py-4 flex items-start justify-between shrink-0">
                 <div>
                     <h2 class="text-lg font-black tracking-tight">Upload Eviden & Qty Actual</h2>
@@ -253,12 +249,13 @@
                 <button type="button" onclick="closeUploadModal()" class="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 text-white font-black text-lg flex items-center justify-center transition">×</button>
             </div>
 
-            {{-- FORM SUBMIT --}}
             <form id="uploadForm" method="POST" action="{{ route('waspang.evidence.upload', $project->id_project) }}" class="flex flex-col min-h-0 overflow-y-auto p-5 space-y-4">
                 @csrf
-                <input type="hidden" id="boq_item_id">
-                <input type="hidden" id="latitude">
-                <input type="hidden" id="longitude">
+                <input type="hidden" name="boq_item_id" id="boq_item_id">
+                <input type="hidden" name="stage" value="instalasi">
+                <input type="hidden" name="evidence_type" value="progress_boq">
+                <input type="hidden" name="latitude" id="latitude">
+                <input type="hidden" name="longitude" id="longitude">
 
                 {{-- INFORMASI GRID TARGET DAN AKTUAL --}}
                 <div class="grid grid-cols-3 gap-2 bg-gray-50 p-3 rounded-2xl border border-gray-100 text-xs shrink-0">
@@ -272,7 +269,7 @@
                     </div>
                     <div>
                         <label class="text-[10px] font-bold text-gray-500 block uppercase tracking-wide">Input Progress</label>
-                        <input type="number" step="0.01" id="quantity_actual" placeholder="Isi Qty" class="mt-0.5 w-full h-8 rounded-lg border-gray-300 bg-white font-mono font-bold text-xs text-blue-600 focus:ring-2 focus:ring-blue-100 focus:border-blue-700 outline-none px-2">
+                        <input type="number" step="0.01" name="quantity_actual" id="quantity_actual" placeholder="Isi Qty" class="mt-0.5 w-full h-8 rounded-lg border-gray-300 bg-white font-mono font-bold text-xs text-blue-600 focus:ring-2 focus:ring-blue-100 focus:border-blue-700 outline-none px-2">
                     </div>
                 </div>
 
@@ -308,9 +305,7 @@
                     <label class="flex flex-col items-center justify-center w-full min-h-[125px] border-2 border-dashed border-blue-300 rounded-2xl bg-blue-50/40 cursor-pointer hover:bg-blue-50 transition p-4">
                         <div class="text-center">
                             <div class="mx-auto w-11 h-11 rounded-xl bg-blue-700 text-white flex items-center justify-center text-xl font-black shadow-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera-icon lucide-camera">
-                                    <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/>
-                                </svg>
+                                <i class="fa-solid fa-camera"></i>
                             </div>
                             <p class="mt-2.5 text-xs font-black text-blue-800">Pilih Eviden Progress</p>
                             <p class="text-[10px] text-gray-400 mt-0.5">JPG, PNG, WEBP · Auto Compress</p>
@@ -328,13 +323,11 @@
                     </div>
                 </div>
 
-                {{-- INPUT CATATAN --}}
                 <div class="text-xs">
                     <label class="text-xs font-black text-gray-600 block">Catatan Tambahan Progress <span class="text-gray-400">(Opsional)</span></label>
                     <textarea name="description" rows="2" placeholder="Contoh: Penarikan span ke-4 selesai..." class="mt-1.5 w-full rounded-2xl border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-700 outline-none transition resize-none"></textarea>
                 </div>
 
-                {{-- ACTION BUTTONS --}}
                 <div class="grid grid-cols-2 gap-2 pt-2 shrink-0">
                     <button type="button" onclick="closeUploadModal()" class="h-11 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-black transition">Batal</button>
                     <button type="submit" class="h-11 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-md transition">Upload</button>
@@ -352,7 +345,6 @@
 <script>
 let selectedFiles = []; 
 
-// ELEMENT UI LOGIC REASON
 const inputActual = document.getElementById('quantity_actual');
 const reasonBox = document.getElementById('reasonBox');
 const reasonRadios = document.getElementsByName('reason_option');

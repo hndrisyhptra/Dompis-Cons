@@ -641,13 +641,13 @@ class WaspangController extends Controller
             'stage' => 'required|in:persiapan,instalasi,pengukuran,finishing',
             'evidence_type' => 'required|string|max:100',
             'photos' => 'required|array',
-            'photos.*' => 'required|max:8192', 
+            'photos.*' => 'required|file|max:10240', // Max 10MB
             'description' => 'nullable|string',
             'latitude' => 'nullable',
             'longitude' => 'nullable',
             'boq_item_id' => 'nullable',
             'quantity_actual' => 'nullable|numeric|min:0',
-            'actual_reason' => 'nullable|string', // TAMBAHAN VALIDASI REASON
+            'actual_reason' => 'nullable|string', 
         ]);
 
         $projectFolder = 'project-' . $project->id_project;
@@ -659,10 +659,12 @@ class WaspangController extends Controller
             
             $originalExtension = strtolower($photo->getClientOriginalExtension());
             $isSor = ($originalExtension === 'sor');
+            // Jika file dari JS (blob) kadang tidak punya ekstensi, kita default ke jpg
             $extension = $isSor ? 'sor' : ($originalExtension ?: 'jpg');
             
             $filename = now()->format('Ymd_His') . '_' . uniqid() . '.' . $extension;
 
+            // Simpan ke direktori terstruktur
             $path = $photo->storeAs(
                 "evidences/{$projectFolder}/{$stage}/{$type}",
                 $filename,
@@ -719,12 +721,10 @@ class WaspangController extends Controller
                     
                     $actualValue = (float)$request->quantity_actual;
                     
-                    // Siapkan array update
                     $updateData = [
                         'quantity_actual' => $actualValue
                     ];
 
-                    // LOGIKA REASON: Jika 0 simpan alasan, jika > 0 kosongkan alasannya
                     if ($actualValue == 0 && $request->has('actual_reason')) {
                         $updateData['actual_reason'] = $request->actual_reason;
                     } else {
@@ -745,7 +745,7 @@ class WaspangController extends Controller
                         'meta' => [
                             'boq_item_id' => $request->boq_item_id,
                             'quantity_actual' => $actualValue,
-                            'actual_reason' => $updateData['actual_reason'], // Catat reason di log juga
+                            'actual_reason' => $updateData['actual_reason'],
                         ],
                     ]);
                 } 
@@ -770,42 +770,62 @@ class WaspangController extends Controller
         return back()->with('success', 'Eviden berhasil diunggah');
     }
 
-    public function deleteEvidence($id)
+    public function replace(Request $request, $id)
     {
-        $evidence = Evidence::findOrFail($id);
+        $request->validate([
+            'file' => 'required|file|max:10240', // Maks 10MB
+        ]);
 
-        if ($evidence->uploaded_by != auth()->user()->id_user) {
-            abort(403);
+        $evidence = \App\Models\Evidence::findOrFail($id);
+        $projectFolder = 'project-' . $evidence->project_id;
+        $stage = $evidence->stage;
+        $type = $evidence->evidence_type;
+
+        // 1. Hapus file fisik lama dari storage
+        if ($evidence->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($evidence->file_path)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($evidence->file_path);
         }
 
-        if ($evidence->status === 'approved') {
-            return back()->with('error', 'Eviden yang sudah approved tidak bisa dihapus');
-        }
+        // 2. Siapkan file baru
+        $file = $request->file('file');
+        
+        $originalExtension = strtolower($file->getClientOriginalExtension());
+        $isSor = ($originalExtension === 'sor');
+        // File dari JS kompresi (blob) akan dibaca tanpa ekstensi, jadikan default jpg.
+        $extension = $isSor ? 'sor' : ($originalExtension ?: 'jpg');
+        
+        $filename = now()->format('Ymd_His') . '_replace_' . uniqid() . '.' . $extension;
 
-        $lopId = Lop::where('project_id', $evidence->project_id)->value('id_lop');
+        // 3. Simpan di direktori yang sama dengan tempat file lama bersarang
+        $path = $file->storeAs(
+            "evidences/{$projectFolder}/{$stage}/{$type}",
+            $filename,
+            'public'
+        );
 
-        ProjectActivityService::log([
+        // 4. Update database (Pastikan review_note masuk $fillable ya di Model Evidence)
+        $evidence->file_path = $path;
+        $evidence->status = 'pending';
+        $evidence->review_note = null; // Menghapus alasan reject karena sudah diunggah ulang
+        $evidence->save();
+
+        // 5. Catat Log Aktivitas (Opsional agar History Rapi)
+        \App\Services\ProjectActivityService::log([
             'project_id' => $evidence->project_id,
-            'lop_id' => $lopId,
+            'lop_id' => \App\Models\Lop::where('project_id', $evidence->project_id)->value('id_lop'),
             'evidence_id' => $evidence->id_evidence,
-            'activity_type' => 'delete_evidence',
-            'title' => 'Hapus Eviden',
-            'description' => 'Waspang menghapus eviden yang belum approved.',
+            'activity_type' => 'replace_evidence',
+            'title' => 'Upload Ulang Eviden (Perbaikan)',
+            'description' => 'Waspang mengunggah ulang eviden yang ditolak (ID-'.$evidence->id_evidence.').',
             'stage' => $evidence->stage,
-            'status_before' => $evidence->status,
-            'status_after' => 'deleted',
+            'status_after' => 'pending',
             'meta' => [
                 'evidence_type' => $evidence->evidence_type,
                 'boq_item_id' => $evidence->boq_item_id,
-                'file_path' => $evidence->file_path,
             ],
         ]);
 
-        Storage::disk('public')->delete($evidence->file_path);
-
-        $evidence->delete();
-
-        return back()->with('success', 'Eviden berhasil dihapus');
+        return back()->with('success', 'Eviden berhasil diperbarui. Status kembali pending.');
     }
 
     //NOTIFICATION

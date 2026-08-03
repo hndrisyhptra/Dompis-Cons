@@ -44,80 +44,8 @@
         </p>
     </div>
 
-    {{-- Project Card --}}
-    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
-
-        <div class="flex items-start justify-between gap-3">
-
-            <div class="min-w-0">
-                <h2 class="text-base font-bold text-gray-900 dark:text-white truncate">
-                    {{ $project->project_name }}
-                </h2>
-
-                <p class="text-sm text-gray-500">
-                    {{ $project->lop?->branch }} · {{ $project->lop?->sto }}
-                </p>
-            </div>
-
-            <a href="{{ route('admin.evidences.approval') }}"
-               class="h-10 px-4 rounded-xl border border-gray-300 dark:border-gray-700 inline-flex items-center text-sm font-bold">
-                ← Kembali
-            </a>
-
-        </div>
-
-        {{-- STEPPER COMPACT --}}
-            <div class="mt-5 flex items-center justify-between">
-
-                <a href="{{ route('admin.evidences.review.project', $project->id_project) }}"
-                class="flex flex-col items-center w-16">
-                    <div class="w-8 h-8 rounded-full border border-red-500 bg-red-50 text-red-600 flex items-center justify-center text-xs font-bold">
-                        1
-                    </div>
-                    <p class="mt-1 text-[11px] font-bold text-red-600">
-                        Persiapan
-                    </p>
-                </a>
-
-                <div class="flex-1 h-0.5 bg-gray-200 mx-1"></div>
-
-                <a href="{{ route('admin.evidences.review.instalasi', $project->id_project) }}"
-                    class="flex flex-col items-center w-16 opacity-50">
-                    <div class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-xs font-bold">
-                        2
-                    </div>
-                    <p class="mt-1 text-[11px] font-semibold">
-                        Instalasi
-                    </p>
-                </a>
-
-                <div class="flex-1 h-0.5 bg-gray-200 mx-1"></div>
-
-                <a href="{{ route('admin.evidences.review.pengukuran', $project->id_project) }}"
-                    class="flex flex-col items-center w-16 opacity-50">
-                    <div class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-xs font-bold">
-                        3
-                    </div>
-                    <p class="mt-1 text-[11px] font-semibold">
-                        Pengukuran
-                    </p>
-                </a>
-
-                <div class="flex-1 h-0.5 bg-gray-200 mx-1"></div>
-
-                <a href="{{ route('admin.evidences.review.finishing', $project->id_project) }}"
-                    class="flex flex-col items-center w-16 opacity-50">
-                    <div class="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center text-xs font-bold">
-                        4
-                    </div>
-                    <p class="mt-1 text-[11px] font-semibold">
-                        Finish
-                    </p>
-                </a>
-
-            </div>
-
-        </div>
+       {{-- HEADER & STEPPER --}}
+    @include('admin.evidences.partials.stepper')
 
     {{-- Step Title --}}
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">

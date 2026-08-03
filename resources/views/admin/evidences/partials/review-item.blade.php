@@ -1,240 +1,218 @@
 @php
-    $status = $items->first()->status ?? 'pending';
-    $firstItem = $items->first();
+    $total = $items->count();
+    $approvedCount = $items->where('status', 'approved')->count();
+    $rejectedCount = $items->where('status', 'rejected')->count();
+    $pendingCount = $items->where('status', 'pending')->count();
 
-    $photoCount = $items->count();
+    // Logika Status Group
+    $groupStatus = 'pending';
+    if ($rejectedCount > 0) {
+        $groupStatus = 'rejected';
+    } elseif ($approvedCount === $total && $total > 0) {
+        $groupStatus = 'approved';
+    }
 
-    $statusClass = match ($status) {
-        'approved' => 'bg-green-100 text-green-700',
-        'rejected' => 'bg-red-100 text-red-700',
-        default => 'bg-yellow-100 text-yellow-700',
+    $statusClass = match ($groupStatus) {
+        'approved' => 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900',
+        'rejected' => 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:border-red-900',
+        default => 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:border-amber-900',
     };
 
-    $iconClass = match ($status) {
-        'approved' => 'bg-green-100 text-green-700',
-        'rejected' => 'bg-red-100 text-red-700',
-        default => 'bg-yellow-100 text-yellow-700',
-    };
-
-    $iconText = match ($status) {
+    $iconText = match ($groupStatus) {
         'approved' => '✓',
         'rejected' => '×',
         default => $number,
     };
+
+    // Ekstraksi Designator & Detail jika dikirim dari Step 2 (Format dari string description)
+    // Contoh format description dari Step 2: "Designator: [M-xxx] • Plan: 10 m • Aktual: 10 m"
+    // Jika dari Step 1 (Persiapan), variabel ini kosong/normal.
 @endphp
 
 <div x-data="{ open: false }"
-     class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+     class="bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm transition-all">
 
-    {{-- BADGE CARD HEADER --}}
+    {{-- HEADER KATEGORI / DESIGNATOR (JUDUL UTAMA) --}}
     <button type="button"
             @click="open = !open"
-            class="w-full p-4 flex items-center justify-between gap-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+            class="w-full p-5 flex items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
 
-        <div class="flex items-center gap-3 min-w-0">
-
-            <div class="w-8 h-8 rounded-xl {{ $iconClass }} flex items-center justify-center text-xs font-bold shrink-0">
+        <div class="flex items-center gap-4 min-w-0">
+            <div class="w-10 h-10 rounded-2xl border {{ $statusClass }} flex items-center justify-center text-sm font-black shrink-0 shadow-sm">
                 {{ $iconText }}
             </div>
-
             <div class="text-left min-w-0">
-
-                <h3 class="text-sm font-bold text-gray-900 dark:text-white truncate">
+                {{-- JUDUL UTAMA MENAMPILKAN TITLE (YANG DI STEP 2 DIISI DESIGNATOR) --}}
+                <h3 class="text-base font-black text-gray-900 dark:text-white truncate font-mono tracking-tight">
                     {{ $title }}
                 </h3>
-
-                <p class="text-xs text-gray-500 truncate">
-                    {{ $photoCount }} foto
-                    @if($firstItem?->description)
-                        · Note Waspang
-                    @endif
+                <p class="text-xs font-medium text-gray-500 truncate mt-0.5">
+                    Total {{ $total }} Foto · <span class="text-emerald-600 font-bold">{{ $approvedCount }} Approved</span> · <span class="text-amber-600 font-bold">{{ $pendingCount }} Pending</span>
                 </p>
-
-                
-
             </div>
-
         </div>
 
-        <div class="flex items-center gap-2 shrink-0">
-
-            <span class="px-2.5 py-1 rounded-lg text-[11px] font-bold {{ $statusClass }}">
-                {{ ucfirst($status) }}
+        <div class="flex items-center gap-3 shrink-0">
+            <span class="px-3 py-1.5 rounded-xl border text-xs font-black uppercase tracking-wider {{ $statusClass }}">
+                {{ ucfirst($groupStatus) }}
             </span>
-
-            <span class="text-gray-400 text-xs" x-text="open ? '▲' : '▼'"></span>
-
+            <div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 transition-transform duration-300" :class="open ? 'rotate-180' : ''">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
         </div>
-
     </button>
 
-    {{-- DETAIL DROPDOWN --}}
-    <div x-show="open"
-         x-transition
-         class="border-t border-gray-100 dark:border-gray-800">
+    {{-- KONTEN COLLAPSIBLE (MUNCUL SAAT DIKLIK) --}}
+    <div x-show="open" x-collapse x-cloak class="border-t border-gray-100 dark:border-gray-800 bg-slate-50/50 dark:bg-slate-900/50">
+        <div class="p-5 space-y-5">
 
-        <div class="p-4">
+            {{-- JIKA INI STEP 2 (BOQ): TAMPILKAN ITEM NAME, PLAN, & AKTUAL DENGAN JELAS DI ATAS --}}
+            @if(isset($description) && !empty($description))
+                <div class="bg-white dark:bg-gray-950 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/50 shadow-xs space-y-3">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded text-[10px] font-black uppercase tracking-wider">Detail</span>
+                    </div>
+                    
+                    {{-- NAMA ITEM (ITEM_NAME) --}}
+                    <div>
+                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nama Item Material:</p>
+                        <p class="text-sm font-bold text-gray-900 dark:text-white mt-0.5 leading-snug">
+                            {{ $subtitle_item_name ?? $description }}
+                        </p>
+                    </div>
 
-            <p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                {{ $description }}
-            </p>
-
-            {{-- NOTE FROM WASPANG --}}
-            @if($firstItem?->description)
-
-                <div class="mt-3 rounded-xl bg-blue-50 border border-blue-100 p-3">
-
-                    <p class="text-[11px] font-bold text-blue-700 mb-1">
-                        Note Waspang
-                    </p>
-
-                    <p class="text-xs text-blue-900 leading-relaxed">
-                        {{ $firstItem->description }}
-                    </p>
-
+                    {{-- KOTAK INFORMASI PLAN & AKTUAL YANG PALING JELAS --}}
+                    @if(isset($plan) && isset($actual))
+                        <div class="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+                            <div class="bg-slate-50 dark:bg-gray-900 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
+                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Target Plan</p>
+                                <p class="text-sm font-black text-blue-600 dark:text-blue-400 mt-0.5 font-mono">{{ $plan }}</p>
+                            </div>
+                            <div class="bg-slate-50 dark:bg-gray-900 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
+                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Aktual Lapangan</p>
+                                <p class="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">{{ $actual }}</p>
+                            </div>
+                        </div>
+                    @endif
                 </div>
-
             @endif
 
-            {{-- REJECT NOTE --}}
-            @if($status == 'rejected' && $firstItem?->review_note)
+            {{-- HEADER AKSI & BULK APPROVE --}}
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <p class="text-xs text-gray-500 leading-relaxed">
+                    Periksa eviden di bawah ini. Anda dapat melakukan aksi approve/reject per foto atau menyetujui sekaligus.
+                </p>
 
-                <div class="mt-3 rounded-xl bg-red-50 border border-red-100 p-3">
-
-                    <p class="text-[11px] font-bold text-red-700 mb-1">
-                        Note Reject Admin
-                    </p>
-
-                    <p class="text-xs text-red-900 leading-relaxed">
-                        {{ $firstItem->review_note }}
-                    </p>
-
-                </div>
-
-            @endif
-
-            {{-- FOTO --}}
-            <div class="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-4">
-
-                @forelse($items as $evidence)
-
-                    <a href="{{ asset('storage/' . $evidence->file_path) }}"
-                       target="_blank"
-                       class="aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
-
-                        <img src="{{ asset('storage/' . $evidence->file_path) }}"
-                             class="w-full h-full object-cover hover:scale-105 transition-all duration-200">
-
-                    </a>
-
-                @empty
-
-                    <div class="col-span-3 text-xs text-gray-500">
-                        Belum ada foto diupload.
-                    </div>
-
-                @endforelse
-
-            </div>
-
-        </div>
-
-        {{-- ACTION --}}
-        @if($firstItem)
-
-            <div class="border-t border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-950 p-4">
-
-                @if($status == 'approved')
-
-                    <div class="flex items-center justify-between gap-3">
-
-                        <div>
-                            <p class="text-xs font-bold text-green-700">
-                                Eviden disetujui
-                            </p>
-
-                            <p class="text-[11px] text-gray-500 mt-0.5">
-                                Status eviden sudah approved.
-                            </p>
-                        </div>
-
-                        <form method="POST"
-                              action="{{ route('admin.evidences.reset', $firstItem->id_evidence) }}">
-                            @csrf
-
-                            <button class="h-9 px-4 rounded-xl border border-gray-300 dark:border-gray-700 text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-800">
-                                Atur Ulang
-                            </button>
-                        </form>
-
-                    </div>
-
-                @elseif($status == 'rejected')
-
-                    <div class="flex items-center justify-between gap-3">
-
-                        <div>
-                            <p class="text-xs font-bold text-red-700">
-                                Eviden ditolak
-                            </p>
-
-                            <p class="text-[11px] text-gray-500 mt-0.5">
-                                Perlu Upload Ulang / Perbaikan Eviden.
-                            </p>
-                        </div>
-
-                        <form method="POST"
-                              action="{{ route('admin.evidences.reset', $firstItem->id_evidence) }}">
-                            @csrf
-
-                            <button class="h-9 px-4 rounded-xl border border-gray-300 dark:border-gray-700 text-xs font-bold hover:bg-gray-100 dark:hover:bg-gray-800">
-                                Atur Ulang
-                            </button>
-                        </form>
-
-                    </div>
-
-                @else
-
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-
-                        {{-- REJECT FORM --}}
-                        <form method="POST"
-                              action="{{ route('admin.evidences.reject', $firstItem->id_evidence) }}"
-                              class="md:col-span-2">
-                            @csrf
-
-                            <textarea name="review_note"
-                                      rows="2"
-                                      required
-                                      placeholder="Tuliskan reason reject ..."
-                                      class="w-full h-20 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-sm resize-none"></textarea>
-
-                            <button class="mt-2 h-9 w-full rounded-xl border border-red-300 text-red-600 text-xs font-bold hover:bg-red-50">
-                                × Reject
-                            </button>
-
-                        </form>
-
-                        {{-- APPROVE FORM --}}
-                        <form method="POST"
-                              action="{{ route('admin.evidences.approve', $firstItem->id_evidence) }}">
-                            @csrf
-
-                            <button class="w-full h-[116px] rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-bold">
-                                ✓ Approve
-                            </button>
-
-                        </form>
-
-                    </div>
-
+                @if($pendingCount > 0)
+                    <form method="POST" action="{{ route('admin.evidences.bulk-approve') }}">
+                        @csrf
+                        @foreach($items->where('status', 'pending') as $pendingItem)
+                            <input type="hidden" name="evidence_ids[]" value="{{ $pendingItem->id_evidence }}">
+                        @endforeach
+                        
+                        <button type="submit" onclick="return confirm('Approve semua {{ $pendingCount }} eviden pending di kategori ini?')"
+                                class="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2 shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                            Bulk Approval ({{ $pendingCount }})
+                        </button>
+                    </form>
                 @endif
-
             </div>
+                            {{-- GRID FOTO / FILE EVIDEN --}}
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                @forelse($items as $evidence)
+                                    <div class="bg-white dark:bg-gray-950 rounded-[1.5rem] border border-gray-200 dark:border-gray-800 p-2.5 shadow-sm flex flex-col transition-all hover:border-blue-300">
+                                        
+                                        <div class="relative aspect-video rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 group flex items-center justify-center">
+                                            
+                                            {{-- ID BADGE --}}
+                                            <div class="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm text-white text-[10px] font-black px-2 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
+                                                <i class="fa-solid fa-tag text-blue-300"></i>
+                                                ID-{{ $evidence->id_evidence }}
+                                            </div>
 
-        @endif
+                                            {{-- STATUS BADGE --}}
+                                            <div class="absolute top-2 right-2 z-10 text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg backdrop-blur-sm shadow-sm
+                                                {{ $evidence->status == 'approved' ? 'bg-emerald-500/90 text-white' : ($evidence->status == 'rejected' ? 'bg-red-500/90 text-white' : 'bg-amber-500/90 text-white') }}">
+                                                {{ $evidence->status }}
+                                            </div>
 
+                                            {{-- CEK APAkah FILE SOR ATAU FOTO BIASA --}}
+                                            @if(str_ends_with(strtolower($evidence->file_path), '.sor'))
+                                                <a href="{{ asset('storage/' . $evidence->file_path) }}" download class="w-full h-full bg-indigo-50 dark:bg-indigo-950/50 flex flex-col items-center justify-center p-3 text-center group-hover:scale-105 transition-transform">
+                                                    <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-xs mb-1 shadow-sm">SOR</div>
+                                                    <p class="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 truncate w-full px-1">{{ basename($evidence->file_path) }}</p>
+                                                    <span class="text-[9px] text-indigo-500">Klik untuk Download</span>
+                                                </a>
+                                            @else
+                                                <a href="{{ asset('storage/' . $evidence->file_path) }}" target="_blank" class="block w-full h-full">
+                                                    <img src="{{ asset('storage/' . $evidence->file_path) }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                                                </a>
+                                            @endif
+                                        </div>
+
+                                        {{-- NOTE WASPANG PER FOTO --}}
+                                        @if($evidence->description)
+                                            <div class="mt-3 px-2">
+                                                <p class="text-[10px] font-bold text-gray-400 uppercase">Note Waspang:</p>
+                                                <p class="text-xs text-gray-700 dark:text-gray-300 font-medium leading-snug">{{ $evidence->description }}</p>
+                                            </div>
+                                        @endif
+
+                                        {{-- AKSI PER FOTO (Sama seperti sebelumnya) --}}
+                                        <div class="mt-3 flex flex-col flex-1 justify-end" x-data="{ showReject: false }">
+                                            @if($evidence->status == 'approved')
+                                                <div class="px-2 pb-1 flex justify-center">
+                                                    <form method="POST" action="{{ route('admin.evidences.reset', $evidence->id_evidence) }}" onsubmit="return confirm('Batalkan approval eviden ini?')">
+                                                        @csrf
+                                                        <button type="submit" class="h-8 px-4 rounded-full bg-red-100 dark:bg-red-800/40 text-red-700 dark:text-red-300 text-[11px] font-bold hover:bg-red-200 transition shadow-sm">
+                                                            <i class="fa-solid fa-rotate-left mr-1"></i> Batalkan Approval
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            @elseif($evidence->status == 'rejected')
+                                                <div class="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 border border-red-100 dark:border-red-900/50 flex flex-col items-center text-center">
+                                                    <p class="text-[10px] font-black text-red-700 dark:text-red-400 uppercase tracking-wide mb-1">Reason Reject:</p>
+                                                    <p class="text-xs text-red-900 dark:text-red-300 font-medium leading-snug mb-3">{{ $evidence->review_note }}</p>
+                                                    <form method="POST" action="{{ route('admin.evidences.reset', $evidence->id_evidence) }}">
+                                                        @csrf
+                                                        <button type="submit" class="h-8 px-4 rounded-full bg-red-100 dark:bg-red-800/40 text-red-700 dark:text-red-300 text-[11px] font-bold hover:bg-red-200 transition shadow-sm">
+                                                            <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            @else
+                                                <div class="grid grid-cols-2 gap-2" x-show="!showReject">
+                                                    <button type="button" @click="showReject = true" class="h-9 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition border border-red-100">
+                                                        Reject
+                                                    </button>
+                                                    <form method="POST" action="{{ route('admin.evidences.approve', $evidence->id_evidence) }}">
+                                                        @csrf
+                                                        <button type="submit" class="w-full h-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition shadow-sm shadow-emerald-500/20">
+                                                            Approve
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                                <div x-show="showReject" x-collapse x-cloak>
+                                                    <form method="POST" action="{{ route('admin.evidences.reject', $evidence->id_evidence) }}" class="bg-slate-50 dark:bg-gray-900 rounded-xl p-2 border border-slate-200 dark:border-gray-700">
+                                                        @csrf
+                                                        <textarea name="review_note" rows="2" required placeholder="Tuliskan ID foto yang direject (Misal: ID-45 blur)..." class="w-full rounded-lg border-gray-300 dark:border-gray-700 text-xs p-2.5 focus:ring-red-500 focus:border-red-500 resize-none bg-white dark:bg-gray-950"></textarea>
+                                                        <div class="flex items-center gap-2 mt-2">
+                                                            <button type="button" @click="showReject = false" class="flex-1 h-8 rounded-lg bg-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-300 transition">Batal</button>
+                                                            <button type="submit" class="flex-1 h-8 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition">Kirim Reject</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @empty
+                                    <div class="col-span-full py-10 text-center">
+                                        <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-2xl text-slate-400">📊</div>
+                                        <p class="text-sm font-bold text-gray-500">Belum ada file/eviden pengukuran diunggah.</p>
+                                    </div>
+                                @endforelse
+                            </div>
+        </div>
     </div>
-
 </div>
