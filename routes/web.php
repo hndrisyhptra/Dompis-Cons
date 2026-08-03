@@ -372,6 +372,8 @@ Route::middleware(['auth'])->group(function () {
 
      Route::get('/admin/projects/{project}/tracking', [DashboardController::class, 'tracking'])
             ->name('admin.projects.tracking');
+    
+    Route::post('/admin/users/{user}/activate', [App\Http\Controllers\UserManagementController::class, 'activate'])->name('admin.users.activate');
 });
 
 

@@ -138,7 +138,7 @@ class ImportController extends Controller
             $rawProgram = $this->cleanValue($data['program'] ?? null);
             $programFormatted = $rawProgram;
             if ($rawProgram) {
-                $progUpper = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $rawProgram)); // Hapus spasi dan dash sementara
+                $progUpper = strtoupper(preg_replace('/[^a-zA-Z0-9]/', '', $rawProgram)); 
                 if (in_array($progUpper, ['PT2', 'PT02'])) {
                     $programFormatted = 'PT 2';
                 } elseif (in_array($progUpper, ['NODEB', 'NODE0B'])) {
@@ -150,7 +150,6 @@ class ImportController extends Controller
             if (!$pidSap) $rowErrors[] = 'PID SAP wajib diisi';
             if (!$namaLop) $rowErrors[] = 'Nama LOP wajib diisi';
 
-            // PENGECUALIAN DUPLIKASI KHUSUS PT 2 (Multi IHLD = PID Boleh Muncul Berkali-kali, Asalkan IHLD beda)
             if ($pidSap) {
                 $pidSapKey = strtolower(trim($pidSap));
                 $ihldKey = strtolower(trim($idIhld));
@@ -178,18 +177,19 @@ class ImportController extends Controller
 
             $executionType = $this->cleanValue($data['execution_type'] ?? 'kemitraan') ?: 'kemitraan';
             $statusProject = $this->cleanValue($data['status_project'] ?? 'active') ?: 'active';
+            
             if (!in_array($executionType, ['kemitraan', 'swakelola', 'turnkey'])) $executionType = 'kemitraan';
-            if (!in_array($statusProject, ['init', 'active', 'close', 'bast'])) $statusProject = 'active';
+            // UPDATE: Tambahkan 'drop' ke dalam pengecekan validasi import excel
+            if (!in_array($statusProject, ['init', 'active', 'close', 'bast', 'drop'])) $statusProject = 'active';
 
             $pidForProject = $pid ?: $pidSap;
 
-            // 1. UPDATE/CREATE PROJECT (Meskipun baris beda, PID SAP sama = 1 Project)
             $projectPayload = [
                 'customer_id'     => $customerId,
                 'pid'             => $pidForProject,
                 'pid_sap'         => $pidSap,
                 'project_name'    => $namaLop,
-                'program'         => $programFormatted, // Program yg sudah dinormalisasi
+                'program'         => $programFormatted,
                 'branch'          => $this->cleanValue($data['branch'] ?? null),
                 'sto'             => $this->cleanValue($data['sto'] ?? null),
                 'mitra_name'      => $this->cleanValue($data['mitra_name'] ?? null),
@@ -204,19 +204,18 @@ class ImportController extends Controller
 
             if ($project) {
                 $project->update($projectPayload);
-                $projectUpdated++; // Ini mungkin akan bertambah terus jika multi-IHLD, tak masalah.
+                $projectUpdated++;
             } else {
                 $project = \App\Models\Project::create($projectPayload);
                 $projectImported++;
             }
 
-            // 2. INSERT KE TABEL LOP (Tabel Utama)
             $lopPayload = [
-                'project_id' => $project->id_project, // Sesuaikan primary key
+                'project_id' => $project->id_project, 
                 'id_ihld' => $idIhld,
                 'lop_name' => $namaLop,
                 'pid_sap' => $pidSap,
-                'program_sap' => $programFormatted, // Program yg sudah dinormalisasi
+                'program_sap' => $programFormatted, 
                 'tematik' => $this->cleanValue($data['tematik'] ?? null),
                 'sto' => $this->cleanValue($data['sto'] ?? null),
                 'branch' => $this->cleanValue($data['branch'] ?? null),
@@ -231,7 +230,7 @@ class ImportController extends Controller
 
             $lop = null;
             if ($idIhld) {
-                $lop = \App\Models\Lop::where('project_id', $project->id_project) // sesuaikan primary key
+                $lop = \App\Models\Lop::where('project_id', $project->id_project)
                     ->where('id_ihld', $idIhld)
                     ->first();
             }
@@ -293,7 +292,9 @@ class ImportController extends Controller
             'nama_lop' => 'required|string|max:255',
             'program' => 'nullable|string|max:150',
             'execution_type' => 'required|in:kemitraan,swakelola,turnkey',
-            'status_project' => 'required|in:init,active,close,bast',
+            
+            // UPDATE: Tambahkan 'drop' ke dalam aturan validasi
+            'status_project' => 'required|in:init,active,close,bast,drop',
 
             'id_ihld' => 'nullable|string|max:100',
             'tematik' => 'nullable|string|max:150',
@@ -334,7 +335,7 @@ class ImportController extends Controller
                 'mapping_status' => 'auto_matched',
             ]);
         } else {
-            Lop::create([
+            \App\Models\Lop::create([
                 'project_id' => $project->id_project,
                 'id_ihld' => $request->id_ihld,
                 'lop_name' => $request->nama_lop,
@@ -1160,36 +1161,135 @@ class ImportController extends Controller
     {
         $search = $request->search;
 
-        $projects = Project::with('lop')
-            ->when($search, function ($query) use ($search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('pid', 'like', "%{$search}%")
-                        ->orWhere('pid_sap', 'like', "%{$search}%")
-                        ->orWhere('project_name', 'like', "%{$search}%")
-                        ->orWhere('program', 'like', "%{$search}%")
-                        ->orWhere('execution_type', 'like', "%{$search}%")
-                        ->orWhere('status_project', 'like', "%{$search}%");
-                });
-            })
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
+        // 1. Setup Mapping Region (Untuk Filter dan Tabel Rekap)
+        $regions = [
+            'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
+            'JATENG DIY' => ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
+            'BALNUS' => ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES']
+        ];
 
-            $totalPid = Project::count();
+        // 2. Ambil list Program untuk Filter
+        $programs = \App\Models\Project::whereNotNull('program')->where('program', '!=', '')
+            ->distinct()->orderBy('program', 'asc')->pluck('program');
 
-            $totalLop = Lop::count();
+        // ====================================================================
+        // KODE BARU: TABEL MATRIX UNFILTERED (Berdasarkan STATUS PROJECT)
+        // ====================================================================
+        // Diambil dari tabel Project langsung, karena status_project ada di sini
+        $allProjectsUnfiltered = \App\Models\Project::all();
 
-            $sudahAdaBoq = Lop::whereHas('boqItems')->count();
+        $matrixData = [];
+        foreach ($regions as $regionName => $regionBranches) {
+            
+            $regionProjects = $allProjectsUnfiltered->filter(function ($p) use ($regionBranches) {
+                return in_array(strtoupper($p->branch ?? ''), $regionBranches);
+            });
 
-            $belumAdaBoq = Lop::whereDoesntHave('boqItems')->count();
+            $regionProgs = [];
+            foreach ($programs as $prog) {
+                $pProgs = $regionProjects->filter(function($p) use ($prog) { return ($p->program ?? '') === $prog; });
+                $regionProgs[$prog] = [
+                    'init'   => $pProgs->where('status_project', 'init')->count(),
+                    'active' => $pProgs->where('status_project', 'active')->count(),
+                    'close'  => $pProgs->where('status_project', 'close')->count(),
+                    'bast'   => $pProgs->where('status_project', 'bast')->count(),
+                    'drop'   => $pProgs->where('status_project', 'drop')->count(),
+                ];
+            }
+
+            $branchesData = [];
+            foreach ($regionBranches as $bName) {
+                $bProjects = $regionProjects->filter(function($p) use ($bName) { return strtoupper($p->branch ?? '') === $bName; });
+                if ($bProjects->isEmpty()) continue;
+
+                $bProgs = [];
+                foreach ($programs as $prog) {
+                    $bpProgs = $bProjects->filter(function($p) use ($prog) { return ($p->program ?? '') === $prog; });
+                    $bProgs[$prog] = [
+                        'init'   => $bpProgs->where('status_project', 'init')->count(),
+                        'active' => $bpProgs->where('status_project', 'active')->count(),
+                        'close'  => $bpProgs->where('status_project', 'close')->count(),
+                        'bast'   => $bpProgs->where('status_project', 'bast')->count(),
+                        'drop'   => $bpProgs->where('status_project', 'drop')->count(),
+                    ];
+                }
+                $branchesData[] = [
+                    'name' => $bName,
+                    'programs' => $bProgs
+                ];
+            }
+
+            $matrixData[] = [
+                'region' => $regionName,
+                'programs' => $regionProgs,
+                'branches' => $branchesData
+            ];
+        } 
+        // ====================================================================
+
+        // 3. Query Utama dengan Filter
+        $query = \App\Models\Project::with('lop');
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('pid', 'like', "%{$search}%")
+                    ->orWhere('pid_sap', 'like', "%{$search}%")
+                    ->orWhere('project_name', 'like', "%{$search}%")
+                    ->orWhere('program', 'like', "%{$search}%")
+                    ->orWhere('execution_type', 'like', "%{$search}%")
+                    ->orWhere('status_project', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('region')) {
+            $selectedRegion = strtoupper($request->region);
+            if (isset($regions[$selectedRegion])) {
+                $query->whereIn(\Illuminate\Support\Facades\DB::raw('UPPER(branch)'), $regions[$selectedRegion]);
+            }
+        }
+        
+        if ($request->filled('branch')) {
+            $query->whereRaw('UPPER(branch) = ?', [strtoupper($request->branch)]);
+        }
+        
+        if ($request->filled('program')) {
+            $query->where('program', $request->program);
+        }
+        
+        if ($request->filled('status_project')) {
+            $query->where('status_project', $request->status_project);
+        }
+
+       // 4. Hitung KPI Widget Cards secara Dinamis (Berdasarkan Query Filter)
+        $filteredQuery = clone $query;
+        
+        $totalPid = $filteredQuery->count();
+        
+        // NEW: Menghitung total PID (Project) yang sudah memiliki data di tabel boq_items
+        $pidMatchBoq = (clone $filteredQuery)->whereExists(function ($q) {
+            $q->select(\Illuminate\Support\Facades\DB::raw(1))
+              ->from('boq_items')
+              ->whereColumn('boq_items.project_id', 'projects.id_project');
+        })->count();
+        
+        // NEW: Project yang berstatus 'active' saja
+        $projectActive = (clone $filteredQuery)->where('status_project', 'active')->count();
+        
+        // Project yang berstatus 'drop'
+        $projectDrop = (clone $filteredQuery)->where('status_project', 'drop')->count();
+
+        // 5. Eksekusi Data Tabel Pagination
+        $projects = $query->latest('id_project')->paginate(10)->withQueryString();
 
         return view('admin.import.data-pid', compact(
             'projects',
             'search',
+            'programs',
             'totalPid',
-            'totalLop',
-            'sudahAdaBoq',
-            'belumAdaBoq'
+            'pidMatchBoq',    // Variabel Baru
+            'projectActive',  // Variabel Baru
+            'projectDrop',
+            'matrixData'
         ));
     }
 

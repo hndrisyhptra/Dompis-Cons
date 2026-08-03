@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Support\Facades\Validator;
 
 class UserManagementController extends Controller
@@ -14,8 +13,8 @@ class UserManagementController extends Controller
     {
         $search = $request->search;
 
-        $users = User::where('status', 'active')
-            ->when($search, function ($query) use ($search) {
+        // Query dirubah tanpa membatasi hanya status active
+        $users = User::when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('nik', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
@@ -36,7 +35,8 @@ class UserManagementController extends Controller
             'nik' => 'required|string|max:30|unique:users,nik',
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:100|unique:users,username',
-            'role' => 'required|in:admin,waspang,pm',
+            // Update: Tambahkan teknisi dan sdi pada daftar in:
+            'role' => 'required|in:admin,waspang,pm,teknisi,sdi',
             'password' => 'required|string|min:6',
         ]);
 
@@ -46,7 +46,8 @@ class UserManagementController extends Controller
             'username' => $request->username,
             'role' => $request->role,
             'status' => 'active',
-            'password' => $request->password,
+            // Update: Pastikan password di-hash agar user bisa login
+            'password' => Hash::make($request->password),
         ]);
 
         return back()->with('success', 'User berhasil ditambahkan');
@@ -60,7 +61,8 @@ class UserManagementController extends Controller
             'nik' => 'required|string|max:30|unique:users,nik,' . $user->id_user . ',id_user',
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:100|unique:users,username,' . $user->id_user . ',id_user',
-            'role' => 'required|in:admin,waspang,pm',
+            // Update: Tambahkan teknisi dan sdi pada daftar in:
+            'role' => 'required|in:admin,waspang,pm,teknisi,sdi',
             'password' => 'nullable|string|min:6',
         ]);
 
@@ -72,7 +74,8 @@ class UserManagementController extends Controller
         ];
 
         if ($request->filled('password')) {
-            $data['password'] = $request->password;
+            // Update: Pastikan password baru di-hash
+            $data['password'] = Hash::make($request->password);
         }
 
         $user->update($data);
@@ -92,115 +95,127 @@ class UserManagementController extends Controller
     }
 
     public function importCsv(Request $request)
-{
-    $request->validate([
-        'file' => 'required|file|mimes:csv,txt|max:5120',
-    ]);
-
-    $file = $request->file('file');
-    $handle = fopen($file->getRealPath(), 'r');
-
-    if (!$handle) {
-        return back()->with('error', 'File CSV tidak bisa dibaca.');
-    }
-
-    $imported = 0;
-    $skipped = 0;
-    $errors = [];
-
-    /*
-    |--------------------------------------------------------------------------
-    | Format CSV
-    |--------------------------------------------------------------------------
-    | Kolom:
-    | A = nik
-    | B = name
-    | C = username
-    | D = role
-    | E = password
-    |--------------------------------------------------------------------------
-    */
-
-    $rowNumber = 0;
-
-    while (($row = fgetcsv($handle, 10000, ',')) !== false) {
-        $rowNumber++;
-
-        // Skip header baris pertama
-        if ($rowNumber == 1) {
-            continue;
-        }
-
-        $nik = trim((string) ($row[0] ?? ''));
-        $name = trim((string) ($row[1] ?? ''));
-        $username = trim((string) ($row[2] ?? ''));
-        $role = strtolower(trim((string) ($row[3] ?? '')));
-        $password = trim((string) ($row[4] ?? ''));
-
-        if (!$nik && !$name && !$username && !$role && !$password) {
-            continue;
-        }
-
-        $validator = Validator::make([
-            'nik' => $nik,
-            'name' => $name,
-            'username' => $username,
-            'role' => $role,
-            'password' => $password,
-        ], [
-            'nik' => 'required|string|max:30',
-            'name' => 'required|string|max:255',
-            'username' => 'required|string|max:100',
-            'role' => 'required|in:admin,waspang,pm',
-            'password' => 'required|string|min:6',
+    {
+        $request->validate([
+            'file' => 'required|file|mimes:csv,txt|max:5120',
         ]);
 
-        if ($validator->fails()) {
-            $skipped++;
-            $errors[] = 'Baris ' . $rowNumber . ': ' . implode(', ', $validator->errors()->all());
-            continue;
+        $file = $request->file('file');
+        $handle = fopen($file->getRealPath(), 'r');
+
+        if (!$handle) {
+            return back()->with('error', 'File CSV tidak bisa dibaca.');
         }
 
-        // Jika NIK sudah ada, skip
-        $nikExists = User::where('nik', $nik)->exists();
+        $imported = 0;
+        $skipped = 0;
+        $errors = [];
 
-        if ($nikExists) {
-            $skipped++;
-            $errors[] = "Baris {$rowNumber}: NIK {$nik} sudah ada, data dilewati.";
-            continue;
+        /*
+        |--------------------------------------------------------------------------
+        | Format CSV
+        |--------------------------------------------------------------------------
+        | Kolom:
+        | A = nik
+        | B = name
+        | C = username
+        | D = role
+        | E = password
+        |--------------------------------------------------------------------------
+        */
+
+        $rowNumber = 0;
+
+        while (($row = fgetcsv($handle, 10000, ',')) !== false) {
+            $rowNumber++;
+
+            // Skip header baris pertama
+            if ($rowNumber == 1) {
+                continue;
+            }
+
+            $nik = trim((string) ($row[0] ?? ''));
+            $name = trim((string) ($row[1] ?? ''));
+            $username = trim((string) ($row[2] ?? ''));
+            $role = strtolower(trim((string) ($row[3] ?? '')));
+            $password = trim((string) ($row[4] ?? ''));
+
+            if (!$nik && !$name && !$username && !$role && !$password) {
+                continue;
+            }
+
+            $validator = Validator::make([
+                'nik' => $nik,
+                'name' => $name,
+                'username' => $username,
+                'role' => $role,
+                'password' => $password,
+            ], [
+                'nik' => 'required|string|max:30',
+                'name' => 'required|string|max:255',
+                'username' => 'required|string|max:100',
+                // Update: Tambahkan teknisi dan sdi pada daftar in:
+                'role' => 'required|in:admin,waspang,pm,teknisi,sdi',
+                'password' => 'required|string|min:6',
+            ]);
+
+            if ($validator->fails()) {
+                $skipped++;
+                $errors[] = 'Baris ' . $rowNumber . ': ' . implode(', ', $validator->errors()->all());
+                continue;
+            }
+
+            // Jika NIK sudah ada, skip
+            $nikExists = User::where('nik', $nik)->exists();
+
+            if ($nikExists) {
+                $skipped++;
+                $errors[] = "Baris {$rowNumber}: NIK {$nik} sudah ada, data dilewati.";
+                continue;
+            }
+
+            // Jika username sudah ada, skip
+            $usernameExists = User::where('username', $username)->exists();
+
+            if ($usernameExists) {
+                $skipped++;
+                $errors[] = "Baris {$rowNumber}: Username {$username} sudah ada, data dilewati.";
+                continue;
+            }
+
+            User::create([
+                'nik' => $nik,
+                'name' => $name,
+                'username' => $username,
+                'role' => $role,
+                'status' => 'active',
+                'password' => Hash::make($password),
+            ]);
+
+            $imported++;
         }
 
-        // Jika username sudah ada, skip
-        $usernameExists = User::where('username', $username)->exists();
+        fclose($handle);
 
-        if ($usernameExists) {
-            $skipped++;
-            $errors[] = "Baris {$rowNumber}: Username {$username} sudah ada, data dilewati.";
-            continue;
+        $message = "Import CSV selesai. Baru: {$imported}, Skip: {$skipped}.";
+
+        if (!empty($errors)) {
+            return back()
+                ->with('success', $message)
+                ->with('import_errors', array_slice($errors, 0, 10));
         }
 
-        User::create([
-            'nik' => $nik,
-            'name' => $name,
-            'username' => $username,
-            'role' => $role,
+        return back()->with('success', $message);
+    }
+
+    public function activate($id)
+    {
+        $user = User::where('id_user', $id)->firstOrFail();
+
+        $user->update([
             'status' => 'active',
-            'password' => Hash::make($password),
         ]);
 
-        $imported++;
+        return back()->with('success', 'User berhasil diaktifkan kembali!');
     }
-
-    fclose($handle);
-
-    $message = "Import CSV selesai. Baru: {$imported}, Skip: {$skipped}.";
-
-    if (!empty($errors)) {
-        return back()
-            ->with('success', $message)
-            ->with('import_errors', array_slice($errors, 0, 10));
-    }
-
-    return back()->with('success', $message);
-}
 }

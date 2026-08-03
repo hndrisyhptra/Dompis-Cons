@@ -23,17 +23,53 @@
     </div>
 </div>
 
-{{-- Filter Panel Utama (Program & Branch) --}}
+{{-- Filter Panel Utama (Region, Branch & Program) --}}
 <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 p-5 mb-8 shadow-xs">
     <form method="GET" action="{{ route('admin.rekap_progress') }}" id="filterForm">
-        {{-- Input hidden agar ketika ganti filter, limit per_page tidak reset ke 10 --}}
         <input type="hidden" name="per_page" value="{{ request('per_page', 10) }}">
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-end">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 items-end">
+            
+            {{-- Region Filter --}}
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    <i class="fa-solid fa-map-location-dot mr-1 text-gray-300"></i> Region
+                </label>
+                <div class="relative">
+                    <select name="region" id="regionSelect" onchange="updateBranchDropdown(); document.getElementById('filterForm').submit();"
+                            class="w-full h-11 pl-4 pr-10 appearance-none rounded-xl bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 text-sm font-medium text-gray-800 dark:text-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer">
+                        <option value="">Semua Region</option>
+                        <option value="JATIM" {{ request('region') == 'JATIM' ? 'selected' : '' }}>JATIM</option>
+                        <option value="JATENG DIY" {{ request('region') == 'JATENG DIY' ? 'selected' : '' }}>JATENG DIY</option>
+                        <option value="BALNUS" {{ request('region') == 'BALNUS' ? 'selected' : '' }}>BALNUS</option>
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400 text-xs">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Branch Filter --}}
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    <i class="fa-solid fa-code-branch mr-1 text-gray-300"></i> Branch
+                </label>
+                <div class="relative">
+                    <select name="branch" id="branchSelect" onchange="document.getElementById('filterForm').submit()"
+                            class="w-full h-11 pl-4 pr-10 appearance-none rounded-xl bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 text-sm font-medium text-gray-800 dark:text-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer">
+                        <option value="">Semua Branch</option>
+                        {{-- Opsi branch akan diisi otomatis via JS berdasarkan Region --}}
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400 text-xs">
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </div>
+                </div>
+            </div>
+
             {{-- Program Filter --}}
             <div class="space-y-1.5">
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                    <i class="fa-solid fa-diagram-project mr-1 text-gray-300"></i> Pilih Program
+                    <i class="fa-solid fa-diagram-project mr-1 text-gray-300"></i> Program
                 </label>
                 <div class="relative">
                     <select name="program" onchange="document.getElementById('filterForm').submit()"
@@ -50,21 +86,18 @@
                     </div>
                 </div>
             </div>
-
-            {{-- Branch Filter --}}
+            {{-- Status Filter --}}
             <div class="space-y-1.5">
                 <label class="block text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                    <i class="fa-solid fa-code-branch mr-1 text-gray-300"></i> Pilih Branch
+                    <i class="fa-solid fa-spinner mr-1 text-gray-300"></i> Status
                 </label>
                 <div class="relative">
-                    <select name="branch" onchange="document.getElementById('filterForm').submit()"
+                    <select name="status" onchange="document.getElementById('filterForm').submit()"
                             class="w-full h-11 pl-4 pr-10 appearance-none rounded-xl bg-gray-50 dark:bg-gray-950/40 border border-gray-200 dark:border-gray-800 text-sm font-medium text-gray-800 dark:text-gray-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer">
-                        <option value="">Semua Branch</option>
-                        @foreach($branches as $branch)
-                            <option value="{{ $branch }}" {{ request('branch') == $branch ? 'selected' : '' }}>
-                                {{ $branch }}
-                            </option>
-                        @endforeach
+                        <option value="">Semua Status</option>
+                        <option value="preparation" {{ request('status') == 'preparation' ? 'selected' : '' }}>Prepare</option>
+                        <option value="instalasi" {{ request('status') == 'instalasi' ? 'selected' : '' }}>On Progress</option>
+                        <option value="finishing" {{ request('status') == 'finishing' ? 'selected' : '' }}>Finish</option>
                     </select>
                     <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-400 text-xs">
                         <i class="fa-solid fa-chevron-down"></i>
@@ -73,7 +106,7 @@
             </div>
 
             {{-- Reset Button --}}
-            @if(request('program') || request('branch') || request('per_page'))
+            @if(request('program') || request('branch') || request('region') || request('status') || request('per_page'))
                 <div>
                     <a href="{{ route('admin.rekap_progress') }}" 
                        class="inline-flex items-center justify-center h-11 px-5 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors w-full sm:w-auto">
@@ -85,68 +118,63 @@
     </form>
 </div>
 
-{{-- Infographic Cards Widget --}}
-<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-8">
-    {{-- Total Segmen --}}
+{{-- Infographic Cards Widget (Diperbarui jadi 4 Card Sesuai Permintaan) --}}
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    
+    {{-- Card 1: Total LOP --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center text-lg shadow-xs">
+        <div class="w-12 h-12 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 rounded-xl flex items-center justify-center text-lg shadow-xs shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bookmark-icon lucide-bookmark">
                 <path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"/></svg>
         </div>
         <div>
-            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Segmen</p>
-            <h3 class="text-2xl font-black text-gray-900 dark:text-white mt-0.5">{{ $totalSegments }} <span class="text-xs font-medium text-gray-400">Segmen</span></h3>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total LOP</p>
+            <h3 class="text-2xl font-black text-gray-900 dark:text-white mt-0.5">{{ $totalSegments }} <span class="text-xs font-medium text-gray-400">Berkas</span></h3>
         </div>
     </div>
     
-    {{-- Total Panjang FO --}}
+    {{-- Card 2: Total Nilai BOQ (KHS) --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 rounded-xl flex items-center justify-center text-lg shadow-xs">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-network-icon lucide-network">
-                <rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+        <div class="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center text-lg shadow-xs shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-wallet"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
         </div>
         <div>
-            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Panjang FO</p>
-            <h3 class="text-xl font-black text-gray-900 dark:text-white mt-0.5">{{ number_format($totalKabelPlan, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">m</span></h3>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Nilai</p>
+            <h3 class="text-lg font-black text-gray-900 dark:text-white mt-0.5">Rp {{ number_format($totalNilaiBoq ?? 0, 0, ',', '.') }}</h3>
         </div>
     </div>
     
-    {{-- Aktual Penarikan FO --}}
+    {{-- Card 3: Target & Aktual FO (Digabung) --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-amber-500 text-white rounded-xl flex items-center justify-center text-lg shadow-xs">
+        <div class="w-12 h-12 bg-amber-500 text-white rounded-xl flex items-center justify-center text-lg shadow-xs shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-network-icon lucide-network">
                 <rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
         </div>
         <div class="w-full">
-            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Aktual Penarikan FO</p>
-            <div class="flex items-baseline justify-between gap-2 mt-0.5">
-                <h3 class="text-xl font-black text-gray-900 dark:text-white">{{ number_format($totalKabelActual, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">m</span></h3>
-                <span class="text-xs font-extrabold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded-md">{{ number_format($totalKabelPersen, 1, ',', '.') }}%</span>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Penarikan FO (Target / Aktual)</p>
+            <div class="flex items-baseline justify-between gap-1 mt-1">
+                <h3 class="text-base font-black text-gray-900 dark:text-white">
+                    {{ number_format($totalKabelPlan, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400 mr-1">m</span> / 
+                    <span class="text-sm font-bold text-gray-500">{{ number_format($totalKabelActual, 0, ',', '.') }}<span class="font-normal text-[10px]">m</span></span>
+                </h3>
+                <span class="text-xs font-extrabold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-md">{{ number_format($totalKabelPersen, 1, ',', '.') }}%</span>
             </div>
         </div>
     </div>
     
-    {{-- Total Target Tiang --}}
+    {{-- Card 4: Target & Aktual Tiang (Digabung) --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-green-50 dark:bg-green-950/40 text-green-600 dark:text-green-400 rounded-xl flex items-center justify-center text-lg shadow-xs">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utility-pole-icon lucide-utility-pole"><path d="M12 2v20"/><path d="M2 5h20"/><path d="M3 3v2"/><path d="M7 3v2"/><path d="M17 3v2"/><path d="M21 3v2"/><path d="m19 5-7 7-7-7"/></svg>
-        </div>
-        <div>
-            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Target Tiang</p>
-            <h3 class="text-xl font-black text-gray-900 dark:text-white mt-0.5">{{ number_format($totalTiangPlan, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">pcs</span></h3>
-        </div>
-    </div>
-    
-    {{-- Aktual Tanam Tiang --}}
-    <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs flex items-center gap-4">
-        <div class="w-12 h-12 bg-green-500 text-white rounded-xl flex items-center justify-center text-lg shadow-xs">
+        <div class="w-12 h-12 bg-green-500 text-white rounded-xl flex items-center justify-center text-lg shadow-xs shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utility-pole-icon lucide-utility-pole"><path d="M12 2v20"/><path d="M2 5h20"/><path d="M3 3v2"/><path d="M7 3v2"/><path d="M17 3v2"/><path d="M21 3v2"/><path d="m19 5-7 7-7-7"/></svg>
         </div>
         <div class="w-full">
-            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Total Aktual Tanam Tiang</p>
-            <div class="flex items-baseline justify-between gap-2 mt-0.5">
-                <h3 class="text-xl font-black text-gray-900 dark:text-white">{{ number_format($totalTiangActual, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400">pcs</span></h3>
-                <span class="text-xs font-extrabold text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/60 px-1.5 py-0.5 rounded-md">{{ number_format($totalTiangPersen, 1, ',', '.') }}%</span>
+            <p class="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Tanam Tiang (Target / Aktual)</p>
+            <div class="flex items-baseline justify-between gap-1 mt-1">
+                <h3 class="text-base font-black text-gray-900 dark:text-white">
+                    {{ number_format($totalTiangPlan, 0, ',', '.') }} <span class="text-xs font-medium text-gray-400 mr-1">pcs</span> / 
+                    <span class="text-sm font-bold text-gray-500">{{ number_format($totalTiangActual, 0, ',', '.') }}<span class="font-normal text-[10px]">pcs</span></span>
+                </h3>
+                <span class="text-xs font-extrabold text-green-600 bg-green-50 px-1.5 py-0.5 rounded-md">{{ number_format($totalTiangPersen, 1, ',', '.') }}%</span>
             </div>
         </div>
     </div>
@@ -161,7 +189,7 @@
         {{-- Table Header & Per-Page Selector (Di Atas Tabel) --}}
         <div class="p-5 border-b border-gray-100 dark:border-gray-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h2 class="font-bold text-gray-900 dark:text-white text-sm uppercase tracking-wider flex items-center gap-2">
-                <i class="fa-solid fa-table-list text-blue-600"></i> Detail Progres Per Segmen LOP
+                <i class="fa-solid fa-table-list text-blue-600"></i> Detail Progres Per LOP
             </h2>
             
             {{-- Per Page Form Selector --}}
@@ -385,8 +413,8 @@
 </div>
 
 {{-- Bottom Gauge Section --}}
-<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-    {{-- Gauge FO --}}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+    {{-- Gauge FO (Dinamis Berdasarkan Filter) --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 flex flex-col items-center justify-center shadow-xs">
         <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Persentase Penarikan FO</h4>
         <div class="w-40 h-24 relative">
@@ -400,7 +428,7 @@
         </p>
     </div>
 
-    {{-- Gauge Tiang --}}
+    {{-- Gauge Tiang (Dinamis Berdasarkan Filter) --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 flex flex-col items-center justify-center shadow-xs">
         <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Persentase Tanam Tiang</h4>
         <div class="w-40 h-24 relative">
@@ -416,7 +444,7 @@
 
     {{-- Line Graph Bulanan --}}
     <div class="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs">
-        <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Tren Progres Lapangan (2026)</h4>
+        <h4 class="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4">Tren Progres (Simulasi)</h4>
         <div class="h-32">
             <canvas id="lineMonthly"></canvas>
         </div>
@@ -477,14 +505,26 @@
         options: { rotation: -90, circumference: 180, cutout: '82%', plugins: { legend: { display: false } }, maintainAspectRatio: false }
     });
 
-    // 4. Line Chart Tren Bulanan
+    // 4. Line Chart Tren Bulanan (Dibuat skala proporsional dinamis dari Persentase)
+    // Formula agar grafik selalu berujung pada nilai persen terbaru
+    let pk = kabelPersen;
+    let pt = tiangPersen;
+    
     new Chart(document.getElementById('lineMonthly'), {
         type: 'line',
         data: {
             labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'],
             datasets: [
-                { label: 'FO (%)', data: [12, 18, 25, 38, 50, {{ min($totalKabelPersen, 100) }}], borderColor: '#F59E0B', backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, borderWidth: 2 },
-                { label: 'Tiang (%)', data: [18, 24, 35, 50, 62, {{ min($totalTiangPersen, 100) }}], borderColor: '#10B981', backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, borderWidth: 2 }
+                { 
+                    label: 'FO (%)', 
+                    data: [pk * 0.15, pk * 0.35, pk * 0.5, pk * 0.75, pk * 0.9, pk], 
+                    borderColor: '#F59E0B', backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, borderWidth: 2 
+                },
+                { 
+                    label: 'Tiang (%)', 
+                    data: [pt * 0.2, pt * 0.4, pt * 0.6, pt * 0.8, pt * 0.95, pt], 
+                    borderColor: '#10B981', backgroundColor: 'transparent', tension: 0.3, pointRadius: 3, borderWidth: 2 
+                }
             ]
         },
         options: { 
@@ -500,22 +540,60 @@
 </script>
 
 <script>
-    // Fungsi untuk mengubah jumlah baris tanpa menghilangkan filter pencarian aktif
     function updatePerPage(val) {
-        // Cari input per_page tersembunyi di form filter atas
         const filterForm = document.getElementById('filterForm');
         const perPageInput = filterForm.querySelector('input[name="per_page"]');
-        
         if (perPageInput) {
             perPageInput.value = val;
-            filterForm.submit(); // Submit ulang form beserta parameter yang aktif
+            filterForm.submit();
         } else {
-            // Fallback (jika form tidak ada)
             const url = new URL(window.location.href);
             url.searchParams.set('per_page', val);
             window.location.href = url.href;
         }
     }
+</script>
+
+<script>
+    // Data Mapping Region ke Branch (Baku / Uppercase)
+    const regionMapping = {
+        'JATIM': ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
+        'JATENG DIY': ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
+        'BALNUS': ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES']
+    };
+
+    function updateBranchDropdown() {
+        const regionSelect = document.getElementById('regionSelect');
+        const branchSelect = document.getElementById('branchSelect');
+        
+        // Pastikan nilai pencarian selalu uppercase
+        const selectedRegion = regionSelect.value.toUpperCase(); 
+        const currentBranch = "{{ request('branch') }}".toUpperCase(); 
+        
+        // Bersihkan opsi lama
+        branchSelect.innerHTML = '<option value="">Semua Branch</option>';
+        
+        // Isi dengan opsi baru jika region dipilih
+        if (selectedRegion && regionMapping[selectedRegion]) {
+            regionMapping[selectedRegion].forEach(function(branch) {
+                let option = document.createElement('option');
+                option.value = branch; 
+                option.text = branch;
+                
+                // Pengecekan case-insensitive (sama-sama uppercase)
+                if(branch.toUpperCase() === currentBranch) {
+                    option.selected = true;
+                }
+                
+                branchSelect.appendChild(option);
+            });
+        }
+    }
+
+    // Jalankan saat halaman pertama kali diload
+    document.addEventListener("DOMContentLoaded", function() {
+        updateBranchDropdown();
+    });
 </script>
 
 @endsection
