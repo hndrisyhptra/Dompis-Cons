@@ -49,8 +49,7 @@ class DashboardController extends Controller
                 'project.boqItems.designatorDataByCode',
             ]);
 
-            // --- KODE BARU: DATA MATRIX UNFILTERED (TIDAK TERPENGARUH DROPDOWN) ---
-            // Kita abaikan project yang berstatus 'drop' agar tidak merusak angka matriks progress
+            // --- DATA MATRIX UNFILTERED (DIPERBARUI DENGAN LOGIKA GOLIVE PT2) ---
             $allLopsUnfiltered = \App\Models\Lop::with('project')
                 ->whereHas('project', function($q) {
                     $q->where('status_project', '!=', 'drop');
@@ -59,20 +58,51 @@ class DashboardController extends Controller
             $matrixData = [];
             foreach ($regions as $regionName => $regionBranches) {
                 
-                // Ambil semua LOP di Region tersebut
                 $regionLopsUnfiltered = $allLopsUnfiltered->filter(function ($lop) use ($regionBranches) {
                     return in_array(strtoupper($lop->branch ?? ''), $regionBranches);
                 });
+
+                // Helper function untuk menghitung status secara akurat (Termasuk PT2 Go-Live)
+                $calcMatrixStatus = function($lopsCollection) {
+                    $prep = 0;
+                    $inst = 0;
+                    $fin  = 0;
+
+                    foreach ($lopsCollection as $l) {
+                        $proj = $l->project;
+                        if (!$proj) continue;
+
+                        // JIKA PT2 DAN SUDAH GOLIVE -> OTOMATIS MASUK KATEGORI FINISH (COMPLETE)
+                        if ($proj->is_golive == 1) {
+                            $fin++;
+                            continue;
+                        }
+
+                        // JIKA REGULER ATAU BELUM GOLIVE -> IKUTI STATUS PROGRESS LOP
+                        if ($l->status_progress === 'preparation') {
+                            $prep++;
+                        } elseif ($l->status_progress === 'instalasi') {
+                            $inst++;
+                        } elseif ($l->status_progress === 'finishing') {
+                            $fin++;
+                        } else {
+                            // Fallback default jika kosong
+                            $prep++;
+                        }
+                    }
+
+                    return [
+                        'preparation' => $prep,
+                        'instalasi'   => $inst,
+                        'finishing'   => $fin,
+                    ];
+                };
 
                 // Hitung per Program untuk Region utama
                 $regionProgs = [];
                 foreach ($programs as $prog) {
                     $pLops = $regionLopsUnfiltered->filter(function($l) use ($prog) { return ($l->project->program ?? '') === $prog; });
-                    $regionProgs[$prog] = [
-                        'preparation' => $pLops->where('status_progress', 'preparation')->count(),
-                        'instalasi'   => $pLops->where('status_progress', 'instalasi')->count(),
-                        'finishing'   => $pLops->where('status_progress', 'finishing')->count(),
-                    ];
+                    $regionProgs[$prog] = $calcMatrixStatus($pLops);
                 }
 
                 // Hitung per Program untuk sub-Branch
@@ -80,16 +110,12 @@ class DashboardController extends Controller
                 foreach ($regionBranches as $bName) {
                     $bLops = $regionLopsUnfiltered->filter(function($l) use ($bName) { return strtoupper($l->branch ?? '') === $bName; });
                     
-                    if ($bLops->isEmpty()) continue; // Jangan tampilkan branch jika kosong
+                    if ($bLops->isEmpty()) continue;
 
                     $bProgs = [];
                     foreach ($programs as $prog) {
                         $bpLops = $bLops->filter(function($l) use ($prog) { return ($l->project->program ?? '') === $prog; });
-                        $bProgs[$prog] = [
-                            'preparation' => $bpLops->where('status_progress', 'preparation')->count(),
-                            'instalasi'   => $bpLops->where('status_progress', 'instalasi')->count(),
-                            'finishing'   => $bpLops->where('status_progress', 'finishing')->count(),
-                        ];
+                        $bProgs[$prog] = $calcMatrixStatus($bpLops);
                     }
                     $branchesData[] = [
                         'name' => $bName,
@@ -102,7 +128,7 @@ class DashboardController extends Controller
                     'programs' => $regionProgs,
                     'branches' => $branchesData
                 ];
-            } 
+            }
             
             // ================= TERAPKAN FILTER =================
             if ($request->filled('program')) {
@@ -162,11 +188,25 @@ class DashboardController extends Controller
 
             $completedApproval = $lops->filter(function ($lop) {
                 if (!$lop->project) return false;
+                
+                // LOGIKA BARU: Jika PT2 dan is_golive == 1, maka dianggap 100%
+                if ($lop->project->is_golive == 1) return true;
+
+                // Jika Reguler, cek progress 100%
                 $summary = $lop->project->progressSummary();
                 return $summary['progress'] == 100;
             })->count();
 
-            $onProgress = max($assignedLop - $completedApproval, 0);
+            // Ubah cara hitung On Progress agar tidak double-count dengan yang sudah Go-Live
+            $onProgress = $lops->filter(function ($lop) {
+                if (!$lop->project) return false;
+                
+                // Jika sudah Go-Live, tidak masuk On Progress
+                if ($lop->project->is_golive == 1) return false;
+
+                $summary = $lop->project->progressSummary();
+                return $summary['progress'] > 0 && $summary['progress'] < 100;
+            })->count();
             $completionRate = $totalLop > 0 ? round(($completedApproval / $totalLop) * 100) : 0;
 
             // Evidence & BOQ Global Summary (Tidak terpengaruh filter LOP, bersifat global)
@@ -197,11 +237,27 @@ class DashboardController extends Controller
                 $calcStats = function ($items) {
                     $total = $items->count();
                     $assigned = $items->filter(function ($lop) { return $lop->project?->assignment; })->count();
-                    $completed = $items->filter(function ($lop) { return ($lop->project?->progressSummary()['progress'] ?? 0) == 100; })->count();
+                    
+                    $completed = $items->filter(function ($lop) { 
+                        if (!$lop->project) return false;
+
+                        // LOGIKA BARU: Jika PT2 dan sudah Go-Live, hitung sebagai Complete
+                        if ($lop->project->is_golive == 1) return true;
+
+                        // Jika Reguler, cek apakah progress summary 100%
+                        return ($lop->project?->progressSummary()['progress'] ?? 0) == 100; 
+                    })->count();
+
                     $waiting = $items->filter(function ($lop) {
+                        if (!$lop->project) return false;
+
+                        // Jika sudah Go-Live, tidak masuk hitungan In Review (Waiting)
+                        if ($lop->project->is_golive == 1) return false;
+
                         $prog = $lop->project?->progressSummary()['progress'] ?? 0;
                         return $prog > 0 && $prog < 100;
                     })->count();
+
                     $percent = $total > 0 ? round(($completed / $total) * 100) : 0;
                     return compact('total', 'assigned', 'waiting', 'completed', 'percent');
                 };

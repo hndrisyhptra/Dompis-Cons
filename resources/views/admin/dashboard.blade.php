@@ -5,6 +5,13 @@
 @php
     $completionRate = $completionRate ?? 0;
 
+    // Cek apakah user sedang memfilter program PT2 (bisa mencakup 'PT 2', 'PT2', dll)
+    $selectedProgram = strtoupper(request('program', ''));
+    $isPt2Selected = str_contains($selectedProgram, 'PT2') || str_contains($selectedProgram, 'PT 2') || str_contains($selectedProgram, 'PT-2');
+
+    // Hitung total PT2 Go-Live
+    $totalGolivePt2 = \App\Models\Project::where('is_golive', 1)->count();
+
     $mainCards = [
         [
             'label' => 'Total LOP',
@@ -44,12 +51,18 @@
         ],
     ];
 
-    $evidenceCards = [
-        ['label' => 'Total Evidence', 'value' => $totalEvidence ?? 0, 'color' => 'slate'],
-        ['label' => 'Pending', 'value' => $pendingEvidence ?? 0, 'color' => 'amber'],
-        ['label' => 'Approved', 'value' => $approvedEvidence ?? 0, 'color' => 'emerald'],
-        ['label' => 'Rejected', 'value' => $rejectedEvidence ?? 0, 'color' => 'red'],
-    ];
+    // Jika filter program PT2 dipilih, masukkan kartu Go-Live ke dalam array kartu utama
+    if ($isPt2Selected) {
+        $mainCards[] = [
+            'label' => 'PT2 Go-Live',
+            'value' => $totalGolivePt2,
+            'desc' => 'Approval Golive by SDI',
+            'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-check-icon lucide-shield-check"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>',
+            'border' => 'border-indigo-300',
+            'text' => 'text-indigo-800',
+            'bg' => 'bg-indigo-100/60',
+        ];
+    }
 @endphp
 
 <div class="min-h-screen bg-slate-50 dark:bg-slate-950 -m-4 md:-m-6 p-4 md:p-6">
@@ -140,8 +153,8 @@
             </form>
         </div>
 
-        {{-- MAIN KPI --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {{-- MAIN KPI (DISESUAIKAN MENJADI 5 GRID) --}}
+       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-{{ count($mainCards) }} gap-4">
             @foreach($mainCards as $card)
                 <div class="rounded-3xl bg-white dark:bg-slate-900 border {{ $card['border'] }} dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition">
                     <div class="flex items-center justify-between gap-4">
@@ -150,7 +163,7 @@
                             <p class="text-3xl font-black {{ $card['text'] }} dark:text-white mt-2">{{ number_format($card['value']) }}</p>
                             <p class="text-xs text-slate-500 mt-1">{{ $card['desc'] }}</p>
                         </div>
-                        <div class="w-14 h-14 rounded-2xl {{ $card['bg'] }} flex items-center justify-center text-2xl">
+                        <div class="w-14 h-14 rounded-2xl {{ $card['bg'] }} flex items-center justify-center text-2xl shrink-0">
                             {!! $card['icon'] !!}
                         </div>
                     </div>
@@ -208,7 +221,6 @@
                     </thead>
                     <tbody class="divide-y divide-slate-200/60">
                         @forelse($statsByRegion ?? [] as $i => $reg)
-                            {{-- Baris Utama Region (Bisa diklik) --}}
                             <tr class="cursor-pointer bg-white hover:bg-slate-50 transition" onclick="toggleRegion('region-{{ $i }}', 'icon-{{ $i }}')">
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
@@ -232,7 +244,6 @@
                                 </td>
                             </tr>
                             
-                            {{-- Baris Anak Branch (Disembunyikan secara default) --}}
                             @foreach($reg['branches'] as $br)
                                 <tr class="hidden bg-slate-50/50 hover:bg-slate-100/50 transition region-{{ $i }}">
                                     <td class="px-6 py-3 pl-[3.25rem]">
@@ -275,7 +286,6 @@
                                 Wilayah (Region / Branch)
                             </th>
                             @foreach($programs ?? [] as $prog)
-                                {{-- Ubah colspan menjadi 4 untuk memuat kolom persentase --}}
                                 <th colspan="4" class="px-3 py-2 text-center border-b border-r border-slate-200/60 whitespace-nowrap">{{ $prog }}</th>
                             @endforeach
                         </tr>
@@ -290,7 +300,6 @@
                     </thead>
                     <tbody class="divide-y divide-slate-200/60">
                         @forelse($matrixData ?? [] as $i => $reg)
-                            {{-- Baris Utama Region --}}
                             <tr class="cursor-pointer bg-white hover:bg-slate-50 transition group" onclick="toggleRegion('matrix-reg-{{ $i }}', 'icon-matrix-{{ $i }}')">
                                 <td class="px-6 py-4 border-r border-slate-200/60 sticky left-0 bg-white group-hover:bg-slate-50 z-10">
                                     <div class="flex items-center gap-3">
@@ -301,7 +310,6 @@
                                     </div>
                                 </td>
                                 
-                                {{-- Loop Data Program --}}
                                 @foreach($programs as $prog)
                                     @php 
                                         $stats = $reg['programs'][$prog]; 
@@ -315,7 +323,6 @@
                                 @endforeach
                             </tr>
                             
-                            {{-- Baris Anak Branch --}}
                             @foreach($reg['branches'] as $br)
                                 <tr class="hidden bg-slate-50/50 hover:bg-slate-100/50 transition matrix-reg-{{ $i }} group-branch">
                                     <td class="px-6 py-3 pl-[3.25rem] border-r border-slate-200/60 sticky left-0 bg-slate-50/90 z-10">
@@ -337,7 +344,6 @@
                             @endforeach
                         @empty
                             <tr>
-                                {{-- Colspan dinamis menyesuaikan jumlah program dikali 4 kolom + 1 kolom wilayah --}}
                                 <td colspan="{{ 1 + (count($programs ?? []) * 4) }}" class="px-6 py-10 text-center text-slate-400 font-medium">
                                     Tidak ada data project terdaftar.
                                 </td>
@@ -350,9 +356,7 @@
 
 {{-- SCRIPT FILTER & COLLAPSIBLE --}}
 <script>
-    // 1. Script Collapsible Table Region
     function toggleRegion(regionClass, iconId) {
-        // Toggle Rows
         const rows = document.querySelectorAll('.' + regionClass);
         let isHidden = false;
         rows.forEach(row => {
@@ -364,7 +368,6 @@
             }
         });
 
-        // Rotate Icon (Chevron)
         const icon = document.getElementById(iconId);
         if (icon) {
             if (isHidden) {
@@ -379,7 +382,6 @@
         }
     }
 
-    // 2. Script Sinkronisasi Region dan Branch
     const regionMapping = {
         'JATIM': ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
         'JATENG DIY': ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
