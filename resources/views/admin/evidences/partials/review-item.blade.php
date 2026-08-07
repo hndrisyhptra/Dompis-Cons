@@ -21,12 +21,14 @@
     $iconText = match ($groupStatus) {
         'approved' => '✓',
         'rejected' => '×',
-        default => $number,
+        default => $number ?? 1,
     };
 
-    // Ekstraksi Designator & Detail jika dikirim dari Step 2 (Format dari string description)
-    // Contoh format description dari Step 2: "Designator: [M-xxx] • Plan: 10 m • Aktual: 10 m"
-    // Jika dari Step 1 (Persiapan), variabel ini kosong/normal.
+    // =========================================================================
+    // DYNAMIC ROUTE PREFIX: Deteksi apakah ini diakses dari halaman PT2
+    // =========================================================================
+    $isPt2 = $isPt2 ?? false; // Default false (Reguler)
+    $routePrefix = $isPt2 ? 'admin.pt2.evidence.' : 'admin.evidences.';
 @endphp
 
 <div x-data="{ open: false }"
@@ -42,7 +44,6 @@
                 {{ $iconText }}
             </div>
             <div class="text-left min-w-0">
-                {{-- JUDUL UTAMA MENAMPILKAN TITLE (YANG DI STEP 2 DIISI DESIGNATOR) --}}
                 <h3 class="text-base font-black text-gray-900 dark:text-white truncate font-mono tracking-tight">
                     {{ $title }}
                 </h3>
@@ -66,8 +67,8 @@
     <div x-show="open" x-collapse x-cloak class="border-t border-gray-100 dark:border-gray-800 bg-slate-50/50 dark:bg-slate-900/50">
         <div class="p-5 space-y-5">
 
-            {{-- JIKA INI STEP 2 (BOQ): TAMPILKAN ITEM NAME, PLAN, & AKTUAL DENGAN JELAS DI ATAS --}}
-            @if(isset($description) && !empty($description))
+            {{-- JIKA INI STEP 2/4 (BOQ): TAMPILKAN ITEM NAME, PLAN, & AKTUAL DENGAN JELAS DI ATAS --}}
+            @if(isset($description) && !empty($description) && $description !== 'ada')
                 <div class="bg-white dark:bg-gray-950 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/50 shadow-xs space-y-3">
                     <div class="flex items-center gap-2">
                         <span class="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded text-[10px] font-black uppercase tracking-wider">Detail</span>
@@ -104,7 +105,8 @@
                 </p>
 
                 @if($pendingCount > 0)
-                    <form method="POST" action="{{ route('admin.evidences.bulk-approve') }}">
+                    {{-- MENGGUNAKAN DYNAMIC ROUTE --}}
+                    <form method="POST" action="{{ route($routePrefix . 'bulk-approve') }}">
                         @csrf
                         @foreach($items->where('status', 'pending') as $pendingItem)
                             <input type="hidden" name="evidence_ids[]" value="{{ $pendingItem->id_evidence }}">
@@ -118,101 +120,102 @@
                     </form>
                 @endif
             </div>
-                            {{-- GRID FOTO / FILE EVIDEN --}}
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                @forelse($items as $evidence)
-                                    <div class="bg-white dark:bg-gray-950 rounded-[1.5rem] border border-gray-200 dark:border-gray-800 p-2.5 shadow-sm flex flex-col transition-all hover:border-blue-300">
-                                        
-                                        <div class="relative aspect-video rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 group flex items-center justify-center">
-                                            
-                                            {{-- ID BADGE --}}
-                                            <div class="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm text-white text-[10px] font-black px-2 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
-                                                <i class="fa-solid fa-tag text-blue-300"></i>
-                                                ID-{{ $evidence->id_evidence }}
-                                            </div>
 
-                                            {{-- STATUS BADGE --}}
-                                            <div class="absolute top-2 right-2 z-10 text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg backdrop-blur-sm shadow-sm
-                                                {{ $evidence->status == 'approved' ? 'bg-emerald-500/90 text-white' : ($evidence->status == 'rejected' ? 'bg-red-500/90 text-white' : 'bg-amber-500/90 text-white') }}">
-                                                {{ $evidence->status }}
-                                            </div>
-
-                                            {{-- CEK APAkah FILE SOR ATAU FOTO BIASA --}}
-                                            @if(str_ends_with(strtolower($evidence->file_path), '.sor'))
-                                                <a href="{{ asset('storage/' . $evidence->file_path) }}" download class="w-full h-full bg-indigo-50 dark:bg-indigo-950/50 flex flex-col items-center justify-center p-3 text-center group-hover:scale-105 transition-transform">
-                                                    <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-xs mb-1 shadow-sm">SOR</div>
-                                                    <p class="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 truncate w-full px-1">{{ basename($evidence->file_path) }}</p>
-                                                    <span class="text-[9px] text-indigo-500">Klik untuk Download</span>
-                                                </a>
-                                            @else
-                                                <a href="{{ asset('storage/' . $evidence->file_path) }}" target="_blank" class="block w-full h-full">
-                                                    <img src="{{ asset('storage/' . $evidence->file_path) }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
-                                                </a>
-                                            @endif
-                                        </div>
-
-                                        {{-- NOTE WASPANG PER FOTO --}}
-                                        @if($evidence->description)
-                                            <div class="mt-3 px-2">
-                                                <p class="text-[10px] font-bold text-gray-400 uppercase">Note Waspang:</p>
-                                                <p class="text-xs text-gray-700 dark:text-gray-300 font-medium leading-snug">{{ $evidence->description }}</p>
-                                            </div>
-                                        @endif
-
-                                        {{-- AKSI PER FOTO (Sama seperti sebelumnya) --}}
-                                        <div class="mt-3 flex flex-col flex-1 justify-end" x-data="{ showReject: false }">
-                                            @if($evidence->status == 'approved')
-                                                <div class="px-2 pb-1 flex justify-center">
-                                                    <form method="POST" action="{{ route('admin.evidences.reset', $evidence->id_evidence) }}" onsubmit="return confirm('Batalkan approval eviden ini?')">
-                                                        @csrf
-                                                        <button type="submit" class="h-8 px-4 rounded-full bg-red-100 dark:bg-red-800/40 text-red-700 dark:text-red-300 text-[11px] font-bold hover:bg-red-200 transition shadow-sm">
-                                                            <i class="fa-solid fa-rotate-left mr-1"></i> Batalkan Approval
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            @elseif($evidence->status == 'rejected')
-                                                <div class="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 border border-red-100 dark:border-red-900/50 flex flex-col items-center text-center">
-                                                    <p class="text-[10px] font-black text-red-700 dark:text-red-400 uppercase tracking-wide mb-1">Reason Reject:</p>
-                                                    <p class="text-xs text-red-900 dark:text-red-300 font-medium leading-snug mb-3">{{ $evidence->review_note }}</p>
-                                                    <form method="POST" action="{{ route('admin.evidences.reset', $evidence->id_evidence) }}">
-                                                        @csrf
-                                                        <button type="submit" class="h-8 px-4 rounded-full bg-red-100 dark:bg-red-800/40 text-red-700 dark:text-red-300 text-[11px] font-bold hover:bg-red-200 transition shadow-sm">
-                                                            <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            @else
-                                                <div class="grid grid-cols-2 gap-2" x-show="!showReject">
-                                                    <button type="button" @click="showReject = true" class="h-9 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition border border-red-100">
-                                                        Reject
-                                                    </button>
-                                                    <form method="POST" action="{{ route('admin.evidences.approve', $evidence->id_evidence) }}">
-                                                        @csrf
-                                                        <button type="submit" class="w-full h-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition shadow-sm shadow-emerald-500/20">
-                                                            Approve
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                                <div x-show="showReject" x-collapse x-cloak>
-                                                    <form method="POST" action="{{ route('admin.evidences.reject', $evidence->id_evidence) }}" class="bg-slate-50 dark:bg-gray-900 rounded-xl p-2 border border-slate-200 dark:border-gray-700">
-                                                        @csrf
-                                                        <textarea name="review_note" rows="2" required placeholder="Tuliskan ID foto yang direject (Misal: ID-45 blur)..." class="w-full rounded-lg border-gray-300 dark:border-gray-700 text-xs p-2.5 focus:ring-red-500 focus:border-red-500 resize-none bg-white dark:bg-gray-950"></textarea>
-                                                        <div class="flex items-center gap-2 mt-2">
-                                                            <button type="button" @click="showReject = false" class="flex-1 h-8 rounded-lg bg-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-300 transition">Batal</button>
-                                                            <button type="submit" class="flex-1 h-8 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition">Kirim Reject</button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            @endif
-                                        </div>
-                                    </div>
-                                @empty
-                                    <div class="col-span-full py-10 text-center">
-                                        <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-2xl text-slate-400">📊</div>
-                                        <p class="text-sm font-bold text-gray-500">Belum ada file/eviden pengukuran diunggah.</p>
-                                    </div>
-                                @endforelse
+            {{-- GRID FOTO / FILE EVIDEN --}}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                @forelse($items as $evidence)
+                    <div class="bg-white dark:bg-gray-950 rounded-[1.5rem] border border-gray-200 dark:border-gray-800 p-2.5 shadow-sm flex flex-col transition-all hover:border-blue-300">
+                        
+                        <div class="relative aspect-video rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 group flex items-center justify-center">
+                            
+                            {{-- ID BADGE --}}
+                            <div class="absolute top-2 left-2 z-10 bg-black/70 backdrop-blur-sm text-white text-[10px] font-black px-2 py-1 rounded-lg flex items-center gap-1.5 shadow-sm">
+                                <i class="fa-solid fa-tag text-blue-300"></i>
+                                ID-{{ $evidence->id_evidence }}
                             </div>
+
+                            {{-- STATUS BADGE --}}
+                            <div class="absolute top-2 right-2 z-10 text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg backdrop-blur-sm shadow-sm
+                                {{ $evidence->status == 'approved' ? 'bg-emerald-500/90 text-white' : ($evidence->status == 'rejected' ? 'bg-red-500/90 text-white' : 'bg-amber-500/90 text-white') }}">
+                                {{ $evidence->status }}
+                            </div>
+
+                            {{-- CEK APAkah FILE SOR ATAU FOTO BIASA --}}
+                            @if(str_ends_with(strtolower($evidence->file_path), '.sor'))
+                                <a href="{{ asset('storage/' . $evidence->file_path) }}" download class="w-full h-full bg-indigo-50 dark:bg-indigo-950/50 flex flex-col items-center justify-center p-3 text-center group-hover:scale-105 transition-transform">
+                                    <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-xs mb-1 shadow-sm">SOR</div>
+                                    <p class="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 truncate w-full px-1">{{ basename($evidence->file_path) }}</p>
+                                    <span class="text-[9px] text-indigo-500">Klik untuk Download</span>
+                                </a>
+                            @else
+                                <a href="{{ asset('storage/' . $evidence->file_path) }}" target="_blank" class="block w-full h-full">
+                                    <img src="{{ asset('storage/' . $evidence->file_path) }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                                </a>
+                            @endif
+                        </div>
+
+                        {{-- NOTE WASPANG PER FOTO --}}
+                        @if($evidence->description)
+                            <div class="mt-3 px-2">
+                                <p class="text-[10px] font-bold text-gray-400 uppercase">Note Waspang:</p>
+                                <p class="text-xs text-gray-700 dark:text-gray-300 font-medium leading-snug">{{ $evidence->description }}</p>
+                            </div>
+                        @endif
+
+                        {{-- AKSI PER FOTO (MENGGUNAKAN DYNAMIC ROUTE) --}}
+                        <div class="mt-3 flex flex-col flex-1 justify-end" x-data="{ showReject: false }">
+                            @if($evidence->status == 'approved')
+                                <div class="px-2 pb-1 flex justify-center">
+                                    <form method="POST" action="{{ route($routePrefix . 'reset', $evidence->id_evidence) }}" onsubmit="return confirm('Batalkan approval eviden ini?')">
+                                        @csrf
+                                        <button type="submit" class="h-8 px-4 rounded-full bg-red-100 dark:bg-red-800/40 text-red-700 dark:text-red-300 text-[11px] font-bold hover:bg-red-200 transition shadow-sm">
+                                            <i class="fa-solid fa-rotate-left mr-1"></i> Batalkan Approval
+                                        </button>
+                                    </form>
+                                </div>
+                            @elseif($evidence->status == 'rejected')
+                                <div class="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 border border-red-100 dark:border-red-900/50 flex flex-col items-center text-center">
+                                    <p class="text-[10px] font-black text-red-700 dark:text-red-400 uppercase tracking-wide mb-1">Reason Reject:</p>
+                                    <p class="text-xs text-red-900 dark:text-red-300 font-medium leading-snug mb-3">{{ $evidence->review_note }}</p>
+                                    <form method="POST" action="{{ route($routePrefix . 'reset', $evidence->id_evidence) }}">
+                                        @csrf
+                                        <button type="submit" class="h-8 px-4 rounded-full bg-red-100 dark:bg-red-800/40 text-red-700 dark:text-red-300 text-[11px] font-bold hover:bg-red-200 transition shadow-sm">
+                                            <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset
+                                        </button>
+                                    </form>
+                                </div>
+                            @else
+                                <div class="grid grid-cols-2 gap-2" x-show="!showReject">
+                                    <button type="button" @click="showReject = true" class="h-9 rounded-xl bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition border border-red-100">
+                                        Reject
+                                    </button>
+                                    <form method="POST" action="{{ route($routePrefix . 'approve', $evidence->id_evidence) }}">
+                                        @csrf
+                                        <button type="submit" class="w-full h-9 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition shadow-sm shadow-emerald-500/20">
+                                            Approve
+                                        </button>
+                                    </form>
+                                </div>
+                                <div x-show="showReject" x-collapse x-cloak>
+                                    <form method="POST" action="{{ route($routePrefix . 'reject', $evidence->id_evidence) }}" class="bg-slate-50 dark:bg-gray-900 rounded-xl p-2 border border-slate-200 dark:border-gray-700">
+                                        @csrf
+                                        <textarea name="review_note" rows="2" required placeholder="Tuliskan ID foto yang direject (Misal: ID-45 blur)..." class="w-full rounded-lg border-gray-300 dark:border-gray-700 text-xs p-2.5 focus:ring-red-500 focus:border-red-500 resize-none bg-white dark:bg-gray-950"></textarea>
+                                        <div class="flex items-center gap-2 mt-2">
+                                            <button type="button" @click="showReject = false" class="flex-1 h-8 rounded-lg bg-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-300 transition">Batal</button>
+                                            <button type="submit" class="flex-1 h-8 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition">Kirim Reject</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @empty
+                    <div class="col-span-full py-10 text-center">
+                        <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-2xl text-slate-400">📊</div>
+                        <p class="text-sm font-bold text-gray-500">Belum ada file/eviden diunggah.</p>
+                    </div>
+                @endforelse
+            </div>
         </div>
     </div>
 </div>

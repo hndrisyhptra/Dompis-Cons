@@ -37,99 +37,157 @@
             </p>
         </div>
 
-        <form id="evidenForm" action="{{ route('teknisi.pt2.storeStep3Eviden', $project->id_project) }}" method="POST" enctype="multipart/form-data">
+        {{-- FORM UTAMA DITUTUP DISINI AGAR TIDAK BENTROK DENGAN FORM REPLACE/DELETE --}}
+        <form id="evidenForm" action="{{ route('teknisi.pt2.storeStep3Eviden', $project->id_project) }}" method="POST" enctype="multipart/form-data" class="hidden">
             @csrf
-
-            <div class="space-y-3">
-                @foreach($allEvidences as $key => $label)
-                    @php
-                        $uploaded = isset($existingEvidences[$key]) ? $existingEvidences[$key] : collect();
-                        
-                        // Pisahkan status foto
-                        $validUploaded = $uploaded->whereIn('status', ['pending', 'approved']);
-                        $rejectedUploaded = $uploaded->where('status', 'rejected');
-                        
-                        $hasValid = $validUploaded->count() > 0;
-                        $hasRejected = $rejectedUploaded->count() > 0;
-                        $isRequired = array_key_exists($key, $requiredEvidences);
-                    @endphp
-
-                    <details id="details-{{ $key }}" class="group bg-white border border-slate-200 rounded-2xl shadow-sm [&_summary::-webkit-details-marker]:hidden transition-all duration-300 {{ ($hasValid || $hasRejected) ? 'open' : '' }}">
-                        
-                        <summary id="summary-{{ $key }}" data-rejected="{{ $hasRejected ? 'true' : 'false' }}" class="flex items-center justify-between p-4 cursor-pointer rounded-2xl transition">
-                            <div class="flex items-center gap-3">
-                                <div id="icon-{{ $key }}" class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-slate-100 text-slate-400">
-                                    📷
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-sm text-slate-800">
-                                        {{ $label }} 
-                                        @if($isRequired) <span class="text-red-500">*</span> @else <span class="text-[9px] text-slate-400 font-normal">(Opsional)</span> @endif
-                                    </h3>
-                                    <p id="count-{{ $key }}" class="text-[10px] font-medium mt-0.5 text-slate-400">Menghitung...</p>
-                                </div>
-                            </div>
-                        </summary>
-
-                        <div class="p-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
-                            <label class="relative flex flex-col items-center justify-center w-full h-20 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-white hover:bg-slate-50 transition">
-                                <span class="text-xs font-bold text-slate-500">+ Pilih Multiple Foto</span>
-                                <input type="file" id="input-{{ $key }}" name="evidences[{{ $key }}][]" multiple accept="image/*" class="hidden" onchange="handleFileSelect(this, '{{ $key }}')">
-                            </label>
-
-                            {{-- INDIKATOR LOADING SAAT PROSES KOMPRES --}}
-                            <div id="loading-{{ $key }}" class="hidden mt-2 text-[10px] font-bold text-blue-600 animate-pulse text-center">
-                                Sedang mengompres foto... mohon tunggu...
-                            </div>
-
-                            <div id="preview-{{ $key }}" class="grid grid-cols-4 gap-2 mt-3 empty:hidden"></div>
-
-                            @if($uploaded->count() > 0)
-                                <div class="mt-4 pt-3 border-t border-slate-200">
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Tersimpan di Database</p>
-                                    <div class="grid grid-cols-4 gap-2">
-                                        @foreach($uploaded as $ev)
-                                            <div class="relative rounded-xl overflow-hidden border {{ $ev->status == 'rejected' ? 'border-red-500 border-2 shadow-red-200' : 'border-slate-200' }} aspect-square shadow-sm">
-                                                <img src="{{ asset('storage/' . $ev->file_path) }}" class="w-full h-full object-cover">
-                                                
-                                                {{-- BADGE DITOLAK / APPROVED --}}
-                                                @if($ev->status == 'rejected')
-                                                    <div class="absolute bottom-0 inset-x-0 bg-red-600 text-white text-[8px] text-center py-1 font-black">DITOLAK</div>
-                                                @elseif($ev->status == 'approved')
-                                                    <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[8px] text-center py-1 font-black">APPROVED</div>
-                                                @endif
-
-                                                <button type="button" onclick="event.preventDefault(); document.getElementById('form-delete-{{ $ev->id_evidence }}').submit();" class="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md">✕</button>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endif
-                        </div>
-                    </details>
-                @endforeach
-            </div>
-
-            <button type="submit" id="btnSubmit" disabled class="w-full h-12 bg-gray-300 text-gray-500 cursor-not-allowed font-black rounded-xl mt-8 shadow-sm transition-all flex items-center justify-center gap-2">
-                <span>Upload Baru & Lanjut Step 4</span>
-            </button>
-
-            <a href="{{ route('teknisi.pt2.step4Eviden', $project->id_project) }}"  class="block w-full h-11 bg-white border-2 border-slate-200 text-slate-600 text-center leading-[2.5rem] font-bold rounded-xl mt-3 active:scale-95 transition">
-                Lewati (Lanjut Step 4) →
-            </a>
         </form>
 
-        {{-- Form Hapus Eviden Database --}}
-        @foreach($allEvidences as $key => $label)
-            @if(isset($existingEvidences[$key]))
-                @foreach($existingEvidences[$key] as $ev)
-                    <form id="form-delete-{{ $ev->id_evidence }}" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_evidence) }}" method="POST" class="hidden">
-                        @csrf
-                        @method('DELETE')
-                    </form>
-                @endforeach
-            @endif
-        @endforeach
+        <div class="space-y-3">
+            @foreach($allEvidences as $key => $label)
+                @php
+                    $uploaded = isset($existingEvidences[$key]) ? $existingEvidences[$key] : collect();
+                    
+                    // Pisahkan status foto
+                    $validUploaded = $uploaded->whereIn('status', ['pending', 'approved']);
+                    $rejectedUploaded = $uploaded->where('status', 'rejected');
+                    
+                    $hasValid = $validUploaded->count() > 0;
+                    $hasRejected = $rejectedUploaded->count() > 0;
+                    $isRequired = array_key_exists($key, $requiredEvidences);
+                @endphp
+
+                <details id="details-{{ $key }}" class="group bg-white border border-slate-200 rounded-2xl shadow-sm [&_summary::-webkit-details-marker]:hidden transition-all duration-300 {{ ($hasValid || $hasRejected) ? 'open' : '' }}">
+                    
+                    <summary id="summary-{{ $key }}" data-rejected="{{ $hasRejected ? 'true' : 'false' }}" class="flex items-center justify-between p-4 cursor-pointer rounded-2xl transition">
+                        <div class="flex items-center gap-3">
+                            <div id="icon-{{ $key }}" class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-slate-100 text-slate-400">
+                                📷
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-sm text-slate-800">
+                                    {{ $label }} 
+                                    @if($isRequired) <span class="text-red-500">*</span> @else <span class="text-[9px] text-slate-400 font-normal">(Opsional)</span> @endif
+                                </h3>
+                                <p id="count-{{ $key }}" class="text-[10px] font-medium mt-0.5 text-slate-400">Menghitung...</p>
+                            </div>
+                        </div>
+                    </summary>
+
+                    <div class="p-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
+                        
+                        {{-- Area Klik Tambah Foto Baru (Dihubungkan dengan form="evidenForm") --}}
+                        <label class="relative flex flex-col items-center justify-center w-full h-20 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-white hover:bg-slate-50 transition">
+                            <span class="text-xs font-bold text-slate-500">+ Pilih Multiple Foto</span>
+                            <input type="file" form="evidenForm" id="input-{{ $key }}" name="evidences[{{ $key }}][]" multiple accept="image/*" class="hidden" onchange="handleFileSelect(this, '{{ $key }}')">
+                        </label>
+
+                        {{-- INDIKATOR LOADING SAAT PROSES KOMPRES --}}
+                        <div id="loading-{{ $key }}" class="hidden mt-2 text-[10px] font-bold text-blue-600 animate-pulse text-center">
+                            Sedang mengompres foto... mohon tunggu...
+                        </div>
+
+                        <div id="preview-{{ $key }}" class="grid grid-cols-4 gap-2 mt-3 empty:hidden"></div>
+
+                        {{-- GRID FOTO YANG TERSIMPAN DI DATABASE --}}
+                        @if($uploaded->count() > 0)
+                            <div class="mt-4 pt-3 border-t border-slate-200">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Tersimpan di Database</p>
+                                
+                                @if($hasRejected)
+                                    <div class="mb-3 rounded-xl border border-red-100 bg-red-50/80 p-3 text-xs text-red-700 leading-relaxed flex items-start gap-2 shadow-sm">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 mt-0.5 text-red-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                        <div>
+                                            <p class="font-bold mb-0.5">Terdapat Eviden Ditolak</p>
+                                            <p>Ketuk pada foto untuk mengunggah ulang (replace).</p>
+                                        </div>
+                                    </div>
+                                @endif
+
+                                {{-- Step 3 menggunakan grid-cols-4 agar lebih muat banyak foto port --}}
+                                <div class="grid grid-cols-4 gap-2">
+                                    @foreach($uploaded as $ev)
+                                        <div class="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group flex items-center justify-center transition-all 
+                                            {{ $ev->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-gray-200' }}">
+
+                                            {{-- INDIKATOR ID FOTO --}}
+                                            <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-20 backdrop-blur-sm pointer-events-none">
+                                                @if($ev->status == 'rejected')
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                                @elseif($ev->status == 'approved')
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                                @endif
+                                                ID-{{ $ev->id_evidence }}
+                                            </div>
+
+                                            {{-- FOTO NORMAL --}}
+                                            <img src="{{ asset('storage/' . $ev->file_path) }}" 
+                                                 class="w-full h-full object-cover {{ $ev->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
+
+                                            {{-- JIKA STATUS REJECTED --}}
+                                            @if($ev->status == 'rejected')
+                                                @if(!empty($ev->review_note))
+                                                    <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[8px] p-1 text-center font-bold z-20 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2 pointer-events-none" title="{{ $ev->review_note }}">
+                                                        {{ $ev->review_note }}
+                                                    </div>
+                                                @endif
+
+                                                {{-- OVERLAY GANTI FOTO --}}
+                                                <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_evidence) }}" enctype="multipart/form-data" 
+                                                      class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
+                                                    @csrf
+                                                    <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-white text-[9px] font-black group">
+                                                        <div class="bg-blue-600 px-2 py-1.5 rounded-xl shadow-lg flex flex-col items-center gap-1">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                                            Replace
+                                                        </div>
+                                                        <input type="file" name="file" class="hidden" onchange="
+                                                            if(this.files.length > 0) {
+                                                                this.previousElementSibling.style.display = 'none';
+                                                                let span = document.createElement('span');
+                                                                span.className = 'animate-pulse text-white mt-1 text-center leading-tight';
+                                                                span.innerText = 'Uploading...';
+                                                                this.parentElement.appendChild(span);
+                                                                this.form.submit();
+                                                            }
+                                                        " accept="image/*">
+                                                    </label>
+                                                </form>
+                                            @endif
+
+                                            {{-- BADGE STATUS PENDING ATAU APPROVED --}}
+                                            @if($ev->status == 'approved')
+                                                <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[7px] text-center py-0.5 font-black z-20 pointer-events-none">APPROVED</div>
+                                            @elseif($ev->status == 'pending')
+                                                <div class="absolute bottom-0 inset-x-0 bg-amber-500 text-white text-[7px] text-center py-0.5 font-black z-20 pointer-events-none">PENDING</div>
+                                            @endif
+
+                                            {{-- TOMBOL DELETE --}}
+                                            @if($ev->status != 'approved')
+                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_evidence) }}" class="absolute top-1 right-1 z-20">
+                                                    @csrf @method('DELETE')
+                                                    <button type="button" onclick="this.closest('form').submit()" class="w-5 h-5 rounded-full bg-black/70 hover:bg-red-600 text-white text-xs flex items-center justify-center font-bold backdrop-blur-sm transition shadow-md">
+                                                        ×
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </details>
+            @endforeach
+        </div>
+
+        {{-- TOMBOL SUBMIT FORM UTAMA (Diikat pakai form="evidenForm") --}}
+        <button type="submit" form="evidenForm" id="btnSubmit" disabled class="w-full h-12 bg-gray-300 text-gray-500 cursor-not-allowed font-black rounded-xl mt-8 shadow-sm transition-all flex items-center justify-center gap-2">
+            <span>Upload Baru & Lanjut Step 4</span>
+        </button>
+
+        <a href="{{ route('teknisi.pt2.step4Eviden', $project->id_project) }}"  class="block w-full h-11 bg-white border-2 border-slate-200 text-slate-600 text-center leading-[2.5rem] font-bold rounded-xl mt-3 active:scale-95 transition">
+            Lewati (Lanjut Step 4) →
+        </a>
 
     </div>
 </div>
@@ -144,7 +202,6 @@
     let serverData = {
         @foreach($allEvidences as $key => $label)
             @php
-                // HANYA MENGHITUNG YANG STATUSNYA PENDING / APPROVED
                 $validCount = isset($existingEvidences[$key]) ? $existingEvidences[$key]->whereIn('status', ['pending', 'approved'])->count() : 0;
             @endphp
             '{{ $key }}': {{ $validCount }},
@@ -188,22 +245,20 @@
     }
 
     async function handleFileSelect(inputElement, key) {
-        let files = Array.from(inputElement.files);
-        if (files.length === 0) return;
+    let files = Array.from(inputElement.files);
+    if (files.length === 0) return;
 
-        document.getElementById('loading-' + key).classList.remove('hidden');
+    document.getElementById('loading-' + key).classList.remove('hidden');
 
-        for (let file of files) {
-            if (file.type.startsWith('image/')) {
-                const compressedFile = await compressImage(file, 1280, 0.7); 
-                newFilesStore[key].push(compressedFile);
-            }
-        }
-        
-        inputElement.value = '';
-        document.getElementById('loading-' + key).classList.add('hidden');
-        renderPreviews(key);
+    for (let file of files) {
+        // LANGSUNG MASUKKAN FILE ASLI KE STORE (TIDAK ADA KOMPRESI)
+        newFilesStore[key].push(file); 
     }
+
+    inputElement.value = '';
+    document.getElementById('loading-' + key).classList.add('hidden');
+    renderPreviews(key);
+}
 
     function removeNewFile(key, index) {
         newFilesStore[key].splice(index, 1);
@@ -283,14 +338,12 @@
         }
 
         // --- STYLING LOGIC ---
-        // Jika statusnya empty atau partial TAPI memiliki foto yang direject, ubah menjadi MERAH PERINGATAN
         if ((state === 'empty' || state === 'partial') && hasRejected) {
              summary.className = 'flex items-center justify-between p-4 cursor-pointer rounded-2xl transition bg-red-50/50 border border-red-200';
              icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-sm bg-red-100 text-red-600';
              icon.innerText = '🚨';
              countText.className = 'text-[10px] font-bold mt-0.5 text-red-600';
         } else {
-             // Styling normal bawaan sistem
              summary.className = 'flex items-center justify-between p-4 cursor-pointer rounded-2xl transition ' + 
                  (state === 'complete' ? 'bg-green-50/50' : (state === 'partial' ? 'bg-amber-50/50' : (state === 'over' ? 'bg-red-50/50' : '')));
              

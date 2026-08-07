@@ -79,7 +79,9 @@
                             
                             $step3 = $evidences->where('stage', 'finishing')->where('evidence_type', 'redaman_port')->count() > 0 ? 1 : 0;
                             
-                            $step4 = \Illuminate\Support\Facades\DB::table('dismantles')->where('project_id', $project->id_project)->exists() ? 1 : 0;
+                            // PERBAIKAN STEP 4: Karena opsional, selalu dianggap lulus (1). Kita hanya mengecek apakah diisi untuk styling UI.
+                            $hasDismantle = \Illuminate\Support\Facades\DB::table('dismantles')->where('project_id', $project->id_project)->exists();
+                            $step4 = 1; 
                             
                             $mancore = \Illuminate\Support\Facades\DB::table('pt2_mancores')->where('project_id', $project->id_project)->first();
                             $step5 = $mancore ? 1 : 0;
@@ -91,6 +93,9 @@
                             $pendingCount = $evidences->where('status', 'pending')->count();
                             $approvedCount = $evidences->where('status', 'approved')->count();
                             $rejectedCount = $evidences->where('status', 'rejected')->count();
+
+                            // PERBAIKAN LOGIKA STATUS LULUS KESELURUHAN (IS COMPLETE)
+                            $isFullyApproved = ($progress == 5 && $pendingCount == 0 && $rejectedCount == 0 && $approvedCount > 0);
                         @endphp
 
                         <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group">
@@ -135,19 +140,19 @@
                                     
                                     {{-- Detail Angka Progress (Mini Badges) --}}
                                     <div class="flex items-center gap-1.5 text-[9px] font-bold">
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 1">
+                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 1 Survey">
                                             S1: <span class="{{ $step1 ? 'text-indigo-600' : 'text-slate-400' }}">{{ $step1 ? '✓' : '✗' }}</span>
                                         </span>
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 2">
+                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 2 Instalasi">
                                             S2: <span class="{{ $step2 ? 'text-indigo-600' : 'text-slate-400' }}">{{ $step2 ? '✓' : '✗' }}</span>
                                         </span>
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 3">
+                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 3 Redaman">
                                             S3: <span class="{{ $step3 ? 'text-indigo-600' : 'text-slate-400' }}">{{ $step3 ? '✓' : '✗' }}</span>
                                         </span>
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 4">
-                                            S4: <span class="{{ $step4 ? 'text-indigo-600' : 'text-slate-400' }}">{{ $step4 ? '✓' : '✗' }}</span>
+                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 4 Dismantle (Opsional)">
+                                            S4: <span class="{{ $hasDismantle ? 'text-indigo-600' : 'text-slate-400' }}">{{ $hasDismantle ? '✓' : 'Opt' }}</span>
                                         </span>
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 5">
+                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 5 Mancore">
                                             S5: <span class="{{ $step5 ? 'text-indigo-600' : 'text-slate-400' }}">{{ $step5 ? '✓' : '✗' }}</span>
                                         </span>
                                     </div>
@@ -157,10 +162,10 @@
                             {{-- KOLOM 4: Status Foto --}}
                             <td class="p-4 align-top text-center">
                                 <div class="flex flex-col gap-1 items-center justify-center font-mono text-[10px] font-black">
-                                    <span class="w-16 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200/40">
+                                    <span class="w-16 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200/40" title="Pending">
                                         P: {{ $pendingCount }}
                                     </span>
-                                    <span class="w-16 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200/40">
+                                    <span class="w-16 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200/40" title="Approved">
                                         A: {{ $approvedCount }}
                                     </span>
                                 </div>
@@ -169,14 +174,21 @@
                             {{-- KOLOM 5: Aksi Review --}}
                             <td class="p-4 align-top text-right">
                                 <div class="flex flex-col items-end gap-2.5">
-                                    <span class="inline-flex px-2.5 py-1 rounded-md text-[9px] font-extrabold tracking-widest uppercase bg-amber-100 text-amber-700">
-                                        {{ $project->status == 'waiting_ut' ? 'NEED REVIEW' : $project->status }}
-                                    </span>
                                     
-                                    {{-- Mengarah ke halaman khusus Review PT2 --}}
+                                    {{-- PERBAIKAN: JIKA FULLY APPROVED, TAMPILKAN LABEL COMPLETE --}}
+                                    @if($isFullyApproved)
+                                        <span class="inline-flex px-2.5 py-1 rounded-md text-[9px] font-extrabold tracking-widest uppercase bg-emerald-100 text-emerald-700">
+                                            COMPLETE
+                                        </span>
+                                    @else
+                                        <span class="inline-flex px-2.5 py-1 rounded-md text-[9px] font-extrabold tracking-widest uppercase bg-amber-100 text-amber-700">
+                                            NEED REVIEW
+                                        </span>
+                                    @endif
+                                    
                                     <a href="{{ route('admin.pt2.review', $project->id_project) }}"
                                        class="h-8 px-4 rounded-xl bg-indigo-50 border border-indigo-200 hover:bg-indigo-600 hover:text-white text-indigo-700 inline-flex items-center justify-center gap-1.5 text-xs font-black transition-all shadow-sm group">
-                                        Review PT2
+                                        {{ $isFullyApproved ? 'Lihat Detail' : 'Review PT2' }}
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
                                     </a>
                                 </div>

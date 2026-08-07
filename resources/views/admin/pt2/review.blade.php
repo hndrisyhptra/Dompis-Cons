@@ -223,6 +223,7 @@
     {{-- EVIDEN FOTO PERSIAPAN (DIPISAH MENGGUNAKAN REVIEW-ITEM MASING-MASING) --}}
     @foreach($requiredEvidences as $key => $label)
         @include('admin.evidences.partials.review-item', [
+            'isPt2' => true,
             'number' => $loop->iteration,
             'title' => $label,
             'description' => 'Bukti foto eviden ' . strtolower($label) . ' lapangan.',

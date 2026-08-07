@@ -48,6 +48,7 @@
 
     {{-- 1. Eviden Material / Barang Tiba --}}
     @include('admin.evidences.partials.review-item', [
+        'isPt2' => true,
         'number' => 1,
         'title' => 'Eviden Material / Barang Tiba',
         'description' => 'Foto fisik material / kabel saat tiba di lokasi sebelum diinstalasi.',
@@ -57,6 +58,7 @@
 
     {{-- 2. Eviden Progress Instalasi --}}
     @include('admin.evidences.partials.review-item', [
+        'isPt2' => true,
         'number' => 2,
         'title' => 'Eviden Progress Instalasi',
         'description' => 'Foto fisik material yang telah selesai terpasang (Progress BOQ).',

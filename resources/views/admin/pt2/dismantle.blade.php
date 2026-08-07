@@ -105,6 +105,7 @@
         {{-- Hanya tampilkan jika teknisi mengupload foto untuk item tersebut, atau tampilkan kosong jika ingin selalu terpampang --}}
         @if($evList->count() > 0)
             @include('admin.evidences.partials.review-item', [
+                'isPt2' => true,
                 'number' => $counter++,
                 'title' => $label,
                 'description' => 'Bukti foto fisik penarikan ' . strtolower($label),

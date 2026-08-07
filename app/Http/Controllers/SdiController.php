@@ -23,9 +23,9 @@ class SdiController extends Controller
     public function index(Request $request)
     {
         // 1. Ambil data project beserta relasi LOP
-        $query = \App\Models\Project::with('lop')
+        $query = Project::with('lop')
             ->where(function ($q) {
-                // KONDISI A: Menampilkan project yang dikirim Admin (Sedang antre)
+                // KONDISI A: Menampilkan project yang dikirim Admin (Sedang antre UT/SDI)
                 $q->where(function ($sub) {
                     $sub->where('status', 'waiting_ut')
                         ->where('sdi_approval_status', 'pending');
@@ -34,14 +34,14 @@ class SdiController extends Controller
                 ->orWhere('is_golive', 1);
             });
 
-        // (Opsional) Jika di sistem Anda SDI HANYA memegang program PT 2, aktifkan baris ini:
-        // $query->where('program', 'PT 2'); 
-
         // 2. Logika Pencarian (Search)
         if ($request->search) {
             $query->where(function ($q) use ($request) {
                 $q->where('project_name', 'like', '%' . $request->search . '%')
-                  ->orWhere('pid', 'like', '%' . $request->search . '%');
+                  ->orWhere('pid', 'like', '%' . $request->search . '%')
+                  ->orWhereHas('lop', function ($lopQ) use ($request) {
+                      $lopQ->where('id_ihld', 'like', '%' . $request->search . '%');
+                  });
             });
         }
 
@@ -55,7 +55,8 @@ class SdiController extends Controller
     public function submitGolive(Request $request, $id)
     {
         $request->validate([
-            'golive_evidence' => 'required|image|mimes:jpeg,png,jpg|max:5120',
+            // Tambahkan webp sebagai best practice kompresi gambar saat ini
+            'golive_evidence' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120', 
         ]);
 
         $project = Project::findOrFail($id);
@@ -65,13 +66,39 @@ class SdiController extends Controller
             $filename = 'UIM_' . time() . '_' . $project->id_project . '.' . $file->getClientOriginalExtension();
             $path = $file->storeAs('evidences/golive', $filename, 'public');
 
-            // UPDATE MENGGUNAKAN STRUKTUR KOLOM DATABASE ANDA
+            /*
+            |--------------------------------------------------------------------------
+            | EKSEKUSI GOLIVE FINAL
+            |--------------------------------------------------------------------------
+            */
             $project->update([
-                'is_golive' => 1,
+                'status' => 'completed',            // Kunci utama agar project masuk tab Completed
+                'status_project' => 'close',        // Menyatakan fisik project ditutup
+                'sdi_approval_status' => 'approved',
+                'is_golive' => 1,                   // Flag ampuh untuk query Dashboard
                 'golive_evidence_path' => $path,
-                'golive_at' => now(), // Mencatat waktu go-live
-                'sdi_approval_status' => 'approved', // Ubah status sdi
-                'status_project' => 'close' // Project dinyatakan close/selesai secara fisik
+                'golive_at' => now(),               // Timestamp resmi Golive
+            ]);
+
+            // Update LOP status progress untuk kepastian akhir
+            Lop::where('project_id', $project->id_project)->update([
+                'status_progress' => 'finishing'
+            ]);
+
+            /*
+            |--------------------------------------------------------------------------
+            | CATAT SEJARAH AKTIVITAS
+            |--------------------------------------------------------------------------
+            */
+            $lopId = Lop::where('project_id', $project->id_project)->value('id_lop');
+            
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lopId,
+                'activity_type' => 'project_golive',
+                'title' => 'Project Go-Live (SDI)',
+                'description' => 'Tim SDI telah mengunggah Eviden UIM dan meresmikan status Go-Live.',
+                'status_after' => 'completed',
             ]);
 
             return back()->with('success', '🎉 Luar biasa! Project berhasil di-GoLive dan Eviden UIM telah tersimpan!');

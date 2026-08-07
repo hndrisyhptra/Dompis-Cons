@@ -310,6 +310,12 @@
                            id="user_password"
                            placeholder="Masukkan Password"
                            class="w-full h-11 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white text-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition">
+                    <p class="mt-1 text-[11px] text-red-500 dark:text-red-400 flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Password minimal harus terdiri dari 6 karakter.
+                    </p>
                     <p class="text-[10px] text-gray-500 mt-1">
                         *Saat edit akun, kosongkan kolom ini jika tidak ingin mengubah password.
                     </p>

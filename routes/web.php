@@ -479,26 +479,28 @@ Route::middleware(['auth'])->group(function () {
 });
 
 
-  /*
+ /*
 |--------------------------------------------------------------------------
-| ROLE TEKNISI
+| ROLE TEKNISI (PT2)
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth'])->prefix('teknisi/pt2')->name('teknisi.pt2.')->group(function () {
     
-    // UBAH: name('dashboard') menjadi name('index')
-    Route::get('/dashboard', [TeknisiPt2Controller::class, 'index'])->name('index');
-    
-    Route::get('/inbox', [TeknisiPt2Controller::class, 'inbox'])->name('inbox');
+    // Dashboard & Inbox
+    Route::get('/dashboard', [\App\Http\Controllers\TeknisiPt2Controller::class, 'index'])->name('index');
+    Route::get('/inbox', [\App\Http\Controllers\TeknisiPt2Controller::class, 'inbox'])->name('inbox');
     
     // Step 1: Survey & Pilih Mode
-    Route::get('/survey/{project_id}', [TeknisiPt2Controller::class, 'step1'])->name('step1');
-    Route::post('/survey/{project_id}', [TeknisiPt2Controller::class, 'storeStep1'])->name('storeStep1');
-    // Lanjutan Step 1: Eviden Survey
-    Route::get('/survey/{project_id}/eviden', [TeknisiPt2Controller::class, 'step1Eviden'])->name('step1Eviden');
-    Route::post('/survey/{project_id}/eviden', [TeknisiPt2Controller::class, 'storeStep1Eviden'])->name('storeStep1Eviden');
-    // Route untuk Hapus Eviden
+    Route::get('/survey/{project_id}', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step1'])->name('step1');
+    Route::post('/survey/{project_id}', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep1'])->name('storeStep1');
+    Route::get('/survey/{project_id}/eviden', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step1Eviden'])->name('step1Eviden');
+    Route::post('/survey/{project_id}/eviden', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep1Eviden'])->name('storeStep1Eviden');
+    
+    // ==========================================
+    // MANAJEMEN EVIDEN (HAPUS & REPLACE)
+    // ==========================================
     Route::delete('/eviden/{id}', [\App\Http\Controllers\TeknisiPt2Controller::class, 'deleteEvidence'])->name('deleteEvidence');
+    Route::post('/eviden/{id}/replace', [\App\Http\Controllers\TeknisiPt2Controller::class, 'replaceEvidence'])->name('replaceEvidence'); // <-- TAMBAHAN BARU
 
     // Step 2: Eviden Progress Instalasi
     Route::get('/survey/{project_id}/step2', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step2Eviden'])->name('step2Eviden');
@@ -518,44 +520,55 @@ Route::middleware(['auth'])->prefix('teknisi/pt2')->name('teknisi.pt2.')->group(
     
 });
 
-    // PROFILE TEKNISI
-    Route::middleware(['auth'])->group(function () {
-        Route::get('/teknisi/profil', function () {
-            return view('teknisi.profile');
-        })->name('teknisi.profil');
-    });
+// PROFILE TEKNISI
+Route::middleware(['auth'])->group(function () {
+    Route::get('/teknisi/profil', function () {
+        return view('teknisi.profile');
+    })->name('teknisi.profil');
+});
 
-    // ROUTE KHUSUS APPROVAL PT2 OLEH ADMIN
-    Route::prefix('admin/pt2')->name('admin.pt2.')->middleware(['auth'])->group(function () {
-        Route::get('/approval', [App\Http\Controllers\AdminPt2Controller::class, 'index'])->name('approval');
-        Route::get('/review/{id}', [App\Http\Controllers\AdminPt2Controller::class, 'review'])->name('review');
+/*
+|--------------------------------------------------------------------------
+| ROUTE KHUSUS APPROVAL PT2 OLEH ADMIN
+|--------------------------------------------------------------------------
+*/
+Route::prefix('admin/pt2')->name('admin.pt2.')->middleware(['auth'])->group(function () {
+    // List & Detail Review
+    Route::get('/approval', [\App\Http\Controllers\AdminPt2Controller::class, 'index'])->name('approval');
+    Route::get('/review/{id}', [\App\Http\Controllers\AdminPt2Controller::class, 'review'])->name('review');
 
-        Route::get('/{id}/instalasi', [App\Http\Controllers\AdminPt2Controller::class, 'reviewInstalasi'])->name('instalasi');
-        Route::get('/{id}/redaman', [App\Http\Controllers\AdminPt2Controller::class, 'reviewRedaman'])->name('redaman');
-        Route::get('/{id}/dismantle', [App\Http\Controllers\AdminPt2Controller::class, 'reviewDismantle'])->name('dismantle');
-        Route::get('/{id}/mancore', [App\Http\Controllers\AdminPt2Controller::class, 'reviewMancore'])->name('mancore');
+    // Review per Step
+    Route::get('/{id}/instalasi', [\App\Http\Controllers\AdminPt2Controller::class, 'reviewInstalasi'])->name('instalasi');
+    Route::get('/{id}/redaman', [\App\Http\Controllers\AdminPt2Controller::class, 'reviewRedaman'])->name('redaman');
+    Route::get('/{id}/dismantle', [\App\Http\Controllers\AdminPt2Controller::class, 'reviewDismantle'])->name('dismantle');
+    Route::get('/{id}/mancore', [\App\Http\Controllers\AdminPt2Controller::class, 'reviewMancore'])->name('mancore');
 
-        Route::post('/survey/{id}/approve', [App\Http\Controllers\AdminPt2Controller::class, 'approveSurvey'])->name('survey.approve');
-        Route::post('/survey/{id}/reject', [App\Http\Controllers\AdminPt2Controller::class, 'rejectSurvey'])->name('survey.reject');
-        Route::post('/survey/{id}/reset', [App\Http\Controllers\AdminPt2Controller::class, 'resetSurvey'])->name('survey.reset');
+    // Aksi Form Survey
+    Route::post('/survey/{id}/approve', [\App\Http\Controllers\AdminPt2Controller::class, 'approveSurvey'])->name('survey.approve');
+    Route::post('/survey/{id}/reject', [\App\Http\Controllers\AdminPt2Controller::class, 'rejectSurvey'])->name('survey.reject');
+    Route::post('/survey/{id}/reset', [\App\Http\Controllers\AdminPt2Controller::class, 'resetSurvey'])->name('survey.reset');
 
-        Route::post('/{id}/send-to-sdi', [App\Http\Controllers\AdminPt2Controller::class, 'sendToSdi'])->name('sendToSdi');
+    // TAMBAHAN: AKSI FORM EVIDEN PT2 (Memanggil fungsi baru yang kita buat agar tidak tabrakan)
+    Route::post('/eviden/{id}/approve', [\App\Http\Controllers\AdminPt2Controller::class, 'approveEvidencePt2'])->name('evidence.approve');
+    Route::post('/eviden/{id}/reject', [\App\Http\Controllers\AdminPt2Controller::class, 'rejectEvidencePt2'])->name('evidence.reject');
+    Route::post('/eviden/{id}/reset', [\App\Http\Controllers\AdminPt2Controller::class, 'resetEvidencePt2'])->name('evidence.reset');
+    Route::post('/eviden/bulk-approve', [\App\Http\Controllers\AdminPt2Controller::class, 'bulkApprovePt2'])->name('evidence.bulk-approve');
 
-    });
+    // Aksi Kirim ke SDI
+    Route::post('/{id}/send-to-sdi', [\App\Http\Controllers\AdminPt2Controller::class, 'sendToSdi'])->name('sendToSdi');
+});
 
- /*
+/*
 |--------------------------------------------------------------------------
 | ROLE SDI
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth'])->prefix('sdi')->name('sdi.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\SdiController::class, 'index'])->name('index');
-    Route::post('/golive/{id}', [\App\Http\Controllers\SdiController::class, 'storeGoLive'])->name('golive.store');
+    
+    // Cukup gunakan 1 route ini untuk mengeksekusi fungsi submitGolive
+    Route::post('/golive/{id}', [\App\Http\Controllers\SdiController::class, 'submitGolive'])->name('golive.store');
 });
-// Route Khusus SDI Go-Live
-Route::post('/proses-golive-sdi-pt2/{id}', [\App\Http\Controllers\SdiController::class, 'submitGolive'])
-    ->name('sdi.eksekusi.golive')
-    ->middleware('auth');
 
 /*
 |--------------------------------------------------------------------------

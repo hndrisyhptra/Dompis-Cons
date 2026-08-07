@@ -619,6 +619,7 @@ public function importCsv(Request $request)
             'evidences',
             'boqItems.designatorData',
             'boqItems.designatorDataByCode',
+            'lop' // Pastikan LOP ter-load untuk mengecek program SAP
         ])->find($evidence->project_id);
 
         if ($project) {
@@ -627,65 +628,54 @@ public function importCsv(Request $request)
 
             /*
             |--------------------------------------------------------------------------
-            | UPDATE STATUS PROGRESS LOP
+            | BARIER PELINDUNG PT2 & GOLIVE
             |--------------------------------------------------------------------------
+            | Kita cegah sistem reguler mengubah status LOP jika ini adalah PT2 
+            | atau jika project sudah ditutup / Go-Live.
             */
-            if (($summary['progress'] ?? 0) == 100) {
+            $programSap = strtoupper($project->lop->program_sap ?? '');
+            $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
 
-                Lop::where('project_id', $project->id_project)
-                    ->update([
-                        'status_progress' => 'finishing',
-                    ]);
-
-                $project->update([
-                    'status_project' => 'close',
-                ]);
-
-            } elseif ($evidence->stage == 'persiapan') {
-
-                Lop::where('project_id', $project->id_project)
-                    ->update([
-                        'status_progress' => 'instalasi',
-                    ]);
-
-                $project->update([
-                    'status_project' => 'active',
-                ]);
-
-            } elseif ($evidence->stage == 'instalasi') {
-
-                Lop::where('project_id', $project->id_project)
-                    ->update([
-                        'status_progress' => 'finishing', 
-                    ]);
-
-                $project->update([
-                    'status_project' => 'active',
-                ]);
-
-            } elseif ($evidence->stage == 'pengukuran') {
-
-                Lop::where('project_id', $project->id_project)
-                    ->update([
-                        'status_progress' => 'finishing',
-                    ]);
-
-                $project->update([
-                    'status_project' => 'active',
-                ]);
-
-            }
+            // Cek dari Enum status dan Flag is_golive
+            $isAlreadyClosed = in_array($project->status_project, ['close', 'completed', 'drop']) || 
+                               in_array($project->status, ['waiting_ut', 'completed', 'close']) ||
+                               $project->is_golive == 1;
 
             /*
             |--------------------------------------------------------------------------
-            | PROJECT COMPLETE ACTIVITY
+            | UPDATE STATUS PROGRESS LOP (KHUSUS REGULER)
+            |--------------------------------------------------------------------------
+            */
+            if (!$isPt2 && !$isAlreadyClosed) {
+
+                if (($summary['progress'] ?? 0) == 100) {
+
+                    Lop::where('project_id', $project->id_project)->update(['status_progress' => 'finishing']);
+                    $project->update(['status_project' => 'close']);
+
+                } elseif ($evidence->stage == 'persiapan') {
+
+                    Lop::where('project_id', $project->id_project)->update(['status_progress' => 'instalasi']);
+                    $project->update(['status_project' => 'active']);
+
+                } elseif ($evidence->stage == 'instalasi' || $evidence->stage == 'pengukuran') {
+
+                    Lop::where('project_id', $project->id_project)->update(['status_progress' => 'finishing']);
+                    $project->update(['status_project' => 'active']);
+
+                }
+            } // <-- Akhir dari Barier Pelindung
+
+            /*
+            |--------------------------------------------------------------------------
+            | PROJECT COMPLETE ACTIVITY (KHUSUS REGULER)
             |--------------------------------------------------------------------------
             */
             $alreadyCompleteLogged = ProjectActivityLog::where('project_id', $project->id_project)
                 ->where('activity_type', 'project_completed')
                 ->exists();
 
-            if (($summary['progress'] ?? 0) == 100 && !$alreadyCompleteLogged) {
+            if (!$isPt2 && !$isAlreadyClosed && ($summary['progress'] ?? 0) == 100 && !$alreadyCompleteLogged) {
 
                 ProjectActivityService::log([
                     'project_id'   => $project->id_project,

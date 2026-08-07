@@ -164,26 +164,29 @@
 
                 </div>
 
-                {{-- BOQ Material --}}
+               {{-- BOQ Material --}}
                 <div id="materialContainer" class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hidden">
                     <div class="flex items-center justify-between mb-3">
                         <label class="block text-xs font-black text-slate-800">Review BOQ Material</label>
-                        <button type="button" onclick="addMaterialRow()" class="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold">+ Tambah</button>
+                        <button type="button" onclick="addMaterialRow()" class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg text-xs font-bold transition">
+                            + Tambah
+                        </button>
                     </div>
-                    <div class="overflow-hidden border border-slate-200 rounded-xl">
+                    
+                    {{-- UBAH: Ganti overflow-hidden menjadi overflow-visible --}}
+                    <div class="overflow-visible border border-slate-200 rounded-xl pb-16">
                         <table class="w-full text-left text-xs">
                             <thead class="bg-slate-50 border-b border-slate-200">
                                 <tr>
                                     <th class="p-2 font-bold text-slate-600">Material</th>
                                     <th class="p-2 font-bold text-slate-600 w-16 text-center">Qty</th>
-                                    <th class="p-2 font-bold text-slate-600 w-8"></th>
+                                    <th class="p-2 font-bold text-slate-600 w-9"></th>
                                 </tr>
                             </thead>
                             <tbody id="materialTableBody" class="divide-y divide-slate-100"></tbody>
                         </table>
                     </div>
                 </div>
-            </div>
 
             {{-- 2. TOMBOL AKSI DINAMIS --}}
             <div class="mt-8 space-y-3">
@@ -245,8 +248,28 @@
     function toggleModeData() {
         let mode = document.querySelector('input[name="mode"]:checked');
         if (!mode) return;
+        
         let m = mode.value;
         
+        // ==========================================
+        // TAMBAHAN: FITUR LOCK MODE 
+        // ==========================================
+        document.querySelectorAll('input[name="mode"]').forEach(radio => {
+            let label = radio.closest('label');
+            
+            // Matikan fungsi klik di semua label agar tidak bisa diubah
+            label.style.pointerEvents = 'none';
+            label.classList.remove('cursor-pointer');
+
+            if (!radio.checked) {
+                // Disable input yang TIDAK dipilih agar tidak bisa diakses lewat keyboard (Tab)
+                radio.disabled = true;
+                // Tambahkan efek visual buram/redup untuk opsi yang tidak dipilih
+                label.classList.add('opacity-40', 'bg-slate-50');
+            }
+        });
+        // ==========================================
+
         document.getElementById('modeFieldsContainer').classList.remove('hidden');
         document.getElementById('materialContainer').classList.remove('hidden');
         
@@ -269,6 +292,7 @@
             document.getElementById('fieldPowerIn').classList.remove('hidden');
             document.getElementById('labelCore').innerText = ''; 
         }
+        
         checkFormValidity();
     }
 
@@ -276,27 +300,117 @@
         let tbody = document.getElementById('materialTableBody');
         let tr = document.createElement('tr');
         
-        let options = '<option value="">Pilih...</option>';
+        let selectedText = '';
+        let listItems = '';
+        
+        // Looping untuk membuat list pencarian
         designatorList.forEach(item => {
-            let sel = (selectedId == item.id_designator) ? 'selected' : '';
-            options += `<option value="${item.id_designator}" ${sel}>${item.designator} - ${item.item_name}</option>`;
+            let nameEscaped = item.item_name.replace(/'/g, "\\'"); // Hindari error tanda kutip
+            let label = `${item.designator} - ${item.item_name}`;
+            
+            if (selectedId == item.id_designator) {
+                selectedText = label;
+            }
+            
+            listItems += `
+                <li class="px-3 py-2 border-b border-slate-50 text-[10px] hover:bg-blue-50 cursor-pointer text-slate-700 transition-colors" 
+                    onclick="selectMaterial(this, '${item.id_designator}', '${item.designator} - ${nameEscaped}')">
+                    ${label}
+                </li>`;
         });
 
         tr.innerHTML = `
-            <td class="p-1.5 border-r border-slate-100">
-                <select name="materials[]" class="w-full text-[11px] rounded bg-white border border-slate-200 outline-none p-2">${options}</select>
+            <td class="p-1.5 border-r border-slate-100 relative align-top">
+                <!-- Input hidden yang dikirim ke form/backend -->
+                <input type="hidden" name="materials[]" value="${selectedId}">
+                
+                <div class="relative">
+                    <input type="text" 
+                        class="w-full text-[11px] rounded bg-white border border-slate-200 outline-none p-2 pr-6 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
+                        placeholder="Ketik cari material..." 
+                        value="${selectedText}" 
+                        autocomplete="off"
+                        onfocus="openDropdown(this)"
+                        onblur="closeDropdown(this)"
+                        onkeyup="filterDropdown(this)">
+                    
+                    <!-- Icon Search -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="absolute right-2 top-2.5 w-3 h-3 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                </div>
+
+                <!-- Dropdown List -->
+                <ul class="absolute left-0 z-50 w-[250px] bg-white border border-slate-200 shadow-2xl max-h-48 overflow-y-auto rounded-lg mt-1 hidden material-list">
+                    ${listItems}
+                </ul>
             </td>
-            <td class="p-1.5 border-r border-slate-100">
-                <input type="number" name="qty[]" value="${qty}" min="1" class="w-full text-center text-xs rounded bg-white border border-slate-200 p-2 outline-none">
+            <td class="p-1.5 border-r border-slate-100 align-top">
+                <input type="number" name="qty[]" value="${qty}" min="1" class="w-full text-center text-xs rounded bg-white border border-slate-200 p-2 outline-none focus:border-blue-500">
             </td>
-            <td class="p-1.5 text-center">
-                <button type="button" onclick="this.closest('tr').remove(); checkFormValidity();" class="w-6 h-6 bg-red-50 text-red-600 rounded text-xs font-bold">✕</button>
+            <td class="p-1.5 text-center align-top">
+                <button type="button" onclick="this.closest('tr').remove(); checkFormValidity();" class="w-7 h-7 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-bold transition">✕</button>
             </td>
         `;
         tbody.appendChild(tr);
         checkFormValidity();
     }
 
+    // Fungsi-fungsi pembantu untuk dropdown
+    function openDropdown(input) {
+        // Tutup dropdown lain yang sedang terbuka
+        document.querySelectorAll('.material-list').forEach(ul => ul.classList.add('hidden'));
+        
+        let ul = input.parentElement.nextElementSibling;
+        ul.classList.remove('hidden');
+        
+        // Reset filter pencarian saat pertama diklik
+        let items = ul.getElementsByTagName('li');
+        for (let i = 0; i < items.length; i++) {
+            items[i].style.display = "";
+        }
+    }
+
+    function closeDropdown(input) {
+        // Timeout sedikit agar klik pada <li> bisa diproses sebelum dropdown ditutup
+        setTimeout(() => {
+            let ul = input.parentElement.nextElementSibling;
+            if(ul) ul.classList.add('hidden');
+            
+            // Validasi: jika teks input dihapus manual jadi kosong, maka hapus ID hidden-nya juga
+            if(input.value.trim() === '') {
+                input.parentElement.previousElementSibling.value = '';
+                checkFormValidity();
+            }
+        }, 200);
+    }
+
+    function filterDropdown(input) {
+        let filter = input.value.toLowerCase();
+        let ul = input.parentElement.nextElementSibling;
+        let items = ul.getElementsByTagName('li');
+
+        for (let i = 0; i < items.length; i++) {
+            let txtValue = items[i].textContent || items[i].innerText;
+            if (txtValue.toLowerCase().indexOf(filter) > -1) {
+                items[i].style.display = "";
+            } else {
+                items[i].style.display = "none";
+            }
+        }
+    }
+
+    function selectMaterial(li, id, text) {
+        let ul = li.parentElement;
+        let visibleInput = ul.previousElementSibling.querySelector('input[type="text"]');
+        let hiddenInput = ul.previousElementSibling.previousElementSibling; // tag <input type="hidden">
+
+        hiddenInput.value = id;
+        visibleInput.value = text;
+        
+        ul.classList.add('hidden');
+        checkFormValidity();
+    }
+
+    // UPDATE: Pada fungsi checkFormValidity(), ubah cara validasi array material
     function checkFormValidity() {
         let isValid = false;
         let status = document.querySelector('input[name="status_survey"]:checked');
@@ -311,8 +425,15 @@
                 let core = document.querySelector('input[name="core_ex"]').value.trim();
                 
                 let matsValid = true;
-                document.querySelectorAll('select[name="materials[]"]').forEach(el => { if(!el.value) matsValid = false; });
-                document.querySelectorAll('input[name="qty[]"]').forEach(el => { if(!el.value) matsValid = false; });
+                
+                // --- PERUBAHAN DISINI (ubah dari select ke input hidden) ---
+                document.querySelectorAll('input[name="materials[]"]').forEach(el => { 
+                    if(!el.value) matsValid = false; 
+                });
+                document.querySelectorAll('input[name="qty[]"]').forEach(el => { 
+                    if(!el.value || el.value <= 0) matsValid = false; 
+                });
+                // -----------------------------------------------------------
 
                 if (m === 'A' && document.querySelector('select[name="sub_mode_a"]').value && document.querySelector('input[name="odp_name"]').value.trim() && dist && core && document.querySelector('input[name="power_out"]').value.trim() && matsValid) isValid = true;
                 if (m === 'B' && document.querySelector('select[name="possible_add"]').value && dist && core && document.querySelector('input[name="power_in_feeder"]').value.trim() && matsValid) isValid = true;
@@ -321,11 +442,10 @@
         }
 
         let btn = document.getElementById('btnSubmit');
-        // Jika mode edit, tombol update selalu biru. Jika belum isi, validasi berjalan.
         if (isValid || isEditMode) {
             btn.disabled = false;
             btn.classList.remove('bg-gray-300', 'text-gray-500', 'cursor-not-allowed');
-            if(!isEditMode) btn.classList.add('bg-blue-600', 'text-white'); // Mode baru
+            if(!isEditMode) btn.classList.add('bg-blue-600', 'text-white'); 
         } else {
             btn.disabled = true;
             btn.classList.add('bg-gray-300', 'text-gray-500', 'cursor-not-allowed');

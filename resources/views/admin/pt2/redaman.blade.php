@@ -52,6 +52,7 @@
 
     {{-- 1. Eviden Redaman / OPM / OTDR --}}
     @include('admin.evidences.partials.review-item', [
+       'isPt2' => true,
         'number' => 1,
         'title' => 'Eviden Hasil Ukur (Redaman & Port)',
         'description' => 'Bukti foto pengukuran redaman (OPM/OTDR) sesuai Mode (A/B/C).',
@@ -61,6 +62,7 @@
 
     {{-- 2. Eviden Tambahan (Lainnya) - Opsional --}}
     @include('admin.evidences.partials.review-item', [
+        'isPt2' => true,
         'number' => 2,
         'title' => 'Foto Tambahan / Lainnya (Opsional)',
         'description' => 'Dokumentasi pendukung lainnya di lapangan.',
