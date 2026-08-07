@@ -232,10 +232,21 @@
         checkFormValidity();
     });
 
-    function handleFileSelect(inputElement, key) {
+    async function handleFileSelect(inputElement, key) {
         let files = Array.from(inputElement.files);
-        newFilesStore[key] = newFilesStore[key].concat(files);
+        if (files.length === 0) return;
+
+        // Hilangkan loading kompresi jika ada
+        let loadingEl = document.getElementById('loading-' + key);
+        if(loadingEl) loadingEl.classList.remove('hidden');
+
+        for (let file of files) {
+            // LANGSUNG MASUKKAN FILE ASLI KE STORE TANPA COMPRESS
+            newFilesStore[key].push(file); 
+        }
+        
         inputElement.value = '';
+        if(loadingEl) loadingEl.classList.add('hidden');
         renderPreviews(key);
     }
 

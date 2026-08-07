@@ -323,51 +323,50 @@
         checkFormValidity();
     }
 
-    function compressImage(file, maxWidth = 1280, quality = 0.75) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let w = img.width, h = img.height;
-                    if (w > maxWidth) { h = Math.round((h * maxWidth) / w); w = maxWidth; }
-                    canvas.width = w; canvas.height = h;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, w, h);
-                    canvas.toBlob((blob) => {
-                        let newFileName = file.name.replace(/\.[^/.]+$/, "") + '.jpg';
-                        resolve(new File([blob], newFileName, { type: 'image/jpeg', lastModified: Date.now() }));
-                    }, 'image/jpeg', quality);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-    }
+    // function compressImage(file, maxWidth = 1280, quality = 0.75) {
+    //     return new Promise((resolve) => {
+    //         const reader = new FileReader();
+    //         reader.onload = (e) => {
+    //             const img = new Image();
+    //             img.onload = () => {
+    //                 const canvas = document.createElement('canvas');
+    //                 let w = img.width, h = img.height;
+    //                 if (w > maxWidth) { h = Math.round((h * maxWidth) / w); w = maxWidth; }
+    //                 canvas.width = w; canvas.height = h;
+    //                 const ctx = canvas.getContext('2d');
+    //                 ctx.drawImage(img, 0, 0, w, h);
+    //                 canvas.toBlob((blob) => {
+    //                     let newFileName = file.name.replace(/\.[^/.]+$/, "") + '.jpg';
+    //                     resolve(new File([blob], newFileName, { type: 'image/jpeg', lastModified: Date.now() }));
+    //                 }, 'image/jpeg', quality);
+    //             };
+    //             img.src = e.target.result;
+    //         };
+    //         reader.readAsDataURL(file);
+    //     });
+    // }
 
-    async function handleFileSelect(inputElement, key) {
+    // FUNGSI INI SUDAH TIDAK PAKAI 'async' KARENA TIDAK ADA PROSES KOMPRESI
+    function handleFileSelect(inputElement, key) {
         let files = Array.from(inputElement.files);
         if (files.length === 0) return;
-        document.getElementById('loading-' + key).classList.remove('hidden');
+        
+        let loadingEl = document.getElementById('loading-' + key);
+        if (loadingEl) loadingEl.classList.remove('hidden');
         
         for (let file of files) {
+            // Pastikan yang dimasukkan hanya file gambar
             if (file.type.startsWith('image/')) {
-                const compressedFile = await compressImage(file, 1280, 0.7); 
-                newFilesStore[key].push(compressedFile);
+                newFilesStore[key].push(file); // Masukkan foto ASLI (berserta metadata/exif)
             }
         }
         
         inputElement.value = '';
-        document.getElementById('loading-' + key).classList.add('hidden');
+        if (loadingEl) loadingEl.classList.add('hidden');
         renderPreviews(key);
     }
 
-    function removeNewFile(key, index) {
-        newFilesStore[key].splice(index, 1);
-        renderPreviews(key);
-    }
-
+    // FUNGSI RENDER DIUBAH MENGGUNAKAN URL.createObjectURL AGAR SUPER CEPAT
     function renderPreviews(key) {
         const previewContainer = document.getElementById('preview-' + key);
         previewContainer.innerHTML = ''; 
@@ -375,23 +374,24 @@
         
         newFilesStore[key].forEach((file, index) => {
             dataTransfer.items.add(file);
-            let reader = new FileReader();
-            reader.onload = function(e) {
-                let div = document.createElement('div');
-                div.className = 'relative rounded-xl overflow-hidden border border-blue-200 border-2 aspect-square';
-                div.innerHTML = `
-                    <img src="${e.target.result}" class="w-full h-full object-cover">
-                    <div class="absolute bottom-0 inset-x-0 bg-blue-600 text-white text-[8px] text-center py-0.5 font-bold">BARU</div>
-                    <button type="button" onclick="removeNewFile('${key}', ${index})" class="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md">✕</button>
-                `;
-                previewContainer.appendChild(div);
-            }
-            reader.readAsDataURL(file);
+            
+            // Generate link lokal instan untuk preview (Anti Ngelag)
+            let imgUrl = URL.createObjectURL(file);
+            
+            let div = document.createElement('div');
+            div.className = 'relative rounded-xl overflow-hidden border border-blue-200 border-2 aspect-square';
+            div.innerHTML = `
+                <img src="${imgUrl}" class="w-full h-full object-cover">
+                <div class="absolute bottom-0 inset-x-0 bg-blue-600 text-white text-[8px] text-center py-0.5 font-bold">BARU</div>
+                <button type="button" onclick="removeNewFile('${key}', ${index})" class="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md">✕</button>
+            `;
+            previewContainer.appendChild(div);
         });
 
         document.getElementById('input-' + key).files = dataTransfer.files;
         uploadedData[key] = newFilesStore[key].length;
         
+        // Update Teks Label & Style Kotak Upload
         let labelBtn = document.getElementById('label-btn-' + key);
         let uploadBox = document.getElementById('upload-box-' + key);
         let total = uploadedData[key] + serverData[key];
@@ -407,6 +407,11 @@
         }
 
         checkFormValidity();
+    }
+
+    function removeNewFile(key, index) {
+        newFilesStore[key].splice(index, 1);
+        renderPreviews(key);
     }
 
     function checkFormValidity() {

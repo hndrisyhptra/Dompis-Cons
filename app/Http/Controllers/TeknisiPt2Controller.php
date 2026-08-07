@@ -508,4 +508,41 @@ class TeknisiPt2Controller extends Controller
         return redirect()->route('teknisi.pt2.inbox')
                          ->with('success', '🎉 Luar biasa! Data Project berhasil di-submit dan sedang menunggu Approval Admin.');
     }
+
+    // ==========================================
+    // HELPER: KONVERSI EXIF GPS KE DESIMAL
+    // ==========================================
+    private function getExifGps($file)
+    {
+        $lat = null;
+        $lng = null;
+
+        // Baca exif menggunakan fungsi bawaan PHP (@ untuk menekan error jika file bukan gambar)
+        $exif = @exif_read_data($file->getPathname());
+
+        if ($exif && isset($exif['GPSLatitude']) && isset($exif['GPSLongitude'])) {
+            $lat = $this->convertGpsArrayToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef']);
+            $lng = $this->convertGpsArrayToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef']);
+        }
+
+        return ['latitude' => $lat, 'longitude' => $lng];
+    }
+
+    private function convertGpsArrayToDecimal($coordinate, $hemisphere)
+    {
+        $degrees = count($coordinate) > 0 ? $this->gpsFractionToFloat($coordinate[0]) : 0;
+        $minutes = count($coordinate) > 1 ? $this->gpsFractionToFloat($coordinate[1]) : 0;
+        $seconds = count($coordinate) > 2 ? $this->gpsFractionToFloat($coordinate[2]) : 0;
+
+        $flip = ($hemisphere == 'W' || $hemisphere == 'S') ? -1 : 1;
+        return $flip * ($degrees + $minutes / 60 + $seconds / 3600);
+    }
+
+    private function gpsFractionToFloat($fraction)
+    {
+        $parts = explode('/', $fraction);
+        if (count($parts) <= 0) return 0;
+        if (count($parts) == 1) return $parts[0];
+        return floatval($parts[0]) / (floatval($parts[1]) ?: 1); // Hindari division by zero
+    }
 }

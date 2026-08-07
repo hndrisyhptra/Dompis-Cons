@@ -221,44 +221,46 @@
         checkFormValidity();
     });
 
-    function compressImage(file, maxWidth = 1280, quality = 0.75) {
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let w = img.width, h = img.height;
-                    if (w > maxWidth) { h = Math.round((h * maxWidth) / w); w = maxWidth; }
-                    canvas.width = w; canvas.height = h;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, w, h);
-                    canvas.toBlob((blob) => {
-                        let newFileName = file.name.replace(/\.[^/.]+$/, "") + '.jpg';
-                        resolve(new File([blob], newFileName, { type: 'image/jpeg', lastModified: Date.now() }));
-                    }, 'image/jpeg', quality);
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
-    }
+    // function compressImage(file, maxWidth = 1280, quality = 0.75) {
+    //     return new Promise((resolve) => {
+    //         const reader = new FileReader();
+    //         reader.onload = (e) => {
+    //             const img = new Image();
+    //             img.onload = () => {
+    //                 const canvas = document.createElement('canvas');
+    //                 let w = img.width, h = img.height;
+    //                 if (w > maxWidth) { h = Math.round((h * maxWidth) / w); w = maxWidth; }
+    //                 canvas.width = w; canvas.height = h;
+    //                 const ctx = canvas.getContext('2d');
+    //                 ctx.drawImage(img, 0, 0, w, h);
+    //                 canvas.toBlob((blob) => {
+    //                     let newFileName = file.name.replace(/\.[^/.]+$/, "") + '.jpg';
+    //                     resolve(new File([blob], newFileName, { type: 'image/jpeg', lastModified: Date.now() }));
+    //                 }, 'image/jpeg', quality);
+    //             };
+    //             img.src = e.target.result;
+    //         };
+    //         reader.readAsDataURL(file);
+    //     });
+    // }
 
     async function handleFileSelect(inputElement, key) {
-    let files = Array.from(inputElement.files);
-    if (files.length === 0) return;
+        let files = Array.from(inputElement.files);
+        if (files.length === 0) return;
 
-    document.getElementById('loading-' + key).classList.remove('hidden');
+        // Hilangkan loading kompresi jika ada
+        let loadingEl = document.getElementById('loading-' + key);
+        if(loadingEl) loadingEl.classList.remove('hidden');
 
-    for (let file of files) {
-        // LANGSUNG MASUKKAN FILE ASLI KE STORE (TIDAK ADA KOMPRESI)
-        newFilesStore[key].push(file); 
+        for (let file of files) {
+            // LANGSUNG MASUKKAN FILE ASLI KE STORE TANPA COMPRESS
+            newFilesStore[key].push(file); 
+        }
+        
+        inputElement.value = '';
+        if(loadingEl) loadingEl.classList.add('hidden');
+        renderPreviews(key);
     }
-
-    inputElement.value = '';
-    document.getElementById('loading-' + key).classList.add('hidden');
-    renderPreviews(key);
-}
 
     function removeNewFile(key, index) {
         newFilesStore[key].splice(index, 1);
