@@ -85,9 +85,16 @@ class Project extends Model
         return $this->hasMany(Evidence::class, 'project_id', 'id_project');
     }
 
+    // 1. Relasi Tunggal (Untuk kompatibilitas dengan menu PT2 / Controller lama)
     public function lop()
     {
         return $this->hasOne(Lop::class, 'project_id', 'id_project');
+    }
+
+    // 2. Relasi Jamak (Untuk arsitektur baru 1 Project Banyak LOP di Data PID)
+    public function lops()
+    {
+        return $this->hasMany(Lop::class, 'project_id', 'id_project');
     }
 
     public function progressSummary(): array

@@ -5,12 +5,13 @@
 @php
     $completionRate = $completionRate ?? 0;
 
-    // Cek apakah user sedang memfilter program PT2 (bisa mencakup 'PT 2', 'PT2', dll)
+    // Cek apakah user sedang memfilter program PT2
     $selectedProgram = strtoupper(request('program', ''));
     $isPt2Selected = str_contains($selectedProgram, 'PT2') || str_contains($selectedProgram, 'PT 2') || str_contains($selectedProgram, 'PT-2');
 
-    // Hitung total PT2 Go-Live
-    $totalGolivePt2 = \App\Models\Project::where('is_golive', 1)->count();
+    // CATATAN: Variabel $totalGolivePt2 sudah dikirim dari Controller 
+    // dengan membawa hasil filter aktif (Region, Branch, Program). 
+    // Jadi kita cukup pakai variabel tersebut ($totalGolivePt2 ?? 0).
 
     $mainCards = [
         [
@@ -51,11 +52,11 @@
         ],
     ];
 
-    // Jika filter program PT2 dipilih, masukkan kartu Go-Live ke dalam array kartu utama
+    // Jika filter program PT2 dipilih, masukkan kartu Go-Live menggunakan data terfilter dari Controller
     if ($isPt2Selected) {
         $mainCards[] = [
             'label' => 'PT2 Go-Live',
-            'value' => $totalGolivePt2,
+            'value' => $totalGolivePt2 ?? 0,
             'desc' => 'Approval Golive by SDI',
             'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-check-icon lucide-shield-check"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>',
             'border' => 'border-indigo-300',
@@ -154,9 +155,9 @@
         </div>
 
         {{-- MAIN KPI (DISESUAIKAN MENJADI 5 GRID) --}}
-       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-{{ count($mainCards) }} gap-4">
+        <div class="flex flex-wrap gap-4">
             @foreach($mainCards as $card)
-                <div class="rounded-3xl bg-white dark:bg-slate-900 border {{ $card['border'] }} dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition">
+            <div class="flex-1 min-w-[200px] rounded-3xl bg-white dark:bg-slate-900 border {{ $card['border'] }} p-5 shadow-sm">
                     <div class="flex items-center justify-between gap-4">
                         <div>
                             <p class="text-xs text-slate-500 font-bold uppercase">{{ $card['label'] }}</p>

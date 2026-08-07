@@ -77,8 +77,8 @@
                             </td>
                             <td class="px-5 py-4 text-center">
                                 @if(!$project->is_golive)
-                                    {{-- TOMBOL PROSES GO-LIVE (Hanya jika belum golive) --}}
-                                    <button type="button" onclick="openGoLiveModal('{{ route('sdi.eksekusi.golive', $project->id_project) }}', '{{ $project->pid }}', '{{ $project->project_name }}')" 
+                                    {{-- PERBAIKAN: sdi.eksekusi.golive diganti menjadi sdi.golive.store --}}
+                                    <button type="button" onclick="openGoLiveModal('{{ route('sdi.golive.store', $project->id_project) }}', '{{ $project->pid }}', '{{ $project->project_name }}')" 
                                             class="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm inline-flex items-center gap-2">
                                         Proses Go-Live 🚀
                                     </button>
@@ -113,7 +113,6 @@
 </div>
 
 {{-- MODAL PROSES GO LIVE INTERAKTIF --}}
-{{-- Hapus class hidden dan tambahkan m-auto pada modalContent untuk memastikan posisinya presisi --}}
 <div id="goLiveModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4 opacity-0 transition-opacity duration-300">
     <div class="bg-white dark:bg-gray-900 w-full max-w-md m-auto rounded-3xl overflow-hidden flex flex-col shadow-2xl transform scale-95 transition-transform duration-300" id="modalContent">
         
@@ -203,6 +202,8 @@
         let modalContent = document.getElementById('modalContent');
         
         modal.classList.remove('hidden');
+        modal.classList.add('flex'); // PERBAIKAN: pastikan flex agar di tengah
+        
         setTimeout(() => {
             modal.classList.remove('opacity-0');
             modalContent.classList.remove('scale-95');
@@ -218,7 +219,6 @@
         modalContent.classList.add('scale-95');
         
         setTimeout(() => {
-            // PERBAIKAN: Kembalikan ke 'hidden'
             modal.classList.remove('flex');
             modal.classList.add('hidden');
             

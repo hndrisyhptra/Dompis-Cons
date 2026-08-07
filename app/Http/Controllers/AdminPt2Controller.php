@@ -12,9 +12,9 @@ class AdminPt2Controller extends Controller
         $statusFilter = $request->input('status_filter', 'pending');
         $search = $request->input('search');
 
-        // Query dasar: Ambil yang Program SAP-nya mengandung unsur PT2
-        $query = Project::with(['lop', 'assignment.teknisi', 'evidences', 'pt2Survey'])
-            ->whereHas('lop', function ($q) {
+        // [PERBAIKAN] Gunakan 'lops' (jamak) sebagai relasi utama
+        $query = Project::with(['lops', 'assignment.teknisi', 'evidences', 'pt2Survey'])
+            ->whereHas('lops', function ($q) {
                 $q->where(function($subQ) {
                     $subQ->where('program_sap', 'LIKE', '%PT2%')
                          ->orWhere('program_sap', 'LIKE', '%PT-2%')
@@ -26,14 +26,16 @@ class AdminPt2Controller extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('project_name', 'like', "%{$search}%")
-                  ->orWhereHas('lop', function ($qLop) use ($search) {
+                  ->orWhere('pid_sap', 'like', "%{$search}%") // Tambahan search PID SAP
+                  ->orWhereHas('lops', function ($qLop) use ($search) {
                       $qLop->where('id_ihld', 'like', "%{$search}%")
+                           ->orWhere('lop_name', 'like', "%{$search}%") // Tambahan search LOP Name
                            ->orWhere('sto', 'like', "%{$search}%");
                   });
             });
         }
 
-        // LOGIKA TAB FILTER YANG SUDAH DIPERBAIKI
+        // LOGIKA TAB FILTER
         if ($statusFilter === 'pending') {
             // Tampilkan yang ADA eviden pending DAN belum Go-Live SDI
             $query->whereHas('evidences', function($qEv) {
@@ -44,15 +46,16 @@ class AdminPt2Controller extends Controller
             });
         } elseif ($statusFilter === 'active') {
             // On Progress: Semua yang belum selesai
-            $query->whereNotIn('status', ['completed', 'close']);
+            $query->whereNotIn('status_project', ['completed', 'close', 'drop']);
         } elseif ($statusFilter === 'completed') {
             // Completed: Tampilkan project yang sudah Selesai / Go-Live / Close
-            $query->whereIn('status', ['completed', 'close']); 
+            $query->whereIn('status_project', ['completed', 'close'])
+                  ->orWhere('is_golive', 1); 
         }
 
         $projects = $query->orderBy('updated_at', 'desc')->paginate(10);
 
-        return view('admin.pt2.approval-list', compact('projects'));
+        return view('admin.pt2.approval-list', compact('projects', 'statusFilter'));
     }
 
     public function review($id)

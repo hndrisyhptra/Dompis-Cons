@@ -14,6 +14,8 @@ use App\Http\Controllers\DesignatorPriceController;
 use App\Http\Controllers\AssignWaspangController;
 use App\Http\Controllers\DashboardPmController;
 use App\Http\Controllers\TeknisiPt2Controller;
+use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\AdminPt2Controller;
 
 
 
@@ -565,6 +567,8 @@ Route::prefix('admin/pt2')->name('admin.pt2.')->middleware(['auth'])->group(func
 */
 Route::middleware(['auth'])->prefix('sdi')->name('sdi.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\SdiController::class, 'index'])->name('index');
+
+    Route::get('/eksekusi-golive/{id}', [\App\Http\Controllers\SdiController::class, 'eksekusiGolive'])->name('eksekusi.golive');
     
     // Cukup gunakan 1 route ini untuk mengeksekusi fungsi submitGolive
     Route::post('/golive/{id}', [\App\Http\Controllers\SdiController::class, 'submitGolive'])->name('golive.store');
@@ -572,8 +576,19 @@ Route::middleware(['auth'])->prefix('sdi')->name('sdi.')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| AUTH
+| NEW MENU PER PROGRAM
 |--------------------------------------------------------------------------
 */
+Route::prefix('program')->name('program.')->group(function () {
+    // PT 2 (Menggunakan controller yang sudah ada)
+    Route::get('/pt2', [AdminPt2Controller::class, 'index'])->name('pt2');
+
+    // Program Lainnya
+    Route::get('/osp', [ProgramController::class, 'osp'])->name('osp');
+    Route::get('/node-b', [ProgramController::class, 'nodeB'])->name('nodeb');
+    Route::get('/hem', [ProgramController::class, 'hem'])->name('hem');
+    Route::get('/olo', [ProgramController::class, 'olo'])->name('olo');
+    Route::get('/konstruk-eksternal', [ProgramController::class, 'konstruksiEksternal'])->name('konstruk');
+});
 
 require __DIR__.'/auth.php';

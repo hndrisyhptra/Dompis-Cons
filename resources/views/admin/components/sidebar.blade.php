@@ -117,122 +117,130 @@
             </div>
         </div>
 
-        @php
-            $projectOpen = request()->routeIs('projects.*');
-            $activeProgram = request('program');
-        @endphp
+       @php
+    // Mengecek apakah URL saat ini adalah bagian dari menu program
+    $isProjectMenuOpen = request()->routeIs('program.*');
+@endphp
 
-        {{-- PROJECT ID --}}
-        <div x-data="{ open: {{ $projectOpen ? 'true' : 'false' }} }">
+<div x-data="{ open: {{ $isProjectMenuOpen ? 'true' : 'false' }} }">
 
-            <button type="button"
-                    @click="open = !open"
-                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
-                    {{ $projectOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+    {{-- BUTTON HEADER MENU --}}
+    <button type="button"
+            @click="open = !open"
+            class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            {{ $isProjectMenuOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
-                <div class="flex items-center gap-3">
-                    @if($projectOpen)
-                        <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
-                    @endif
+        <div class="flex items-center gap-3">
+            @if($isProjectMenuOpen)
+                <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+            @endif
 
-                    <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                            class="w-5 h-5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <path d="M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z"/>
-                            <path d="M8 7h8"/>
-                            <path d="M8 11h8"/>
-                            <path d="M8 15h5"/>
-                        </svg>
-                    </div>
-
-                    <span>Project ID</span>
-                </div>
-
-                <svg :class="open ? 'rotate-180' : ''"
-                    class="w-4 h-4 transition-transform"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
+            <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                    class="w-5 h-5"
                     viewBox="0 0 24 24"
-                    stroke="currentColor">
-                    <path stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M19 9l-7 7-7-7"/>
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z"/>
+                    <path d="M8 7h8"/>
+                    <path d="M8 11h8"/>
+                    <path d="M8 15h5"/>
                 </svg>
-            </button>
+            </div>
 
-                <div x-show="open"
-                    x-transition
-                    class="mt-2 ml-5 pl-3 border-l border-gray-200 dark:border-gray-700 space-y-1">
-
-                    <a href="{{ route('projects.index', ['program' => 'OSP']) }}"
-                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                    {{ $activeProgram == 'OSP' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                        <span class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                            OSP
-                        </span>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Fiber</span>
-                    </a>
-
-                    <a href="{{ route('projects.index', ['program' => 'NODE B']) }}"
-                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                    {{ $activeProgram == 'NODE B' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                        <span class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
-                            NODE B
-                        </span>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Site</span>
-                    </a>
-
-                    <a href="{{ route('projects.index', ['program' => 'HEM']) }}"
-                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                    {{ $activeProgram == 'HEM' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                        <span class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                            HEM
-                        </span>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">HEM</span>
-                    </a>
-
-                    <a href="{{ route('projects.index', ['program' => 'OLO']) }}"
-                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                    {{ $activeProgram == 'OLO' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                        <span class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                            OLO
-                        </span>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">Partner</span>
-                    </a>
-
-                    <a href="{{ route('projects.index', ['program' => 'Konstruksi Eksternal']) }}"
-                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                    {{ $activeProgram == 'Konstruksi Eksternal' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                        <span class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-red-500"></span>
-                            Eksternal
-                        </span>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700">Exbis</span>
-                    </a>
-
-                    <a href="{{ route('projects.index', ['program' => 'PT 2']) }}"
-                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
-                    {{ $activeProgram == 'PT 2' ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-                        <span class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
-                            PT 2
-                        </span>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">Swakelola</span>
-                    </a>
-
-                </div>
+            <span>Project ID</span>
         </div>
+
+        <svg :class="open ? 'rotate-180' : ''"
+            class="w-4 h-4 transition-transform"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor">
+            <path stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 9l-7 7-7-7"/>
+        </svg>
+    </button>
+
+    {{-- DROPDOWN SUB-MENU --}}
+    <div x-show="open"
+        x-transition
+        x-cloak
+        class="mt-2 ml-5 pl-3 border-l border-gray-200 dark:border-gray-700 space-y-1">
+
+        {{-- OSP --}}
+        <a href="{{ route('program.osp') }}"
+        class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+        {{ request()->routeIs('program.osp') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+            <span class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full {{ request()->routeIs('program.osp') ? 'bg-blue-600' : 'bg-blue-400' }}"></span>
+                OSP
+            </span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Fiber</span>
+        </a>
+
+        {{-- NODE B --}}
+        <a href="{{ route('program.nodeb') }}"
+        class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+        {{ request()->routeIs('program.nodeb') ? 'bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+            <span class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full {{ request()->routeIs('program.nodeb') ? 'bg-purple-600' : 'bg-purple-400' }}"></span>
+                NODE B
+            </span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Site</span>
+        </a>
+
+        {{-- HEM --}}
+        <a href="{{ route('program.hem') }}"
+        class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+        {{ request()->routeIs('program.hem') ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+            <span class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full {{ request()->routeIs('program.hem') ? 'bg-amber-600' : 'bg-amber-400' }}"></span>
+                HEM
+            </span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">HEM</span>
+        </a>
+
+        {{-- OLO --}}
+        <a href="{{ route('program.olo') }}"
+        class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+        {{ request()->routeIs('program.olo') ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+            <span class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full {{ request()->routeIs('program.olo') ? 'bg-green-600' : 'bg-green-400' }}"></span>
+                OLO
+            </span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">Partner</span>
+        </a>
+
+        {{-- Konstruksi Eksternal --}}
+        <a href="{{ route('program.konstruk') }}"
+        class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+        {{ request()->routeIs('program.konstruk') ? 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+            <span class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full {{ request()->routeIs('program.konstruk') ? 'bg-red-600' : 'bg-red-400' }}"></span>
+                Eksternal
+            </span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700">Exbis</span>
+        </a>
+
+        {{-- PT 2 --}}
+        <a href="{{ route('program.pt2') }}"
+        class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+        {{ request()->routeIs('program.pt2') ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+            <span class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full {{ request()->routeIs('program.pt2') ? 'bg-cyan-600' : 'bg-cyan-400' }}"></span>
+                PT 2
+            </span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">Swakelola</span>
+        </a>
+
+    </div>
+</div>
 
         @php
             $masterDesignatorOpen = request()->routeIs('designators.*')

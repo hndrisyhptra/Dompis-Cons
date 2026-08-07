@@ -509,7 +509,7 @@
                             </label>
                             <select name="mapping_by" required
                                     class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm">
-                                <option value="pid">By PID SAP</option>
+                                <!-- <option value="pid">By PID SAP</option> -->
                                 <option value="id_ihld">ID IHLD</option>
                                 <option value="lop_name">By Nama LOP</option>
                             </select>
@@ -716,15 +716,14 @@
         setTimeout(() => setProgress(70, 'stepMatching'), 1600);
         setTimeout(() => setProgress(95, 'stepComplete'), 2300);
     }
-</script>
-<script>
-    // PERBAIKAN: Memanggil data langsung dari Model agar tidak bergantung pada Controller
+
+    // --- MANAJEMEN CUSTOMER & PACKAGE DINAMIS ---
     const allPackages = @json(\App\Models\Package::all() ?? []); 
 
     function toggleCustomerType() {
         try {
             const typeRadio = document.querySelector('input[name="project_type"]:checked');
-            if (!typeRadio) return; // Keamanan tambahan
+            if (!typeRadio) return;
             
             const type = typeRadio.value;
             const wrapperExbis = document.getElementById('wrapper_customer_exbis');
@@ -742,7 +741,7 @@
                 wrapperPackage.classList.add('md:col-span-2');
                 selectExbis.required = false;
                 selectExbis.value = ""; 
-                finalCustomerId.value = "1"; 
+                finalCustomerId.value = "1"; // Default ID untuk internal (TIF)
             }
 
             updatePackageDropdown();
@@ -768,10 +767,8 @@
             const activeCustomerId = document.getElementById('final_customer_id').value;
             const packageSelect = document.getElementById('package_id');
             
-            // Reset isi dropdown package
             packageSelect.innerHTML = '<option value="">-- Pilih Package --</option>';
             
-            // Jika ID customer kosong, matikan package
             if (!activeCustomerId || activeCustomerId === "") {
                 packageSelect.disabled = true;
                 return;
@@ -779,7 +776,6 @@
 
             packageSelect.disabled = false;
 
-            // Filter data package
             const filteredPackages = allPackages.filter(pkg => pkg.customer_id == activeCustomerId);
             
             filteredPackages.forEach(pkg => {
@@ -793,7 +789,16 @@
         }
     }
 
-    // Jalankan inisialisasi
+    // Fungsi tambahan untuk tombol Download Template agar membawa parameter customer_id jika diperlukan
+    function downloadTemplateWithParams() {
+        const customerId = document.getElementById('final_customer_id').value;
+        const baseUrl = "{{ route('admin.import.boq.template') }}";
+        
+        // Mengarahkan ke route template dengan menyertakan parameter customer_id
+        window.location.href = `${baseUrl}?customer_id=${customerId}`;
+    }
+
+    // Jalankan inisialisasi saat halaman selesai dimuat
     document.addEventListener('DOMContentLoaded', function() {
         toggleCustomerType();
     });

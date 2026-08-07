@@ -40,7 +40,7 @@ class ImportController extends Controller
         ));
     }
 
-    public function importPid(Request $request)
+   public function importPid(Request $request)
     {
         ini_set('memory_limit', '1024M');
         set_time_limit(0);
@@ -54,7 +54,6 @@ class ImportController extends Controller
 
         $file = $request->file('file');
         $fileName = $file->getClientOriginalName();
-
         $filePath = $file->getRealPath();
         
         try {
@@ -72,7 +71,6 @@ class ImportController extends Controller
         $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
 
         $headers = [];
-
         for ($col = 1; $col <= $highestColumnIndex; $col++) {
             $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
             $header = strtolower(trim((string) $sheet->getCell($columnLetter . '1')->getValue()));
@@ -81,7 +79,6 @@ class ImportController extends Controller
 
         $requiredHeaders = ['pid_sap', 'id_ihld', 'nama_lop'];
         $missingHeaders = [];
-
         foreach ($requiredHeaders as $requiredHeader) {
             if (!in_array($requiredHeader, $headers)) {
                 $missingHeaders[] = $requiredHeader;
@@ -116,7 +113,8 @@ class ImportController extends Controller
         $validRows = 0;
 
         $invalidRows = [];
-        $pidSapTracker = [];
+        $duplicateTracker = []; // Tracker duplikat ID_IHLD & Nama LOP di file
+        $trackedProjects = [];  // Tracker agar tidak hitung double saat update project (Wadah)
 
         for ($row = 2; $row <= $highestRow; $row++) {
 
@@ -149,16 +147,15 @@ class ImportController extends Controller
             $rowErrors = [];
             if (!$pidSap) $rowErrors[] = 'PID SAP wajib diisi';
             if (!$namaLop) $rowErrors[] = 'Nama LOP wajib diisi';
+            if (!$idIhld) $rowErrors[] = 'ID IHLD wajib diisi';
 
-            if ($pidSap) {
-                $pidSapKey = strtolower(trim($pidSap));
-                $ihldKey = strtolower(trim($idIhld));
-                $trackerKey = $programFormatted === 'PT 2' ? $pidSapKey . '_' . $ihldKey : $pidSapKey;
-
-                if (isset($pidSapTracker[$trackerKey])) {
-                    $rowErrors[] = 'Duplikat di file pada row ' . $pidSapTracker[$trackerKey];
+            // ATURAN DUPLIKAT: Kombinasi id_ihld DAN nama_lop tidak boleh sama persis di dalam file
+            if ($namaLop && $idIhld) {
+                $trackerKey = strtolower(trim($idIhld)) . '_' . strtolower(trim($namaLop));
+                if (isset($duplicateTracker[$trackerKey])) {
+                    $rowErrors[] = 'Duplikat data di file (ID IHLD & Nama LOP sama) pada baris ' . $duplicateTracker[$trackerKey];
                 } else {
-                    $pidSapTracker[$trackerKey] = $row;
+                    $duplicateTracker[$trackerKey] = $row;
                 }
             }
 
@@ -179,67 +176,89 @@ class ImportController extends Controller
             $statusProject = $this->cleanValue($data['status_project'] ?? 'active') ?: 'active';
             
             if (!in_array($executionType, ['kemitraan', 'swakelola', 'turnkey'])) $executionType = 'kemitraan';
-            // UPDATE: Tambahkan 'drop' ke dalam pengecekan validasi import excel
             if (!in_array($statusProject, ['init', 'active', 'close', 'bast', 'drop'])) $statusProject = 'active';
 
             $pidForProject = $pid ?: $pidSap;
 
-            $projectPayload = [
-                'customer_id'     => $customerId,
-                'pid'             => $pidForProject,
-                'pid_sap'         => $pidSap,
-                'project_name'    => $namaLop,
-                'program'         => $programFormatted,
-                'branch'          => $this->cleanValue($data['branch'] ?? null),
-                'sto'             => $this->cleanValue($data['sto'] ?? null),
-                'mitra_name'      => $this->cleanValue($data['mitra_name'] ?? null),
-                'execution_type'  => $executionType,
-                'status_project'  => $statusProject,
-            ];
-
+            // =========================================================================
+            // 1. KELOLA PROJECT (WADAH) - HANYA 1 PROJECT PER PID_SAP
+            // =========================================================================
             $project = \App\Models\Project::where('pid_sap', $pidSap)->first();
-            if (!$project && $pid) {
-                $project = \App\Models\Project::where('pid', $pid)->first();
-            }
 
             if ($project) {
-                $project->update($projectPayload);
-                $projectUpdated++;
+                // SMART UPDATE: Hanya timpa kolom project jika di file Excel ADA ISINYA.
+                // Jika kosong (null), biarkan data lama yang sudah tersimpan.
+                $updatePayload = [];
+                
+                if ($programFormatted) $updatePayload['program'] = $programFormatted;
+                if ($pidForProject) $updatePayload['pid'] = $pidForProject;
+                
+                $branchData = $this->cleanValue($data['branch'] ?? null);
+                if ($branchData) $updatePayload['branch'] = $branchData;
+                
+                $stoData = $this->cleanValue($data['sto'] ?? null);
+                if ($stoData) $updatePayload['sto'] = $stoData;
+                
+                $mitraData = $this->cleanValue($data['mitra_name'] ?? null);
+                if ($mitraData) $updatePayload['mitra_name'] = $mitraData;
+
+                $updatePayload['execution_type'] = $executionType;
+                $updatePayload['status_project'] = $statusProject;
+
+                // Lakukan update HANYA dengan kolom yang ada isinya
+                $project->update($updatePayload);
+                
+                if (!in_array($project->id_project, $trackedProjects)) {
+                    $projectUpdated++;
+                    $trackedProjects[] = $project->id_project;
+                }
             } else {
+                // Buat Project Baru (Wadah Pertama)
+                $projectPayload = [
+                    'customer_id'     => $customerId,
+                    'pid'             => $pidForProject,
+                    'pid_sap'         => $pidSap,
+                    // Nama Generic karena menampung banyak LOP
+                    'project_name'    => 'Project ' . $pidSap, 
+                    'program'         => $programFormatted,
+                    'branch'          => $this->cleanValue($data['branch'] ?? null),
+                    'sto'             => $this->cleanValue($data['sto'] ?? null),
+                    'mitra_name'      => $this->cleanValue($data['mitra_name'] ?? null),
+                    'execution_type'  => $executionType,
+                    'status_project'  => $statusProject,
+                ];
+
                 $project = \App\Models\Project::create($projectPayload);
                 $projectImported++;
+                $trackedProjects[] = $project->id_project;
             }
+
+            // =========================================================================
+            // 2. KELOLA LOP (ISI) - DIKAITKAN KE WADAH PROJECT DI ATAS
+            // =========================================================================
+            $lop = \App\Models\Lop::where('project_id', $project->id_project)
+                ->where('id_ihld', $idIhld)
+                ->whereRaw('LOWER(TRIM(lop_name)) = ?', [strtolower(trim($namaLop))])
+                ->first();
 
             $lopPayload = [
-                'project_id' => $project->id_project, 
-                'id_ihld' => $idIhld,
-                'lop_name' => $namaLop,
-                'pid_sap' => $pidSap,
-                'program_sap' => $programFormatted, 
-                'tematik' => $this->cleanValue($data['tematik'] ?? null),
-                'sto' => $this->cleanValue($data['sto'] ?? null),
-                'branch' => $this->cleanValue($data['branch'] ?? null),
-                'batch' => $this->cleanValue($data['batch'] ?? null),
-                'no_sp' => $this->cleanValue($data['no_sp'] ?? null),
-                'tgl_sp' => $this->cleanDate($data['tgl_sp'] ?? null),
-                'tgl_toc' => $this->cleanDate($data['tgl_toc'] ?? null),
-                'mitra_name' => $this->cleanValue($data['mitra_name'] ?? null),
-                'mapping_status' => 'auto_matched',
-                'status_progress' => 'preparation',
+                'project_id'      => $project->id_project, 
+                'id_ihld'         => $idIhld,
+                'lop_name'        => $namaLop,
+                'pid_sap'         => $pidSap,
+                'program_sap'     => $programFormatted, 
+                'tematik'         => $this->cleanValue($data['tematik'] ?? null),
+                'sto'             => $this->cleanValue($data['sto'] ?? null),
+                'branch'          => $this->cleanValue($data['branch'] ?? null),
+                'batch'           => $this->cleanValue($data['batch'] ?? null),
+                'no_sp'           => $this->cleanValue($data['no_sp'] ?? null),
+                'tgl_sp'          => $this->cleanDate($data['tgl_sp'] ?? null),
+                'tgl_toc'         => $this->cleanDate($data['tgl_toc'] ?? null),
+                'mitra_name'      => $this->cleanValue($data['mitra_name'] ?? null),
+                'mapping_status'  => 'auto_matched',
+                // Pastikan tidak mereset progress yang sudah ada saat update
+                'status_progress' => $lop ? $lop->status_progress : 'preparation',
             ];
-
-            $lop = null;
-            if ($idIhld) {
-                $lop = \App\Models\Lop::where('project_id', $project->id_project)
-                    ->where('id_ihld', $idIhld)
-                    ->first();
-            }
-
-            if (!$lop) {
-                $lop = \App\Models\Lop::where('project_id', $project->id_project)
-                    ->whereRaw('LOWER(TRIM(lop_name)) = ?', [strtolower(trim($namaLop))])
-                    ->first();
-            }
 
             if ($lop) {
                 $lop->update($lopPayload);
@@ -280,7 +299,7 @@ class ImportController extends Controller
             ])
             ->with(
                 'success',
-                "Import PID selesai. Project Baru {$projectImported}, Update Project {$projectUpdated}, LOP Baru {$lopImported}, Update LOP {$lopUpdated}, Data di Skip {$skipped}."
+                "Import Selesai. Project (Wadah): {$projectImported} Baru, {$projectUpdated} Update. LOP (Detail): {$lopImported} Baru, {$lopUpdated} Update. Skipped: {$skipped}."
             );
     }
 
@@ -1228,7 +1247,7 @@ class ImportController extends Controller
         // ====================================================================
 
         // 3. Query Utama dengan Filter
-        $query = \App\Models\Project::with('lop');
+        $query = \App\Models\Project::with('lops');
 
         if ($search) {
             $query->where(function ($q) use ($search) {

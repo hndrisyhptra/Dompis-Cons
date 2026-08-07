@@ -200,10 +200,12 @@
                             <th class="px-5 py-4 text-center text-xs font-black text-slate-500 uppercase">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                   <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
                         @forelse($projects as $project)
                             @php
-                                $lop = $project->lop;
+                                $lops = $project->lops ?? collect();
+                                $lopsCount = $lops->count();
+                                $firstLop = $lops->first();
 
                                 $detailData = [
                                     'id_project' => $project->id_project,
@@ -213,21 +215,27 @@
                                     'program' => $project->program ?? '-',
                                     'execution_type' => $project->execution_type ?? '-',
                                     'status_project' => $project->status_project ?? '-',
-                                    'id_ihld' => $lop?->id_ihld ?? '-',
-                                    'lop_name' => $lop?->lop_name ?? $project->project_name ?? '-',
-                                    'sto' => $lop?->sto ?? '-',
-                                    'branch' => $lop?->branch ?? '-',
-                                    'tematik' => $lop?->tematik ?? '-',
-                                    'batch' => $lop?->batch ?? '-',
-                                    'mitra_name' => $lop?->mitra_name ?? '-',
-                                    'no_sp' => $lop?->no_sp ?? '-',
-                                    'tgl_sp' => $lop?->tgl_sp ?? '-',
-                                    'tgl_toc' => $lop?->tgl_toc ?? '-',
+                                    'id_ihld' => $firstLop?->id_ihld ?? '-',
+                                    'lop_name' => $firstLop?->lop_name ?? $project->project_name ?? '-',
+                                    'sto' => $project->sto ?? $firstLop?->sto ?? '-',
+                                    'branch' => $project->branch ?? $firstLop?->branch ?? '-',
+                                    'tematik' => $firstLop?->tematik ?? '-',
+                                    'batch' => $firstLop?->batch ?? '-',
+                                    'mitra_name' => $project->mitra_name ?? $firstLop?->mitra_name ?? '-',
+                                    'no_sp' => $firstLop?->no_sp ?? '-',
+                                    'tgl_sp' => $firstLop?->tgl_sp ?? '-',
+                                    'tgl_toc' => $firstLop?->tgl_toc ?? '-',
                                     'update_url' => route('admin.import.pid.update', $project->id_project),
                                     'delete_url' => route('admin.import.pid.delete', $project->id_project),
                                 ];
                             @endphp
-                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">
+
+                            {{-- BARIS UTAMA (PROJECT / WADAH) --}}
+                            {{-- Hanya bisa di-klik jika LOP lebih dari 1 --}}
+                            <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/60 transition {{ $lopsCount > 1 ? 'cursor-pointer' : '' }}"
+                                @if($lopsCount > 1) 
+                                    @click="expanded === {{ $project->id_project }} ? expanded = null : expanded = {{ $project->id_project }}" 
+                                @endif>
                                 <td class="px-5 py-4 whitespace-nowrap">
                                     <p class="font-black text-slate-900 dark:text-white">{{ $project->pid ?? '-' }}</p>
                                     <p class="text-xs text-slate-500">ID {{ $project->id_project }}</p>
@@ -239,11 +247,23 @@
                                 </td>
                                 <td class="px-5 py-4 min-w-[260px]">
                                     <p class="font-black text-slate-900 dark:text-white truncate max-w-sm">{{ $project->project_name ?? '-' }}</p>
-                                    <p class="text-xs text-slate-500 mt-1">IHLD: {{ $lop?->id_ihld ?? '-' }} · Mitra: {{ $lop?->mitra_name ?? '-' }}</p>
+                                    
+                                    <div class="flex items-center gap-2 mt-1.5">
+                                        <span class="text-[10px] font-black px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">{{ $lopsCount }} LOP</span>
+                                        {{-- Tampilkan teks klik detail hanya jika LOP lebih dari 1 --}}
+                                        @if($lopsCount > 1)
+                                            <span class="text-[10px] text-blue-600 font-bold uppercase tracking-wide">Klik lihat detail ⤓</span>
+                                        @endif
+                                    </div>
+                                    
+                                    {{-- Tampilkan detail sekilas jika hanya ada 1 LOP --}}
+                                    @if($lopsCount == 1)
+                                        <p class="text-[10px] font-bold text-slate-500 mt-1">IHLD: {{ $firstLop?->id_ihld ?? '-' }} · Mitra: {{ $firstLop?->mitra_name ?? '-' }}</p>
+                                    @endif
                                 </td>
                                 <td class="px-5 py-4 whitespace-nowrap">
-                                    <p class="font-bold text-slate-900 dark:text-white">{{ $lop?->sto ?? '-' }}</p>
-                                    <p class="text-xs text-slate-500">{{ $lop?->branch ?? '-' }}</p>
+                                    <p class="font-bold text-slate-900 dark:text-white">{{ $project->sto ?? '-' }}</p>
+                                    <p class="text-xs text-slate-500">{{ $project->branch ?? '-' }}</p>
                                 </td>
                                 <td class="px-5 py-4 whitespace-nowrap">
                                     <span class="px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-black">
@@ -251,9 +271,7 @@
                                     </span>
                                 </td>
                                 <td class="px-5 py-4 text-center whitespace-nowrap">
-                                    @php
-                                        $status = strtolower($project->status_project ?? 'active');
-                                    @endphp
+                                    @php $status = strtolower($project->status_project ?? 'active'); @endphp
                                     <span class="px-3 py-1.5 rounded-full text-xs font-black
                                         {{ $status === 'active' ? 'bg-emerald-50 text-emerald-700' : '' }}
                                         {{ $status === 'init' ? 'bg-blue-50 text-blue-700' : '' }}
@@ -277,16 +295,16 @@
                                                         openMenu = true;
                                                     }
                                                 "
-                                                class="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 font-black">
+                                                class="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 font-black">
                                             ⋮
                                         </button>
                                         <template x-teleport="body">
                                             <div x-show="openMenu" @click.outside="openMenu = false" x-cloak
                                                 :style="`position: fixed; left: ${btnRect.right}px; top: ${dropUp ? (btnRect.top - 8) : (btnRect.bottom + 8)}px; transform: ${dropUp ? 'translate(-100%, -100%)' : 'translateX(-100%)'};`"
                                                 class="w-44 rounded-2xl bg-white border border-slate-200 shadow-2xl z-[9999] overflow-hidden">
-                                                <button type="button" @click="openMenu = false; openDetail(@js($detailData))" class="w-full text-left px-4 py-3 text-sm font-bold hover:bg-slate-50 transition-colors">Detail</button>
+                                                <!-- <button type="button" @click="openMenu = false; openDetail(@js($detailData))" class="w-full text-left px-4 py-3 text-sm font-bold hover:bg-slate-50 transition-colors">Detail</button> -->
                                                 <button type="button" @click="openMenu = false; openEdit(@js($detailData))" class="w-full text-left px-4 py-3 text-sm font-bold text-amber-700 hover:bg-amber-50 transition-colors">Edit</button>
-                                                <form action="{{ route('admin.import.pid.delete', $project->id_project) }}" method="POST" onsubmit="return confirm('Yakin hapus project ini? Semua BOQ dan assignment akan ikut terhapus.')">
+                                                <form action="{{ route('admin.import.pid.delete', $project->id_project) }}" method="POST" onsubmit="return confirm('Yakin hapus project ini? Semua LOP, BOQ dan assignment akan ikut terhapus.')">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button class="w-full text-left px-4 py-3 text-sm font-bold text-red-700 hover:bg-red-50 transition-colors">Delete</button>
@@ -296,6 +314,47 @@
                                     </div>
                                 </td>
                             </tr>
+
+                            {{-- BARIS ANAK (DAFTAR LOP DALAM FORMAT LIST TABEL) --}}
+                            @if($lopsCount > 1)
+                            <tr x-show="expanded === {{ $project->id_project }}" x-collapse x-cloak class="bg-slate-50/80 dark:bg-slate-900/80 border-b-2 border-blue-200 dark:border-blue-900">
+                                <td colspan="7" class="p-0">
+                                    <div class="px-6 md:px-12 py-5">
+                                        <p class="text-xs font-black text-slate-500 uppercase mb-3 tracking-wider">
+                                            Daftar {{ $lopsCount }} LOP Terdaftar di PID Ini
+                                        </p>
+                                        
+                                        <div class="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                                            <table class="w-full text-left text-xs">
+                                                <thead class="bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400">
+                                                    <tr>
+                                                        <th class="px-4 py-3 font-bold uppercase w-12 text-center">No</th>
+                                                        <th class="px-4 py-3 font-bold uppercase">Nama LOP</th>
+                                                        <th class="px-4 py-3 font-bold uppercase">ID IHLD</th>
+                                                        <th class="px-4 py-3 font-bold uppercase">Mitra</th>
+                                                        <th class="px-4 py-3 font-bold uppercase">Program</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-slate-100 dark:divide-slate-700/50">
+                                                    @foreach($lops as $idx => $lopItem)
+                                                        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition">
+                                                            <td class="px-4 py-3 font-medium text-slate-500 text-center">{{ $idx + 1 }}</td>
+                                                            <td class="px-4 py-3 font-black text-slate-800 dark:text-slate-200">{{ $lopItem->lop_name ?? '-' }}</td>
+                                                            <td class="px-4 py-3 font-bold text-slate-600 dark:text-slate-300">{{ $lopItem->id_ihld ?? '-' }}</td>
+                                                            <td class="px-4 py-3 font-bold text-slate-600 dark:text-slate-300">{{ $lopItem->mitra_name ?? '-' }}</td>
+                                                            <td class="px-4 py-3 font-medium text-slate-500">
+                                                                {{ $lopItem->program_sap ?? '-' }}
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            @endif
+
                         @empty
                             <tr>
                                 <td colspan="7" class="px-5 py-12 text-center">
@@ -499,6 +558,7 @@
 
     function pidPage() {
         return {
+            expanded: null,
             showDetail: false,
             showEdit: false,
             selected: {},
