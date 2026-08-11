@@ -2,106 +2,80 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Pt2Survey;
-use App\Models\Project;
-use App\Models\ProjectAssignment;
-use App\Models\Notification;
-use App\Models\Evidence;
-use App\Models\EvidenceRevisionHistory;
-use App\Models\Lop;
-use App\Models\User;
+use App\Models\Pt2Lop;
 use App\Services\ProjectActivityService;
-use App\Models\ProjectIssue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Auth;
 
 class SdiController extends Controller
 {
-    // Menampilkan Daftar Project (Hanya yang dikirim Admin & Sudah GoLive)
+    // Menampilkan Daftar LOP PT 2 untuk SDI Approval
+    // Menampilkan Daftar LOP PT 2 untuk SDI Approval
     public function index(Request $request)
     {
-        // 1. Ambil data project beserta relasi LOP
-        $query = Project::with('lop')
-            ->where(function ($q) {
-                // KONDISI A: Menampilkan project yang dikirim Admin (Sedang antre UT/SDI)
-                $q->where(function ($sub) {
-                    $sub->where('status', 'waiting_ut')
-                        ->where('sdi_approval_status', 'pending');
-                })
-                // KONDISI B: ATAU menampilkan project yang sudah selesai di-GoLive
-                ->orWhere('is_golive', 1);
-            });
+        // Gunakan whereNotNull dan where('sdi_approval_status', '!=', '') 
+        // untuk memastikan LOP yang belum dikirim admin (masih kosong/null) tersaring keluar sepenuhnya.
+        $query = \App\Models\Pt2Lop::with(['project', 'assignment.teknisi'])
+            ->whereNotNull('sdi_approval_status')
+            ->where('sdi_approval_status', '!=', '')
+            ->whereIn('sdi_approval_status', ['pending', 'approved']);
 
-        // 2. Logika Pencarian (Search)
-        if ($request->search) {
-            $query->where(function ($q) use ($request) {
-                $q->where('project_name', 'like', '%' . $request->search . '%')
-                  ->orWhere('pid', 'like', '%' . $request->search . '%')
-                  ->orWhereHas('lop', function ($lopQ) use ($request) {
-                      $lopQ->where('id_ihld', 'like', '%' . $request->search . '%');
-                  });
+        // Logika Pencarian (Search)
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('lop_name', 'like', '%' . $search . '%')
+                ->orWhere('id_ihld', 'like', '%' . $search . '%')
+                ->orWhere('sto', 'like', '%' . $search . '%')
+                ->orWhereHas('project', function ($projQ) use ($search) {
+                    $projQ->where('pid', 'like', '%' . $search . '%');
+                });
             });
         }
 
-        // 3. Eksekusi query dengan Pagination
-        $projects = $query->latest('updated_at')->paginate($request->per_page ?? 10);
+        // Filter status jika ingin (opsional)
+        if ($request->filled('status_filter')) {
+            $query->where('sdi_approval_status', $request->status_filter);
+        }
+
+        $lops = $query->latest('updated_at')->paginate($request->per_page ?? 10)->withQueryString();
         
-        return view('sdi.index', compact('projects'));
+        return view('sdi.index', compact('lops'));
     }
 
-    // Memproses Upload Eviden UIM dan Update Status Go-Live
-    public function submitGolive(Request $request, $id)
+    // Memproses Upload Eviden UIM dan Go-Live Per LOP
+    public function submitGolive(Request $request, $lop_id)
     {
         $request->validate([
-            // Tambahkan webp sebagai best practice kompresi gambar saat ini
             'golive_evidence' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120', 
         ]);
 
-        $project = Project::findOrFail($id);
+        $lop = Pt2Lop::findOrFail($lop_id);
 
         if ($request->hasFile('golive_evidence')) {
             $file = $request->file('golive_evidence');
-            $filename = 'UIM_' . time() . '_' . $project->id_project . '.' . $file->getClientOriginalExtension();
-            $path = $file->storeAs('evidences/golive', $filename, 'public');
+            $filename = 'UIM_PT2_LOP_' . time() . '_' . $lop->id_pt2_lop . '.' . $file->getClientOriginalExtension();
+            $path = $file->storeAs('evidences/golive/pt2', $filename, 'public');
 
-            /*
-            |--------------------------------------------------------------------------
-            | EKSEKUSI GOLIVE FINAL
-            |--------------------------------------------------------------------------
-            */
-            $project->update([
-                'status' => 'completed',            // Kunci utama agar project masuk tab Completed
-                'status_project' => 'close',        // Menyatakan fisik project ditutup
+            // Update status Go-Live spesifik pada tabel pt2_lops
+            $lop->update([
+                'is_golive' => 1,
                 'sdi_approval_status' => 'approved',
-                'is_golive' => 1,                   // Flag ampuh untuk query Dashboard
                 'golive_evidence_path' => $path,
-                'golive_at' => now(),               // Timestamp resmi Golive
+                'golive_at' => now(),
             ]);
 
-            // Update LOP status progress untuk kepastian akhir
-            Lop::where('project_id', $project->id_project)->update([
-                'status_progress' => 'finishing'
-            ]);
-
-            /*
-            |--------------------------------------------------------------------------
-            | CATAT SEJARAH AKTIVITAS
-            |--------------------------------------------------------------------------
-            */
-            $lopId = Lop::where('project_id', $project->id_project)->value('id_lop');
-            
+            // Catat log aktivitas
             ProjectActivityService::log([
-                'project_id' => $project->id_project,
-                'lop_id' => $lopId,
-                'activity_type' => 'project_golive',
-                'title' => 'Project Go-Live (SDI)',
-                'description' => 'Tim SDI telah mengunggah Eviden UIM dan meresmikan status Go-Live.',
+                'project_id' => $lop->pt2_project_id,
+                'lop_id' => $lop->id_pt2_lop,
+                'activity_type' => 'lop_golive_pt2',
+                'title' => 'LOP PT 2 Go-Live (SDI)',
+                'description' => 'Tim SDI telah mengunggah Eviden UIM dan meresmikan status Go-Live untuk LOP: ' . $lop->lop_name,
                 'status_after' => 'completed',
             ]);
 
-            return back()->with('success', '🎉 Luar biasa! Project berhasil di-GoLive dan Eviden UIM telah tersimpan!');
+            return back()->with('success', '🎉 Luar biasa! LOP PT 2 berhasil di-GoLive dan Eviden UIM telah tersimpan!');
         }
 
         return back()->with('error', 'Gagal mengupload eviden. Silakan coba lagi.');

@@ -2,6 +2,8 @@
 
 @section('content')
 @php
+    $lop = $project->lop; // Ambil $lop dari relasi yang disuntikkan oleh Controller
+
     // Ambil data berdasarkan evidence_type yang spesifik untuk Step 3
     $evRedaman = $project->evidences->where('stage', 'finishing')->where('evidence_type', 'redaman_port');
     
@@ -19,7 +21,7 @@
 
     {{-- Header --}}
     <div>
-        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Approval PT2</h1>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Approval LOP PT 2</h1>
         <p class="text-sm text-gray-500">Pilih project untuk mulai review step by step</p>
     </div>
 
@@ -27,13 +29,19 @@
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 shadow-sm">
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-                <h2 class="text-base font-bold text-gray-900 dark:text-white truncate">{{ $project->project_name }}</h2>
-                <p class="text-sm text-gray-500">{{ $project->lop?->branch }} · {{ $project->lop?->sto }}</p>
+                <h2 class="text-base font-bold text-gray-900 dark:text-white truncate">{{ $lop->lop_name }}</h2>
+                <p class="text-sm text-gray-500 font-medium mt-0.5">
+                    PID: <span class="font-bold text-gray-700 dark:text-gray-300">{{ $project->pid ?? '-' }}</span> · 
+                    IHLD: <span class="font-mono text-cyan-600 dark:text-cyan-400">{{ $lop->id_ihld ?? '-' }}</span> · 
+                    STO {{ $lop->sto ?? '-' }}
+                </p>
             </div>
-            <a href="{{ route('admin.pt2.approval') }}" class="h-10 px-4 rounded-xl border border-gray-300 inline-flex items-center text-sm font-bold text-gray-700 hover:bg-gray-50 transition">← Kembali</a>
+            <a href="{{ route('admin.pt2.approval') }}" class="h-10 px-4 rounded-xl border border-gray-300 dark:border-gray-700 inline-flex items-center text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                ← Kembali
+            </a>
         </div>
 
-        @include('admin.pt2.partials.stepper', ['currentStep' => 3])
+        @include('admin.pt2.partials.stepper', ['currentStep' => 3, 'lop' => $lop])
     </div>
 
     {{-- Step Title --}}
@@ -45,14 +53,14 @@
                 <p class="text-sm text-gray-500">Tinjau hasil ukur redaman dan foto tambahan (opsional).</p>
             </div>
             <span class="px-3 py-1 rounded-full text-xs font-bold {{ $step3Completed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }}">
-                {{ $step3Completed ? 'Approved' : 'Pending' }}
+                {{ $step3Completed ? 'Approved' : 'Pending Review' }}
             </span>
         </div>
     </div>
 
     {{-- 1. Eviden Redaman / OPM / OTDR --}}
     @include('admin.evidences.partials.review-item', [
-       'isPt2' => true,
+        'isPt2' => true,
         'number' => 1,
         'title' => 'Eviden Hasil Ukur (Redaman & Port)',
         'description' => 'Bukti foto pengukuran redaman (OPM/OTDR) sesuai Mode (A/B/C).',
@@ -67,15 +75,15 @@
         'title' => 'Foto Tambahan / Lainnya (Opsional)',
         'description' => 'Dokumentasi pendukung lainnya di lapangan.',
         'items' => $evLainnya,
-        'type' => 'foto_lainnya', {{-- PASTIKAN INI TERTULIS foto_lainnya --}}
+        'type' => 'foto_lainnya',
     ])
 
     {{-- Footer Actions --}}
     <div class="flex items-center justify-between pt-2">
-        <a href="{{ route('admin.pt2.instalasi', $project->id_project) }}" class="text-sm font-bold text-gray-500 hover:text-gray-900 transition">
+        <a href="{{ route('admin.pt2.instalasi', $lop->id_pt2_lop) }}" class="text-sm font-bold text-gray-500 hover:text-gray-900 transition">
             ← Step Instalasi
         </a>
-        <a href="{{ route('admin.pt2.dismantle', $project->id_project) }}" class="h-10 px-5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-bold inline-flex items-center justify-center transition hover:opacity-90">
+        <a href="{{ route('admin.pt2.dismantle', $lop->id_pt2_lop) }}" class="h-10 px-5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-bold inline-flex items-center justify-center transition hover:opacity-90">
             Step Dismantle →
         </a>
     </div>

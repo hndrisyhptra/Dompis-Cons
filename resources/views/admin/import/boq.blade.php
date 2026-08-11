@@ -162,231 +162,231 @@
             </div>
         @endif
 
-                {{-- RESULT --}}
-                @if($result)
-                    <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
+        {{-- RESULT --}}
+        @if($result)
+            <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
 
-                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                            <div>
-                                <h2 class="text-lg font-black text-slate-900 dark:text-white">
-                                    Detail Hasil Import BOQ
-                                </h2>
-                                <p class="text-sm text-slate-500">
-                                    File: <b>{{ $result['file_name'] ?? '-' }}</b>
-                                </p>
-                                <p class="text-xs text-slate-500 mt-1">
-                                    Sheet/Package: <b>{{ $result['sheet_name'] ?? '-' }}</b>
-                                </p>
-                            </div>
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                    <div>
+                        <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                            Detail Hasil Import BOQ
+                        </h2>
+                        <p class="text-sm text-slate-500">
+                            File: <b>{{ $result['file_name'] ?? '-' }}</b>
+                        </p>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Sheet/Package: <b>{{ $result['sheet_name'] ?? '-' }}</b>
+                        </p>
+                    </div>
 
-                            <span class="px-4 py-2 rounded-2xl bg-emerald-50 text-emerald-700 text-xs font-black">
-                                IMPORT COMPLETE
-                            </span>
-                        </div>
+                    <span class="px-4 py-2 rounded-2xl bg-emerald-50 text-emerald-700 text-xs font-black">
+                        IMPORT COMPLETE
+                    </span>
+                </div>
 
-                        @if(!empty($result['error_message']))
-                            <div class="rounded-3xl bg-red-50 border border-red-200 p-5 mb-5">
-                                <p class="text-sm font-black text-red-700">
-                                    Import gagal
-                                </p>
-                                <p class="text-xs text-red-600 mt-1">
-                                    {{ $result['error_message'] }}
-                                </p>
-                            </div>
-                        @endif
-
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div class="rounded-3xl bg-slate-50 dark:bg-slate-800 p-5">
-                                <p class="text-xs text-slate-500 font-bold">Header BOQ</p>
-                                <p class="text-3xl font-black text-slate-900 dark:text-white mt-1">
-                                    {{ $result['total_headers'] ?? 0 }}
-                                </p>
-                            </div>
-
-                            <div class="rounded-3xl bg-emerald-50 p-5">
-                                <p class="text-xs text-emerald-700 font-bold">LOP Match</p>
-                                <p class="text-3xl font-black text-emerald-700 mt-1">
-                                    {{ $result['matched_lop'] ?? 0 }}
-                                </p>
-                            </div>
-
-                            <div class="rounded-3xl bg-red-50 p-5">
-                                <p class="text-xs text-red-700 font-bold">LOP Tidak Match</p>
-                                <p class="text-3xl font-black text-red-700 mt-1">
-                                    {{ $result['unmapped_lop'] ?? 0 }}
-                                </p>
-                            </div>
-
-                            <div class="rounded-3xl bg-blue-50 p-5">
-                                <p class="text-xs text-blue-700 font-bold">
-                                    Data Sudah Ada
-                                </p>
-
-                                <p class="text-3xl font-black text-blue-700 mt-1">
-                                    {{ $result['existing_boq_headers'] ?? 0 }}
-                                </p>
-
-                                <p class="text-xs text-blue-600 mt-2">
-                                    PID SAP / Nama LOP yang sudah memiliki BOQ
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                            <div class="rounded-3xl bg-blue-50 p-5">
-                                <p class="text-xs text-blue-700 font-bold">Data Baru</p>
-                                <p class="text-2xl font-black text-blue-700 mt-1">
-                                    {{ $result['imported'] ?? 0 }}
-                                </p>
-                            </div>
-
-                            <div class="rounded-3xl bg-amber-50 p-5">
-                                <p class="text-xs text-amber-700 font-bold">Update</p>
-                                <p class="text-2xl font-black text-amber-700 mt-1">
-                                    {{ $result['updated'] ?? 0 }}
-                                </p>
-                            </div>
-
-                            <div class="rounded-3xl bg-red-50 p-5">
-                                <p class="text-xs text-red-700 font-bold">Designator Tidak Ketemu</p>
-                                <p class="text-2xl font-black text-red-700 mt-1">
-                                    {{ $result['unmapped_designator'] ?? 0 }}
-                                </p>
-                            </div>
-
-                            <div class="rounded-3xl bg-orange-50 p-5">
-                                <p class="text-xs text-orange-700 font-bold">Harga Kosong</p>
-                                <p class="text-2xl font-black text-orange-700 mt-1">
-                                    {{ $result['price_missing'] ?? 0 }}
-                                </p>
-                            </div>
-                        </div>
-
-                        @if(!empty($result['invalid_rows']))
-                            <div class="mt-6 rounded-[2rem] border border-red-200 bg-red-50 overflow-hidden">
-                                <div class="px-5 py-4 border-b border-red-200">
-                                    <h3 class="text-sm font-black text-red-700">
-                                        Preview Data Bermasalah
-                                    </h3>
-                                    <p class="text-xs text-red-600 mt-1">
-                                        Menampilkan maksimal 10 data pertama yang gagal validasi/matching.
-                                    </p>
-                                </div>
-
-                                <div class="overflow-x-auto">
-                                    <table class="w-full text-sm">
-                                        <thead class="bg-red-100/70">
-                                            <tr>
-                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Type</th>
-                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Header</th>
-                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Row</th>
-                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Designator</th>
-                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Qty</th>
-                                                <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Keterangan</th>
-                                            </tr>
-                                        </thead>
-
-                                        <tbody class="divide-y divide-red-200">
-                                            @foreach($result['invalid_rows'] as $invalid)
-                                                <tr>
-                                                    <td class="px-4 py-3 font-bold text-red-700">
-                                                        {{ $invalid['type'] ?? '-' }}
-                                                    </td>
-                                                    <td class="px-4 py-3 text-red-700">
-                                                        {{ $invalid['header'] ?? '-' }}
-                                                    </td>
-                                                    <td class="px-4 py-3 text-red-700">
-                                                        {{ $invalid['row'] ?? '-' }}
-                                                    </td>
-                                                    <td class="px-4 py-3 text-red-700">
-                                                        {{ $invalid['designator'] ?? '-' }}
-                                                    </td>
-                                                    <td class="px-4 py-3 text-red-700">
-                                                        {{ $invalid['qty'] ?? '-' }}
-                                                    </td>
-                                                    <td class="px-4 py-3 font-bold text-red-700">
-                                                        {{ $invalid['reason'] ?? '-' }}
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        @endif
-
+                @if(!empty($result['error_message']))
+                    <div class="rounded-3xl bg-red-50 border border-red-200 p-5 mb-5">
+                        <p class="text-sm font-black text-red-700">
+                            Import gagal
+                        </p>
+                        <p class="text-xs text-red-600 mt-1">
+                            {{ $result['error_message'] }}
+                        </p>
                     </div>
                 @endif
 
-                {{-- LIVE PROGRESS --}}
-                <div id="progressCard"
-                     class="hidden bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
-
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                        <div>
-                            <h2 class="text-lg font-black text-slate-900 dark:text-white">
-                                Proses Import BOQ Berjalan
-                            </h2>
-                            <p id="progressFileName" class="text-sm text-slate-500">
-                                Membaca file...
-                            </p>
-                        </div>
-
-                        <div class="text-right">
-                            <p id="progressPercentText" class="text-3xl font-black text-blue-700">0%</p>
-                            <p class="text-xs text-slate-500 font-bold">Processing</p>
-                        </div>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="rounded-3xl bg-slate-50 dark:bg-slate-800 p-5">
+                        <p class="text-xs text-slate-500 font-bold">Header BOQ</p>
+                        <p class="text-3xl font-black text-slate-900 dark:text-white mt-1">
+                            {{ $result['total_headers'] ?? 0 }}
+                        </p>
                     </div>
 
-                    <div class="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-6">
-                        <div id="progressBar"
-                             class="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-500"
-                             style="width: 0%">
-                        </div>
+                    <div class="rounded-3xl bg-emerald-50 p-5">
+                        <p class="text-xs text-emerald-700 font-bold">LOP Match</p>
+                        <p class="text-3xl font-black text-emerald-700 mt-1">
+                            {{ $result['matched_lop'] ?? 0 }}
+                        </p>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div id="stepReading" class="rounded-3xl bg-blue-50 border border-blue-100 p-4">
-                            <p class="text-2xl mb-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-notebook-pen-icon lucide-notebook-pen"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
-                                    <path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
-                                </svg>
-                            </p>
-                            <p class="text-sm font-black text-blue-700">Reading File</p>
-                            <p class="text-xs text-blue-600 mt-1">Membaca matrix BOQ</p>
-                        </div>
+                    <div class="rounded-3xl bg-red-50 p-5">
+                        <p class="text-xs text-red-700 font-bold">LOP Tidak Match</p>
+                        <p class="text-3xl font-black text-red-700 mt-1">
+                            {{ $result['unmapped_lop'] ?? 0 }}
+                        </p>
+                    </div>
 
-                        <div id="stepValidating" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                            <p class="text-2xl mb-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-checks-icon lucide-list-checks">
-                                    <path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/>
-                                </svg>
-                            </p>
-                            <p class="text-sm font-black text-slate-700">Validating BOQ</p>
-                            <p class="text-xs text-slate-500 mt-1">Cek package & volume</p>
-                        </div>
+                    <div class="rounded-3xl bg-blue-50 p-5">
+                        <p class="text-xs text-blue-700 font-bold">
+                            Data Sudah Ada
+                        </p>
 
-                        <div id="stepMatching" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                            <p class="text-2xl mb-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link-icon lucide-link">
-                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                                </svg>
-                            </p>
-                            <p class="text-sm font-black text-slate-700">Matching Data</p>
-                            <p class="text-xs text-slate-500 mt-1">LOP & designator</p>
-                        </div>
+                        <p class="text-3xl font-black text-blue-700 mt-1">
+                            {{ $result['existing_boq_headers'] ?? 0 }}
+                        </p>
 
-                        <div id="stepComplete" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                            <p class="text-2xl mb-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-big-icon lucide-circle-check-big">
-                                    <path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>
-                                </svg>
-                            </p>
-                            <p class="text-sm font-black text-slate-700">Import Complete</p>
-                            <p class="text-xs text-slate-500 mt-1">Menyiapkan hasil</p>
-                        </div>
+                        <p class="text-xs text-blue-600 mt-2">
+                            PID SAP / Nama LOP yang sudah memiliki BOQ
+                        </p>
                     </div>
                 </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                    <div class="rounded-3xl bg-blue-50 p-5">
+                        <p class="text-xs text-blue-700 font-bold">Data Baru</p>
+                        <p class="text-2xl font-black text-blue-700 mt-1">
+                            {{ $result['imported'] ?? 0 }}
+                        </p>
+                    </div>
+
+                    <div class="rounded-3xl bg-amber-50 p-5">
+                        <p class="text-xs text-amber-700 font-bold">Update</p>
+                        <p class="text-2xl font-black text-amber-700 mt-1">
+                            {{ $result['updated'] ?? 0 }}
+                        </p>
+                    </div>
+
+                    <div class="rounded-3xl bg-red-50 p-5">
+                        <p class="text-xs text-red-700 font-bold">Designator Tidak Ketemu</p>
+                        <p class="text-2xl font-black text-red-700 mt-1">
+                            {{ $result['unmapped_designator'] ?? 0 }}
+                        </p>
+                    </div>
+
+                    <div class="rounded-3xl bg-orange-50 p-5">
+                        <p class="text-xs text-orange-700 font-bold">Harga Kosong</p>
+                        <p class="text-2xl font-black text-orange-700 mt-1">
+                            {{ $result['price_missing'] ?? 0 }}
+                        </p>
+                    </div>
+                </div>
+
+                @if(!empty($result['invalid_rows']))
+                    <div class="mt-6 rounded-[2rem] border border-red-200 bg-red-50 overflow-hidden">
+                        <div class="px-5 py-4 border-b border-red-200">
+                            <h3 class="text-sm font-black text-red-700">
+                                Preview Data Bermasalah
+                            </h3>
+                            <p class="text-xs text-red-600 mt-1">
+                                Menampilkan maksimal 10 data pertama yang gagal validasi/matching.
+                            </p>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-red-100/70">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Type</th>
+                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Header</th>
+                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Row</th>
+                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Designator</th>
+                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Qty</th>
+                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Keterangan</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody class="divide-y divide-red-200">
+                                    @foreach($result['invalid_rows'] as $invalid)
+                                        <tr>
+                                            <td class="px-4 py-3 font-bold text-red-700">
+                                                {{ $invalid['type'] ?? '-' }}
+                                            </td>
+                                            <td class="px-4 py-3 text-red-700">
+                                                {{ $invalid['header'] ?? '-' }}
+                                            </td>
+                                            <td class="px-4 py-3 text-red-700">
+                                                {{ $invalid['row'] ?? '-' }}
+                                            </td>
+                                            <td class="px-4 py-3 text-red-700">
+                                                {{ $invalid['designator'] ?? '-' }}
+                                            </td>
+                                            <td class="px-4 py-3 text-red-700">
+                                                {{ $invalid['qty'] ?? '-' }}
+                                            </td>
+                                            <td class="px-4 py-3 font-bold text-red-700">
+                                                {{ $invalid['reason'] ?? '-' }}
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+
+            </div>
+        @endif
+
+        {{-- LIVE PROGRESS --}}
+        <div id="progressCard"
+             class="hidden bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
+
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                <div>
+                    <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                        Proses Import BOQ Berjalan
+                    </h2>
+                    <p id="progressFileName" class="text-sm text-slate-500">
+                        Membaca file...
+                    </p>
+                </div>
+
+                <div class="text-right">
+                    <p id="progressPercentText" class="text-3xl font-black text-blue-700">0%</p>
+                    <p class="text-xs text-slate-500 font-bold">Processing</p>
+                </div>
+            </div>
+
+            <div class="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-6">
+                <div id="progressBar"
+                     class="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-500"
+                     style="width: 0%">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div id="stepReading" class="rounded-3xl bg-blue-50 border border-blue-100 p-4">
+                    <p class="text-2xl mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-notebook-pen-icon lucide-notebook-pen"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
+                            <path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
+                        </svg>
+                    </p>
+                    <p class="text-sm font-black text-blue-700">Reading File</p>
+                    <p class="text-xs text-blue-600 mt-1">Membaca matrix BOQ</p>
+                </div>
+
+                <div id="stepValidating" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
+                    <p class="text-2xl mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-checks-icon lucide-list-checks">
+                            <path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/>
+                        </svg>
+                    </p>
+                    <p class="text-sm font-black text-slate-700">Validating BOQ</p>
+                    <p class="text-xs text-slate-500 mt-1">Cek package & volume</p>
+                </div>
+
+                <div id="stepMatching" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
+                    <p class="text-2xl mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link-icon lucide-link">
+                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        </svg>
+                    </p>
+                    <p class="text-sm font-black text-slate-700">Matching Data</p>
+                    <p class="text-xs text-slate-500 mt-1">LOP & designator</p>
+                </div>
+
+                <div id="stepComplete" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
+                    <p class="text-2xl mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-big-icon lucide-circle-check-big">
+                            <path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>
+                        </svg>
+                    </p>
+                    <p class="text-sm font-black text-slate-700">Import Complete</p>
+                    <p class="text-xs text-slate-500 mt-1">Menyiapkan hasil</p>
+                </div>
+            </div>
+        </div>
 
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
 
@@ -461,13 +461,20 @@
                                 <label class="flex items-center gap-2 cursor-pointer">
                                     <input type="radio" name="project_type" value="internal" checked onchange="toggleCustomerType()" 
                                            class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-slate-300">
-                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Default</span>
+                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">TIF</span>
                                 </label>
 
                                 <label class="flex items-center gap-2 cursor-pointer">
                                     <input type="radio" name="project_type" value="external" onchange="toggleCustomerType()" 
                                            class="w-4 h-4 text-amber-500 focus:ring-amber-500 border-slate-300">
                                     <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Eksternal Bisnis (Exbis)</span>
+                                </label>
+
+                                {{-- TAMBAHAN: RADIO BUTTON PT 2 --}}
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="project_type" value="pt2" onchange="toggleCustomerType()" 
+                                           class="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-slate-300">
+                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Program PT 2</span>
                                 </label>
                             </div>
                         </div>
@@ -509,8 +516,8 @@
                             </label>
                             <select name="mapping_by" required
                                     class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm">
-                                <option value="pid">By PID SAP</option>
-                                <option value="id_ihld">ID IHLD</option>
+                                <!-- <option value="pid">By PID SAP</option> -->
+                                <option value="id_ihld">By ID IHLD</option>
                                 <option value="lop_name">By Nama LOP</option>
                             </select>
                         </div>
@@ -724,25 +731,35 @@
     function toggleCustomerType() {
         try {
             const typeRadio = document.querySelector('input[name="project_type"]:checked');
-            if (!typeRadio) return; // Keamanan tambahan
+            if (!typeRadio) return; 
             
             const type = typeRadio.value;
             const wrapperExbis = document.getElementById('wrapper_customer_exbis');
             const selectExbis = document.getElementById('select_customer_exbis');
             const wrapperPackage = document.getElementById('wrapper_package');
             const finalCustomerId = document.getElementById('final_customer_id');
+            const form = document.getElementById('importForm'); // <-- Ambil form untuk ubah action
 
             if (type === 'external') {
                 wrapperExbis.classList.remove('hidden');
                 wrapperPackage.classList.remove('md:col-span-2');
                 selectExbis.required = true;
                 finalCustomerId.value = selectExbis.value; 
+                form.action = "{{ route('admin.import.boq.upload') }}"; // Route OSP/Exbis
+            } else if (type === 'pt2') {
+                wrapperExbis.classList.add('hidden');
+                wrapperPackage.classList.add('md:col-span-2');
+                selectExbis.required = false;
+                selectExbis.value = ""; 
+                finalCustomerId.value = "1"; // Default (asumsi TIF/Default untuk PT2)
+                form.action = "{{ route('admin.import.pt2.upload-boq') }}"; // Route Khusus PT2
             } else {
                 wrapperExbis.classList.add('hidden');
                 wrapperPackage.classList.add('md:col-span-2');
                 selectExbis.required = false;
                 selectExbis.value = ""; 
                 finalCustomerId.value = "1"; 
+                form.action = "{{ route('admin.import.boq.upload') }}"; // Route OSP
             }
 
             updatePackageDropdown();
@@ -768,10 +785,8 @@
             const activeCustomerId = document.getElementById('final_customer_id').value;
             const packageSelect = document.getElementById('package_id');
             
-            // Reset isi dropdown package
             packageSelect.innerHTML = '<option value="">-- Pilih Package --</option>';
             
-            // Jika ID customer kosong, matikan package
             if (!activeCustomerId || activeCustomerId === "") {
                 packageSelect.disabled = true;
                 return;
@@ -779,7 +794,6 @@
 
             packageSelect.disabled = false;
 
-            // Filter data package
             const filteredPackages = allPackages.filter(pkg => pkg.customer_id == activeCustomerId);
             
             filteredPackages.forEach(pkg => {
@@ -793,7 +807,6 @@
         }
     }
 
-    // Jalankan inisialisasi
     document.addEventListener('DOMContentLoaded', function() {
         toggleCustomerType();
     });

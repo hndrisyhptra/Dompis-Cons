@@ -2,6 +2,7 @@
 
 @section('content')
 @php
+    $lop = $project->lop; // Diambil dari injeksi trik Controller
     $survey = $project->pt2Survey;
     $mode = $survey ? $survey->mode : 'A';
     
@@ -47,22 +48,24 @@
     {{-- Header --}}
     <div>
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">
-            Approval PT2
+            Approval LOP PT 2
         </h1>
         <p class="text-sm text-gray-500">
             Pilih project untuk mulai review step by step
         </p>
     </div>
 
-    {{-- Project Card & Stepper --}}
+    {{-- LOP Info Card & Stepper --}}
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 shadow-sm">
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
                 <h2 class="text-base font-bold text-gray-900 dark:text-white truncate">
-                    {{ $project->project_name }}
+                    {{ $lop->lop_name }}
                 </h2>
-                <p class="text-sm text-gray-500">
-                    {{ $project->lop?->branch }} · {{ $project->lop?->sto }}
+                <p class="text-sm text-gray-500 font-medium">
+                    PID: <span class="font-bold text-gray-700 dark:text-gray-300">{{ $project->pid ?? '-' }}</span> · 
+                    IHLD: <span class="font-mono text-cyan-600 dark:text-cyan-400">{{ $lop->id_ihld ?? '-' }}</span> · 
+                    STO {{ $lop->sto ?? '-' }}
                 </p>
             </div>
             <a href="{{ route('admin.pt2.approval') }}" class="h-10 px-4 rounded-xl border border-gray-300 dark:border-gray-700 inline-flex items-center text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
@@ -71,7 +74,7 @@
         </div>
 
         {{-- PANGGIL STEPPER --}}
-        @include('admin.pt2.partials.stepper', ['currentStep' => 1])
+        @include('admin.pt2.partials.stepper', ['currentStep' => 1, 'lop' => $lop])
     </div>
 
     {{-- Step Title & Status Badge --}}
@@ -97,7 +100,7 @@
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
             <div>
-                <h3 class="text-sm font-bold text-gray-900 dark:text-white">Data Survey Lapangan (PT2)</h3>
+                <h3 class="text-sm font-bold text-gray-900 dark:text-white">Data Survey Lapangan (PT 2)</h3>
                 <p class="text-xs text-gray-400">Tinjau parameter teknis hasil survey lapangan oleh teknisi.</p>
             </div>
 
@@ -105,7 +108,7 @@
             @if($survey)
                 <div class="flex items-center gap-2">
                     @if($survey->pm_approval_status === 'pending')
-                        <form action="{{ route('admin.pt2.survey.approve', $project->id_project) }}" method="POST">
+                        <form action="{{ route('admin.pt2.survey.approve', $lop->id_pt2_lop) }}" method="POST">
                             @csrf
                             <button type="submit" class="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black transition shadow-sm inline-flex items-center gap-1.5">
                                 ✓ Approve Survey
@@ -120,7 +123,7 @@
                         <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
                             ✓ Survey Approved
                         </span>
-                        <form action="{{ route('admin.pt2.survey.reset', $project->id_project) }}" method="POST">
+                        <form action="{{ route('admin.pt2.survey.reset', $lop->id_pt2_lop) }}" method="POST">
                             @csrf
                             <button type="submit" class="h-9 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition border border-gray-300">
                                 Atur Ulang
@@ -131,7 +134,7 @@
                         <span class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold">
                             ✕ Survey Ditolak
                         </span>
-                        <form action="{{ route('admin.pt2.survey.reset', $project->id_project) }}" method="POST">
+                        <form action="{{ route('admin.pt2.survey.reset', $lop->id_pt2_lop) }}" method="POST">
                             @csrf
                             <button type="submit" class="h-9 px-3 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold transition border border-gray-300">
                                 Atur Ulang
@@ -220,7 +223,7 @@
         @endif
     </div>
 
-    {{-- EVIDEN FOTO PERSIAPAN (DIPISAH MENGGUNAKAN REVIEW-ITEM MASING-MASING) --}}
+    {{-- EVIDEN FOTO PERSIAPAN --}}
     @foreach($requiredEvidences as $key => $label)
         @include('admin.evidences.partials.review-item', [
             'isPt2' => true,
@@ -235,7 +238,7 @@
     {{-- Footer Actions --}}
     <div class="flex items-center justify-between pt-2">
         <p class="text-sm text-gray-500 font-medium">Step 1 dari 5</p>
-        <a href="{{ route('admin.pt2.instalasi', $project->id_project) }}" class="h-10 px-5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-bold inline-flex items-center justify-center transition hover:opacity-90">
+        <a href="{{ route('admin.pt2.instalasi', $lop->id_pt2_lop) }}" class="h-10 px-5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-bold inline-flex items-center justify-center transition hover:opacity-90">
             Step Instalasi →
         </a>
     </div>
@@ -261,7 +264,7 @@
             if (result.isConfirmed && result.value) {
                 let form = document.createElement('form');
                 form.method = 'POST';
-                form.action = "{{ route('admin.pt2.survey.reject', $project->id_project) }}";
+                form.action = "{{ route('admin.pt2.survey.reject', $lop->id_pt2_lop) }}";
                 
                 let token = document.createElement('input');
                 token.type = 'hidden';

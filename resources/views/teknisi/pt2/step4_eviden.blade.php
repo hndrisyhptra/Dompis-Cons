@@ -21,7 +21,7 @@
         </div>
 
         {{-- FORM UTAMA DITUTUP DISINI AGAR TIDAK NESTED --}}
-        <form id="step4Form" action="{{ route('teknisi.pt2.storeStep4Eviden', $project->id_project) }}" method="POST" enctype="multipart/form-data" class="hidden">
+        <form id="step4Form" action="{{ route('teknisi.pt2.storeStep4Eviden', $lop->id_pt2_lop) }}" method="POST" enctype="multipart/form-data" class="hidden">
             @csrf
         </form>
 
@@ -86,7 +86,7 @@
                                         <div class="relative rounded-xl overflow-hidden border {{ $ev->status == 'rejected' ? 'border-red-500 border-2 shadow-red-200' : 'border-slate-200' }} aspect-square group">
                                             
                                             <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-20 backdrop-blur-sm pointer-events-none">
-                                                ID-{{ $ev->id_evidence }}
+                                                ID-{{ $ev->id_pt2_evidence }}
                                             </div>
 
                                             <img src="{{ asset('storage/' . $ev->file_path) }}" class="w-full h-full object-cover {{ $ev->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
@@ -98,7 +98,7 @@
                                                         {{ $ev->review_note }}
                                                     </div>
                                                 @endif
-                                                <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_evidence) }}" enctype="multipart/form-data" 
+                                                <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_pt2_evidence) }}" enctype="multipart/form-data" 
                                                       class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
                                                     @csrf
                                                     <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-white text-[9px] font-black group-hover:opacity-100">
@@ -128,7 +128,7 @@
                                             @endif
 
                                             @if($ev->status != 'approved')
-                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_evidence) }}" class="absolute top-1 right-1 z-20">
+                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_pt2_evidence) }}" class="absolute top-1 right-1 z-20">
                                                     @csrf @method('DELETE')
                                                     <button type="button" onclick="this.closest('form').submit();" class="w-5 h-5 bg-black/70 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md transition">✕</button>
                                                 </form>
@@ -202,7 +202,7 @@
                                                 <div class="relative rounded-lg overflow-hidden border {{ $ev->status == 'rejected' ? 'border-red-500 border-2 shadow-red-200' : 'border-slate-200' }} aspect-square group">
                                                     
                                                     <div class="absolute top-1 left-1 bg-black/60 text-white text-[8px] font-black px-1 py-0.5 rounded z-20 backdrop-blur-sm pointer-events-none">
-                                                        ID-{{ $ev->id_evidence }}
+                                                        ID-{{ $ev->id_pt2_evidence }}
                                                     </div>
 
                                                     <img src="{{ asset('storage/' . $ev->file_path) }}" class="w-full h-full object-cover {{ $ev->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
@@ -214,7 +214,7 @@
                                                                 {{ $ev->review_note }}
                                                             </div>
                                                         @endif
-                                                        <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_evidence) }}" enctype="multipart/form-data" 
+                                                        <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_pt2_evidence) }}" enctype="multipart/form-data" 
                                                               class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
                                                             @csrf
                                                             <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-white text-[8px] font-black group-hover:opacity-100">
@@ -244,7 +244,7 @@
                                                     @endif
                                                     
                                                     @if($ev->status != 'approved')
-                                                        <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_evidence) }}" class="absolute top-1 right-1 z-20">
+                                                        <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_pt2_evidence) }}" class="absolute top-1 right-1 z-20">
                                                             @csrf @method('DELETE')
                                                             <button type="button" onclick="this.closest('form').submit();" class="w-4 h-4 bg-black/70 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[8px] font-black shadow-md transition">✕</button>
                                                         </form>

@@ -23,8 +23,8 @@
                 ‹
             </a>
             <div>
-                <h1 class="text-xl font-black tracking-tight">Inbox Project PT 2</h1>
-                <p class="text-xs text-blue-100 mt-0.5">{{ $projects->count() }} LOP di Assign ke Anda</p>
+                <h1 class="text-xl font-black tracking-tight">Inbox LOP PT 2</h1>
+                <p class="text-xs text-blue-100 mt-0.5">{{ $assignedLops->count() }} LOP di Assign ke Anda</p>
             </div>
         </div>
     </div>
@@ -47,64 +47,141 @@
 
     {{-- LIST CARDS PROJECT LOP --}}
     <div class="px-4 mt-4 space-y-4">
-        @forelse($projects as $project)
+        @forelse($assignedLops as $lop)
            @php
-                $survey = $project->pt2Survey;
-                $mancore = $project->pt2Mancore ?? null;
-                $evidences = $project->evidences ?? collect();
+                // MENGGUNAKAN QUERY LANGSUNG AGAR DATA TIDAK TUMPANG TINDIH ANTAR LOP
+                $survey = \App\Models\SurveyPt2::where('pt2_lop_id', $lop->id_pt2_lop)->first();
+                $mancore = \App\Models\MancorePt2::where('pt2_lop_id', $lop->id_pt2_lop)->first();
+                $evidences = \App\Models\Pt2Evidence::where('pt2_lop_id', $lop->id_pt2_lop)->get();
+                $project = $lop->project;
 
-                // DETEKSI PROGRESS PT 2 (Sesuai dengan Stepper PT 2)
+                // DETEKSI PROGRESS MURNI PER LOP
                 $step1Done = $survey ? true : false;
-                
-                // Step 2: Cukup cek apakah ada foto di stage 'instalasi' (Tanpa progress_boq)
                 $step2Done = $evidences->where('stage', 'instalasi')->count() > 0; 
-                
-                // Step 3: Redaman (Di stage finishing dengan tipe spesifik 'redaman_port')
                 $step3Done = $evidences->where('stage', 'finishing')->where('evidence_type', 'redaman_port')->count() > 0;
-                
-                // Step 4: Dismantle (Cek apakah sudah tersimpan di tabel dismantles)
-                $step4Done = \Illuminate\Support\Facades\DB::table('dismantles')->where('project_id', $project->id_project)->exists(); 
-                
-                // Step 5: Mancore
+                $step4Done = \App\Models\DismantlePt2::where('pt2_lop_id', $lop->id_pt2_lop)->exists(); 
                 $step5Done = $mancore ? true : false;
 
-                $isKendala = $survey && $survey->has_kendala == 1;
-                $isGoLive = $project->is_golive;
+                // Cek kendala (hanya dianggap kendala jika PM belum approve)
+                $isKendala = $survey && $survey->has_kendala == 1 && $survey->pm_approval_status !== 'approved';
 
-                // Hitung persentase untuk UI (Berdasarkan 5 Step Mutlak)
+                // HITUNG PERSENTASE MURNI BERDASARKAN KERJAAN TEKNISI PER LOP
                 $doneStep = 0;
                 if ($step1Done) $doneStep++;
                 if ($step2Done) $doneStep++;
                 if ($step3Done) $doneStep++;
                 if ($step4Done) $doneStep++;
-                if ($step5Done) $doneStep++;
+                
+                // Jika Step 5 (Mancore) selesai, LOP otomatis 100% (karena step 4 dismantle opsional)
+                if ($step5Done) {
+                    $progress = 100;
+                    $allStepDone = true;
+                    $step4Done = true; // Paksa UI centang hijau untuk step 4 agar rapi
+                } else {
+                    $progress = round(($doneStep / 5) * 100);
+                    $allStepDone = false;
+                }
 
-                // Progress Maksimal 100% (5/5)
-                $progress = ($isGoLive || $step5Done) ? 100 : round(($doneStep / 5) * 100);
-                $allStepDone = ($progress === 100);
+                // ==============================================================
+                // STATUS WORKFLOW LOP PT2
+                // ==============================================================
+
+                $isWaitingAdmin = false;
+                $isWaitingSdi = false;
+                $isGoLive = false;
+
+                /*
+                |--------------------------------------------------------------------------
+                | 1. GO LIVE
+                |--------------------------------------------------------------------------
+                | Jika LOP sudah ditandai Go Live, status final.
+                | Prioritas tertinggi.
+                */
+                if ((int) $lop->is_golive === 1) {
+
+                    $isGoLive = true;
+
+                } else {
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | 2. SEMUA STEP SUDAH SELESAI
+                    |--------------------------------------------------------------------------
+                    | Setelah Step 5 submit, LOP menunggu approval Admin.
+                    */
+                    if ($allStepDone) {
+
+                        /*
+                        |--------------------------------------------------------------------------
+                        | Jika SDI approval sudah pending
+                        | berarti Admin sudah approve dan sudah dikirim ke SDI.
+                        |--------------------------------------------------------------------------
+                        */
+                        if (
+                            $lop->sdi_approval_status &&
+                            strtolower($lop->sdi_approval_status) === 'pending'
+                        ) {
+
+                            $isWaitingSdi = true;
+
+                        } else {
+
+                            /*
+                            |--------------------------------------------------------------------------
+                            | Belum masuk SDI = menunggu Approval Admin
+                            |--------------------------------------------------------------------------
+                            */
+                            $isWaitingAdmin = true;
+                        }
+                    }
+                }
 
                 // DYNAMIC TEMPLATE DESIGN STYLES
                 $borderColor = $allStepDone ? 'border-l-emerald-600' : ($isKendala ? 'border-l-rose-500' : 'border-l-blue-600');
                 $progressColor = $allStepDone ? 'bg-emerald-500' : ($isKendala ? 'bg-rose-500' : 'bg-blue-600');
-                
-                $lastUpdate = $project->updated_at;
+                $lastUpdate = $lop->updated_at;
 
-                // LOGIKA TOMBOL DINAMIS (Mencari step apa yang belum diselesaikan)
+                // LOGIKA TOMBOL DINAMIS NEXT STEP
                 $nextStepUrl = '';
                 $nextStepText = '';
                 
                 if (!$step2Done) {
-                    $nextStepUrl = route('teknisi.pt2.step2Eviden', $project->id_project);
+                    $nextStepUrl = route('teknisi.pt2.step2Eviden', $lop->id_pt2_lop);
                     $nextStepText = 'Lanjut Step 2 →';
                 } elseif (!$step3Done) {
-                    $nextStepUrl = route('teknisi.pt2.step3Eviden', $project->id_project);
+                    $nextStepUrl = route('teknisi.pt2.step3Eviden', $lop->id_pt2_lop);
                     $nextStepText = 'Lanjut Step 3 →';
-                } elseif (!$step4Done) {
-                    $nextStepUrl = route('teknisi.pt2.step4Eviden', $project->id_project);
-                    $nextStepText = 'Lanjut Step 4 →';
                 } else {
-                    $nextStepUrl = url('teknisi/pt2/survey/'.$project->id_project.'/step5');
-                    $nextStepText = 'Lanjut Step 5 →';
+                    $nextStepUrl = route('teknisi.pt2.step4Eviden', $lop->id_pt2_lop);
+                    $nextStepText = 'Lanjut Step 4/5 →';
+                }
+
+                // ==============================================================
+                // STATUS BADGE
+                // ==============================================================
+
+                $badgeClass = 'bg-amber-100 text-amber-700';
+                $badgeText = 'On Progress';
+
+                if ($isGoLive) {
+
+                    $badgeClass = 'bg-emerald-100 text-emerald-700';
+                    $badgeText = 'GO LIVE';
+
+                } elseif ($isWaitingSdi) {
+
+                    $badgeClass = 'bg-indigo-100 text-indigo-700';
+                    $badgeText = 'Menunggu Approve SDI';
+
+                } elseif ($isWaitingAdmin) {
+
+                    $badgeClass = 'bg-blue-100 text-blue-700';
+                    $badgeText = 'Menunggu Approve Admin';
+
+                } elseif ($isKendala) {
+
+                    $badgeClass = 'bg-rose-100 text-rose-700';
+                    $badgeText = 'Terkendala';
                 }
             @endphp
 
@@ -113,16 +190,15 @@
                 <div class="flex justify-between items-start gap-3">
                     <div class="min-w-0">
                         <h2 class="text-base font-black text-slate-800 tracking-tight leading-tight">
-                            {{ $project->project_name }}
+                            {{ $lop->lop_name }}
                         </h2>
                         <p class="text-[11px] text-slate-400 font-bold mt-1">
-                            PID: {{ $project->pid ?? '-' }} · {{ $project->lop?->sto ?? '-' }}
+                            PID: {{ $project->pid ?? '-' }} · STO {{ $lop->sto ?? '-' }} · IHLD: {{ $lop->id_ihld ?? '-' }}
                         </p>
                     </div>
 
-                    <span class="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide
-                        {{ $allStepDone ? 'bg-emerald-100 text-emerald-700' : ($isKendala ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700') }}">
-                        {{ $isGoLive ? 'GO LIVE' : ($allStepDone ? 'Waiting SDI' : ($isKendala ? 'Terkendala' : 'On Progress')) }}
+                    <span class="shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide {{ $badgeClass }}">
+                        {{ $badgeText }}
                     </span>
                 </div>
 
@@ -173,59 +249,103 @@
                         <p class="text-[11px] font-black text-slate-700">{{ $lastUpdate ? $lastUpdate->diffForHumans() : '-' }}</p>
                     </div>
                 </div>
-
                 {{-- ACTION BUTTONS --}}
                 <div class="mt-3.5 pt-1">
+
+                    {{-- ==========================================================
+                        GO LIVE
+                        ========================================================== --}}
                     @if($isGoLive)
-                        {{-- JIKA SUDAH GO LIVE --}}
+
                         <div class="grid grid-cols-3 gap-2">
+
                             <div class="col-span-2 h-10 flex items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 text-[11px] font-black">
-                                🎉 Project Go Live
+                                🎉 GO LIVE
                             </div>
-                            <a href="{{ route('teknisi.pt2.step1', $project->id_project) }}" class="h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-black transition active:scale-[0.98]">
+
+                            <a href="{{ route('teknisi.pt2.step1', $lop->id_pt2_lop) }}"
+                            class="h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-black transition active:scale-[0.98]">
                                 Detail
                             </a>
+
                         </div>
-                    @elseif($step5Done)
-                        {{-- JIKA STEP 5 SELESAI TAPI BELUM GO LIVE (MENUNGGU SDI) --}}
+
+                    {{-- ==========================================================
+                        MENUNGGU APPROVE SDI
+                        ========================================================== --}}
+                    @elseif($isWaitingSdi)
+
                         <div class="grid grid-cols-3 gap-2">
-                            <div class="col-span-2 h-10 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200 text-[11px] font-black">
-                                ⏳ Menunggu Approval SDI
+
+                            <div class="col-span-2 h-10 flex items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200 text-[11px] font-black">
+                                ⏳ Menunggu Approve SDI
                             </div>
-                            <a href="{{ route('teknisi.pt2.step1', $project->id_project) }}" class="h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-black transition active:scale-[0.98]">
-                                Review Data
+
+                            <a href="{{ route('teknisi.pt2.step1', $lop->id_pt2_lop) }}"
+                            class="h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-black transition active:scale-[0.98]">
+                                Review
                             </a>
+
                         </div>
-                    @else
-                        {{-- Logika Tombol Dinamis berdasarkan Step yang belum selesai --}}
-                        @if(!$step1Done || $isKendala)
-                            {{-- JIKA BELUM STEP 1 ATAU SEDANG KENDALA, ARAHKAN KE STEP 1 --}}
-                            <a href="{{ route('teknisi.pt2.step1', $project->id_project) }}"
-                            class="h-10 w-full flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md transition active:scale-[0.98]">
-                                {{ $isKendala ? 'Update Survey Kendala' : 'Mulai Step 1 (Survey)' }}
+
+                    {{-- ==========================================================
+                        MENUNGGU APPROVE ADMIN
+                        ========================================================== --}}
+                    @elseif($isWaitingAdmin)
+
+                        <div class="grid grid-cols-3 gap-2">
+
+                            <div class="col-span-2 h-10 flex items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200 text-[11px] font-black">
+                                ⏳ Menunggu Approve Admin
+                            </div>
+
+                            <a href="{{ route('teknisi.pt2.step1', $lop->id_pt2_lop) }}"
+                            class="h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-black transition active:scale-[0.98]">
+                                Review
                             </a>
+
+                        </div>
+
+                    {{-- ==========================================================
+                        BELUM SELESAI
+                        ========================================================== --}}
+                    @else
+
+                        @if(!$step1Done || $isKendala)
+
+                            <a href="{{ route('teknisi.pt2.step1', $lop->id_pt2_lop) }}"
+                            class="h-10 w-full flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md transition active:scale-[0.98]">
+
+                                {{ $isKendala ? 'Update Survey Kendala' : 'Mulai Step 1 (Survey)' }}
+
+                            </a>
+
                         @else
-                            {{-- JIKA STEP 1 SELESAI, BISA LANJUT STEP BERIKUTNYA --}}
+
                             <div class="grid grid-cols-2 gap-2">
-                                <a href="{{ route('teknisi.pt2.step1', $project->id_project) }}"
+
+                                <a href="{{ route('teknisi.pt2.step1', $lop->id_pt2_lop) }}"
                                 class="h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black transition active:scale-[0.98]">
-                                    Lihat Data Survey
+                                    Lihat Data
                                 </a>
-                                
-                                {{-- TOMBOL LANJUT STEP DINAMIS --}}
+
                                 <a href="{{ $nextStepUrl }}"
                                 class="h-10 flex items-center justify-center rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md transition active:scale-[0.98]">
                                     {{ $nextStepText }}
                                 </a>
+
                             </div>
+
                         @endif
+
                     @endif
+
                 </div>
 
             </div>
         @empty
             <div class="bg-white border border-slate-100 rounded-3xl p-8 text-center text-xs text-slate-400 shadow-xs">
-                Belum ada project PT 2 yang ditugaskan kepada Anda saat ini.
+                Belum ada LOP PT 2 yang ditugaskan kepada Anda saat ini.
             </div>
         @endforelse
     </div>

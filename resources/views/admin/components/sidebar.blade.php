@@ -118,7 +118,9 @@
         </div>
 
         @php
-            $projectOpen = request()->routeIs('projects.*');
+            $projectOpen = request()->routeIs('projects.*')
+                || request()->routeIs('admin.pt2.*');
+
             $activeProgram = request('program');
         @endphp
 
@@ -221,7 +223,7 @@
                         <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700">Exbis</span>
                     </a>
 
-                    <a href="{{ route('projects.index', ['program' => 'PT 2']) }}"
+                    <a href="{{ route('admin.pt2.index', ['program' => 'PT 2']) }}"
                     class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
                     {{ $activeProgram == 'PT 2' ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                         <span class="flex items-center gap-2">
@@ -511,7 +513,8 @@
 
         {{-- APPROVAL EVIDEN (DROPDOWN) --}}
         @php
-            $approvalOpen = request()->routeIs('admin.evidences.*') || request()->routeIs('admin.pt2.*');
+            $approvalOpen = request()->routeIs('admin.evidences.*')
+                || request()->routeIs('admin.pt2.approval*');
         @endphp
         
         <div x-data="{ open: {{ $approvalOpen ? 'true' : 'false' }} }">
@@ -572,7 +575,7 @@
 
                 <a href="{{ route('admin.pt2.approval') }}"
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
-                {{ request()->routeIs('admin.pt2.*') ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                {{ request()->routeIs('admin.pt2.approval*') ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-indigo-500"></span>

@@ -14,7 +14,7 @@
             </p>
         </div>
 
-        <form id="step5Form" action="{{ route('teknisi.pt2.storeStep5', $project->id_project) }}" method="POST">
+        <form id="step5Form" action="{{ route('teknisi.pt2.storeStep5', $lop->id_pt2_lop) }}" method="POST">
             @csrf
 
             <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden mb-8">

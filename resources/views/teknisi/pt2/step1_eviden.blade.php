@@ -11,16 +11,20 @@
         <div class="bg-white rounded-xl border border-gray-200/80 p-3 shadow-xs">
             <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Nama LOP</p>
             <p class="text-xs font-bold text-gray-900 leading-snug break-words mb-2.5">
-                {{ $project->project_name }}
+                {{ $lop->lop_name }}
             </p>
             <div class="flex flex-wrap items-center gap-1.5">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
+                    <span class="text-gray-400 mr-1 font-normal">IHLD:</span>
+                    <span class="font-mono">{{ $lop->id_ihld ?? '-' }}</span>
+                </span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
                     <span class="text-gray-400 mr-1 font-normal">STO:</span>
-                    <span class="font-mono">{{ $project->lop?->sto ?? '-' }}</span>
+                    <span class="font-mono">{{ $lop->sto ?? '-' }}</span>
                 </span>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
                     <span class="text-gray-400 mr-1 font-normal">Branch:</span>
-                    <span>{{ $project->lop?->branch ?? '-' }}</span>
+                    <span>{{ $lop->branch ?? '-' }}</span>
                 </span>
             </div>
         </div>
@@ -34,8 +38,8 @@
             <div class="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-xs font-bold">{{ session('error') }}</div>
         @endif
 
-        {{-- FORM UTAMA DITUTUP DISINI AGAR TIDAK BENTROK DENGAN FORM REPLACE/DELETE --}}
-        <form id="evidenForm" action="{{ route('teknisi.pt2.storeStep1Eviden', $project->id_project) }}" method="POST" enctype="multipart/form-data" class="hidden">
+        {{-- FORM UTAMA MENGGUNAKAN ID_PT2_LOP --}}
+        <form id="evidenForm" action="{{ route('teknisi.pt2.storeStep1Eviden', $lop->id_pt2_lop) }}" method="POST" enctype="multipart/form-data" class="hidden">
             @csrf
         </form>
 
@@ -79,7 +83,7 @@
 
                     <div class="p-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
                         
-                        {{-- Area Klik Tambah Foto Baru (Terhubung ke form utama via form="evidenForm") --}}
+                        {{-- Area Klik Tambah Foto Baru --}}
                         <label class="relative flex flex-col items-center justify-center w-full h-20 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-white hover:bg-slate-50 transition">
                             <span class="text-xs font-bold text-slate-500">+ Tambah Foto Baru</span>
                             <input type="file" form="evidenForm" id="input-{{ $key }}" name="evidences[{{ $key }}][]" multiple accept="image/*" class="hidden" onchange="handleFileSelect(this, '{{ $key }}')">
@@ -88,7 +92,7 @@
                         {{-- Grid Preview Foto Baru --}}
                         <div id="preview-{{ $key }}" class="grid grid-cols-3 gap-2 mt-3 empty:hidden"></div>
 
-                        {{-- Grid Review Foto Lama (Style Persis Waspang) --}}
+                        {{-- Grid Review Foto Lama --}}
                         @if($uploaded->count() > 0)
                             <div class="mt-4 pt-3 border-t border-slate-200">
                                 <p class="text-[10px] font-bold text-slate-400 uppercase mb-2">Tersimpan di Database</p>
@@ -108,21 +112,19 @@
                                         <div class="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group flex items-center justify-center transition-all 
                                             {{ $ev->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-gray-200' }}">
 
-                                            {{-- INDIKATOR ID FOTO --}}
+                                            {{-- INDIKATOR ID FOTO (MENGGUNAKAN ID_PT2_EVIDENCE) --}}
                                             <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-20 backdrop-blur-sm pointer-events-none">
                                                 @if($ev->status == 'rejected')
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                                                 @elseif($ev->status == 'approved')
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                                                 @endif
-                                                ID-{{ $ev->id_evidence }}
+                                                ID-{{ $ev->id_pt2_evidence }}
                                             </div>
 
-                                            {{-- FOTO NORMAL --}}
                                             <img src="{{ asset('storage/' . $ev->file_path) }}" 
                                                  class="w-full h-full object-cover {{ $ev->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
 
-                                            {{-- JIKA STATUS REJECTED, TAMPILKAN NOTE & FORM REPLACE --}}
                                             @if($ev->status == 'rejected')
                                                 @if(!empty($ev->review_note))
                                                     <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[9px] p-1.5 text-center font-bold z-20 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2 pointer-events-none" title="{{ $ev->review_note }}">
@@ -130,8 +132,8 @@
                                                     </div>
                                                 @endif
 
-                                                {{-- OVERLAY GANTI FOTO --}}
-                                                <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_evidence) }}" enctype="multipart/form-data" 
+                                                {{-- FORM REPLACE EVIDEN PT 2 --}}
+                                                <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_pt2_evidence) }}" enctype="multipart/form-data" 
                                                       class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
                                                     @csrf
                                                     <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-white text-[10px] font-black group">
@@ -143,16 +145,16 @@
                                                     </label>
                                                 </form>
                                             @endif
-                                            {{-- BADGE STATUS PENDING ATAU APPROVED (Di Bawah) --}}
+
                                             @if($ev->status == 'approved')
                                                 <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[8px] text-center py-1 font-black z-20 pointer-events-none">APPROVED</div>
                                             @elseif($ev->status == 'pending')
                                                 <div class="absolute bottom-0 inset-x-0 bg-amber-500 text-white text-[8px] text-center py-1 font-black z-20 pointer-events-none">PENDING</div>
                                             @endif
 
-                                            {{-- TOMBOL DELETE --}}
+                                            {{-- TOMBOL DELETE EVIDEN PT 2 --}}
                                             @if($ev->status != 'approved')
-                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_evidence) }}" class="absolute top-1 right-1 z-20">
+                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_pt2_evidence) }}" class="absolute top-1 right-1 z-20">
                                                     @csrf @method('DELETE')
                                                     <button type="submit" class="w-6 h-6 rounded-full bg-black/70 hover:bg-red-600 text-white text-xs flex items-center justify-center font-bold backdrop-blur-sm transition">
                                                         ×
@@ -170,14 +172,14 @@
             @endforeach
         </div>
 
-        {{-- TOMBOL SUBMIT FORM (Terhubung via form="evidenForm") --}}
+        {{-- TOMBOL SUBMIT FORM --}}
         <button type="submit" form="evidenForm" id="btnSubmit" disabled 
             class="w-full h-12 bg-gray-300 text-gray-500 cursor-not-allowed font-black rounded-xl mt-8 shadow-sm transition-all flex items-center justify-center gap-2">
             <span>Upload Baru & Lanjut Step 2</span>
         </button>
 
         {{-- TOMBOL SKIP / LEWATI --}}
-        <a href="{{ route('teknisi.pt2.step2Eviden', $project->id_project) }}" class="block w-full h-11 bg-white border-2 border-slate-200 text-slate-600 text-center leading-[2.5rem] font-bold rounded-xl mt-3 active:scale-95 transition">
+        <a href="{{ route('teknisi.pt2.step2Eviden', $lop->id_pt2_lop) }}" class="block w-full h-11 bg-white border-2 border-slate-200 text-slate-600 text-center leading-[2.5rem] font-bold rounded-xl mt-3 active:scale-95 transition">
             Lewati (Lanjut Step 2) →
         </a>
 
@@ -217,12 +219,10 @@
         let files = Array.from(inputElement.files);
         if (files.length === 0) return;
 
-        // Hilangkan loading kompresi jika ada
         let loadingEl = document.getElementById('loading-' + key);
         if(loadingEl) loadingEl.classList.remove('hidden');
 
         for (let file of files) {
-            // LANGSUNG MASUKKAN FILE ASLI KE STORE TANPA COMPRESS
             newFilesStore[key].push(file); 
         }
         

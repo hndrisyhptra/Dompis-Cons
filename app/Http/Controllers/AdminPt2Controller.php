@@ -3,66 +3,174 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\Project;
+use App\Models\Pt2Project;
+use App\Models\Pt2Lop;
+use App\Models\SurveyPt2;
+use App\Models\Pt2Evidence;
+use App\Models\DismantlePt2;
+use App\Models\MancorePt2;
+use App\Models\User;
+use App\Services\ProjectActivityService;
+use Illuminate\Support\Facades\DB;
 
 class AdminPt2Controller extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | FUNGSI INDEX (HALAMAN DAFTAR PROJECT & LOP ACCORDION)
+    |--------------------------------------------------------------------------
+    */
     public function index(Request $request)
     {
-        $statusFilter = $request->input('status_filter', 'pending');
-        $search = $request->input('search');
+        $query = Pt2Project::with([
+            'lops.boqItems',
+            'lops.assignment.teknisi',
+            'lops.evidences',
+            'lops.surveys'
+        ]);
 
-        // Query dasar: Ambil yang Program SAP-nya mengandung unsur PT2
-        $query = Project::with(['lop', 'assignment.teknisi', 'evidences', 'pt2Survey'])
-            ->whereHas('lop', function ($q) {
-                $q->where(function($subQ) {
-                    $subQ->where('program_sap', 'LIKE', '%PT2%')
-                         ->orWhere('program_sap', 'LIKE', '%PT-2%')
-                         ->orWhere('program_sap', 'LIKE', '%PT 2%');
-                });
-            });
-
-        // Filter Pencarian
-        if ($search) {
+        if ($request->filled('search')) {
+            $search = $request->search;
             $query->where(function ($q) use ($search) {
                 $q->where('project_name', 'like', "%{$search}%")
-                  ->orWhereHas('lop', function ($qLop) use ($search) {
-                      $qLop->where('id_ihld', 'like', "%{$search}%")
-                           ->orWhere('sto', 'like', "%{$search}%");
+                  ->orWhere('pid', 'like', "%{$search}%")
+                  ->orWhere('pid_sap', 'like', "%{$search}%")
+                  ->orWhereHas('lops', function ($lop) use ($search) {
+                      $lop->where('sto', 'like', "%{$search}%")
+                          ->orWhere('branch', 'like', "%{$search}%")
+                          ->orWhere('mitra_name', 'like', "%{$search}%")
+                          ->orWhere('lop_name', 'like', "%{$search}%")
+                          ->orWhere('id_ihld', 'like', "%{$search}%");
                   });
             });
         }
 
-        // LOGIKA TAB FILTER YANG SUDAH DIPERBAIKI
-        if ($statusFilter === 'pending') {
-            // Tampilkan yang ADA eviden pending DAN belum Go-Live SDI
-            $query->whereHas('evidences', function($qEv) {
-                $qEv->where('status', 'pending');
-            })->where(function($qSdi) {
-                $qSdi->whereNull('sdi_approval_status')
-                     ->orWhere('sdi_approval_status', '!=', 'approve');
-            });
-        } elseif ($statusFilter === 'active') {
-            // On Progress: Semua yang belum selesai
-            $query->whereNotIn('status', ['completed', 'close']);
-        } elseif ($statusFilter === 'completed') {
-            // Completed: Tampilkan project yang sudah Selesai / Go-Live / Close
-            $query->whereIn('status', ['completed', 'close']); 
+        $regions = [
+            'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
+            'JATENG DIY' => ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
+            'BALNUS' => ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES']
+        ];
+
+        if ($request->filled('region')) {
+            $selectedRegion = strtoupper($request->region);
+            if (isset($regions[$selectedRegion])) {
+                $query->whereIn(DB::raw('UPPER(branch)'), $regions[$selectedRegion]);
+            }
         }
 
-        $projects = $query->orderBy('updated_at', 'desc')->paginate(10);
+        if ($request->filled('branch')) {
+            $query->whereRaw('UPPER(branch) = ?', [strtoupper($request->branch)]);
+        }
 
-        return view('admin.pt2.approval-list', compact('projects'));
+        if ($request->filled('status_project')) {
+            $query->where('status_project', $request->status_project);
+        }
+
+        $perPage = $request->input('per_page', 10);
+        $projects = $query->latest('updated_at')->paginate($perPage)->onEachSide(1)->withQueryString();
+
+        $branches = Pt2Lop::whereNotNull('branch')->where('branch', '!=', '')->distinct()->orderBy('branch')->pluck('branch');
+        $assignableUsers = User::whereIn('role', ['teknisi', 'waspang'])->get();
+
+        return view('admin.pt2.index', compact('projects', 'branches', 'assignableUsers'));
     }
 
-    public function review($id)
+    /*
+    |--------------------------------------------------------------------------
+    | FUNGSI APPROVAL LIST (HALAMAN DAFTAR LOP YANG BUTUH REVIEW)
+    |--------------------------------------------------------------------------
+    */
+    public function approvalList(Request $request)
     {
-        $project = Project::with([
-            'lop', 
-            'assignment.teknisi', 
-            'evidences', 
-            'pt2Survey'
-        ])->findOrFail($id);
+        // Default filter diarahkan ke 'active' (On Progress)
+        $statusFilter = $request->input('status_filter', 'active');
+        $search = $request->input('search');
+        $region = $request->input('region');
+        $branch = $request->input('branch');
+
+        // Menggunakan tabel Pt2Lop sebagai basis
+        $query = \App\Models\Pt2Lop::with(['project', 'assignment.teknisi', 'evidences', 'surveys']);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('lop_name', 'like', "%{$search}%")
+                  ->orWhere('id_ihld', 'like', "%{$search}%")
+                  ->orWhereHas('project', function($qProj) use ($search) {
+                      $qProj->where('pid', 'like', "%{$search}%")
+                            ->orWhere('pid_sap', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $regions = [
+            'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
+            'JATENG DIY' => ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
+            'BALNUS' => ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES']
+        ];
+
+        if ($region && isset($regions[strtoupper($region)])) {
+            $query->whereIn(\Illuminate\Support\Facades\DB::raw('UPPER(branch)'), $regions[strtoupper($region)]);
+        }
+
+        if ($branch) {
+            $query->whereRaw('UPPER(branch) = ?', [strtoupper($branch)]);
+        }
+
+        // ==========================================
+        // LOGIKA TAB FILTER BERDASARKAN STATUS EVIDEN (FOTO) 100% AMAN
+        // ==========================================
+        if ($statusFilter === 'active') {
+            // ON PROGRESS: 
+            // LOP yang sudah di-upload eviden, TAPI masih ada yang ditolak (rejected) 
+            // sehingga teknisi sedang dalam tahap memperbaikinya.
+            $query->whereHas('evidences')
+                  ->whereHas('evidences', function($qEv) {
+                      $qEv->where('status', 'rejected');
+                  })
+                  ->whereDoesntHave('evidences', function($qEv) {
+                      $qEv->where('status', 'pending');
+                  });
+                  
+        } elseif ($statusFilter === 'pending') {
+            // MENUNGGU REVIEW: 
+            // LOP yang memiliki minimal 1 eviden berstatus 'pending'. 
+            $query->whereHas('evidences', function($qEv) {
+                $qEv->where('status', 'pending');
+            });
+                  
+        } elseif ($statusFilter === 'completed') {
+            // APPROVED / SELESAI: 
+            // LOP yang memiliki eviden 'approved' DAN sama sekali tidak punya eviden 'pending' atau 'rejected'
+            $query->whereHas('evidences', function($qEv) {
+                $qEv->where('status', 'approved');
+            })->whereDoesntHave('evidences', function($qEv) {
+                $qEv->whereIn('status', ['pending', 'rejected']);
+            });
+        }
+
+        $lops = $query->orderBy('updated_at', 'desc')->paginate(10)->withQueryString();
+
+        $branches = \App\Models\Pt2Lop::whereNotNull('branch')->where('branch', '!=', '')->distinct()->orderBy('branch')->pluck('branch');
+
+        return view('admin.pt2.approval-list', compact('lops', 'branches'));
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FUNGSI REVIEW KELENGKAPAN PER LOP (Suntik Data ke Blade Lama)
+    |--------------------------------------------------------------------------
+    */
+
+    public function review($lop_id)
+    {
+        $lop = Pt2Lop::with(['project', 'assignment.teknisi', 'evidences', 'surveys'])->findOrFail($lop_id);
+
+        // Trik agar file Blade lama Anda tetap jalan tanpa error
+        $project = $lop->project;
+        $project->lop = $lop; 
+        $project->evidences = $lop->evidences; 
+        $project->assignment = $lop->assignment; 
+        $project->pt2Survey = $lop->surveys()->first(); 
 
         $survey = $project->pt2Survey;
         $mode = $survey ? $survey->mode : 'A';
@@ -89,17 +197,17 @@ class AdminPt2Controller extends Controller
         return view('admin.pt2.review', compact('project', 'mode', 'requiredEvidences'));
     }
 
-    public function approveSurvey(Request $request, $id)
+    public function approveSurvey(Request $request, $lop_id)
     {
-        $survey = \App\Models\Pt2Survey::where('project_id', $id)->firstOrFail();
+        $survey = SurveyPt2::where('pt2_lop_id', $lop_id)->firstOrFail();
         $survey->update(['pm_approval_status' => 'approved']);
         return back()->with('success', 'Data Survey lapangan berhasil disetujui!');
     }
 
-    public function rejectSurvey(Request $request, $id)
+    public function rejectSurvey(Request $request, $lop_id)
     {
         $request->validate(['kendala_note' => 'required|string']);
-        $survey = \App\Models\Pt2Survey::where('project_id', $id)->firstOrFail();
+        $survey = SurveyPt2::where('pt2_lop_id', $lop_id)->firstOrFail();
         $survey->update([
             'pm_approval_status' => 'rejected',
             'kendala_note' => $request->kendala_note,
@@ -108,51 +216,80 @@ class AdminPt2Controller extends Controller
         return back()->with('success', 'Data Survey ditolak dan dikembalikan ke Teknisi.');
     }
 
-    public function resetSurvey($id)
+    public function resetSurvey($lop_id)
     {
-        $survey = \App\Models\Pt2Survey::where('project_id', $id)->firstOrFail();
+        $survey = SurveyPt2::where('pt2_lop_id', $lop_id)->firstOrFail();
         $survey->update(['pm_approval_status' => 'pending']);
         return back()->with('success', 'Status Survey berhasil diatur ulang menjadi Pending.');
     }
 
-    public function reviewInstalasi($id)
+    public function reviewInstalasi($lop_id)
     {
-        $project = Project::with(['lop', 'assignment.teknisi', 'evidences'])->findOrFail($id);
+        $lop = Pt2Lop::with(['project', 'assignment.teknisi', 'evidences'])->findOrFail($lop_id);
+        
+        $project = $lop->project;
+        $project->lop = $lop;
+        $project->evidences = $lop->evidences;
+        $project->assignment = $lop->assignment;
+
         return view('admin.pt2.instalasi', compact('project'));
     }
 
-    public function reviewRedaman($id)
+    public function reviewRedaman($lop_id)
     {
-        $project = Project::with(['lop', 'assignment.teknisi', 'evidences'])->findOrFail($id);
+        $lop = Pt2Lop::with(['project', 'assignment.teknisi', 'evidences'])->findOrFail($lop_id);
+        
+        $project = $lop->project;
+        $project->lop = $lop;
+        $project->evidences = $lop->evidences;
+        $project->assignment = $lop->assignment;
+
         return view('admin.pt2.redaman', compact('project'));
     }
 
-    public function reviewDismantle($id)
+    public function reviewDismantle($lop_id)
     {
-        $project = Project::with(['lop', 'assignment.teknisi', 'evidences'])->findOrFail($id);
-        $dismantles = \Illuminate\Support\Facades\DB::table('dismantles')->where('project_id', $id)->get();
+        $lop = Pt2Lop::with(['project', 'assignment.teknisi', 'evidences'])->findOrFail($lop_id);
+        
+        $project = $lop->project;
+        $project->lop = $lop;
+        $project->evidences = $lop->evidences;
+        $project->assignment = $lop->assignment;
+
+        // Tarik data dismantle dari tabel dismantles_pt2
+        $dismantles = DismantlePt2::where('pt2_lop_id', $lop_id)->get();
+
         return view('admin.pt2.dismantle', compact('project', 'dismantles'));
     }
 
-    public function reviewMancore($id)
+    public function reviewMancore($lop_id)
     {
-        $project = Project::with(['lop', 'assignment.teknisi'])->findOrFail($id);
+        $lop = Pt2Lop::with(['project', 'assignment.teknisi'])->findOrFail($lop_id);
+        
+        $project = $lop->project;
+        $project->lop = $lop;
+        $project->assignment = $lop->assignment;
+        $project->pt2Mancore = MancorePt2::where('pt2_lop_id', $lop_id)->first();
+
         return view('admin.pt2.mancore', compact('project'));
     }
 
-    public function sendToSdi($id)
+    /*
+    |--------------------------------------------------------------------------
+    | FUNGSI GO-LIVE (SDI) - PER LOP
+    |--------------------------------------------------------------------------
+    */
+    public function sendToSdi($lop_id)
     {
-        $project = \App\Models\Project::findOrFail($id);
+        $lop = Pt2Lop::findOrFail($lop_id);
 
-        $project->status = 'waiting_ut';
-        $project->sdi_approval_status = 'pending';
-        $project->save();
+        // Update status spesifik LOP untuk masuk antrean SDI
+        $lop->update([
+            'sdi_approval_status' => 'pending', 
+            'updated_at' => now(),
+        ]);
 
-        // [PERBAIKAN] Saat dikirim ke SDI, majukan progress LOP ke finishing secara paksa
-        \App\Models\Lop::where('project_id', $project->id_project)
-            ->update(['status_progress' => 'finishing']);
-
-        return back()->with('success', 'Project berhasil dikirim! Menunggu proses Go-Live dari tim SDI.');
+        return back()->with('success', 'LOP berhasil dikirim ke SDI untuk proses Go-Live.');
     }
 
     /*
@@ -160,25 +297,19 @@ class AdminPt2Controller extends Controller
     | FUNGSI APPROVE / REJECT EVIDEN KHUSUS PT2
     |--------------------------------------------------------------------------
     */
-
-    public function approveEvidencePt2($id)
+    public function approveEvidencePt2($id_pt2_evidence)
     {
-        $evidence = \App\Models\Evidence::with(['project'])->findOrFail($id);
+        $evidence = Pt2Evidence::findOrFail($id_pt2_evidence);
 
         $oldStatus = $evidence->status;
-
-        // 1. Set status menjadi approved
         $evidence->status = 'approved';
         $evidence->review_note = null;
         $evidence->save();
 
-        // 2. Catat Log Activity
-        $lopId = \App\Models\Lop::where('project_id', $evidence->project_id)->value('id_lop');
-        
-        \App\Services\ProjectActivityService::log([
-            'project_id' => $evidence->project_id,
-            'lop_id' => $lopId,
-            'evidence_id' => $evidence->id_evidence,
+        ProjectActivityService::log([
+            'project_id' => $evidence->pt2_project_id,
+            'lop_id' => $evidence->pt2_lop_id,
+            'evidence_id' => $evidence->id_pt2_evidence,
             'activity_type' => 'approve_evidence_pt2',
             'title' => 'Eviden PT2 Disetujui',
             'description' => 'Admin menyetujui eviden PT2 kategori: ' . $evidence->evidence_type,
@@ -193,39 +324,23 @@ class AdminPt2Controller extends Controller
         return back()->with('success', 'Eviden PT2 berhasil disetujui.');
     }
 
-    public function rejectEvidencePt2(Request $request, $id)
+    public function rejectEvidencePt2(Request $request, $id_pt2_evidence)
     {
         $request->validate([
             'review_note' => 'required|string',
         ]);
 
-        $evidence = \App\Models\Evidence::with(['project'])->findOrFail($id);
+        $evidence = Pt2Evidence::findOrFail($id_pt2_evidence);
 
         $oldStatus = $evidence->status;
-
-        // 1. Set status menjadi rejected
         $evidence->status = 'rejected';
         $evidence->review_note = $request->review_note;
         $evidence->save();
 
-        // 2. Catat riwayat revisi
-        \App\Models\EvidenceRevisionHistory::create([
-            'evidence_id' => $evidence->id_evidence,
-            'project_id' => $evidence->project_id,
-            'reviewed_by' => auth()->user()->id_user,
-            'stage' => $evidence->stage,
-            'evidence_type' => $evidence->evidence_type,
-            'review_note' => $request->review_note,
-            'status' => 'rejected',
-        ]);
-
-        // 3. Catat Log Activity
-        $lopId = \App\Models\Lop::where('project_id', $evidence->project_id)->value('id_lop');
-
-        \App\Services\ProjectActivityService::log([
-            'project_id' => $evidence->project_id,
-            'lop_id' => $lopId,
-            'evidence_id' => $evidence->id_evidence,
+        ProjectActivityService::log([
+            'project_id' => $evidence->pt2_project_id,
+            'lop_id' => $evidence->pt2_lop_id,
+            'evidence_id' => $evidence->id_pt2_evidence,
             'activity_type' => 'reject_evidence_pt2',
             'title' => 'Eviden PT2 Ditolak',
             'description' => 'Admin menolak eviden PT2. Catatan: ' . $request->review_note,
@@ -237,9 +352,9 @@ class AdminPt2Controller extends Controller
         return back()->with('success', 'Eviden PT2 berhasil ditolak.');
     }
 
-    public function resetEvidencePt2($id)
+    public function resetEvidencePt2($id_pt2_evidence)
     {
-        $evidence = \App\Models\Evidence::findOrFail($id);
+        $evidence = Pt2Evidence::findOrFail($id_pt2_evidence);
         
         $evidence->update([
             'status' => 'pending',
@@ -253,10 +368,10 @@ class AdminPt2Controller extends Controller
     {
         $request->validate([
             'evidence_ids' => 'required|array',
-            'evidence_ids.*' => 'exists:evidences,id_evidence',
+            'evidence_ids.*' => 'exists:pt2_evidences,id_pt2_evidence',
         ]);
 
-        \App\Models\Evidence::whereIn('id_evidence', $request->evidence_ids)
+        Pt2Evidence::whereIn('id_pt2_evidence', $request->evidence_ids)
             ->update([
                 'status' => 'approved',
                 'review_note' => null 

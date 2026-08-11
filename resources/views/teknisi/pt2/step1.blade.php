@@ -2,9 +2,10 @@
 
 @section('content')
 @php
-    $survey = $project->pt2Survey;
+    $survey = $lop->surveys()->first();
     $isEdit = $survey ? true : false;
     $detailData = $survey ? json_decode($survey->detail_data, true) : [];
+    $project = $lop->project; // Untuk mengambil data induk PID jika dibutuhkan
 @endphp
 
 <div class="min-h-screen max-w-md mx-auto bg-[#f8fafc] pb-24 font-sans">
@@ -17,20 +18,25 @@
         <div class="bg-white rounded-xl border border-gray-200/80 p-3 shadow-xs">
             <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Nama LOP</p>
             <p class="text-xs font-bold text-gray-900 leading-snug break-words mb-2.5">
-                {{ $project->project_name }}
+                {{ $lop->lop_name }}
             </p>
             <div class="flex flex-wrap items-center gap-1.5">
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
+                    <span class="text-gray-400 mr-1 font-normal">IHLD:</span>
+                    <span class="font-mono">{{ $lop->id_ihld ?? '-' }}</span>
+                </span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
                     <span class="text-gray-400 mr-1 font-normal">STO:</span>
-                    <span class="font-mono">{{ $project->lop?->sto ?? '-' }}</span>
+                    <span class="font-mono">{{ $lop->sto ?? '-' }}</span>
                 </span>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
                     <span class="text-gray-400 mr-1 font-normal">Branch:</span>
-                    <span>{{ $project->lop?->branch ?? '-' }}</span>
+                    <span>{{ $lop->branch ?? '-' }}</span>
                 </span>
             </div>
         </div>
     </div>
+    
     <div class="px-5 mt-6">
         @if($isEdit)
             <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-xs font-bold flex gap-2 items-center">
@@ -40,7 +46,7 @@
             </div>
         @endif
     
-        <form id="step1Form" action="{{ route('teknisi.pt2.storeStep1', $project->id_project) }}" method="POST">
+        <form id="step1Form" action="{{ route('teknisi.pt2.storeStep1', $lop->id_pt2_lop) }}" method="POST">
             @csrf
 
             {{-- 1. PILIH STATUS SURVEY --}}
@@ -82,9 +88,16 @@
                 <div class="bg-blue-50 p-4 rounded-2xl border border-blue-100">
                     <label class="block text-xs font-black text-blue-800 uppercase tracking-widest mb-3">Tentukan Mode <span class="text-red-500">*</span></label>
                     <div class="space-y-2">
+                        @php
+                            // Anggap mode terkunci jika survey sudah ada dan status PM approval bukan pending/draft
+                            $isModeLocked = $isEdit && $survey->pm_approval_status !== 'pending';
+                        @endphp
+
                         @foreach(['A' => 'A. MODE EXPAND', 'B' => 'B. EXPAND ADD SPLITTER 1:8', 'C' => 'C. PT2 SIMPLE'] as $val => $label)
-                        <label class="cursor-pointer flex">
-                            <input type="radio" name="mode" value="{{ $val }}" class="peer sr-only" onchange="toggleModeData()" {{ ($isEdit && $survey->mode === $val) ? 'checked' : '' }}>
+                        <label class="cursor-pointer flex {{ $isModeLocked ? 'pointer-events-none opacity-60' : '' }}">
+                            <input type="radio" name="mode" value="{{ $val }}" class="peer sr-only" onchange="toggleModeData()" 
+                                {{ ($isEdit && $survey->mode === $val) ? 'checked' : '' }}
+                                {{ $isModeLocked ? 'disabled' : '' }}>
                             <div class="w-full py-2.5 bg-white border border-blue-200 rounded-xl text-center font-bold text-sm text-slate-600 peer-checked:bg-blue-600 peer-checked:text-white transition">
                                 {{ $label }}
                             </div>
@@ -173,7 +186,6 @@
                         </button>
                     </div>
                     
-                    {{-- UBAH: Ganti overflow-hidden menjadi overflow-visible --}}
                     <div class="overflow-visible border border-slate-200 rounded-xl pb-16">
                         <table class="w-full text-left text-xs">
                             <thead class="bg-slate-50 border-b border-slate-200">
@@ -195,8 +207,7 @@
                         <button type="submit" id="btnSubmit" class="w-full h-11 bg-slate-800 text-white font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
                             <span>Update Data</span>
                         </button>
-                        {{-- Tombol Lanjut ke Eviden tanpa Update --}}
-                        <a href="{{ route('teknisi.pt2.step1Eviden', $project->id_project) }}" class="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-1">
+                        <a href="{{ route('teknisi.pt2.step1Eviden', $lop->id_pt2_lop) }}" class="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-1">
                             <span>Lanjut Eviden</span> →
                         </a>
                     </div>
@@ -212,11 +223,11 @@
 </div>
 
 {{-- BOTTOM NAV --}}
-    @include('teknisi.partials.bottom-nav', ['active' => 'home'])
+@include('teknisi.partials.bottom-nav', ['active' => 'home'])
 
 <script>
     const designatorList = @json($designators);
-    const existingBoq = @json($project->boqItems ?? []);
+    const existingBoq = @json($lop->boqItems ?? []);
     let isEditMode = {{ $isEdit ? 'true' : 'false' }};
 
     document.getElementById('step1Form').addEventListener('input', checkFormValidity);
@@ -250,25 +261,6 @@
         if (!mode) return;
         
         let m = mode.value;
-        
-        // ==========================================
-        // TAMBAHAN: FITUR LOCK MODE 
-        // ==========================================
-        document.querySelectorAll('input[name="mode"]').forEach(radio => {
-            let label = radio.closest('label');
-            
-            // Matikan fungsi klik di semua label agar tidak bisa diubah
-            label.style.pointerEvents = 'none';
-            label.classList.remove('cursor-pointer');
-
-            if (!radio.checked) {
-                // Disable input yang TIDAK dipilih agar tidak bisa diakses lewat keyboard (Tab)
-                radio.disabled = true;
-                // Tambahkan efek visual buram/redup untuk opsi yang tidak dipilih
-                label.classList.add('opacity-40', 'bg-slate-50');
-            }
-        });
-        // ==========================================
 
         document.getElementById('modeFieldsContainer').classList.remove('hidden');
         document.getElementById('materialContainer').classList.remove('hidden');
@@ -303,9 +295,8 @@
         let selectedText = '';
         let listItems = '';
         
-        // Looping untuk membuat list pencarian
         designatorList.forEach(item => {
-            let nameEscaped = item.item_name.replace(/'/g, "\\'"); // Hindari error tanda kutip
+            let nameEscaped = item.item_name.replace(/'/g, "\\'");
             let label = `${item.designator} - ${item.item_name}`;
             
             if (selectedId == item.id_designator) {
@@ -321,7 +312,6 @@
 
         tr.innerHTML = `
             <td class="p-1.5 border-r border-slate-100 relative align-top">
-                <!-- Input hidden yang dikirim ke form/backend -->
                 <input type="hidden" name="materials[]" value="${selectedId}">
                 
                 <div class="relative">
@@ -334,11 +324,9 @@
                         onblur="closeDropdown(this)"
                         onkeyup="filterDropdown(this)">
                     
-                    <!-- Icon Search -->
                     <svg xmlns="http://www.w3.org/2000/svg" class="absolute right-2 top-2.5 w-3 h-3 text-slate-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 </div>
 
-                <!-- Dropdown List -->
                 <ul class="absolute left-0 z-50 w-[250px] bg-white border border-slate-200 shadow-2xl max-h-48 overflow-y-auto rounded-lg mt-1 hidden material-list">
                     ${listItems}
                 </ul>
@@ -354,15 +342,11 @@
         checkFormValidity();
     }
 
-    // Fungsi-fungsi pembantu untuk dropdown
     function openDropdown(input) {
-        // Tutup dropdown lain yang sedang terbuka
         document.querySelectorAll('.material-list').forEach(ul => ul.classList.add('hidden'));
-        
         let ul = input.parentElement.nextElementSibling;
         ul.classList.remove('hidden');
         
-        // Reset filter pencarian saat pertama diklik
         let items = ul.getElementsByTagName('li');
         for (let i = 0; i < items.length; i++) {
             items[i].style.display = "";
@@ -370,12 +354,10 @@
     }
 
     function closeDropdown(input) {
-        // Timeout sedikit agar klik pada <li> bisa diproses sebelum dropdown ditutup
         setTimeout(() => {
             let ul = input.parentElement.nextElementSibling;
             if(ul) ul.classList.add('hidden');
             
-            // Validasi: jika teks input dihapus manual jadi kosong, maka hapus ID hidden-nya juga
             if(input.value.trim() === '') {
                 input.parentElement.previousElementSibling.value = '';
                 checkFormValidity();
@@ -401,7 +383,7 @@
     function selectMaterial(li, id, text) {
         let ul = li.parentElement;
         let visibleInput = ul.previousElementSibling.querySelector('input[type="text"]');
-        let hiddenInput = ul.previousElementSibling.previousElementSibling; // tag <input type="hidden">
+        let hiddenInput = ul.previousElementSibling.previousElementSibling;
 
         hiddenInput.value = id;
         visibleInput.value = text;
@@ -410,7 +392,6 @@
         checkFormValidity();
     }
 
-    // UPDATE: Pada fungsi checkFormValidity(), ubah cara validasi array material
     function checkFormValidity() {
         let isValid = false;
         let status = document.querySelector('input[name="status_survey"]:checked');
@@ -426,14 +407,12 @@
                 
                 let matsValid = true;
                 
-                // --- PERUBAHAN DISINI (ubah dari select ke input hidden) ---
                 document.querySelectorAll('input[name="materials[]"]').forEach(el => { 
                     if(!el.value) matsValid = false; 
                 });
                 document.querySelectorAll('input[name="qty[]"]').forEach(el => { 
                     if(!el.value || el.value <= 0) matsValid = false; 
                 });
-                // -----------------------------------------------------------
 
                 if (m === 'A' && document.querySelector('select[name="sub_mode_a"]').value && document.querySelector('input[name="odp_name"]').value.trim() && dist && core && document.querySelector('input[name="power_out"]').value.trim() && matsValid) isValid = true;
                 if (m === 'B' && document.querySelector('select[name="possible_add"]').value && dist && core && document.querySelector('input[name="power_in_feeder"]').value.trim() && matsValid) isValid = true;

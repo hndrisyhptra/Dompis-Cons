@@ -14,6 +14,9 @@ use App\Http\Controllers\DesignatorPriceController;
 use App\Http\Controllers\AssignWaspangController;
 use App\Http\Controllers\DashboardPmController;
 use App\Http\Controllers\TeknisiPt2Controller;
+use App\Http\Controllers\AdminPt2Controller;
+use App\Http\Controllers\Pt2AssignmentController;
+use App\Http\Controllers\SdiController;
 
 
 
@@ -491,10 +494,10 @@ Route::middleware(['auth'])->prefix('teknisi/pt2')->name('teknisi.pt2.')->group(
     Route::get('/inbox', [\App\Http\Controllers\TeknisiPt2Controller::class, 'inbox'])->name('inbox');
     
     // Step 1: Survey & Pilih Mode
-    Route::get('/survey/{project_id}', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step1'])->name('step1');
-    Route::post('/survey/{project_id}', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep1'])->name('storeStep1');
-    Route::get('/survey/{project_id}/eviden', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step1Eviden'])->name('step1Eviden');
-    Route::post('/survey/{project_id}/eviden', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep1Eviden'])->name('storeStep1Eviden');
+    Route::get('/survey/{lop_id}', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step1'])->name('step1');
+    Route::post('/survey/{lop_id}', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep1'])->name('storeStep1');
+    Route::get('/survey/{lop_id}/eviden', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step1Eviden'])->name('step1Eviden');
+    Route::post('/survey/{lop_id}/eviden', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep1Eviden'])->name('storeStep1Eviden');
     
     // ==========================================
     // MANAJEMEN EVIDEN (HAPUS & REPLACE)
@@ -503,20 +506,20 @@ Route::middleware(['auth'])->prefix('teknisi/pt2')->name('teknisi.pt2.')->group(
     Route::post('/eviden/{id}/replace', [\App\Http\Controllers\TeknisiPt2Controller::class, 'replaceEvidence'])->name('replaceEvidence'); // <-- TAMBAHAN BARU
 
     // Step 2: Eviden Progress Instalasi
-    Route::get('/survey/{project_id}/step2', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step2Eviden'])->name('step2Eviden');
-    Route::post('/survey/{project_id}/step2', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep2Eviden'])->name('storeStep2Eviden');
+    Route::get('/survey/{lop_id}/step2', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step2Eviden'])->name('step2Eviden');
+    Route::post('/survey/{lop_id}/step2', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep2Eviden'])->name('storeStep2Eviden');
 
     // Step 3: Eviden Finishing (Redaman ODP)
-    Route::get('/survey/{project_id}/step3', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step3Eviden'])->name('step3Eviden');
-    Route::post('/survey/{project_id}/step3', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep3Eviden'])->name('storeStep3Eviden');
+    Route::get('/survey/{lop_id}/step3', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step3Eviden'])->name('step3Eviden');
+    Route::post('/survey/{lop_id}/step3', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep3Eviden'])->name('storeStep3Eviden');
 
     // Step 4: Dismantle Material
-    Route::get('/survey/{project_id}/step4', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step4Eviden'])->name('step4Eviden');
-    Route::post('/survey/{project_id}/step4', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep4Eviden'])->name('storeStep4Eviden');
+    Route::get('/survey/{lop_id}/step4', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step4Eviden'])->name('step4Eviden');
+    Route::post('/survey/{lop_id}/step4', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep4Eviden'])->name('storeStep4Eviden');
 
     // Step 5: Mancore & Submit Approval
-    Route::get('/survey/{project_id}/step5', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step5'])->name('step5');
-    Route::post('/survey/{project_id}/step5', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep5'])->name('storeStep5');
+    Route::get('/survey/{lop_id}/step5', [\App\Http\Controllers\TeknisiPt2Controller::class, 'step5'])->name('step5');
+    Route::post('/survey/{lop_id}/step5', [\App\Http\Controllers\TeknisiPt2Controller::class, 'storeStep5'])->name('storeStep5');
     
 });
 
@@ -526,15 +529,15 @@ Route::middleware(['auth'])->group(function () {
         return view('teknisi.profile');
     })->name('teknisi.profil');
 });
-
 /*
 |--------------------------------------------------------------------------
 | ROUTE KHUSUS APPROVAL PT2 OLEH ADMIN
 |--------------------------------------------------------------------------
 */
 Route::prefix('admin/pt2')->name('admin.pt2.')->middleware(['auth'])->group(function () {
+    
     // List & Detail Review
-    Route::get('/approval', [\App\Http\Controllers\AdminPt2Controller::class, 'index'])->name('approval');
+    Route::get('/approval', [\App\Http\Controllers\AdminPt2Controller::class, 'approvalList'])->name('approval');
     Route::get('/review/{id}', [\App\Http\Controllers\AdminPt2Controller::class, 'review'])->name('review');
 
     // Review per Step
@@ -548,7 +551,7 @@ Route::prefix('admin/pt2')->name('admin.pt2.')->middleware(['auth'])->group(func
     Route::post('/survey/{id}/reject', [\App\Http\Controllers\AdminPt2Controller::class, 'rejectSurvey'])->name('survey.reject');
     Route::post('/survey/{id}/reset', [\App\Http\Controllers\AdminPt2Controller::class, 'resetSurvey'])->name('survey.reset');
 
-    // TAMBAHAN: AKSI FORM EVIDEN PT2 (Memanggil fungsi baru yang kita buat agar tidak tabrakan)
+    // Aksi Form Eviden PT2
     Route::post('/eviden/{id}/approve', [\App\Http\Controllers\AdminPt2Controller::class, 'approveEvidencePt2'])->name('evidence.approve');
     Route::post('/eviden/{id}/reject', [\App\Http\Controllers\AdminPt2Controller::class, 'rejectEvidencePt2'])->name('evidence.reject');
     Route::post('/eviden/{id}/reset', [\App\Http\Controllers\AdminPt2Controller::class, 'resetEvidencePt2'])->name('evidence.reset');
@@ -557,7 +560,6 @@ Route::prefix('admin/pt2')->name('admin.pt2.')->middleware(['auth'])->group(func
     // Aksi Kirim ke SDI
     Route::post('/{id}/send-to-sdi', [\App\Http\Controllers\AdminPt2Controller::class, 'sendToSdi'])->name('sendToSdi');
 });
-
 /*
 |--------------------------------------------------------------------------
 | ROLE SDI
@@ -566,10 +568,30 @@ Route::prefix('admin/pt2')->name('admin.pt2.')->middleware(['auth'])->group(func
 Route::middleware(['auth'])->prefix('sdi')->name('sdi.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\SdiController::class, 'index'])->name('index');
     
-    // Cukup gunakan 1 route ini untuk mengeksekusi fungsi submitGolive
+    // Route untuk mengeksekusi go-live per LOP PT 2
     Route::post('/golive/{id}', [\App\Http\Controllers\SdiController::class, 'submitGolive'])->name('golive.store');
-});
 
+    // Jika menggunakan parameter {id}
+    Route::post('/admin/pt2/{id}/send-to-sdi', [AdminPt2Controller::class, 'sendToSdi'])->name('admin.pt2.sendToSdi');
+});
+Route::post('/sdi/pt2/golive/{lop_id}', [App\Http\Controllers\SdiController::class, 'submitGolive'])->name('sdi.eksekusi.golive');
+
+// Route Upload PID & BOQ Khusus PT 2 (Arahkan ke fungsi yang sama di controller)
+Route::post('/import/pt2/upload-pid', [App\Http\Controllers\ImportController::class, 'importPid'])->name('admin.import.pt2.upload');
+Route::post('/import/pt2/upload-boq', [App\Http\Controllers\ImportController::class, 'importBoq'])->name('admin.import.pt2.upload-boq');
+
+// ROUTE KHUSUS ASSIGNMENT PT 2
+Route::post('/pt2-assignments/assign', [Pt2AssignmentController::class, 'assignTeknisi'])->name('admin.pt2.assign');
+Route::delete('/pt2-assignments/{pt2_lop_id}/remove', [Pt2AssignmentController::class, 'removeAssign'])->name('admin.pt2.remove_assign');
+
+// Route Menu Program PT 2
+Route::get('/pt2', [AdminPt2Controller::class, 'index'])->name('admin.pt2.index');
+Route::get('/pt2/tracking/{lop_id}', [\App\Http\Controllers\AdminPt2Controller::class, 'tracking'])->name('admin.pt2.tracking');
+Route::delete('/pt2/destroy-lop/{lop_id}', [\App\Http\Controllers\AdminPt2Controller::class, 'destroyLop'])->name('admin.pt2.destroyLop');
+
+// Route Assignment PT 2
+Route::post('/pt2/assignments/store', [Pt2AssignmentController::class, 'assignTeknisi'])->name('admin.pt2.assign.store');
+Route::delete('/pt2/assignments/remove/{pt2_lop_id}', [Pt2AssignmentController::class, 'removeAssign'])->name('admin.pt2.assign.remove');
 /*
 |--------------------------------------------------------------------------
 | AUTH

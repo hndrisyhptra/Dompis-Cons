@@ -9,14 +9,25 @@
     
     @include('teknisi.partials.stepper', ['title' => 'Step 3 - Eviden Redaman'])
 
+    {{-- PROJECT INFO CARD - Badge Style --}}
     <div class="px-4 mt-3">
         <div class="bg-white rounded-xl border border-gray-200/80 p-3 shadow-xs">
             <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Nama LOP</p>
-            <p class="text-xs font-bold text-gray-900 leading-snug break-words mb-2.5">{{ $project->project_name ?? '-' }}</p>
-            <div class="flex items-center gap-1.5">
+            <p class="text-xs font-bold text-gray-900 leading-snug break-words mb-2.5">
+                {{ $lop->lop_name }}
+            </p>
+            <div class="flex flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
+                    <span class="text-gray-400 mr-1 font-normal">IHLD:</span>
+                    <span class="font-mono">{{ $lop->id_ihld ?? '-' }}</span>
+                </span>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
                     <span class="text-gray-400 mr-1 font-normal">STO:</span>
-                    <span class="font-mono">{{ $project->lop->sto ?? '-' }}</span>
+                    <span class="font-mono">{{ $lop->sto ?? '-' }}</span>
+                </span>
+                <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-gray-100 text-[11px] font-semibold text-gray-700">
+                    <span class="text-gray-400 mr-1 font-normal">Branch:</span>
+                    <span>{{ $lop->branch ?? '-' }}</span>
                 </span>
             </div>
         </div>
@@ -33,12 +44,12 @@
         <div class="mb-5 bg-blue-50 border border-blue-100 p-4 rounded-2xl flex items-start gap-3">
             <span class="text-xl">💡</span>
             <p class="text-xs font-medium text-blue-800 leading-relaxed">
-                Mode <strong>{{ $mode }}</strong>. Pilih <strong>{{ str_replace('_', ' ', $targetPortCount) }} Foto</strong> sekaligus. Foto akan otomatis dikompres sebelum dikirim agar cepat & hemat kuota.
+                Mode <strong>{{ $mode }}</strong>. Pilih <strong>{{ str_replace('_', ' ', $targetPortCount) }} Foto</strong> sekaligus. Metadata Foto akan otomatis tersimpan.
             </p>
         </div>
 
         {{-- FORM UTAMA DITUTUP DISINI AGAR TIDAK BENTROK DENGAN FORM REPLACE/DELETE --}}
-        <form id="evidenForm" action="{{ route('teknisi.pt2.storeStep3Eviden', $project->id_project) }}" method="POST" enctype="multipart/form-data" class="hidden">
+        <form id="evidenForm" action="{{ route('teknisi.pt2.storeStep3Eviden', $lop->id_pt2_lop) }}" method="POST" enctype="multipart/form-data" class="hidden">
             @csrf
         </form>
 
@@ -61,7 +72,7 @@
                     <summary id="summary-{{ $key }}" data-rejected="{{ $hasRejected ? 'true' : 'false' }}" class="flex items-center justify-between p-4 cursor-pointer rounded-2xl transition">
                         <div class="flex items-center gap-3">
                             <div id="icon-{{ $key }}" class="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-slate-100 text-slate-400">
-                                📷
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera-icon lucide-camera"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg>
                             </div>
                             <div>
                                 <h3 class="font-bold text-sm text-slate-800">
@@ -83,7 +94,7 @@
 
                         {{-- INDIKATOR LOADING SAAT PROSES KOMPRES --}}
                         <div id="loading-{{ $key }}" class="hidden mt-2 text-[10px] font-bold text-blue-600 animate-pulse text-center">
-                            Sedang mengompres foto... mohon tunggu...
+                            Sedang upload foto... mohon tunggu...
                         </div>
 
                         <div id="preview-{{ $key }}" class="grid grid-cols-4 gap-2 mt-3 empty:hidden"></div>
@@ -116,7 +127,7 @@
                                                 @elseif($ev->status == 'approved')
                                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                                                 @endif
-                                                ID-{{ $ev->id_evidence }}
+                                                ID-{{ $ev->id_pt2_evidence }}
                                             </div>
 
                                             {{-- FOTO NORMAL --}}
@@ -132,7 +143,7 @@
                                                 @endif
 
                                                 {{-- OVERLAY GANTI FOTO --}}
-                                                <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_evidence) }}" enctype="multipart/form-data" 
+                                                <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_pt2_evidence) }}" enctype="multipart/form-data" 
                                                       class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
                                                     @csrf
                                                     <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-white text-[9px] font-black group">
@@ -163,7 +174,7 @@
 
                                             {{-- TOMBOL DELETE --}}
                                             @if($ev->status != 'approved')
-                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_evidence) }}" class="absolute top-1 right-1 z-20">
+                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_pt2_evidence) }}" class="absolute top-1 right-1 z-20">
                                                     @csrf @method('DELETE')
                                                     <button type="button" onclick="this.closest('form').submit()" class="w-5 h-5 rounded-full bg-black/70 hover:bg-red-600 text-white text-xs flex items-center justify-center font-bold backdrop-blur-sm transition shadow-md">
                                                         ×
@@ -185,7 +196,7 @@
             <span>Upload Baru & Lanjut Step 4</span>
         </button>
 
-        <a href="{{ route('teknisi.pt2.step4Eviden', $project->id_project) }}"  class="block w-full h-11 bg-white border-2 border-slate-200 text-slate-600 text-center leading-[2.5rem] font-bold rounded-xl mt-3 active:scale-95 transition">
+        <a href="{{ route('teknisi.pt2.step4Eviden', $lop->id_pt2_lop) }}"  class="block w-full h-11 bg-white border-2 border-slate-200 text-slate-600 text-center leading-[2.5rem] font-bold rounded-xl mt-3 active:scale-95 transition">
             Lewati (Lanjut Step 4) →
         </a>
 
@@ -351,7 +362,7 @@
              
              icon.className = 'w-8 h-8 rounded-full flex items-center justify-center text-sm ' + 
                  (state === 'complete' ? 'bg-green-100 text-green-600' : (state === 'partial' ? 'bg-amber-100 text-amber-600' : (state === 'over' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400')));
-             icon.innerText = (state === 'complete' ? '✅' : (state === 'partial' ? '⚠️' : (state === 'over' ? '❌' : '📷')));
+             icon.innerHTML = (state === 'complete' ? '✅' : (state === 'partial' ? '⚠️' : (state === 'over' ? '❌' : '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera-icon lucide-camera"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/></svg>')));
              
              countText.className = 'text-[10px] font-medium mt-0.5 ' + 
                  (state === 'complete' ? 'text-green-600' : (state === 'partial' ? 'text-amber-600' : (state === 'over' ? 'text-red-600' : 'text-slate-400')));

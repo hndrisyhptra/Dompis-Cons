@@ -1,7 +1,8 @@
 @php
-    // 1. AMBIL DATA DARI DATABASE
-    $survey = $project->pt2Survey;
-    $evidences = \App\Models\Evidence::where('project_id', $project->id_project)->get();
+    // 1. AMBIL DATA DARI DATABASE BERDASARKAN LOP
+    $survey = $lop->surveys()->first();
+    // Menggunakan relasi evidences jika sudah di-eager load, atau panggil manual:
+    $evidences = $lop->evidences ?? \App\Models\Pt2Evidence::where('pt2_lop_id', $lop->id_pt2_lop)->get();
     
     // 2. DETEKSI REJECTED EVIDENCES PER STEP
     // Cek apakah ada foto dengan status 'rejected' di masing-masing stage
@@ -25,8 +26,8 @@
     $hasSurvey = $survey ? true : false;
     $hasEvSurvey = $evidences->where('stage', 'persiapan')->isNotEmpty();
     $hasEvInstalasi = $evidences->where('stage', 'instalasi')->isNotEmpty();
-    $hasEvRedaman = $evidences->where('stage', 'finishing')->where('evidence_type', 'redaman_port')->isNotEmpty();
-    $hasDismantle = \Illuminate\Support\Facades\DB::table('dismantles')->where('project_id', $project->id_project)->exists();
+    $hasEvRedaman = $evidences->where('stage', 'finishing')->whereIn('evidence_type', ['redaman_port', 'foto_lainnya'])->isNotEmpty();
+    $hasDismantle = \App\Models\DismantlePt2::where('pt2_lop_id', $lop->id_pt2_lop)->exists();
     
     // 4. LOGIKA CENTANG SELESAI (Syarat: Data Ada & TIDAK ADA YANG DIREJECT)
     $step1Done = $hasSurvey && $hasEvSurvey && !$step1Rejected; 
@@ -34,8 +35,8 @@
     $step3Done = $hasEvRedaman && !$step3Rejected;
     $step4Done = $hasDismantle && !$step4Rejected; 
     
-    // Asumsi Step 5 selesai jika status project sudah dikirim ke Admin/Golive
-    $step5Done = in_array($project->status, ['waiting_ut', 'completed', 'close']) || in_array($project->status_project, ['pending_approval', 'close', 'bast']);
+    // Asumsi Step 5 selesai jika Mancore sudah diinput oleh Teknisi
+    $step5Done = \App\Models\MancorePt2::where('pt2_lop_id', $lop->id_pt2_lop)->exists();
 
     // 5. DETEKSI HALAMAN AKTIF
     $route = Route::currentRouteName();
@@ -45,19 +46,19 @@
     $isStep4 = $route === 'teknisi.pt2.step4Eviden'; 
     $isStep5 = $route === 'teknisi.pt2.step5';       
 
-    // 6. LOGIKA TOMBOL BACK
+    // 6. LOGIKA TOMBOL BACK YANG LEBIH RAPI
     $backUrl = route('teknisi.pt2.inbox'); 
     
     if ($route === 'teknisi.pt2.step1Eviden') {
-        $backUrl = route('teknisi.pt2.step1', $project->id_project); 
+        $backUrl = route('teknisi.pt2.step1', $lop->id_pt2_lop); 
     } elseif ($route === 'teknisi.pt2.step2Eviden') {
-        $backUrl = route('teknisi.pt2.step1Eviden', $project->id_project); 
+        $backUrl = route('teknisi.pt2.step1Eviden', $lop->id_pt2_lop); 
     } elseif ($route === 'teknisi.pt2.step3Eviden') {
-        $backUrl = route('teknisi.pt2.step2Eviden', $project->id_project);
+        $backUrl = route('teknisi.pt2.step2Eviden', $lop->id_pt2_lop);
     } elseif ($route === 'teknisi.pt2.step4Eviden') {
-        $backUrl = url('teknisi/pt2/survey/'.$project->id_project.'/step3'); 
+        $backUrl = route('teknisi.pt2.step3Eviden', $lop->id_pt2_lop); 
     } elseif ($route === 'teknisi.pt2.step5') {
-        $backUrl = url('teknisi/pt2/survey/'.$project->id_project.'/step4'); 
+        $backUrl = route('teknisi.pt2.step4Eviden', $lop->id_pt2_lop); 
     }
 @endphp
 
@@ -70,7 +71,7 @@
             ‹
         </a>
         <div>
-            <p class="text-[10px] text-blue-200 font-medium uppercase tracking-widest">Project Progress</p>
+            <p class="text-[10px] text-blue-200 font-medium uppercase tracking-widest">Progress LOP</p>
             <h1 class="text-lg font-black tracking-tight leading-tight mt-0.5">{{ $title ?? 'Detail Project' }}</h1>
         </div>
     </div>
@@ -83,7 +84,7 @@
         <div class="relative grid grid-cols-5 text-center">
             
             {{-- STEP 1: SURVEY --}}
-            <a href="{{ route('teknisi.pt2.step1', $project->id_project) }}" class="z-10 block transition hover:scale-110">
+            <a href="{{ route('teknisi.pt2.step1', $lop->id_pt2_lop) }}" class="z-10 block transition hover:scale-110">
                 <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all shadow-sm
                     {{ $step1Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500' : 
                        ($step1Done ? 'bg-green-100 text-green-700' : 
@@ -94,7 +95,7 @@
             </a>
 
             {{-- STEP 2: PROGRESS --}}
-            <a href="{{ route('teknisi.pt2.step2Eviden', $project->id_project) }}" class="z-10 block transition hover:scale-110">
+            <a href="{{ route('teknisi.pt2.step2Eviden', $lop->id_pt2_lop) }}" class="z-10 block transition hover:scale-110">
                 <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all shadow-sm
                     {{ $step2Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500' : 
                        ($step2Done ? 'bg-green-100 text-green-700' : 
@@ -105,7 +106,7 @@
             </a>
 
             {{-- STEP 3: FINISH --}}
-            <a href="{{ route('teknisi.pt2.step3Eviden', $project->id_project) }}" class="z-10 block transition hover:scale-110">
+            <a href="{{ route('teknisi.pt2.step3Eviden', $lop->id_pt2_lop) }}" class="z-10 block transition hover:scale-110">
                 <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all shadow-sm
                     {{ $step3Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500' : 
                        ($step3Done ? 'bg-green-100 text-green-700' : 
@@ -116,7 +117,7 @@
             </a>
 
             {{-- STEP 4: UKUR (DISMANTLE) --}}
-            <a href="{{ route('teknisi.pt2.step4Eviden', $project->id_project) }}" class="z-10 block transition hover:scale-110">
+            <a href="{{ route('teknisi.pt2.step4Eviden', $lop->id_pt2_lop) }}" class="z-10 block transition hover:scale-110">
                 <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all shadow-sm
                     {{ $step4Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500' : 
                        ($step4Done ? 'bg-green-100 text-green-700' : 
@@ -127,7 +128,7 @@
             </a>
 
             {{-- STEP 5: SUBMIT --}}
-            <a href="{{ route('teknisi.pt2.step5', $project->id_project) }}" class="z-10 block transition hover:scale-110">
+            <a href="{{ route('teknisi.pt2.step5', $lop->id_pt2_lop) }}" class="z-10 block transition hover:scale-110">
                 <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all shadow-sm
                     {{ $step5Done ? 'bg-green-100 text-green-700' : 
                        ($isStep5 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-800 border-2 border-blue-400 text-blue-200') }}">

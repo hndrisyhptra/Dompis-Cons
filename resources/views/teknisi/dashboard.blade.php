@@ -25,60 +25,27 @@
         </div>
     </div>
 
-    {{-- RE-CALCULATION BLOCK KHUSUS PT2 TEKNISI --}}
-    @php
-        $allProjects = $projects ?? collect();
-        
-        $statOnProgress = 0;
-        $statWaitingApproval = 0;
-        $statFinish = 0;
-
-        foreach ($allProjects as $proj) {
-            if ($proj->is_golive) {
-                // Skenario 3: Project sudah di-approve SDI / GoLive
-                $statFinish++;
-            } elseif ($proj->pt2Mancore) {
-                // Skenario 2: Teknisi sudah selesai Step 5 (Mancore), tapi belum GoLive
-                $statWaitingApproval++;
-            } else {
-                // Skenario 1: Project masih di Step 1 sampai sebelum input Step 5
-                $statOnProgress++;
-            }
-        }
-
-        // Sinkronisasi data widget progress
-        $progressDone = $statFinish;
-        $progressPercent = $totalAssigned > 0 ? round(($progressDone / $totalAssigned) * 100) : 0;
-        
-        // Mengambil update terakhir
-        $lastUpdate = optional(
-            $allProjects->flatMap(fn($p) => $p->evidences ?? collect())
-                ->sortByDesc('updated_at')
-                ->first()
-        )->updated_at;
-    @endphp
-
     {{-- STATISTIK GRID CARDS --}}
     <div class="grid grid-cols-2 gap-3 px-4 -mt-4">
-        <!-- Card 1: Tetap (LOP Assigned) -->
+        <!-- Card 1: LOP Assigned -->
         <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-xs">
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">LOP Assigned</p>
             <h2 class="text-2xl font-black text-slate-800 tracking-tight mt-1">{{ $totalAssigned }}</h2>
             <span class="inline-flex mt-2 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-extrabold">
-                Total Order
+                Total Order PT 2
             </span>
         </div>
 
-        <!-- Card 2: On Progress (Progress Instalasi & Finish Instalasi) -->
+        <!-- Card 2: On Progress -->
         <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-xs">
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">On Progress</p>
             <h2 class="text-2xl font-black text-amber-600 tracking-tight mt-1">{{ $statOnProgress }}</h2>
             <span class="inline-flex mt-2 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-600 text-[10px] font-extrabold">
-                Progress & Finish Instalasi
+                Pengerjaan Lapangan
             </span>
         </div>
 
-        <!-- Card 3: Waiting Approval (Step 5 Done) -->
+        <!-- Card 3: Waiting Approval -->
         <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-xs">
             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">In Review</p>
             <h2 class="text-2xl font-black text-blue-600 tracking-tight mt-1">{{ $statWaitingApproval }}</h2>
@@ -87,12 +54,12 @@
             </span>
         </div>
 
-        <!-- Card 4: Selesai / GoLive -->
+        <!-- Card 4: Selesai / Finish -->
         <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-xs">
-            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Go Live</p>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Selesai</p>
             <h2 class="text-2xl font-black text-emerald-600 tracking-tight mt-1">{{ $statFinish }}</h2>
             <span class="inline-flex mt-2 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-extrabold">
-                Project Selesai
+                LOP Finish
             </span>
         </div>
     </div>
@@ -101,22 +68,18 @@
     <div class="px-4 mt-6">
         <h2 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Aksi Cepat</h2>
         <div class="grid grid-cols-2 gap-3">
-            {{-- Mengarah ke Route Teknisi --}}
+            {{-- Mengarah ke Route Inbox Teknisi PT2 --}}
             <a href="{{ route('teknisi.pt2.inbox') }}" class="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs hover:border-blue-200 transition active:scale-[0.98]">
                 <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center mb-2.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 13.5l3 3 3-3m-3 3v-6m10.125-3H17.25m3 0v1.125c0 .621-.504 1.125-1.125 1.125H3.75A1.125 1.125 0 012.625 11.25V5.25m17.625 0A1.125 1.125 0 0019.125 4.125H4.875A1.125 1.125 0 003.75 5.25m17.625 0v11.25c0 .621-.504 1.125-1.125 1.125H3.75a1.125 1.125 0 01-1.125-1.125V5.25" />
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-inbox-icon lucide-inbox"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
                 </div>
                 <h3 class="font-black text-slate-800 text-sm">Inbox PT2</h3>
-                <p class="text-[11px] text-slate-400 font-bold mt-0.5">{{ $activeProjectsCount }} Project Aktif</p>
+                <p class="text-[11px] text-slate-400 font-bold mt-0.5">{{ $totalAssigned }} Total LOP</p>
             </a>
 
-            <a href="#" class="bg-blue-700 rounded-2xl p-4 text-white shadow-md hover:bg-blue-900 transition active:scale-[0.98]">
+            <a href="{{ route('teknisi.pt2.inbox', ['status' => 'finish']) }}" class="bg-blue-700 rounded-2xl p-4 text-white shadow-md hover:bg-blue-900 transition active:scale-[0.98]">
                 <div class="w-8 h-8 rounded-lg bg-white/10 text-emerald-400 flex items-center justify-center mb-2.5">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-badge-check-icon lucide-badge-check"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/></svg>
                 </div>
                 <h3 class="font-black text-white text-sm">List Selesai</h3>
                 <p class="text-[11px] text-emerald-400 font-bold mt-0.5">{{ $statFinish }} LOP Finish</p>
@@ -124,13 +87,13 @@
         </div>
     </div>
 
-    {{-- PROGRESS WORKRING SUMMARY CARDS --}}
+    {{-- PROGRESS WORKING SUMMARY CARDS --}}
     <div class="px-4 mt-6">
         <h2 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Progress Pekerjaan</h2>
         <div class="bg-white rounded-3xl border border-slate-100 p-5 shadow-xs">
             <div class="flex items-start justify-between mb-4">
                 <div>
-                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Project</p>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Order</p>
                     <p class="text-base font-black text-slate-800 tracking-tight mt-0.5">{{ $progressDone }} dari {{ $totalAssigned }} LOP Selesai</p>
                 </div>
                 <div class="text-right">

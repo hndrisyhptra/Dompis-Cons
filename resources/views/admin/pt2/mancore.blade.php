@@ -2,32 +2,40 @@
 
 @section('content')
 @php
-    $mancore = \Illuminate\Support\Facades\DB::table('pt2_mancores')->where('project_id', $project->id_project)->first();
+    $lop = $project->lop; // Data LOP yang sudah di-inject
+    $mancore = $project->pt2Mancore;
     $step5Completed = $mancore ? true : false;
     
-    // Logika Status Sesuai ENUM DB
-    $isWaitingSdi = $project->status == 'waiting_ut' && $project->sdi_approval_status == 'pending';
-    $isGoLive = $project->is_golive == 1;
+    // LOGIKA STATUS MENGGUNAKAN LOP (Kunci Masalah Ada di Sini)
+    $isWaitingSdi = $lop->sdi_approval_status === 'pending';
+    $isGoLive = $lop->is_golive == 1 || $lop->sdi_approval_status === 'approved';
 @endphp
 
 <div class="max-w-4xl mx-auto space-y-4 px-4 py-6">
 
     {{-- Header & Stepper --}}
     <div>
-        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Approval PT2</h1>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Approval LOP PT 2</h1>
         <p class="text-sm text-gray-500">Pilih project untuk mulai review step by step</p>
     </div>
 
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 shadow-sm">
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-                <h2 class="text-base font-bold text-gray-900 dark:text-white truncate">{{ $project->project_name }}</h2>
-                <p class="text-sm text-gray-500">{{ $project->lop?->branch }} · {{ $project->lop?->sto }}</p>
+                <h2 class="text-base font-bold text-gray-900 dark:text-white truncate">{{ $lop->lop_name }}</h2>
+                <p class="text-sm text-gray-500 font-medium mt-0.5">
+                    PID: <span class="font-bold text-gray-700 dark:text-gray-300">{{ $project->pid ?? '-' }}</span> · 
+                    IHLD: <span class="font-mono text-cyan-600 dark:text-cyan-400">{{ $lop->id_ihld ?? '-' }}</span> · 
+                    STO {{ $lop->sto ?? '-' }}
+                </p>
             </div>
-            <a href="{{ route('admin.pt2.approval') }}" class="h-10 px-4 rounded-xl border border-gray-300 inline-flex items-center text-sm font-bold text-gray-700">← Kembali</a>
+            <a href="{{ route('admin.pt2.approval') }}" class="h-10 px-4 rounded-xl border border-gray-300 dark:border-gray-700 inline-flex items-center text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                ← Kembali
+            </a>
         </div>
         
-        @include('admin.pt2.partials.stepper', ['currentStep' => 5])
+        {{-- PANGGIL STEPPER --}}
+        @include('admin.pt2.partials.stepper', ['currentStep' => 5, 'lop' => $lop])
     </div>
 
     {{-- Step Title --}}
@@ -71,15 +79,16 @@
             
             <p class="text-xs text-gray-400 mt-4 text-right">Diupdate pada: {{ \Carbon\Carbon::parse($mancore->updated_at)->format('d M Y H:i') }}</p>
         @else
-            <div class="p-8 text-center text-sm font-bold text-red-500 bg-red-50 rounded-xl">
-                Teknisi belum menginput Data Mancore.
+            <div class="p-8 text-center text-sm font-bold text-red-500 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-100 dark:border-red-900/50">
+                <i class="fa-solid fa-circle-exclamation mr-1"></i> Teknisi belum menginput Data Mancore.
             </div>
         @endif
     </div>
 
     {{-- Footer Actions --}}
     <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-200 dark:border-gray-800">
-        <a href="{{ route('admin.pt2.dismantle', $project->id_project) }}" class="text-sm font-bold text-gray-500 hover:text-gray-900 transition">← Step Dismantle</a>
+        {{-- TOMBOL KEMBALI KE DISMANTLE LOP INI --}}
+        <a href="{{ route('admin.pt2.dismantle', $lop->id_pt2_lop) }}" class="text-sm font-bold text-gray-500 hover:text-gray-900 dark:hover:text-white transition">← Step Dismantle</a>
         
         <div class="flex flex-wrap items-center gap-2">
             
@@ -104,16 +113,19 @@
                 </button>
 
             @else
-                {{-- TOMBOL KIRIM KE SDI --}}
-                <form id="formSendSdi" method="POST" action="{{ route('admin.pt2.sendToSdi', $project->id_project) }}">
-                    @csrf
-                    <button type="button" onclick="confirmSendSdi()" class="h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center transition shadow-md gap-2">
-                        Kirim ke SDI 🚀
-                    </button>
-                </form>
+                {{-- TOMBOL KIRIM KE SDI (PERHATIKAN ID YANG DIKIRIM ADALAH ID PROJECT INDUK) --}}
+                <form id="formSendSdi" method="POST" action="{{ route('admin.pt2.sendToSdi', ['id' => $project->lop->id_pt2_lop]) }}">
+    @csrf
+    <button type="button" 
+            onclick="confirmSendSdi()" 
+            class="h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold inline-flex items-center justify-center transition shadow-md gap-2" 
+            {{ !$step5Completed ? 'disabled' : '' }}>
+        Kirim ke SDI 🚀
+    </button>
+</form>
 
                 {{-- TOMBOL GENERATE BERKAS: DISABLE --}}
-                <button type="button" disabled class="h-10 px-5 rounded-xl bg-gray-200 text-gray-400 cursor-not-allowed text-sm font-bold inline-flex items-center justify-center border border-gray-300 gap-2">
+                <button type="button" disabled class="h-10 px-5 rounded-xl bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed text-sm font-bold inline-flex items-center justify-center border border-gray-300 dark:border-gray-700 gap-2">
                     📄 Generate Berkas (Terkunci)
                 </button>
             @endif
@@ -123,13 +135,13 @@
 
 </div>
 
-{{-- SCRIPT DILETAKKAN DI DALAM SECTION CONTENT AGAR PASTI TER-LOAD --}}
+{{-- SCRIPT --}}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     function confirmSendSdi() {
         Swal.fire({
-            title: 'Kirim ke SDI?',
-            text: "Pastikan semua eviden Step 1 hingga 4 sudah divalidasi. Project akan dikirim ke dashboard SDI untuk proses persetujuan Go-Live UIM.",
+            title: 'Kirim LOP ke SDI?',
+            html: "Pastikan <b>SEMUA EVIDEN</b> di dalam LOP ini sudah divalidasi.<br>LOP ini akan terkirim ke dashboard SDI.",
             icon: 'question',
             showCancelButton: true,
             confirmButtonColor: '#2563eb',
@@ -139,10 +151,9 @@
             customClass: { popup: 'rounded-3xl' }
         }).then((result) => {
             if (result.isConfirmed) {
-                // Loading state
                 Swal.fire({
                     title: 'Memproses...',
-                    text: 'Mengirim data ke sistem SDI.',
+                    text: 'Mengirim data PID ke sistem SDI.',
                     allowOutsideClick: false,
                     didOpen: () => { Swal.showLoading() }
                 });

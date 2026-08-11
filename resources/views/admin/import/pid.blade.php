@@ -465,13 +465,20 @@
                                 <label class="flex items-center gap-2 cursor-pointer">
                                     <input type="radio" name="project_type" value="internal" checked onchange="toggleCustomerSelect()" 
                                            class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300">
-                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Default</span>
+                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">TIF</span>
                                 </label>
 
                                 <label class="flex items-center gap-2 cursor-pointer">
                                     <input type="radio" name="project_type" value="external" onchange="toggleCustomerSelect()" 
                                            class="w-4 h-4 text-amber-500 focus:ring-amber-500 border-gray-300">
                                     <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Eksternal Bisnis (Exbis)</span>
+                                </label>
+
+                                {{-- TAMBAHAN: RADIO BUTTON PT 2 --}}
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="project_type" value="pt2" onchange="toggleCustomerSelect()" 
+                                           class="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-gray-300">
+                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Program PT 2</span>
                                 </label>
                             </div>
                         </div>
@@ -718,6 +725,7 @@
         const wrapper = document.getElementById('external_customer_wrapper');
         const select = document.getElementById('customer_id_select');
         const hiddenInput = document.getElementById('hidden_customer_id');
+        const form = document.getElementById('importForm');
         
         if (type === 'external') {
             // Tampilkan dropdown Exbis
@@ -725,11 +733,19 @@
             select.required = true;
             select.value = ""; // Paksa user untuk memilih
             hiddenInput.value = ""; // Kosongkan agar validasi controller bereaksi jika tidak dipilih
+            form.action = "{{ route('admin.import.pid.upload') }}"; // Arahkan ke OSP
+        } else if (type === 'pt2') {
+            // Sembunyikan dropdown, arahkan ke route khusus PT 2
+            wrapper.classList.add('hidden');
+            select.required = false;
+            hiddenInput.value = "1"; // Default (bisa diabaikan controller nanti)
+            form.action = "{{ route('admin.import.pt2.upload') }}"; // Arahkan ke PT2
         } else {
-            // Sembunyikan dropdown, set default ke TIF
+            // Sembunyikan dropdown, set default ke TIF, arahkan ke OSP
             wrapper.classList.add('hidden');
             select.required = false;
             hiddenInput.value = "1"; // Otomatis kirim ID TIF
+            form.action = "{{ route('admin.import.pid.upload') }}"; // Arahkan ke OSP
         }
     }
 

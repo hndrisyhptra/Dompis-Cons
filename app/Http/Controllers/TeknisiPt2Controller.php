@@ -2,68 +2,206 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Pt2Survey;
-use App\Models\Project;
-use App\Models\ProjectAssignment;
-use App\Models\Notification;
-use App\Models\Evidence;
-use App\Models\EvidenceRevisionHistory;
-use App\Models\Lop;
+use App\Models\Pt2Project;
+use App\Models\Pt2Lop;
+use App\Models\Pt2Assignment;
+use App\Models\SurveyPt2;
+use App\Models\Pt2Evidence;
+use App\Models\DismantlePt2;
+use App\Models\MancorePt2;
+use App\Models\BoqItem; // Atau Pt2BoqItem jika Anda menggunakannya, di sini kita gunakan model terkait
+use App\Models\Designator;
 use App\Models\User;
 use App\Services\ProjectActivityService;
-use App\Models\ProjectIssue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class TeknisiPt2Controller extends Controller
 {
-    public function index()
+   public function index()
     {
         $user = Auth::user();
-        
-        $projects = Project::with(['evidences', 'boqItems.designatorData', 'pt2Mancore'])
-            ->whereHas('assignment', function ($query) use ($user) {
-                $query->where('teknisi_id', $user->id_user); 
-            })
-            ->get();
 
-        $totalAssigned = $projects->count();
-        $activeProjectsCount = $projects->where('is_golive', false)->count();
+        // Ambil semua LOP PT2 yang di-assign ke teknisi
+        $assignedLops = Pt2Lop::with([
+            'project',
+            'evidences',
+            'boqItems.designatorData',
+            'surveys'
+        ])
+        ->whereHas('assignment', function ($query) use ($user) {
+            $query->where('teknisi_id', $user->id_user);
+        })
+        ->get();
 
-        return view('teknisi.dashboard', compact('projects', 'totalAssigned', 'activeProjectsCount'));
+        /*
+        |--------------------------------------------------------------------------
+        | STATISTIK LOP
+        |--------------------------------------------------------------------------
+        */
+
+        $statOnProgress = 0;
+        $statWaitingApproval = 0;
+        $statFinish = 0;
+
+        foreach ($assignedLops as $lop) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | PRIORITAS UTAMA:
+            | is_golive pada LOP
+            |--------------------------------------------------------------------------
+            */
+
+            if ((int) $lop->is_golive === 1) {
+
+                // Project/LOP sudah Go Live
+                $statFinish++;
+
+                continue;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Jika belum Go Live, cek apakah sedang Review
+            |--------------------------------------------------------------------------
+            */
+
+            $survey = $lop->surveys->first();
+
+            /*
+            |--------------------------------------------------------------------------
+            | Mancore sudah dibuat = sudah masuk proses review
+            |--------------------------------------------------------------------------
+            */
+
+            $mancore = MancorePt2::where(
+                'pt2_lop_id',
+                $lop->id_pt2_lop
+            )->first();
+
+            if (
+                $mancore ||
+                ($survey && $survey->pm_approval_status === 'approved')
+            ) {
+
+                $statWaitingApproval++;
+
+            } else {
+
+                $statOnProgress++;
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL
+        |--------------------------------------------------------------------------
+        */
+
+        $totalAssigned = $assignedLops->count();
+
+        $activeProjectsCount =
+            $statOnProgress + $statWaitingApproval;
+
+        /*
+        |--------------------------------------------------------------------------
+        | PROGRESS PENYELESAIAN
+        |--------------------------------------------------------------------------
+        */
+
+        $progressDone = $statFinish;
+
+        $progressPercent = $totalAssigned > 0
+            ? round(($progressDone / $totalAssigned) * 100)
+            : 0;
+
+        /*
+        |--------------------------------------------------------------------------
+        | UPDATE EVIDENCE TERAKHIR
+        |--------------------------------------------------------------------------
+        */
+
+        $lastUpdate = optional(
+            $assignedLops
+                ->flatMap(function ($lop) {
+                    return $lop->evidences ?? collect();
+                })
+                ->sortByDesc('updated_at')
+                ->first()
+        )->updated_at;
+
+        return view('teknisi.dashboard', compact(
+            'assignedLops',
+            'totalAssigned',
+            'activeProjectsCount',
+            'statOnProgress',
+            'statWaitingApproval',
+            'statFinish',
+            'progressDone',
+            'progressPercent',
+            'lastUpdate'
+        ));
     }
 
-    public function inbox()
+    public function inbox(Request $request)
     {
         $user = Auth::user();
-        
-        $projects = Project::with(['pt2Survey'])
-            ->whereHas('assignment', function ($query) use ($user) {
-                $query->where('teknisi_id', $user->id_user);
-            })
+
+        $query = Pt2Lop::with([
+            'project',
+            'surveys',
+            'assignment'
+        ])
+        ->whereHas('assignment', function ($query) use ($user) {
+            $query->where('teknisi_id', $user->id_user);
+        });
+
+        /*
+        |--------------------------------------------------------------------------
+        | FILTER LIST SELESAI
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->get('status') === 'finish') {
+
+            $query->where('is_golive', 1);
+
+        } else {
+
+            // Inbox normal hanya menampilkan
+            // LOP yang belum Go Live
+            $query->where('is_golive', 0);
+        }
+
+        $assignedLops = $query
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return view('teknisi.pt2.inbox', compact('projects'));
+        return view(
+            'teknisi.pt2.inbox',
+            compact('assignedLops')
+        );
     }
 
-    public function step1($project_id)
+    public function step1($lop_id)
     {
-        $project = Project::with(['pt2Survey', 'boqItems.designatorData'])->findOrFail($project_id);
+        $lop = Pt2Lop::with(['surveys', 'boqItems.designatorData', 'project'])->findOrFail($lop_id);
         
-        $designators = \App\Models\Designator::where('type', 'material')
+        $designators = Designator::where('type', 'material')
                         ->orWhere('designator', 'LIKE', 'M-%')
                         ->orderBy('designator')
                         ->get();
 
-        return view('teknisi.pt2.step1', compact('project', 'designators'));
+        return view('teknisi.pt2.step1', compact('lop', 'designators'));
     }
 
-    public function storeStep1(Request $request, $project_id)
+    public function storeStep1(Request $request, $lop_id)
     {
-        $project = Project::with('lop')->findOrFail($project_id);
+        $lop = Pt2Lop::with('project')->findOrFail($lop_id);
 
         $request->validate([
             'status_survey' => 'required|in:kendala,eksekusi',
@@ -74,9 +212,10 @@ class TeknisiPt2Controller extends Controller
         $hasKendala = ($request->status_survey === 'kendala') ? 1 : 0;
         $pmApproval = $hasKendala ? 'pending' : 'approved'; 
 
-        \App\Models\Pt2Survey::updateOrCreate(
-            ['project_id' => $project->id_project],
+        SurveyPt2::updateOrCreate(
+            ['pt2_lop_id' => $lop->id_pt2_lop],
             [
+                'pt2_project_id' => $lop->pt2_project_id,
                 'has_kendala' => $hasKendala,
                 'kendala_note' => $hasKendala ? $request->kendala_note : null,
                 'pm_approval_status' => $pmApproval,
@@ -89,7 +228,6 @@ class TeknisiPt2Controller extends Controller
                 'power_in_feeder' => $hasKendala ? null : $request->power_in_feeder,
                 'tipe_kabel' => $hasKendala ? null : $request->tipe_kabel,
                 'kesimpulan' => $hasKendala ? null : $request->kesimpulan,
-                
                 'detail_data' => $hasKendala ? null : json_encode([
                     'possible_add' => $request->possible_add,
                     'opsi_simple' => $request->opsi_simple,
@@ -98,18 +236,19 @@ class TeknisiPt2Controller extends Controller
         );
 
         if (!$hasKendala && $request->has('materials')) {
-            \App\Models\BoqItem::where('project_id', $project->id_project)->delete();
+            // Hapus BOQ lama khusus LOP ini, lalu masukkan yang baru
+            \App\Models\Pt2BoqItem::where('pt2_lop_id', $lop->id_pt2_lop)->delete();
 
             $materials = $request->materials;
             $qtys = $request->qty;
 
             foreach ($materials as $index => $designator_id) {
                 if (!empty($designator_id) && !empty($qtys[$index])) {
-                    $master = \App\Models\Designator::where('id_designator', $designator_id)->first();
+                    $master = Designator::where('id_designator', $designator_id)->first();
                     if ($master) {
-                        \App\Models\BoqItem::create([
-                            'project_id' => $project->id_project,
-                            'lop_id' => $project->lop_id ?? optional($project->lop)->id_lop,
+                        \App\Models\Pt2BoqItem::create([
+                            'pt2_project_id' => $lop->pt2_project_id,
+                            'pt2_lop_id' => $lop->id_pt2_lop,
                             'designator_id' => $designator_id,
                             'designator' => $master->designator, 
                             'item_name' => $master->item_name, 
@@ -120,22 +259,21 @@ class TeknisiPt2Controller extends Controller
                 }
             }
         } elseif ($hasKendala) {
-            \App\Models\BoqItem::where('project_id', $project->id_project)->delete();
+            \App\Models\Pt2BoqItem::where('pt2_lop_id', $lop->id_pt2_lop)->delete();
         }
 
         if ($hasKendala) {
-             $project->update(['status_project' => 'pending_pm']);
-             return redirect()->route('teknisi.pt2.index')->with('warning', 'Survey terkendala dilaporkan. Menunggu Approval PM.');
+             return redirect()->route('teknisi.pt2.inbox')->with('warning', 'Survey terkendala dilaporkan. Menunggu Approval PM.');
         }
 
-        return redirect()->route('teknisi.pt2.step1Eviden', $project->id_project)
+        return redirect()->route('teknisi.pt2.step1Eviden', $lop->id_pt2_lop)
                          ->with('success', 'Data Survey & BOQ Material berhasil disimpan! Silakan upload eviden.');
     }
 
-    public function step1Eviden($project_id)
+    public function step1Eviden($lop_id)
     {
-        $project = Project::with('pt2Survey')->findOrFail($project_id);
-        $survey = $project->pt2Survey;
+        $lop = Pt2Lop::with(['surveys', 'project'])->findOrFail($lop_id);
+        $survey = $lop->surveys()->first();
 
         if (!$survey || $survey->has_kendala) {
             return redirect()->route('teknisi.pt2.inbox')->with('error', 'Project ini terkendala atau survey belum lengkap.');
@@ -155,20 +293,21 @@ class TeknisiPt2Controller extends Controller
             $requiredEvidences = ['base_tray_feeder' => 'Foto Eviden Base Tray Feeder', 'base_tray_distribusi' => 'Foto Eviden Base Tray Distribusi'];
         }
 
-        $existingEvidences = \App\Models\Evidence::where('project_id', $project_id)
+        $existingEvidences = Pt2Evidence::where('pt2_lop_id', $lop_id)
             ->where('stage', 'persiapan')
             ->get()
             ->groupBy('evidence_type');
 
-        return view('teknisi.pt2.step1_eviden', compact('project', 'mode', 'requiredEvidences', 'existingEvidences'));
+        $project = $lop->project; // Untuk kompatibilitas view
+        return view('teknisi.pt2.step1_eviden', compact('lop', 'project', 'mode', 'requiredEvidences', 'existingEvidences'));
     }
 
     public function deleteEvidence($id)
     {
-        $evidence = \App\Models\Evidence::findOrFail($id); 
+        $evidence = Pt2Evidence::findOrFail($id); 
         
-        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($evidence->file_path)) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($evidence->file_path);
+        if (Storage::disk('public')->exists($evidence->file_path)) {
+            Storage::disk('public')->delete($evidence->file_path);
         }
         
         $evidence->delete();
@@ -176,9 +315,9 @@ class TeknisiPt2Controller extends Controller
         return back()->with('success', 'Foto eviden berhasil dihapus.');
     }
 
-    public function storeStep1Eviden(Request $request, $project_id)
+    public function storeStep1Eviden(Request $request, $lop_id)
     {
-        $project = Project::findOrFail($project_id);
+        $lop = Pt2Lop::findOrFail($lop_id);
 
         $request->validate([
             'evidences' => 'required|array',
@@ -193,14 +332,14 @@ class TeknisiPt2Controller extends Controller
                 foreach ($files as $file) {
                     if ($file->isValid()) {
                         $filename = time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-                        $path = $file->storeAs('evidences/' . $project->id_project, $filename, 'public');
+                        $path = $file->storeAs('evidences/pt2/' . $lop->id_pt2_lop, $filename, 'public');
 
-                        \App\Models\Evidence::create([
-                            'project_id' => $project->id_project,
+                        Pt2Evidence::create([
+                            'pt2_project_id' => $lop->pt2_project_id,
+                            'pt2_lop_id' => $lop->id_pt2_lop,
                             'stage' => $stage,
                             'evidence_type' => $type,
                             'file_path' => $path,
-                            // file_name DIHAPUS DARI SINI
                             'status' => 'pending', 
                             'uploaded_by' => Auth::user()->id_user,
                         ]);
@@ -208,26 +347,23 @@ class TeknisiPt2Controller extends Controller
                 }
             }
             
-            return redirect()->route('teknisi.pt2.step2Eviden', $project->id_project)
+            return redirect()->route('teknisi.pt2.step2Eviden', $lop->id_pt2_lop)
                              ->with('success', 'Eviden Survey berhasil disimpan! Lanjut Step 2.');
         }
 
         return back()->with('error', 'Gagal mengupload eviden. Pastikan foto sudah dipilih.');
     }
 
-    // ==========================================
-    // FUNGSI REPLACE FOTO EVIDEN (TEKNISI PT2)
-    // ==========================================
     public function replaceEvidence(Request $request, $id)
     {
         $request->validate([
             'file' => 'required|file|max:10240',
         ]);
 
-        $evidence = \App\Models\Evidence::findOrFail($id);
+        $evidence = Pt2Evidence::findOrFail($id);
 
-        if ($evidence->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($evidence->file_path)) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($evidence->file_path);
+        if ($evidence->file_path && Storage::disk('public')->exists($evidence->file_path)) {
+            Storage::disk('public')->delete($evidence->file_path);
         }
 
         $file = $request->file('file');
@@ -237,13 +373,12 @@ class TeknisiPt2Controller extends Controller
         $filename = now()->format('Ymd_His') . '_replace_' . uniqid() . '.' . $extension;
 
         $path = $file->storeAs(
-            'evidences/' . $evidence->project_id,
+            'evidences/pt2/' . $evidence->pt2_lop_id,
             $filename,
             'public'
         );
 
         $evidence->file_path = $path;
-        // $evidence->file_name = $filename; // <-- BARIS INI DIHAPUS AGAR TIDAK ERROR
         $evidence->status = 'pending';
         $evidence->review_note = null;
         $evidence->uploaded_by = Auth::user()->id_user ?? $evidence->uploaded_by;
@@ -252,10 +387,10 @@ class TeknisiPt2Controller extends Controller
         return back()->with('success', 'Eviden berhasil diperbarui. Status kembali pending.');
     }
 
-    public function step2Eviden($project_id)
+    public function step2Eviden($lop_id)
     {
-        $project = Project::with('pt2Survey')->findOrFail($project_id);
-        $survey = $project->pt2Survey;
+        $lop = Pt2Lop::with(['surveys', 'project'])->findOrFail($lop_id);
+        $survey = $lop->surveys()->first();
 
         if (!$survey) {
             return redirect()->route('teknisi.pt2.inbox')->with('error', 'Survey belum dilakukan.');
@@ -268,17 +403,18 @@ class TeknisiPt2Controller extends Controller
             'progress_instalasi' => 'Foto Progress Instalasi',
         ];
 
-        $existingEvidences = \App\Models\Evidence::where('project_id', $project_id)
+        $existingEvidences = Pt2Evidence::where('pt2_lop_id', $lop_id)
             ->where('stage', 'instalasi') 
             ->get()
             ->groupBy('evidence_type');
 
-        return view('teknisi.pt2.step2_eviden', compact('project', 'mode', 'requiredEvidences', 'existingEvidences'));
+        $project = $lop->project;
+        return view('teknisi.pt2.step2_eviden', compact('lop', 'project', 'mode', 'requiredEvidences', 'existingEvidences'));
     }
 
-    public function storeStep2Eviden(Request $request, $project_id)
+    public function storeStep2Eviden(Request $request, $lop_id)
     {
-        $project = Project::findOrFail($project_id);
+        $lop = Pt2Lop::findOrFail($lop_id);
 
         $request->validate([
             'evidences' => 'required|array',
@@ -293,14 +429,14 @@ class TeknisiPt2Controller extends Controller
                 foreach ($files as $file) {
                     if ($file->isValid()) {
                         $filename = time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-                        $path = $file->storeAs('evidences/' . $project->id_project, $filename, 'public');
+                        $path = $file->storeAs('evidences/pt2/' . $lop->id_pt2_lop, $filename, 'public');
 
-                        \App\Models\Evidence::create([
-                            'project_id' => $project->id_project,
+                        Pt2Evidence::create([
+                            'pt2_project_id' => $lop->pt2_project_id,
+                            'pt2_lop_id' => $lop->id_pt2_lop,
                             'stage' => $stage,
                             'evidence_type' => $type,
                             'file_path' => $path,
-                            // file_name DIHAPUS DARI SINI
                             'status' => 'pending', 
                             'uploaded_by' => auth()->id(),
                         ]);
@@ -314,10 +450,10 @@ class TeknisiPt2Controller extends Controller
         return back()->with('error', 'Gagal mengupload eviden. Pastikan foto sudah dipilih.');
     }
 
-    public function step3Eviden($project_id)
+    public function step3Eviden($lop_id)
     {
-        $project = Project::with('pt2Survey')->findOrFail($project_id);
-        $survey = $project->pt2Survey;
+        $lop = Pt2Lop::with(['surveys', 'project'])->findOrFail($lop_id);
+        $survey = $lop->surveys()->first();
 
         if (!$survey) {
             return redirect()->route('teknisi.pt2.inbox')->with('error', 'Survey belum dilakukan.');
@@ -343,17 +479,18 @@ class TeknisiPt2Controller extends Controller
             'foto_lainnya' => 'Foto Tambahan / Lainnya (Opsional)',
         ];
 
-        $existingEvidences = \App\Models\Evidence::where('project_id', $project_id)
+        $existingEvidences = Pt2Evidence::where('pt2_lop_id', $lop_id)
             ->where('stage', 'finishing')
             ->get()
             ->groupBy('evidence_type');
 
-        return view('teknisi.pt2.step3_eviden', compact('project', 'mode', 'requiredEvidences', 'optionalEvidences', 'existingEvidences', 'targetPortCount'));
+        $project = $lop->project;
+        return view('teknisi.pt2.step3_eviden', compact('lop', 'project', 'mode', 'requiredEvidences', 'optionalEvidences', 'existingEvidences', 'targetPortCount'));
     }
 
-    public function storeStep3Eviden(Request $request, $project_id)
+    public function storeStep3Eviden(Request $request, $lop_id)
     {
-        $project = Project::findOrFail($project_id);
+        $lop = Pt2Lop::findOrFail($lop_id);
 
         $request->validate([
             'evidences' => 'required|array',
@@ -368,50 +505,52 @@ class TeknisiPt2Controller extends Controller
                 foreach ($files as $file) {
                     if ($file->isValid()) {
                         $filename = time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-                        $path = $file->storeAs('evidences/' . $project->id_project, $filename, 'public');
+                        $path = $file->storeAs('evidences/pt2/' . $lop->id_pt2_lop, $filename, 'public');
 
-                        \App\Models\Evidence::create([
-                            'project_id' => $project->id_project,
+                        Pt2Evidence::create([
+                            'pt2_project_id' => $lop->pt2_project_id,
+                            'pt2_lop_id' => $lop->id_pt2_lop,
                             'stage' => $stage,
                             'evidence_type' => $type,
                             'file_path' => $path,
-                            // file_name DIHAPUS DARI SINI
                             'status' => 'pending', 
                             'uploaded_by' => auth()->id(),
                         ]);
                     }
                 }
             }
-            return redirect(url('teknisi/pt2/survey/'.$project->id_project.'/step4'))->with('success', 'Eviden Redaman berhasil disimpan! Lanjut ke Step 4.');
+            return redirect(url('teknisi/pt2/survey/'.$lop->id_pt2_lop.'/step4'))->with('success', 'Eviden Redaman berhasil disimpan! Lanjut ke Step 4.');
         }
 
         return back()->with('error', 'Gagal mengupload eviden. Pastikan foto sudah dipilih.');
     }
 
-    public function step4Eviden($project_id)
+    public function step4Eviden($lop_id)
     {
-        $project = Project::with('pt2Survey')->findOrFail($project_id);
+        $lop = Pt2Lop::with('project')->findOrFail($lop_id);
 
-        $dismantles = \Illuminate\Support\Facades\DB::table('dismantles')->where('project_id', $project_id)->get();
+        $dismantles = DismantlePt2::where('pt2_lop_id', $lop_id)->get();
         $odpData = $dismantles->where('category', 'ODP')->first();
         
-        $existingEvidences = \App\Models\Evidence::where('project_id', $project_id)
+        $existingEvidences = Pt2Evidence::where('pt2_lop_id', $lop_id)
             ->where('stage', 'finishing')
             ->get()
             ->groupBy('evidence_type');
 
-        return view('teknisi.pt2.step4_eviden', compact('project', 'dismantles', 'odpData', 'existingEvidences'));
+        $project = $lop->project;
+        return view('teknisi.pt2.step4_eviden', compact('lop', 'project', 'dismantles', 'odpData', 'existingEvidences'));
     }
 
-    public function storeStep4Eviden(Request $request, $project_id)
+    public function storeStep4Eviden(Request $request, $lop_id)
     {
-        $project = Project::findOrFail($project_id);
+        $lop = Pt2Lop::findOrFail($lop_id);
 
-        \Illuminate\Support\Facades\DB::table('dismantles')->where('project_id', $project->id_project)->delete();
+        DismantlePt2::where('pt2_lop_id', $lop->id_pt2_lop)->delete();
 
         if ($request->odp_item && $request->odp_item !== 'none') {
-            \Illuminate\Support\Facades\DB::table('dismantles')->insert([
-                'project_id' => $project->id_project,
+            DismantlePt2::create([
+                'pt2_project_id' => $lop->pt2_project_id,
+                'pt2_lop_id' => $lop->id_pt2_lop,
                 'category' => 'ODP',
                 'item_name' => $request->odp_item,
                 'qty' => $request->odp_qty ?? 1,
@@ -422,8 +561,9 @@ class TeknisiPt2Controller extends Controller
             foreach ($request->splitters as $sp => $val) {
                 $qty = $request->input('qty_splitter_' . $sp);
                 if ($qty) {
-                    \Illuminate\Support\Facades\DB::table('dismantles')->insert([
-                        'project_id' => $project->id_project,
+                    DismantlePt2::create([
+                        'pt2_project_id' => $lop->pt2_project_id,
+                        'pt2_lop_id' => $lop->id_pt2_lop,
                         'category' => 'Splitter',
                         'item_name' => 'Splitter ' . str_replace('_', ':', $sp),
                         'qty' => $qty,
@@ -438,14 +578,14 @@ class TeknisiPt2Controller extends Controller
                 foreach ($files as $file) {
                     if ($file->isValid()) {
                         $filename = time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-                        $path = $file->storeAs('evidences/' . $project->id_project, $filename, 'public');
+                        $path = $file->storeAs('evidences/pt2/' . $lop->id_pt2_lop, $filename, 'public');
 
-                        \App\Models\Evidence::create([
-                            'project_id' => $project->id_project,
+                        Pt2Evidence::create([
+                            'pt2_project_id' => $lop->pt2_project_id,
+                            'pt2_lop_id' => $lop->id_pt2_lop,
                             'stage' => 'finishing',
                             'evidence_type' => $type,
                             'file_path' => $path,
-                            // file_name DIHAPUS DARI SINI
                             'status' => 'pending', 
                             'uploaded_by' => auth()->id(),
                         ]);
@@ -454,21 +594,22 @@ class TeknisiPt2Controller extends Controller
             }
         }
 
-        return redirect(url('teknisi/pt2/survey/'.$project->id_project.'/step5'))->with('success', 'Data Dismantle & Eviden berhasil disimpan! Lanjut Step 5.');
+        return redirect(url('teknisi/pt2/survey/'.$lop->id_pt2_lop.'/step5'))->with('success', 'Data Dismantle & Eviden berhasil disimpan! Lanjut Step 5.');
     }
 
-    public function step5($project_id)
+    public function step5($lop_id)
     {
-        $project = Project::findOrFail($project_id);
+        $lop = Pt2Lop::with('project')->findOrFail($lop_id);
         
-        $mancore = \Illuminate\Support\Facades\DB::table('pt2_mancores')->where('project_id', $project_id)->first();
+        $mancore = MancorePt2::where('pt2_lop_id', $lop_id)->first();
+        $project = $lop->project;
 
-        return view('teknisi.pt2.step5', compact('project', 'mancore'));
+        return view('teknisi.pt2.step5', compact('lop', 'project', 'mancore'));
     }
 
-    public function storeStep5(Request $request, $project_id)
+    public function storeStep5(Request $request, $lop_id)
     {
-        $project = Project::findOrFail($project_id);
+        $lop = Pt2Lop::findOrFail($lop_id);
 
         $request->validate([
             'odp_label' => 'required|string|max:255',
@@ -477,72 +618,18 @@ class TeknisiPt2Controller extends Controller
             'feeder_core' => 'required|string|max:255',
         ]);
 
-        $existing = \Illuminate\Support\Facades\DB::table('pt2_mancores')->where('project_id', $project_id)->first();
-
-        if ($existing) {
-            \Illuminate\Support\Facades\DB::table('pt2_mancores')
-                ->where('project_id', $project_id)
-                ->update([
-                    'odp_label' => $request->odp_label,
-                    'odc_label' => $request->odc_label,
-                    'distribusi_core' => $request->distribusi_core,
-                    'feeder_core' => $request->feeder_core,
-                    'updated_at' => now(),
-                ]);
-        } else {
-            \Illuminate\Support\Facades\DB::table('pt2_mancores')->insert([
-                'project_id' => $project_id,
+        MancorePt2::updateOrCreate(
+            ['pt2_lop_id' => $lop->id_pt2_lop],
+            [
+                'pt2_project_id' => $lop->pt2_project_id,
                 'odp_label' => $request->odp_label,
                 'odc_label' => $request->odc_label,
                 'distribusi_core' => $request->distribusi_core,
                 'feeder_core' => $request->feeder_core,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
-
-        $project->update([
-            'status' => 'waiting_ut' 
-        ]);
+            ]
+        );
 
         return redirect()->route('teknisi.pt2.inbox')
-                         ->with('success', '🎉 Luar biasa! Data Project berhasil di-submit dan sedang menunggu Approval Admin.');
-    }
-
-    // ==========================================
-    // HELPER: KONVERSI EXIF GPS KE DESIMAL
-    // ==========================================
-    private function getExifGps($file)
-    {
-        $lat = null;
-        $lng = null;
-
-        // Baca exif menggunakan fungsi bawaan PHP (@ untuk menekan error jika file bukan gambar)
-        $exif = @exif_read_data($file->getPathname());
-
-        if ($exif && isset($exif['GPSLatitude']) && isset($exif['GPSLongitude'])) {
-            $lat = $this->convertGpsArrayToDecimal($exif['GPSLatitude'], $exif['GPSLatitudeRef']);
-            $lng = $this->convertGpsArrayToDecimal($exif['GPSLongitude'], $exif['GPSLongitudeRef']);
-        }
-
-        return ['latitude' => $lat, 'longitude' => $lng];
-    }
-
-    private function convertGpsArrayToDecimal($coordinate, $hemisphere)
-    {
-        $degrees = count($coordinate) > 0 ? $this->gpsFractionToFloat($coordinate[0]) : 0;
-        $minutes = count($coordinate) > 1 ? $this->gpsFractionToFloat($coordinate[1]) : 0;
-        $seconds = count($coordinate) > 2 ? $this->gpsFractionToFloat($coordinate[2]) : 0;
-
-        $flip = ($hemisphere == 'W' || $hemisphere == 'S') ? -1 : 1;
-        return $flip * ($degrees + $minutes / 60 + $seconds / 3600);
-    }
-
-    private function gpsFractionToFloat($fraction)
-    {
-        $parts = explode('/', $fraction);
-        if (count($parts) <= 0) return 0;
-        if (count($parts) == 1) return $parts[0];
-        return floatval($parts[0]) / (floatval($parts[1]) ?: 1); // Hindari division by zero
+                         ->with('success', '🎉 Luar biasa! Data LOP PT 2 berhasil di-submit dan sedang menunggu Approval Admin.');
     }
 }

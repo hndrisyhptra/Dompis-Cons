@@ -2,8 +2,8 @@
 
 @section('content')
 @php
-    $dismantles = \Illuminate\Support\Facades\DB::table('dismantles')->where('project_id', $project->id_project)->get();
-    
+    $lop = $project->lop; // Diambil dari injeksi trik Controller
+
     // Definisikan daftar item dismantle yang didukung
     $dismantleItems = [
         'odp' => 'Foto Eviden ODP Dibongkar',
@@ -17,28 +17,46 @@
 
     // Cek apakah step 4 selesai (Semua eviden dismantle yang ada di database sudah di-approve)
     $uploadedDismantleEvidences = $allEvidences->whereIn('evidence_type', array_keys($dismantleItems));
-    $step4Completed = $uploadedDismantleEvidences->count() > 0 && 
-                      $uploadedDismantleEvidences->where('status', 'approved')->count() === $uploadedDismantleEvidences->count();
+    
+    // Logika Step 4: Selesai jika semua fotonya 'approved'. 
+    // Atau jika memang tidak ada dismantle sama sekali (karena ini opsional), anggap true.
+    $step4Completed = true; 
+    if ($uploadedDismantleEvidences->count() > 0) {
+        $step4Completed = $uploadedDismantleEvidences->where('status', 'approved')->count() === $uploadedDismantleEvidences->count();
+    } elseif ($dismantles->count() > 0) {
+        // Ada data teks dismantle, tapi belum ada foto
+        $step4Completed = false;
+    }
 @endphp
 
 <div class="max-w-4xl mx-auto space-y-4 px-4 py-6">
 
-    {{-- Header & Stepper --}}
+    {{-- Header --}}
     <div>
-        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Approval PT2</h1>
+        <h1 class="text-xl font-bold text-gray-900 dark:text-white">Approval LOP PT 2</h1>
         <p class="text-sm text-gray-500">Pilih project untuk mulai review step by step</p>
     </div>
 
+    {{-- LOP Info Card & Stepper --}}
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 shadow-sm">
         <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-                <h2 class="text-base font-bold text-gray-900 dark:text-white truncate">{{ $project->project_name }}</h2>
-                <p class="text-sm text-gray-500">{{ $project->lop?->branch }} · {{ $project->lop?->sto }}</p>
+                <h2 class="text-base font-bold text-gray-900 dark:text-white truncate">
+                    {{ $lop->lop_name }}
+                </h2>
+                <p class="text-sm text-gray-500 font-medium">
+                    PID: <span class="font-bold text-gray-700 dark:text-gray-300">{{ $project->pid ?? '-' }}</span> · 
+                    IHLD: <span class="font-mono text-cyan-600 dark:text-cyan-400">{{ $lop->id_ihld ?? '-' }}</span> · 
+                    STO {{ $lop->sto ?? '-' }}
+                </p>
             </div>
-            <a href="{{ route('admin.pt2.approval') }}" class="h-10 px-4 rounded-xl border border-gray-300 inline-flex items-center text-sm font-bold text-gray-700">← Kembali</a>
+            <a href="{{ route('admin.pt2.approval') }}" class="h-10 px-4 rounded-xl border border-gray-300 dark:border-gray-700 inline-flex items-center text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                ← Kembali
+            </a>
         </div>
         
-        @include('admin.pt2.partials.stepper', ['currentStep' => 4])
+        {{-- PANGGIL STEPPER --}}
+        @include('admin.pt2.partials.stepper', ['currentStep' => 4, 'lop' => $lop])
     </div>
 
     {{-- Step Title --}}
@@ -46,11 +64,11 @@
         <div class="h-1 bg-indigo-500"></div>
         <div class="p-4 flex items-center justify-between">
             <div>
-                <h2 class="text-base font-bold text-gray-900 dark:text-white">Step 4 — Dismantle</h2>
-                <p class="text-sm text-gray-500">Tinjau rincian material dan foto eviden dismantle.</p>
+                <h2 class="text-base font-bold text-gray-900 dark:text-white">Step 4 — Dismantle (Opsional)</h2>
+                <p class="text-sm text-gray-500">Tinjau rincian material dan foto eviden dismantle (pembongkaran).</p>
             </div>
             <span class="px-3 py-1 rounded-full text-xs font-bold {{ $step4Completed ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700' }}">
-                {{ $step4Completed ? 'Approved' : 'Pending Review' }}
+                {{ $step4Completed ? 'Approved / Clear' : 'Pending Review' }}
             </span>
         </div>
     </div>
@@ -86,8 +104,10 @@
                 </table>
             </div>
         @else
-            <div class="p-6 text-center text-sm font-bold text-gray-500">
-                Data Dismantle Kosong / Tidak ada item yang dibongkar.
+            <div class="p-8 text-center flex flex-col items-center justify-center">
+                <div class="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-gray-400 text-2xl mb-3">📦</div>
+                <p class="text-sm font-bold text-gray-500 dark:text-gray-400">Data Dismantle Kosong</p>
+                <p class="text-xs text-gray-400 mt-1">Teknisi tidak menginput item yang dibongkar pada LOP ini.</p>
             </div>
         @endif
     </div>
@@ -102,7 +122,7 @@
             $evList = $allEvidences->where('evidence_type', $key);
         @endphp
 
-        {{-- Hanya tampilkan jika teknisi mengupload foto untuk item tersebut, atau tampilkan kosong jika ingin selalu terpampang --}}
+        {{-- Hanya tampilkan komponen jika teknisi mengupload foto untuk item tersebut --}}
         @if($evList->count() > 0)
             @include('admin.evidences.partials.review-item', [
                 'isPt2' => true,
@@ -117,8 +137,8 @@
 
     {{-- Footer --}}
     <div class="flex items-center justify-between pt-2">
-        <a href="{{ route('admin.pt2.redaman', $project->id_project) }}" class="text-sm font-bold text-gray-500 hover:text-gray-900 transition">← Step Redaman</a>
-        <a href="{{ route('admin.pt2.mancore', $project->id_project) }}" class="h-10 px-5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-bold inline-flex items-center justify-center transition hover:opacity-90">
+        <a href="{{ route('admin.pt2.redaman', $lop->id_pt2_lop) }}" class="text-sm font-bold text-gray-500 hover:text-gray-900 dark:hover:text-white transition">← Step Redaman</a>
+        <a href="{{ route('admin.pt2.mancore', $lop->id_pt2_lop) }}" class="h-10 px-5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-bold inline-flex items-center justify-center transition hover:opacity-90">
             Step Mancore →
         </a>
     </div>
