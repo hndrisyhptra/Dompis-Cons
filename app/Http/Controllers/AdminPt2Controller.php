@@ -75,7 +75,7 @@ class AdminPt2Controller extends Controller
         return view('admin.pt2.index', compact('projects', 'branches', 'assignableUsers'));
     }
 
-    /*
+   /*
     |--------------------------------------------------------------------------
     | FUNGSI APPROVAL LIST (HALAMAN DAFTAR LOP YANG BUTUH REVIEW)
     |--------------------------------------------------------------------------
@@ -117,34 +117,42 @@ class AdminPt2Controller extends Controller
         }
 
         // ==========================================
-        // LOGIKA TAB FILTER BERDASARKAN STATUS EVIDEN (FOTO) 100% AMAN
+        // LOGIKA TAB FILTER YANG AKURAT
         // ==========================================
-        if ($statusFilter === 'active') {
-            // ON PROGRESS: 
-            // LOP yang sudah di-upload eviden, TAPI masih ada yang ditolak (rejected) 
-            // sehingga teknisi sedang dalam tahap memperbaikinya.
-            $query->whereHas('evidences')
-                  ->whereHas('evidences', function($qEv) {
-                      $qEv->where('status', 'rejected');
-                  })
-                  ->whereDoesntHave('evidences', function($qEv) {
-                      $qEv->where('status', 'pending');
-                  });
-                  
-        } elseif ($statusFilter === 'pending') {
-            // MENUNGGU REVIEW: 
-            // LOP yang memiliki minimal 1 eviden berstatus 'pending'. 
+        if ($statusFilter === 'pending') {
+            // MENUNGGU REVIEW: Punya minimal 1 eviden berstatus 'pending'
             $query->whereHas('evidences', function($qEv) {
                 $qEv->where('status', 'pending');
             });
                   
         } elseif ($statusFilter === 'completed') {
-            // APPROVED / SELESAI: 
-            // LOP yang memiliki eviden 'approved' DAN sama sekali tidak punya eviden 'pending' atau 'rejected'
-            $query->whereHas('evidences', function($qEv) {
-                $qEv->where('status', 'approved');
-            })->whereDoesntHave('evidences', function($qEv) {
-                $qEv->whereIn('status', ['pending', 'rejected']);
+            // SELESAI: Sudah sampai tahap akhir (Mancore), atau sudah dikirim ke SDI, atau Go-Live
+            $query->where(function($q) {
+                $q->whereIn('status_progress', ['done', 'mancore', 'complete'])
+                  ->orWhere('is_golive', 1)
+                  ->orWhereIn('sdi_approval_status', ['pending', 'approved']);
+            });
+
+        } elseif ($statusFilter === 'active') {
+            // ON PROGRESS: 
+            // 1. TIDAK ada eviden pending
+            // 2. Belum masuk tahap Selesai/Go-Live
+            // 3. SUDAH ADA AKTIVITAS (Telah upload foto eviden / survey) -> LOP Kosong disembunyikan
+            $query->whereDoesntHave('evidences', function($qEv) {
+                $qEv->where('status', 'pending');
+            })->where(function($q) {
+                $q->whereNotIn('status_progress', ['done', 'mancore', 'complete'])
+                  ->orWhereNull('status_progress');
+            })->where(function($q) {
+                $q->whereNull('sdi_approval_status')
+                  ->orWhereNotIn('sdi_approval_status', ['pending', 'approved']);
+            })->where(function($q) {
+                $q->where('is_golive', 0)
+                  ->orWhereNull('is_golive');
+            })->where(function($q) {
+                // KUNCI PERBAIKAN: Menjamin hanya LOP yang sudah diisi teknisi yang muncul
+                $q->whereHas('evidences')
+                  ->orWhereHas('surveys');
             });
         }
 

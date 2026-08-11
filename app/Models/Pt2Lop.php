@@ -46,76 +46,93 @@ class Pt2Lop extends Model
     // Fungsi Kalkulasi Progress LOP
     public function progressSummary()
     {
-        // 1. Cek Prioritas Tertinggi: GO-LIVE (Mutlak 100%)
+        // 1. Prioritas Mutlak: GO-LIVE (Jika sudah di-approve SDI)
         if ($this->is_golive == 1 || $this->sdi_approval_status === 'approved') {
             return [
-                'progress' => 100,
-                'stageLabel' => 'GO-LIVE',
-                'color' => 'bg-emerald-500',
-                'badge' => 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                'progress' => 100, 
+                'stageLabel' => 'GO-LIVE', 
+                'color' => 'bg-emerald-500', 
+                'badge' => 'bg-emerald-100 text-emerald-700 border border-emerald-200'
             ];
         }
-
-        // 2. Cek Prioritas Kedua: Menunggu SDI (Mutlak 100%)
+        
+        // 2. Prioritas Mutlak: Menunggu SDI (Dikirim Admin, belum di-approve SDI)
         if ($this->sdi_approval_status === 'pending') {
             return [
-                'progress' => 100,
-                'stageLabel' => 'Menunggu SDI',
-                'color' => 'bg-indigo-500',
-                'badge' => 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                'progress' => 100, 
+                'stageLabel' => 'Menunggu SDI', 
+                'color' => 'bg-indigo-500', 
+                'badge' => 'bg-indigo-100 text-indigo-700 border border-indigo-200'
             ];
         }
 
-        // 3. Baca tahapan dari database (progress teknisi)
-        $status = strtolower($this->status_progress ?? '');
+        $progress = 0;
+        $stageLabel = 'Persiapan';
 
-        switch ($status) {
-            case 'done':
-            case 'mancore':
-            case 'complete':
-                return [
-                    'progress' => 100,
-                    'stageLabel' => 'Complete',
-                    'color' => 'bg-green-500',
-                    'badge' => 'bg-green-100 text-green-700 border-green-200'
-                ];
-            case 'dismantle':
-                return [
-                    'progress' => 80,
-                    'stageLabel' => 'Dismantle',
-                    'color' => 'bg-purple-500',
-                    'badge' => 'bg-purple-100 text-purple-700 border-purple-200'
-                ];
-            case 'finish':
-            case 'redaman':
-                return [
-                    'progress' => 60,
-                    'stageLabel' => 'Finish',
-                    'color' => 'bg-blue-500',
-                    'badge' => 'bg-blue-100 text-blue-700 border-blue-200'
-                ];
-            case 'progress':
-            case 'instalasi':
-                return [
-                    'progress' => 40,
-                    'stageLabel' => 'Progress',
-                    'color' => 'bg-amber-500',
-                    'badge' => 'bg-amber-100 text-amber-700 border-amber-200'
-                ];
-            case 'survey':
-                return [
-                    'progress' => 20,
-                    'stageLabel' => 'Survey',
-                    'color' => 'bg-yellow-500',
-                    'badge' => 'bg-yellow-100 text-yellow-800 border-yellow-200'
-                ];
-            default:
-                return [
-                    'progress' => 0,
-                    'stageLabel' => 'Persiapan',
-                    'color' => 'bg-gray-400',
-                    'badge' => 'bg-gray-100 text-gray-600 border-gray-200'
-                ];
+        // 3. DYNAMIC CHECKING FISIK DATA (TOP-DOWN)
+        // Mengecek dari tahap paling akhir ke tahap paling awal. Jika tahap akhir ada, otomatis override tahap sebelumnya.
+
+        // Step 5: Complete (Mancore)
+        if (\App\Models\MancorePt2::where('pt2_lop_id', $this->id_pt2_lop)->exists()) {
+            $progress = 100; 
+            $stageLabel = 'Complete';
         }
+        // Step 4: Dismantle
+        elseif (\App\Models\DismantlePt2::where('pt2_lop_id', $this->id_pt2_lop)->exists() || \App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->whereRaw("LOWER(stage) = 'dismantle'")->exists()) {
+            $progress = 80; 
+            $stageLabel = 'Dismantle';
+        }
+        // Step 3: Finish (Dulu Redaman)
+        elseif (\App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->whereRaw("LOWER(stage) IN ('redaman', 'finish')")->exists()) {
+            $progress = 60; 
+            $stageLabel = 'Finish';
+        }
+        // Step 2: Progress (Dulu Instalasi)
+        elseif (\App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->whereRaw("LOWER(stage) IN ('instalasi', 'progress')")->exists()) {
+            $progress = 40; 
+            $stageLabel = 'Progress';
+        }
+        // Step 1: Survey
+        elseif (\App\Models\SurveyPt2::where('pt2_lop_id', $this->id_pt2_lop)->exists()) {
+            $progress = 20; 
+            $stageLabel = 'Survey';
+        }
+
+        // 4. FALLBACK: Cek kolom status_progress
+        // Berjaga-jaga jika bukti fisik terhapus tapi status progress di database masih tinggi
+        $dbStatus = strtolower($this->status_progress ?? '');
+        $statusMap = [
+            'preparation' => 0, 'persiapan' => 0,
+            'survey' => 20, 
+            'instalasi' => 40, 'progress' => 40, 
+            'redaman' => 60, 'finish' => 60, 
+            'dismantle' => 80, 
+            'mancore' => 100, 'done' => 100, 'complete' => 100
+        ];
+        
+        $dbProgress = $statusMap[$dbStatus] ?? 0;
+        
+        // Jika status_progress di database lebih tinggi dari fisik data (misal di-bypass / sinkronisasi ulang)
+        if ($dbProgress > $progress) {
+            $progress = $dbProgress;
+            
+            if ($dbProgress == 20) $stageLabel = 'Survey';
+            elseif ($dbProgress == 40) $stageLabel = 'Progress';
+            elseif ($dbProgress == 60) $stageLabel = 'Finish';
+            elseif ($dbProgress == 80) $stageLabel = 'Dismantle';
+            elseif ($dbProgress == 100) $stageLabel = 'Complete';
+        }
+
+        // 5. MAPPING WARNA SESUAI TAHAPAN BARU
+        $colorMap = [
+            100 => ['color' => 'bg-green-500', 'badge' => 'bg-green-100 text-green-700 border border-green-200'],
+            80  => ['color' => 'bg-purple-500', 'badge' => 'bg-purple-100 text-purple-700 border border-purple-200'],
+            60  => ['color' => 'bg-blue-500', 'badge' => 'bg-blue-100 text-blue-700 border border-blue-200'],
+            40  => ['color' => 'bg-amber-500', 'badge' => 'bg-amber-100 text-amber-700 border border-amber-200'],
+            20  => ['color' => 'bg-yellow-500', 'badge' => 'bg-yellow-100 text-yellow-800 border border-yellow-200'],
+            0   => ['color' => 'bg-gray-400', 'badge' => 'bg-gray-100 text-gray-600 border border-gray-200'],
+        ];
+
+        return array_merge(['progress' => $progress, 'stageLabel' => $stageLabel], $colorMap[$progress] ?? $colorMap[0]);
     }
 }

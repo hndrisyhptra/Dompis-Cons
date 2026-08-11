@@ -119,7 +119,7 @@
 
         @php
             $projectOpen = request()->routeIs('projects.*')
-                || request()->routeIs('admin.pt2.*');
+                || request()->routeIs('admin.pt2.index');
 
             $activeProgram = request('program');
         @endphp
