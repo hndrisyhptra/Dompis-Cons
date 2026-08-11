@@ -92,7 +92,7 @@
                     <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">PID / PID SAP</th>
                     <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500">Lokasi</th>
                     <th class="px-5 py-3 text-center text-xs font-black uppercase text-gray-500">Total LOP</th>
-                    <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500 min-w-[150px]">Progress LOP</th>
+                    <th class="px-5 py-3 text-left text-xs font-black uppercase text-gray-500 min-w-[150px]">Progress Keseluruhan</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -100,10 +100,17 @@
                     @php 
                         $lopsCount = $project->lops->count(); 
                         $completedLops = 0;
+                        $sumProgress = 0;
+                        
+                        // Menghitung progress secara bersih menggunakan Model
                         foreach($project->lops as $l) {
-                            if($l->progressSummary()['progress'] == 100) $completedLops++;
+                            $summ = $l->progressSummary();
+                            $sumProgress += $summ['progress'];
+                            if($summ['progress'] == 100) $completedLops++;
                         }
-                        $pidProgress = $lopsCount > 0 ? round(($completedLops / $lopsCount) * 100) : 0;
+                        
+                        // Rata-rata progress parent PID agar lebih presisi (misal 1 LOP 0%, 1 LOP 100% = PID Progress 50%)
+                        $pidProgress = $lopsCount > 0 ? round($sumProgress / $lopsCount) : 0;
                     @endphp
                     
                     {{-- BARIS UTAMA (PID WADAH) --}}
@@ -124,11 +131,11 @@
                         </td>
                         <td class="px-5 py-4">
                             <div class="flex items-center justify-between mb-1 text-[10px] font-bold text-gray-500">
-                                <span>{{ $completedLops }} dari {{ $lopsCount }} Selesai</span>
-                                <span>{{ $pidProgress }}%</span>
+                                <span>{{ $completedLops }} dari {{ $lopsCount }} LOP Selesai</span>
+                                <span class="{{ $pidProgress == 100 ? 'text-emerald-600' : '' }}">{{ $pidProgress }}%</span>
                             </div>
                             <div class="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                <div class="h-full bg-emerald-500 rounded-full transition-all" style="width: {{ $pidProgress }}%"></div>
+                                <div class="h-full {{ $pidProgress == 100 ? 'bg-emerald-500' : 'bg-blue-500' }} rounded-full transition-all" style="width: {{ $pidProgress }}%"></div>
                             </div>
                         </td>
                     </tr>
@@ -151,17 +158,12 @@
                                         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                                             @foreach($project->lops as $lop)
                                                 @php
-                                                    $summary = $lop->progressSummary();
-                                                    $progress = $summary['progress'];
-                                                    $stageLabel = $summary['stageLabel'];
                                                     $assignedUser = $lop->assignment->teknisi ?? null;
-
-                                                    if ($progress == 100) { $stageBadge = 'bg-green-100 text-green-700'; $progressColor = 'bg-green-600'; } 
-                                                    elseif ($stageLabel === 'Finishing') { $stageBadge = 'bg-purple-100 text-purple-700'; $progressColor = 'bg-purple-600'; } 
-                                                    elseif ($stageLabel === 'Pengukuran') { $stageBadge = 'bg-blue-100 text-blue-700'; $progressColor = 'bg-blue-600'; } 
-                                                    elseif ($stageLabel === 'Instalasi') { $stageBadge = 'bg-yellow-100 text-yellow-700'; $progressColor = 'bg-yellow-600'; } 
-                                                    else { $stageBadge = 'bg-red-100 text-red-700'; $progressColor = 'bg-red-600'; }
+                                                    
+                                                    // BLADE SANGAT BERSIH: Semua data diambil langsung dari Model
+                                                    $summary = $lop->progressSummary();
                                                 @endphp
+                                                
                                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                                                     <td class="px-4 py-4">
                                                         <p class="font-bold text-gray-900 dark:text-white">{{ $lop->lop_name }}</p>
@@ -172,15 +174,22 @@
                                                             <p class="font-bold text-gray-900 dark:text-white text-xs">{{ $assignedUser->name }}</p>
                                                             <p class="text-[10px] text-emerald-600 font-bold mt-0.5">Teknisi PT 2</p>
                                                         @else
-                                                            <span class="px-2 py-1 bg-gray-100 text-gray-500 text-[10px] font-bold rounded">Belum Assign</span>
+                                                            <span class="px-2 py-1 bg-gray-100 text-gray-500 text-[10px] font-bold rounded border border-gray-200">Belum Assign</span>
                                                         @endif
                                                     </td>
                                                     <td class="px-4 py-4">
-                                                        <span class="px-2 py-1 rounded-md text-[10px] font-black uppercase {{ $stageBadge }}">{{ $stageLabel }}</span>
+                                                        <span class="px-2.5 py-1 rounded-md text-[10px] font-black uppercase {{ $summary['badge'] }}">
+                                                            {{ $summary['stageLabel'] }}
+                                                        </span>
                                                     </td>
                                                     <td class="px-4 py-4 min-w-[120px]">
-                                                        <div class="flex justify-between mb-1 text-[10px] font-bold text-gray-500"><span>Progress</span><span>{{ $progress }}%</span></div>
-                                                        <div class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full"><div class="h-full {{ $progressColor }} rounded-full" style="width: {{ $progress }}%"></div></div>
+                                                        <div class="flex justify-between mb-1 text-[10px] font-bold text-gray-500">
+                                                            <span>Progress</span>
+                                                            <span>{{ $summary['progress'] }}%</span>
+                                                        </div>
+                                                        <div class="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                            <div class="h-full {{ $summary['color'] }} rounded-full transition-all" style="width: {{ $summary['progress'] }}%"></div>
+                                                        </div>
                                                     </td>
                                                     
                                                     {{-- KOLOM AKSI DROPDOWN MENU --}}

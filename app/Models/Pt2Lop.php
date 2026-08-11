@@ -46,39 +46,76 @@ class Pt2Lop extends Model
     // Fungsi Kalkulasi Progress LOP
     public function progressSummary()
     {
-        $evidences = $this->evidences ?? collect();
-        $boqItems = $this->boqItems ?? collect();
+        // 1. Cek Prioritas Tertinggi: GO-LIVE (Mutlak 100%)
+        if ($this->is_golive == 1 || $this->sdi_approval_status === 'approved') {
+            return [
+                'progress' => 100,
+                'stageLabel' => 'GO-LIVE',
+                'color' => 'bg-emerald-500',
+                'badge' => 'bg-emerald-100 text-emerald-700 border-emerald-200'
+            ];
+        }
 
-        // 1. Persiapan
-        $persiapanDone = $evidences->where('stage', 'persiapan')->where('evidence_type', 'barang_tiba')->where('status', 'approved')->count() > 0 
-            && $evidences->where('stage', 'persiapan')->where('evidence_type', 'perizinan')->where('status', 'approved')->count() > 0;
+        // 2. Cek Prioritas Kedua: Menunggu SDI (Mutlak 100%)
+        if ($this->sdi_approval_status === 'pending') {
+            return [
+                'progress' => 100,
+                'stageLabel' => 'Menunggu SDI',
+                'color' => 'bg-indigo-500',
+                'badge' => 'bg-indigo-100 text-indigo-700 border-indigo-200'
+            ];
+        }
 
-        // 2. Instalasi
-        $materialBoqItems = $boqItems->filter(fn($boq) => str_starts_with($boq->designator, 'M-'));
-        $boqTotal = $materialBoqItems->count();
-        $boqApproved = $materialBoqItems->filter(function($boq) use ($evidences) {
-            return $evidences->where('stage', 'instalasi')->where('evidence_type', 'progress_boq')->where('pt2_boq_id', $boq->id_pt2_boq)->where('status', 'approved')->count() > 0;
-        })->count();
-        $instalasiDone = $boqTotal > 0 && $boqApproved >= $boqTotal;
+        // 3. Baca tahapan dari database (progress teknisi)
+        $status = strtolower($this->status_progress ?? '');
 
-        // 3. Finishing
-        $finishingDone = $evidences->where('stage', 'finishing')->where('status', 'approved')->count() > 0;
-
-        $doneStep = 0;
-        if ($persiapanDone) $doneStep++;
-        if ($instalasiDone) $doneStep++;
-        if ($finishingDone) $doneStep++;
-
-        $progress = ($persiapanDone && $instalasiDone && $finishingDone) ? 100 : round(($doneStep / 3) * 100);
-        
-        $stageLabel = 'Persiapan';
-        if ($progress == 100) $stageLabel = 'Selesai';
-        elseif ($instalasiDone) $stageLabel = 'Finishing';
-        elseif ($persiapanDone) $stageLabel = 'Instalasi';
-
-        return [
-            'progress' => $progress,
-            'stageLabel' => $stageLabel
-        ];
+        switch ($status) {
+            case 'done':
+            case 'mancore':
+            case 'complete':
+                return [
+                    'progress' => 100,
+                    'stageLabel' => 'Complete',
+                    'color' => 'bg-green-500',
+                    'badge' => 'bg-green-100 text-green-700 border-green-200'
+                ];
+            case 'dismantle':
+                return [
+                    'progress' => 80,
+                    'stageLabel' => 'Dismantle',
+                    'color' => 'bg-purple-500',
+                    'badge' => 'bg-purple-100 text-purple-700 border-purple-200'
+                ];
+            case 'finish':
+            case 'redaman':
+                return [
+                    'progress' => 60,
+                    'stageLabel' => 'Finish',
+                    'color' => 'bg-blue-500',
+                    'badge' => 'bg-blue-100 text-blue-700 border-blue-200'
+                ];
+            case 'progress':
+            case 'instalasi':
+                return [
+                    'progress' => 40,
+                    'stageLabel' => 'Progress',
+                    'color' => 'bg-amber-500',
+                    'badge' => 'bg-amber-100 text-amber-700 border-amber-200'
+                ];
+            case 'survey':
+                return [
+                    'progress' => 20,
+                    'stageLabel' => 'Survey',
+                    'color' => 'bg-yellow-500',
+                    'badge' => 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                ];
+            default:
+                return [
+                    'progress' => 0,
+                    'stageLabel' => 'Persiapan',
+                    'color' => 'bg-gray-400',
+                    'badge' => 'bg-gray-100 text-gray-600 border-gray-200'
+                ];
+        }
     }
 }
