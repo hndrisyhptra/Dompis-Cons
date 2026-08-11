@@ -17,6 +17,7 @@ use App\Http\Controllers\TeknisiPt2Controller;
 use App\Http\Controllers\AdminPt2Controller;
 use App\Http\Controllers\Pt2AssignmentController;
 use App\Http\Controllers\SdiController;
+use App\Http\Controllers\ProgramController;
 
 
 
@@ -592,6 +593,15 @@ Route::delete('/pt2/destroy-lop/{lop_id}', [\App\Http\Controllers\AdminPt2Contro
 // Route Assignment PT 2
 Route::post('/pt2/assignments/store', [Pt2AssignmentController::class, 'assignTeknisi'])->name('admin.pt2.assign.store');
 Route::delete('/pt2/assignments/remove/{pt2_lop_id}', [Pt2AssignmentController::class, 'removeAssign'])->name('admin.pt2.assign.remove');
+
+// Rute Program Khusus (Kecuali PT 2)
+Route::prefix('program')->name('program.')->group(function () {
+    Route::get('/osp', [ProgramController::class, 'osp'])->name('osp');
+    Route::get('/node-b', [ProgramController::class, 'nodeb'])->name('nodeb');
+    Route::get('/hem', [ProgramController::class, 'hem'])->name('hem');
+    Route::get('/olo', [ProgramController::class, 'olo'])->name('olo');
+    Route::get('/konstruksi-eksternal', [ProgramController::class, 'konstruk'])->name('konstruk');
+});
 /*
 |--------------------------------------------------------------------------
 | AUTH

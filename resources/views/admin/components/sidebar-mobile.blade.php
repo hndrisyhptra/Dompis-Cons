@@ -1,20 +1,21 @@
-<aside class="flex flex-col w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 min-h-screen">
-
+<aside class="flex flex-col w-64 h-screen max-h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 overflow-hidden">
     {{-- Logo --}}
-    <div class="h-16 px-5 flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
-
+    <div class="h-16 min-h-16 shrink-0 px-5 flex items-center justify-between border-b border-gray-200 dark:border-gray-800">
 
         <div class="flex items-center gap-3">
             <img src="{{ asset('images/logo-dompis-cons.png') }}" alt="Logo" class="w-9 h-9">
+
             <div>
                 <h1 class="text-base font-black tracking-tight text-gray-900 dark:text-white">
                     DOMPIS <span class="text-blue-600">Cons</span>
                 </h1>
+
                 <p class="text-xs text-gray-500">
                     Admin Project
                 </p>
             </div>
         </div>
+
         <button @click="sidebarOpen = false"
                 class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-700">
             ×
@@ -23,7 +24,7 @@
     </div>
 
     {{-- Menu --}}
-    <div class="flex-1 p-4 space-y-1">
+    <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-4 space-y-1">
 
         {{-- Main --}}
         <p class="text-xs uppercase text-gray-400 font-semibold px-3 mb-2">
@@ -518,26 +519,80 @@
             </span>
         </a>
 
-        <a href="{{ route('admin.evidences.approval') }}"
-            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
-            {{ request()->routeIs('admin.evidences.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+         {{-- APPROVAL EVIDEN (DROPDOWN) --}}
+        @php
+            $approvalOpen = request()->routeIs('admin.evidences.*')
+                || request()->routeIs('admin.pt2.approval*');
+        @endphp
+        
+        <div x-data="{ open: {{ $approvalOpen ? 'true' : 'false' }} }">
 
-            @if(request()->routeIs('admin.evidences.*'))
-                <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
-            @endif
+            <button type="button"
+                    @click="open = !open"
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    {{ $approvalOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
-            <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-badge-check-icon lucide-badge-check">
-                        <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/>
+                <div class="flex items-center gap-3">
+                    @if($approvalOpen)
+                        <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+                    @endif
+
+                    <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" 
+                             class="w-5 h-5" 
+                             viewBox="0 0 24 24" 
+                             fill="none" 
+                             stroke="currentColor" 
+                             stroke-width="2" 
+                             stroke-linecap="round" 
+                             stroke-linejoin="round">
+                             <path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/>
+                             <path d="m9 12 2 2 4-4"/>
+                        </svg>
+                    </div>
+
+                    <span>Approval Eviden</span>
+                </div>
+
+                <svg :class="open ? 'rotate-180' : ''"
+                    class="w-4 h-4 transition-transform"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 9l-7 7-7-7"/>
                 </svg>
-            </div>
-                
+            </button>
 
-            <span>
-                Approval Eviden
-            </span>
-            
-        </a>
+            <div x-show="open"
+                x-transition
+                class="mt-1 ml-5 pl-3 border-l border-gray-200 dark:border-gray-700 space-y-1">
+
+                <a href="{{ route('admin.evidences.approval') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.evidences.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                    <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        Approval Konstruksi
+                    </span>
+                </a>
+
+                <a href="{{ route('admin.pt2.approval') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.pt2.approval*') ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                    <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        Approval PT2
+                    </span>
+                </a>
+
+            </div>
+        </div>
 
         <!-- <a href="#"
            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
