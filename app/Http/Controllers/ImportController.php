@@ -680,77 +680,531 @@ class ImportController extends Controller
 
     public function dataBoq(Request $request)
     {
-        $search = $request->search;
-        $package = $request->package;
+        $search = trim((string) $request->input('search', ''));
+        $package = $request->input('package');
 
-        $lops = Lop::query()
-            ->with([
-                'project',
-                'package',
-                'boqItems.designatorData',
+        /*
+        |--------------------------------------------------------------------------
+        | TABLE NAME
+        |--------------------------------------------------------------------------
+        | Pakai nama table dari Model agar aman jika nama tabel custom.
+        */
+        $lopTable = (new Lop())->getTable();
+        $projectTable = (new Project())->getTable();
+        $packageTable = (new PackageModel())->getTable();
+        $boqTable = (new BoqItem())->getTable();
+        $designatorTable = (new Designator())->getTable();
+        $priceTable = (new DesignatorPackagePrice())->getTable();
+
+        /*
+        |--------------------------------------------------------------------------
+        | CURRENT PACKAGE PRICE
+        |--------------------------------------------------------------------------
+        |
+        | Harga tidak menggunakan boq_items.unit_price / total_price.
+        |
+        | Harga selalu dihitung ulang dari:
+        |
+        | designator_package_price.price × boq_items.quantity_plan
+        |
+        | Jika tanpa sengaja ada lebih dari 1 price untuk kombinasi
+        | designator + package, gunakan record id_price terakhir.
+        |
+        */
+        $latestPriceIdSub = DB::table($priceTable)
+            ->selectRaw('MAX(id_price) AS id_price')
+            ->groupBy(
+                'designator_id',
+                'package_id'
+            );
+
+        $currentPriceSub = DB::table("{$priceTable} as dpp")
+            ->joinSub(
+                $latestPriceIdSub,
+                'latest_price',
+                function ($join) {
+                    $join->on(
+                        'latest_price.id_price',
+                        '=',
+                        'dpp.id_price'
+                    );
+                }
+            )
+            ->select([
+                'dpp.designator_id',
+                'dpp.package_id',
             ])
-            ->whereHas('boqItems')
-            ->when($search, function ($query) use ($search) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('lop_name', 'like', "%{$search}%")
-                        ->orWhere('id_ihld', 'like', "%{$search}%")
-                        ->orWhere('sto', 'like', "%{$search}%")
-                        ->orWhere('branch', 'like', "%{$search}%")
-                        ->orWhere('mitra_name', 'like', "%{$search}%")
-                        ->orWhereHas('project', function ($p) use ($search) {
-                            $p->where('pid', 'like', "%{$search}%")
-                                ->orWhere('pid_sap', 'like', "%{$search}%")
-                                ->orWhere('project_name', 'like', "%{$search}%");
-                        });
-                });
-            })
-            ->when($package, function ($query) use ($package) {
-                $query->where('package_id', $package);
-            })
-            ->latest('id_lop')
+            ->selectRaw("
+                CAST(
+                    NULLIF(dpp.price, '')
+                    AS DECIMAL(20,2)
+                ) AS price
+            ");
+
+        /*
+        |--------------------------------------------------------------------------
+        | AGGREGATE BOQ PER LOP
+        |--------------------------------------------------------------------------
+        |
+        | Query ini menghasilkan:
+        |
+        | lop_id
+        | item_count
+        | total_jasa
+        | total_material
+        |
+        | Tidak mengambil seluruh boq_items ke PHP.
+        |
+        */
+        $boqTotalsSub = DB::table("{$boqTable} as bi")
+            ->join(
+                "{$lopTable} as bl",
+                'bl.id_lop',
+                '=',
+                'bi.lop_id'
+            )
+            ->join(
+                "{$designatorTable} as d",
+                'd.id_designator',
+                '=',
+                'bi.designator_id'
+            )
+            ->leftJoinSub(
+                clone $currentPriceSub,
+                'cp',
+                function ($join) {
+                    $join->on(
+                        'cp.designator_id',
+                        '=',
+                        'bi.designator_id'
+                    );
+
+                    $join->on(
+                        'cp.package_id',
+                        '=',
+                        'bl.package_id'
+                    );
+                }
+            )
+            ->select('bi.lop_id')
+
+            ->selectRaw("
+                COUNT(*) AS item_count
+            ")
+
+            ->selectRaw("
+                SUM(
+                    CASE
+                        WHEN d.type = 'jasa'
+                        THEN
+                            COALESCE(bi.quantity_plan, 0)
+                            *
+                            COALESCE(cp.price, 0)
+                        ELSE 0
+                    END
+                ) AS total_jasa
+            ")
+
+            ->selectRaw("
+                SUM(
+                    CASE
+                        WHEN d.type = 'material'
+                        THEN
+                            COALESCE(bi.quantity_plan, 0)
+                            *
+                            COALESCE(cp.price, 0)
+                        ELSE 0
+                    END
+                ) AS total_material
+            ")
+
+            ->groupBy('bi.lop_id');
+
+        /*
+        |--------------------------------------------------------------------------
+        | LIST LOP
+        |--------------------------------------------------------------------------
+        |
+        | Satu query utama.
+        | Tidak eager-load boqItems seluruhnya.
+        |
+        */
+        $lops = Lop::query()
+            ->from("{$lopTable} as l")
+
+            ->joinSub(
+                clone $boqTotalsSub,
+                'bt',
+                function ($join) {
+                    $join->on(
+                        'bt.lop_id',
+                        '=',
+                        'l.id_lop'
+                    );
+                }
+            )
+
+            ->leftJoin(
+                "{$projectTable} as p",
+                'p.id_project',
+                '=',
+                'l.project_id'
+            )
+
+            ->leftJoin(
+                "{$packageTable} as pkg",
+                'pkg.id_package',
+                '=',
+                'l.package_id'
+            )
+
+            ->select([
+                'l.id_lop',
+                'l.project_id',
+                'l.id_ihld',
+                'l.lop_name',
+                'l.package_id',
+                'l.branch',
+                'l.sto',
+                'l.pid_sap',
+
+                'p.pid as project_pid',
+                'p.pid_sap as project_pid_sap',
+                'p.project_name',
+                'p.mitra_name',
+
+                'pkg.package_name',
+
+                'bt.item_count',
+                'bt.total_jasa',
+                'bt.total_material',
+            ])
+
+            /*
+            |--------------------------------------------------------------------------
+            | SEARCH
+            |--------------------------------------------------------------------------
+            */
+            ->when(
+                $search !== '',
+                function ($query) use ($search) {
+
+                    $keyword = "%{$search}%";
+
+                    $query->where(
+                        function ($q) use ($keyword) {
+
+                            $q->where(
+                                'l.lop_name',
+                                'like',
+                                $keyword
+                            )
+
+                            ->orWhere(
+                                'l.id_ihld',
+                                'like',
+                                $keyword
+                            )
+
+                            ->orWhere(
+                                'l.sto',
+                                'like',
+                                $keyword
+                            )
+
+                            ->orWhere(
+                                'l.branch',
+                                'like',
+                                $keyword
+                            )
+
+                            ->orWhere(
+                                'p.mitra_name',
+                                'like',
+                                $keyword
+                            )
+
+                            ->orWhere(
+                                'p.pid',
+                                'like',
+                                $keyword
+                            )
+
+                            ->orWhere(
+                                'p.pid_sap',
+                                'like',
+                                $keyword
+                            )
+
+                            ->orWhere(
+                                'p.project_name',
+                                'like',
+                                $keyword
+                            );
+                        }
+                    );
+                }
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | PACKAGE FILTER
+            |--------------------------------------------------------------------------
+            */
+            ->when(
+                !empty($package),
+                function ($query) use ($package) {
+                    $query->where(
+                        'l.package_id',
+                        $package
+                    );
+                }
+            )
+
+            ->orderByDesc('l.id_lop')
+
             ->paginate(10)
+
             ->withQueryString();
 
-        $packages = PackageModel::orderBy('package_name')->get();
+        /*
+        |--------------------------------------------------------------------------
+        | DETAIL BOQ UNTUK MODAL
+        |--------------------------------------------------------------------------
+        |
+        | Jangan eager-load detail seluruh database.
+        |
+        | Ambil boq_items hanya untuk 10 LOP pada halaman aktif.
+        |
+        | Jadi meskipun DB memiliki puluhan/ratusan ribu BOQ,
+        | detail yang ditarik hanya milik current page.
+        |
+        */
+        $lopIds = $lops
+            ->getCollection()
+            ->pluck('id_lop')
+            ->filter()
+            ->values();
 
-        $allBoq = BoqItem::with('designatorData')->get();
+        $boqItemsByLop = collect();
 
-        $totalLopBoq = Lop::whereHas('boqItems')->count();
-        $totalItemBoq = $allBoq->count();
+        if ($lopIds->isNotEmpty()) {
 
-        $totalMaterial = $allBoq->filter(function ($item) {
-            return str_starts_with(strtoupper($item->designator ?? ''), 'M-');
-        })->count();
+            $detailRows = DB::table("{$boqTable} as bi")
 
-        $totalJasa = $allBoq->filter(function ($item) {
-            return str_starts_with(strtoupper($item->designator ?? ''), 'J-');
-        })->count();
+                ->join(
+                    "{$lopTable} as l",
+                    'l.id_lop',
+                    '=',
+                    'bi.lop_id'
+                )
 
-        $totalPlanValue = $allBoq->sum('total_price');
+                ->join(
+                    "{$designatorTable} as d",
+                    'd.id_designator',
+                    '=',
+                    'bi.designator_id'
+                )
 
-        $totalLopBoq = Lop::whereHas('boqItems')->count();
+                ->leftJoinSub(
+                    clone $currentPriceSub,
+                    'cp',
+                    function ($join) {
 
-        $totalBoqValue = BoqItem::sum('total_price');
+                        $join->on(
+                            'cp.designator_id',
+                            '=',
+                            'bi.designator_id'
+                        );
 
-        $sudahAssign = Lop::whereHas('boqItems')
-            ->whereHas('project.assignments')
-            ->count();
+                        $join->on(
+                            'cp.package_id',
+                            '=',
+                            'l.package_id'
+                        );
+                    }
+                )
 
-        $belumAssign = Lop::whereHas('boqItems')
-            ->whereDoesntHave('project.assignments')
-            ->count();
+                ->whereIn(
+                    'bi.lop_id',
+                    $lopIds
+                )
 
-        return view('admin.import.data-boq', compact(
-            'lops',
-            'packages',
-            'search',
-            'package',
+                ->select([
+                    'bi.id_boq',
+                    'bi.lop_id',
+                    'bi.designator_id',
 
-            'totalLopBoq',
-            'totalBoqValue',
-            'sudahAssign',
-            'belumAssign'
-        ));
+                    'd.designator',
+                    'd.type',
+                    'd.item_name',
+                    'd.unit',
+
+                    'bi.quantity_plan',
+                    'bi.quantity_actual',
+                ])
+
+                ->selectRaw("
+                    COALESCE(cp.price, 0)
+                    AS unit_price
+                ")
+
+                ->selectRaw("
+                    (
+                        COALESCE(bi.quantity_plan, 0)
+                        *
+                        COALESCE(cp.price, 0)
+                    ) AS total_price
+                ")
+
+                ->orderBy('bi.lop_id')
+                ->orderBy('d.type')
+                ->orderBy('d.designator')
+
+                ->get();
+
+            $boqItemsByLop = $detailRows
+                ->groupBy('lop_id');
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | GLOBAL SUMMARY
+        |--------------------------------------------------------------------------
+        |
+        | Gunakan aggregate SQL yang sama.
+        | Tidak load seluruh boq_items.
+        |
+        */
+        $summary = DB::query()
+            ->fromSub(
+                clone $boqTotalsSub,
+                'bt'
+            )
+            ->selectRaw("
+                COUNT(*) AS total_lop_boq,
+
+                COALESCE(
+                    SUM(bt.total_jasa),
+                    0
+                ) AS total_jasa,
+
+                COALESCE(
+                    SUM(bt.total_material),
+                    0
+                ) AS total_material,
+
+                COALESCE(
+                    SUM(
+                        bt.total_jasa
+                        +
+                        bt.total_material
+                    ),
+                    0
+                ) AS total_boq
+            ")
+            ->first();
+
+        $totalLopBoq =
+            (int) ($summary->total_lop_boq ?? 0);
+
+        $totalJasaValue =
+            (float) ($summary->total_jasa ?? 0);
+
+        $totalMaterialValue =
+            (float) ($summary->total_material ?? 0);
+
+        $totalBoqValue =
+            (float) ($summary->total_boq ?? 0);
+
+        /*
+        |--------------------------------------------------------------------------
+        | ASSIGNMENT SUMMARY
+        |--------------------------------------------------------------------------
+        |
+        | Hitung dalam 1 query.
+        |
+        */
+        $assignmentStats = DB::table("{$lopTable} as l")
+
+            ->leftJoin(
+                'pro_assign as pa',
+                'pa.project_id',
+                '=',
+                'l.project_id'
+            )
+
+            ->whereExists(
+                function ($query) use ($boqTable) {
+
+                    $query
+                        ->selectRaw('1')
+                        ->from("{$boqTable} as bi")
+                        ->whereColumn(
+                            'bi.lop_id',
+                            'l.id_lop'
+                        );
+                }
+            )
+
+            ->selectRaw("
+                COUNT(
+                    DISTINCT CASE
+                        WHEN pa.project_id IS NOT NULL
+                        THEN l.id_lop
+                    END
+                ) AS sudah_assign
+            ")
+
+            ->selectRaw("
+                COUNT(
+                    DISTINCT CASE
+                        WHEN pa.project_id IS NULL
+                        THEN l.id_lop
+                    END
+                ) AS belum_assign
+            ")
+
+            ->first();
+
+        $sudahAssign =
+            (int) ($assignmentStats->sudah_assign ?? 0);
+
+        $belumAssign =
+            (int) ($assignmentStats->belum_assign ?? 0);
+
+        /*
+        |--------------------------------------------------------------------------
+        | PACKAGE FILTER OPTIONS
+        |--------------------------------------------------------------------------
+        */
+        $packages = PackageModel::query()
+            ->orderBy('package_name')
+            ->get([
+                'id_package',
+                'package_name',
+            ]);
+
+        return view(
+            'admin.import.data-boq',
+            compact(
+                'lops',
+                'boqItemsByLop',
+
+                'packages',
+                'search',
+                'package',
+
+                'totalLopBoq',
+
+                'totalJasaValue',
+                'totalMaterialValue',
+                'totalBoqValue',
+
+                'sudahAssign',
+                'belumAssign'
+            )
+        );
     }
 
     public function downloadPidTemplate()

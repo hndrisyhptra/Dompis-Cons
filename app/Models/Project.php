@@ -89,100 +89,237 @@ class Project extends Model
     {
         return $this->hasOne(Lop::class, 'project_id', 'id_project');
     }
-
+    
+    protected ?array $progressSummaryCache = null;
     public function progressSummary(): array
     {
-        $evidences = $this->evidences ?? collect();
-        $boqItems = $this->boqItems ?? collect();
-
-        $materialBoqItems = $boqItems->filter(fn ($boq) =>
-            str_starts_with($boq->designator, 'M-')
-        );
-
-        $materialTotal = $materialBoqItems->count();
-
+        // Jangan hitung ulang project yang sama dalam request yang sama
+        if ($this->progressSummaryCache !== null) {
+            return $this->progressSummaryCache;
+        }
+    
+        // Jika controller sudah eager-load, ini tidak menjalankan query tambahan.
+        // Jika belum, Laravel akan mengambil relasi yang dibutuhkan.
+        $this->loadMissing([
+            'evidences',
+            'boqItems.designatorData',
+            'boqItems.designatorDataByCode',
+        ]);
+    
+        $evidences = $this->evidences;
+        $boqItems  = $this->boqItems;
+    
+        /*
+        |--------------------------------------------------------------------------
+        | 1. Scan Evidence SATU KALI
+        |--------------------------------------------------------------------------
+        */
+    
+        $barangTibaApproved = false;
+        $perizinanApproved  = false;
+    
+        $instalasiStats = [];
+        $finishingStats = [];
+    
+        foreach ($evidences as $evidence) {
+    
+            // Persiapan
+            if (
+                $evidence->stage === 'persiapan' &&
+                $evidence->status === 'approved'
+            ) {
+                if ($evidence->evidence_type === 'barang_tiba') {
+                    $barangTibaApproved = true;
+                }
+    
+                if ($evidence->evidence_type === 'perizinan') {
+                    $perizinanApproved = true;
+                }
+            }
+    
+            $boqItemId = $evidence->boq_item_id;
+    
+            if (!$boqItemId) {
+                continue;
+            }
+    
+            $boqKey = (string) $boqItemId;
+    
+            // Evidence instalasi
+            if (
+                $evidence->stage === 'instalasi' &&
+                $evidence->evidence_type === 'progress_boq'
+            ) {
+                if (!isset($instalasiStats[$boqKey])) {
+                    $instalasiStats[$boqKey] = [
+                        'total' => 0,
+                        'approved' => 0,
+                    ];
+                }
+    
+                $instalasiStats[$boqKey]['total']++;
+    
+                if ($evidence->status === 'approved') {
+                    $instalasiStats[$boqKey]['approved']++;
+                }
+            }
+    
+            // Evidence finishing
+            if ($evidence->stage === 'finishing') {
+                if (!isset($finishingStats[$boqKey])) {
+                    $finishingStats[$boqKey] = [
+                        'total' => 0,
+                        'approved' => 0,
+                    ];
+                }
+    
+                $finishingStats[$boqKey]['total']++;
+    
+                if ($evidence->status === 'approved') {
+                    $finishingStats[$boqKey]['approved']++;
+                }
+            }
+        }
+    
+        /*
+        |--------------------------------------------------------------------------
+        | 2. Scan BOQ SATU KALI
+        |--------------------------------------------------------------------------
+        */
+    
+        $materialIds = [];
+        $finishingRequiredIds = [];
+    
+        foreach ($boqItems as $boq) {
+    
+            // Hanya material M-
+            if (!str_starts_with((string) ($boq->designator ?? ''), 'M-')) {
+                continue;
+            }
+    
+            $boqKey = (string) $boq->id_boq;
+    
+            $materialIds[] = $boqKey;
+    
+            $requiresFinishing =
+                (int) optional($boq->designatorData)->requires_finishing_evidence === 1
+                ||
+                (int) optional($boq->designatorDataByCode)->requires_finishing_evidence === 1;
+    
+            if ($requiresFinishing) {
+                $finishingRequiredIds[] = $boqKey;
+            }
+        }
+    
+        /*
+        |--------------------------------------------------------------------------
+        | 3. Persiapan
+        |--------------------------------------------------------------------------
+        */
+    
         $persiapanDone =
-            $evidences->where('stage', 'persiapan')
-                ->where('evidence_type', 'barang_tiba')
-                ->where('status', 'approved')
-                ->count() > 0
-            &&
-            $evidences->where('stage', 'persiapan')
-                ->where('evidence_type', 'perizinan')
-                ->where('status', 'approved')
-                ->count() > 0;
-
-        $instalasiApproved = $materialBoqItems->filter(function ($boq) use ($evidences) {
-            $items = $evidences
-                ->where('stage', 'instalasi')
-                ->where('evidence_type', 'progress_boq')
-                ->where('boq_item_id', $boq->id_boq);
-
-            return $items->count() > 0
-                && $items->where('status', 'pending')->count() == 0
-                && $items->where('status', 'rejected')->count() == 0
-                && $items->where('status', 'approved')->count() == $items->count();
-        })->count();
-
-        $instalasiDone = $materialTotal > 0 && $instalasiApproved >= $materialTotal;
-
+            $barangTibaApproved &&
+            $perizinanApproved;
+    
+        /*
+        |--------------------------------------------------------------------------
+        | 4. Instalasi
+        |--------------------------------------------------------------------------
+        */
+    
+        $materialTotal = count($materialIds);
+        $instalasiApproved = 0;
+    
+        foreach ($materialIds as $boqKey) {
+    
+            $stats = $instalasiStats[$boqKey] ?? null;
+    
+            if (
+                $stats &&
+                $stats['total'] > 0 &&
+                $stats['approved'] === $stats['total']
+            ) {
+                $instalasiApproved++;
+            }
+        }
+    
+        $instalasiDone =
+            $materialTotal > 0 &&
+            $instalasiApproved >= $materialTotal;
+    
+        /*
+        |--------------------------------------------------------------------------
+        | 5. Pengukuran
+        |--------------------------------------------------------------------------
+        */
+    
         // Step 3 tidak wajib upload
         $pengukuranDone = $instalasiDone;
-
-        $finishingRequiredItems = $materialBoqItems->filter(function ($boq) {
-            return optional($boq->designatorData)->requires_finishing_evidence == 1
-                || optional($boq->designatorDataByCode)->requires_finishing_evidence == 1;
-        });
-
-        $finishingTotal = $finishingRequiredItems->count();
-
-        $finishingApproved = $finishingRequiredItems->filter(function ($boq) use ($evidences) {
-            $items = $evidences
-                ->where('stage', 'finishing')
-                ->where('boq_item_id', $boq->id_boq);
-
-            return $items->count() > 0
-                && $items->where('status', 'pending')->count() == 0
-                && $items->where('status', 'rejected')->count() == 0
-                && $items->where('status', 'approved')->count() == $items->count();
-        })->count();
-
-       $finishingDone =
-        $persiapanDone &&
-        $instalasiDone &&
-        $pengukuranDone &&
-        (
-            $finishingTotal == 0 ||
-            $finishingApproved >= $finishingTotal
-        );
-
-        $doneStep = collect([
-            $persiapanDone,
-            $instalasiDone,
-            $pengukuranDone,
-            $finishingDone,
-        ])->filter()->count();
-
-        $progress = round(($doneStep / 4) * 100);
-        
+    
+        /*
+        |--------------------------------------------------------------------------
+        | 6. Finishing
+        |--------------------------------------------------------------------------
+        */
+    
+        $finishingTotal = count($finishingRequiredIds);
+        $finishingApproved = 0;
+    
+        foreach ($finishingRequiredIds as $boqKey) {
+    
+            $stats = $finishingStats[$boqKey] ?? null;
+    
+            if (
+                $stats &&
+                $stats['total'] > 0 &&
+                $stats['approved'] === $stats['total']
+            ) {
+                $finishingApproved++;
+            }
+        }
+    
+        $finishingDone =
+            $persiapanDone &&
+            $instalasiDone &&
+            $pengukuranDone &&
+            (
+                $finishingTotal === 0 ||
+                $finishingApproved >= $finishingTotal
+            );
+    
+        /*
+        |--------------------------------------------------------------------------
+        | 7. Progress
+        |--------------------------------------------------------------------------
+        */
+    
+        $doneStep =
+            (int) $persiapanDone +
+            (int) $instalasiDone +
+            (int) $pengukuranDone +
+            (int) $finishingDone;
+    
+        $progress = (int) round(($doneStep / 4) * 100);
+    
         $stageLabel = match (true) {
             $finishingDone => 'Ready UT',
             $instalasiDone => 'Pengukuran',
             $persiapanDone => 'Instalasi',
             default => 'Persiapan',
         };
-        return compact(
-            'persiapanDone',
-            'instalasiDone',
-            'pengukuranDone',
-            'finishingDone',
-            'materialTotal',
-            'instalasiApproved',
-            'finishingApproved',
-            'finishingTotal',
-            'progress',
-            'stageLabel'
-        );
+    
+        return $this->progressSummaryCache = [
+            'persiapanDone' => $persiapanDone,
+            'instalasiDone' => $instalasiDone,
+            'pengukuranDone' => $pengukuranDone,
+            'finishingDone' => $finishingDone,
+            'materialTotal' => $materialTotal,
+            'instalasiApproved' => $instalasiApproved,
+            'finishingApproved' => $finishingApproved,
+            'finishingTotal' => $finishingTotal,
+            'progress' => $progress,
+            'stageLabel' => $stageLabel,
+        ];
     }
 
     public function activityLogs()

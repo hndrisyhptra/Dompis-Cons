@@ -5,18 +5,29 @@
 @php
     $completionRate = $completionRate ?? 0;
 
-    // Cek apakah user sedang memfilter program PT2 (bisa mencakup 'PT 2', 'PT2', dll)
-    $selectedProgram = strtoupper(request('program', ''));
-    $isPt2Selected = str_contains($selectedProgram, 'PT2') || str_contains($selectedProgram, 'PT 2') || str_contains($selectedProgram, 'PT-2');
+    // Program Regular yang SELALU ditampilkan di filter dan Matrix Regular.
+    // Tetap muncul walaupun count pada database = 0.
+    // PT 2 sengaja tidak dimasukkan ke filter Program.
+    $regularPrograms = collect([
+        'OSP',
+        'OLO',
+        'HEM',
+        'NODE B',
+        'EKSBIS',
+    ]);
 
-    // Hitung total PT2 Go-Live
-    $totalGolivePt2 = \App\Models\Project::where('is_golive', 1)->count();
+    // Satu mapping untuk filter Branch sekaligus fallback tampilan Matrix PT 2.
+    $regionMapping = [
+        'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
+        'JATENG DIY' => ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
+        'BALNUS' => ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES'],
+    ];
 
     $mainCards = [
         [
             'label' => 'Total LOP',
             'value' => $totalLop ?? 0,
-            'desc' => 'Seluruh LOP terdaftar',
+            'desc' => 'Seluruh LOP Regular terdaftar',
             'icon' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-6 h-6 text-slate-500 lucide lucide-file-spreadsheet"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>',
             'border' => 'border-blue-200',
             'text' => 'text-blue-900',
@@ -25,7 +36,7 @@
         [
             'label' => 'BOQ Ready',
             'value' => $boqReady ?? 0,
-            'desc' => 'LOP sudah memiliki BOQ',
+            'desc' => 'LOP Regular sudah memiliki BOQ',
             'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-package-open-icon lucide-package-open"><path d="M12 22v-9"/><path d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z"/><path d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13"/><path d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z"/></svg>',
             'border' => 'border-blue-200',
             'text' => 'text-blue-700',
@@ -34,7 +45,7 @@
         [
             'label' => 'Sudah Assign',
             'value' => $assignedLop ?? 0,
-            'desc' => 'Sudah dibagikan ke Waspang',
+            'desc' => 'LOP Regular sudah dibagikan ke Waspang',
             'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-check-icon lucide-user-check"><path d="m16 11 2 2 4-4"/><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
             'border' => 'border-indigo-200',
             'text' => 'text-indigo-700',
@@ -43,7 +54,7 @@
         [
             'label' => 'Completed',
             'value' => $completedApproval ?? 0,
-            'desc' => 'Progress selesai 100%',
+            'desc' => 'Progress Regular selesai 100%',
             'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-big-icon lucide-circle-check-big"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>',
             'border' => 'border-emerald-200',
             'text' => 'text-emerald-700',
@@ -51,18 +62,6 @@
         ],
     ];
 
-    // Jika filter program PT2 dipilih, masukkan kartu Go-Live ke dalam array kartu utama
-    if ($isPt2Selected) {
-        $mainCards[] = [
-            'label' => 'PT2 Go-Live',
-            'value' => $totalGolivePt2,
-            'desc' => 'Approval Golive by SDI',
-            'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-check-icon lucide-shield-check"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>',
-            'border' => 'border-indigo-300',
-            'text' => 'text-indigo-800',
-            'bg' => 'bg-indigo-100/60',
-        ];
-    }
 @endphp
 
 <div class="min-h-screen bg-slate-50 dark:bg-slate-950 -m-4 md:-m-6 p-4 md:p-6">
@@ -96,12 +95,14 @@
                     {{-- Region Filter --}}
                     <div class="space-y-1.5">
                         <label class="block text-[11px] font-bold uppercase text-slate-500">Region</label>
-                        <select name="region" id="regionSelect" onchange="updateBranchDropdown(); document.getElementById('filterForm').submit();"
+                        <select name="region" id="regionSelect" onchange="handleRegionChange()"
                                 class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition">
                             <option value="">Semua Region</option>
-                            <option value="JATIM" {{ request('region') == 'JATIM' ? 'selected' : '' }}>JATIM</option>
-                            <option value="JATENG DIY" {{ request('region') == 'JATENG DIY' ? 'selected' : '' }}>JATENG DIY</option>
-                            <option value="BALNUS" {{ request('region') == 'BALNUS' ? 'selected' : '' }}>BALNUS</option>
+                            @foreach(array_keys($regionMapping) as $region)
+                                <option value="{{ $region }}" {{ strtoupper(request('region', '')) === $region ? 'selected' : '' }}>
+                                    {{ $region }}
+                                </option>
+                            @endforeach
                         </select>
                     </div>
 
@@ -115,13 +116,13 @@
                         </select>
                     </div>
 
-                    {{-- Program Filter --}}
+                    {{-- Program Regular Filter --}}
                     <div class="space-y-1.5">
-                        <label class="block text-[11px] font-bold uppercase text-slate-500">Program</label>
+                        <label class="block text-[11px] font-bold uppercase text-slate-500">Program Regular</label>
                         <select name="program" onchange="document.getElementById('filterForm').submit()"
                                 class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition">
                             <option value="">Semua Program</option>
-                            @foreach($programs ?? [] as $program)
+                            @foreach($regularPrograms as $program)
                                 <option value="{{ $program }}" {{ request('program') == $program ? 'selected' : '' }}>{{ $program }}</option>
                             @endforeach
                         </select>
@@ -153,8 +154,8 @@
             </form>
         </div>
 
-        {{-- MAIN KPI (DISESUAIKAN MENJADI 5 GRID) --}}
-       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-{{ count($mainCards) }} gap-4">
+        {{-- MAIN KPI REGULAR --}}
+       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             @foreach($mainCards as $card)
                 <div class="rounded-3xl bg-white dark:bg-slate-900 border {{ $card['border'] }} dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition">
                     <div class="flex items-center justify-between gap-4">
@@ -175,7 +176,7 @@
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-5">
             {{-- PIPELINE --}}
             <div class="xl:col-span-12 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
-                <h2 class="text-lg font-black text-slate-900 dark:text-white mb-5">Alur Progress</h2>
+                <h2 class="text-lg font-black text-slate-900 dark:text-white mb-5">Alur Progress Regular</h2>
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                     @foreach($stageSummary ?? [] as $stage)
                         @php
@@ -202,7 +203,7 @@
         <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
             <div class="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
                 <div>
-                    <h2 class="text-sm font-black uppercase tracking-wider text-slate-800">Rekap Assignment & Status Project</h2>
+                    <h2 class="text-sm font-black uppercase tracking-wider text-slate-800">Rekap Assignment & Status Project Regular</h2>
                     <p class="text-xs text-slate-500 mt-1">Klik pada nama Region untuk melihat detail per Branch.</p>
                 </div>
             </div>
@@ -266,15 +267,12 @@
             </div>
         </div>
 
-    </div>
-</div>
-
-{{-- TABEL MATRIX STATUS PROGRESS PER PROGRAM (UNFILTERED) --}}
+        {{-- MATRIX PROJECT REGULAR --}}
         <div class="mt-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
             <div class="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
                 <div>
-                    <h2 class="text-sm font-black uppercase tracking-wider text-slate-800">Matriks Progress per Program</h2>
-                    <p class="text-xs text-slate-500 mt-1">Data global (unfiltered). Tidak akan berubah saat Anda memilih filter di atas.</p>
+                    <h2 class="text-sm font-black uppercase tracking-wider text-slate-800">Matriks Progress Project Regular</h2>
+                    <p class="text-xs text-slate-500 mt-1">Program Regular: OSP, OLO, HEM, NODE B, EKSBIS.</p>
                 </div>
             </div>
 
@@ -285,12 +283,12 @@
                             <th rowspan="2" class="px-6 py-3 text-left border-r border-slate-200/60 align-middle whitespace-nowrap sticky left-0 bg-slate-100/90 backdrop-blur-sm z-10">
                                 Wilayah (Region / Branch)
                             </th>
-                            @foreach($programs ?? [] as $prog)
-                                <th colspan="4" class="px-3 py-2 text-center border-b border-r border-slate-200/60 whitespace-nowrap">{{ $prog }}</th>
+                            @foreach($regularPrograms as $prog)
+                                <th colspan="4" class="px-3 py-2 text-center border-b border-r border-slate-200/60 whitespace-nowrap">{{ strtoupper(trim($prog)) === 'EKSBIS' ? 'Eksbis' : $prog }}</th>
                             @endforeach
                         </tr>
                         <tr>
-                            @foreach($programs ?? [] as $prog)
+                            @foreach($regularPrograms as $prog)
                                 <th class="px-3 py-2 text-center text-blue-600 bg-blue-50/50">Prepare</th>
                                 <th class="px-3 py-2 text-center text-amber-600 bg-amber-50/50">Progress</th>
                                 <th class="px-3 py-2 text-center text-emerald-600 bg-emerald-50/50">Finish</th>
@@ -310,9 +308,13 @@
                                     </div>
                                 </td>
                                 
-                                @foreach($programs as $prog)
+                                @foreach($regularPrograms as $prog)
                                     @php 
-                                        $stats = $reg['programs'][$prog]; 
+                                        $stats = $reg['programs'][$prog] ?? [
+                                            'preparation' => 0,
+                                            'instalasi' => 0,
+                                            'finishing' => 0,
+                                        ]; 
                                         $totalProyek = $stats['preparation'] + $stats['instalasi'] + $stats['finishing'];
                                         $persentase = $totalProyek > 0 ? round(($stats['finishing'] / $totalProyek) * 100) : 0;
                                     @endphp
@@ -329,9 +331,13 @@
                                         <span class="font-bold text-slate-600 whitespace-nowrap">• {{ $br['name'] }}</span>
                                     </td>
                                     
-                                    @foreach($programs as $prog)
+                                    @foreach($regularPrograms as $prog)
                                         @php 
-                                            $stats = $br['programs'][$prog]; 
+                                            $stats = $br['programs'][$prog] ?? [
+                                                'preparation' => 0,
+                                                'instalasi' => 0,
+                                                'finishing' => 0,
+                                            ]; 
                                             $totalProyek = $stats['preparation'] + $stats['instalasi'] + $stats['finishing'];
                                             $persentase = $totalProyek > 0 ? round(($stats['finishing'] / $totalProyek) * 100) : 0;
                                         @endphp
@@ -344,7 +350,7 @@
                             @endforeach
                         @empty
                             <tr>
-                                <td colspan="{{ 1 + (count($programs ?? []) * 4) }}" class="px-6 py-10 text-center text-slate-400 font-medium">
+                                <td colspan="{{ 1 + ($regularPrograms->count() * 4) }}" class="px-6 py-10 text-center text-slate-400 font-medium">
                                     Tidak ada data project terdaftar.
                                 </td>
                             </tr>
@@ -354,15 +360,147 @@
             </div>
         </div>
 
+
+{{-- ============================================================= --}}
+{{-- MATRIX PROJECT PT 2 --}}
+{{-- ============================================================= --}}
+<div class="mt-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-indigo-200 dark:border-indigo-900 overflow-hidden shadow-sm">
+    <div class="px-6 py-5 border-b border-indigo-100 dark:border-indigo-900 bg-indigo-50/50">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <h2 class="text-sm font-black uppercase tracking-wider text-indigo-900 dark:text-indigo-300">
+                    Matriks Progress Project PT 2
+                </h2>
+                <p class="text-xs text-slate-500 mt-1">
+                    Sumber khusus PT 2. Tidak masuk ke KPI dan filter Program Regular.
+                </p>
+            </div>
+
+            <span class="px-3 py-1.5 rounded-xl bg-indigo-100 text-indigo-700 text-[10px] font-black shrink-0">
+                PT 2
+            </span>
+        </div>
+    </div>
+
+    <div class="overflow-x-auto pb-4">
+        <table class="w-full text-xs border-collapse">
+            <thead class="bg-indigo-50/50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                <tr>
+                    <th class="px-6 py-4 text-left border-r border-indigo-100 whitespace-nowrap">Region / Branch</th>
+                    <th class="px-4 py-4 text-center text-blue-600">Preparation</th>
+                    <th class="px-4 py-4 text-center text-amber-600">Instalasi</th>
+                    <th class="px-4 py-4 text-center text-emerald-600">Finishing / Go-Live</th>
+                    <th class="px-4 py-4 text-center text-indigo-700">Total</th>
+                    <th class="px-6 py-4 text-right">% Finish</th>
+                </tr>
+            </thead>
+
+            <tbody class="divide-y divide-indigo-100/70">
+                @forelse($matrixPt2Data ?? [] as $i => $reg)
+                    @php
+                        $regionStats = $reg['stats'] ?? [
+                            'preparation' => 0,
+                            'instalasi' => 0,
+                            'finishing' => 0,
+                            'total' => 0,
+                            'percent' => 0,
+                        ];
+
+                        $regionSlug = \Illuminate\Support\Str::slug($reg['region']);
+                    @endphp
+
+                    <tr class="cursor-pointer bg-white hover:bg-indigo-50/40 transition"
+                        onclick="toggleRegion('matrix-pt2-{{ $regionSlug }}', 'icon-pt2-{{ $regionSlug }}')">
+                        <td class="px-6 py-4 border-r border-indigo-100">
+                            <div class="flex items-center gap-3">
+                                <div class="w-5 h-5 flex items-center justify-center rounded bg-indigo-100 text-indigo-600">
+                                    <svg id="icon-pt2-{{ $regionSlug }}"
+                                         xmlns="http://www.w3.org/2000/svg"
+                                         width="16"
+                                         height="16"
+                                         viewBox="0 0 24 24"
+                                         fill="none"
+                                         stroke="currentColor"
+                                         stroke-width="3"
+                                         stroke-linecap="round"
+                                         stroke-linejoin="round"
+                                         class="transition-transform duration-200">
+                                        <path d="m9 18 6-6-6-6"/>
+                                    </svg>
+                                </div>
+
+                                <span class="font-black text-slate-800">{{ $reg['region'] }}</span>
+                            </div>
+                        </td>
+
+                        <td class="px-4 py-4 text-center font-black text-blue-700">{{ $regionStats['preparation'] ?? 0 }}</td>
+                        <td class="px-4 py-4 text-center font-black text-amber-700">{{ $regionStats['instalasi'] ?? 0 }}</td>
+                        <td class="px-4 py-4 text-center font-black text-emerald-700">{{ $regionStats['finishing'] ?? 0 }}</td>
+                        <td class="px-4 py-4 text-center font-black text-indigo-700">{{ $regionStats['total'] ?? 0 }}</td>
+
+                        <td class="px-6 py-4">
+                            <div class="flex items-center justify-end gap-3">
+                                <div class="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div class="h-full bg-emerald-500 rounded-full"
+                                         style="width: {{ min($regionStats['percent'] ?? 0, 100) }}%"></div>
+                                </div>
+
+                                <span class="font-black text-indigo-700">{{ $regionStats['percent'] ?? 0 }}%</span>
+                            </div>
+                        </td>
+                    </tr>
+
+                    @foreach($reg['branches'] ?? [] as $branch)
+                        @php
+                            $branchStats = $branch['stats'] ?? [
+                                'preparation' => 0,
+                                'instalasi' => 0,
+                                'finishing' => 0,
+                                'total' => 0,
+                                'percent' => 0,
+                            ];
+                        @endphp
+
+                        <tr class="hidden bg-slate-50/70 matrix-pt2-{{ $regionSlug }}">
+                            <td class="px-6 py-3 pl-[3.25rem] border-r border-indigo-100">
+                                <span class="font-bold text-slate-600">• {{ $branch['name'] }}</span>
+                            </td>
+
+                            <td class="px-4 py-3 text-center text-blue-600 font-bold">{{ $branchStats['preparation'] ?? 0 }}</td>
+                            <td class="px-4 py-3 text-center text-amber-600 font-bold">{{ $branchStats['instalasi'] ?? 0 }}</td>
+                            <td class="px-4 py-3 text-center text-emerald-600 font-bold">{{ $branchStats['finishing'] ?? 0 }}</td>
+                            <td class="px-4 py-3 text-center text-indigo-600 font-black">{{ $branchStats['total'] ?? 0 }}</td>
+                            <td class="px-6 py-3 text-right text-indigo-600 font-black">{{ $branchStats['percent'] ?? 0 }}%</td>
+                        </tr>
+                    @endforeach
+                @empty
+                    <tr>
+                        <td colspan="6" class="px-6 py-10 text-center text-slate-400 font-medium">
+                            Tidak ada data PT 2 berdasarkan filter.
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
+    </div>
+</div>
+
 {{-- SCRIPT FILTER & COLLAPSIBLE --}}
 <script>
+    const regionMapping = @json($regionMapping);
+    const currentBranch = @json(strtoupper(request('branch', '')));
+
     function toggleRegion(regionClass, iconId) {
         const rows = document.querySelectorAll('.' + regionClass);
-        let isHidden = false;
+        let opened = false;
+
         rows.forEach(row => {
             if (row.classList.contains('hidden')) {
                 row.classList.remove('hidden');
-                isHidden = true;
+                opened = true;
             } else {
                 row.classList.add('hidden');
             }
@@ -370,47 +508,51 @@
 
         const icon = document.getElementById(iconId);
         if (icon) {
-            if (isHidden) {
-                icon.style.transform = 'rotate(90deg)';
-                icon.parentElement.classList.replace('bg-blue-100', 'bg-blue-600');
-                icon.parentElement.classList.replace('text-blue-600', 'text-white');
-            } else {
-                icon.style.transform = 'rotate(0deg)';
-                icon.parentElement.classList.replace('bg-blue-600', 'bg-blue-100');
-                icon.parentElement.classList.replace('text-white', 'text-blue-600');
-            }
+            icon.style.transform = opened ? 'rotate(90deg)' : 'rotate(0deg)';
         }
     }
 
-    const regionMapping = {
-        'JATIM': ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
-        'JATENG DIY': ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
-        'BALNUS': ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES']
-    };
-
-    function updateBranchDropdown() {
+    function populateBranchDropdown(preserveCurrent = true) {
         const regionSelect = document.getElementById('regionSelect');
         const branchSelect = document.getElementById('branchSelect');
-        const selectedRegion = regionSelect.value.toUpperCase(); 
-        const currentBranch = "{{ request('branch') }}".toUpperCase(); 
-        
-        branchSelect.innerHTML = '<option value="">Semua Branch</option>';
-        
-        if (selectedRegion && regionMapping[selectedRegion]) {
-            regionMapping[selectedRegion].forEach(function(branch) {
-                let option = document.createElement('option');
-                option.value = branch; 
-                option.text = branch;
-                if(branch.toUpperCase() === currentBranch) {
-                    option.selected = true;
-                }
-                branchSelect.appendChild(option);
-            });
+
+        if (!regionSelect || !branchSelect) {
+            return;
         }
+
+        const selectedRegion = (regionSelect.value || '').toUpperCase();
+        const selectedBranch = preserveCurrent ? currentBranch : '';
+
+        branchSelect.innerHTML = '<option value="">Semua Branch</option>';
+
+        let branches = [];
+
+        if (selectedRegion && regionMapping[selectedRegion]) {
+            branches = regionMapping[selectedRegion];
+        } else {
+            branches = Object.values(regionMapping).flat();
+        }
+
+        [...new Set(branches)].forEach(branch => {
+            const option = document.createElement('option');
+            option.value = branch;
+            option.textContent = branch;
+
+            if (branch.toUpperCase() === selectedBranch) {
+                option.selected = true;
+            }
+
+            branchSelect.appendChild(option);
+        });
     }
 
-    document.addEventListener("DOMContentLoaded", function() {
-        updateBranchDropdown();
+    function handleRegionChange() {
+        populateBranchDropdown(false);
+        document.getElementById('filterForm').submit();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        populateBranchDropdown(true);
     });
 </script>
 

@@ -491,23 +491,31 @@ public function importCsv(Request $request)
     public function approvalIndex(Request $request)
     {
         $search = $request->search;
-        $statusFilter = $request->input('status_filter', 'pending');
+        // Default kita arahkan ke pending agar Admin langsung fokus ke kerjaan
+        $statusFilter = $request->input('status_filter', 'pending'); 
         $myKawal = $request->input('my_kawal', '0');
         $programFilter = $request->program;
         $branchFilter = $request->branch;
 
+        $allowedPrograms = ['OSP', 'HEM', 'OLO', 'NODE B'];
+
+        // BASE QUERY: Harus sudah punya minimal 1 eviden (foto)
         $query = Project::with([
             'evidences',
             'boqItems.designatorData',
             'assignment.waspang',
             'lop'
-        ])->whereHas('evidences');
+        ])->whereHas('evidences')
+          ->where(function($q) use ($allowedPrograms) {
+              $q->whereIn('program', $allowedPrograms)
+                ->orWhereHas('lop', function($sub) use ($allowedPrograms) {
+                    $sub->whereIn('program_sap', $allowedPrograms);
+                });
+          });
 
-        // ==========================================================================
-        // ATURAN BARU: SEARCH BAR BERSIFAT GLOBAL (Mengabaikan Filter Lain jika Diisi)
-        // ==========================================================================
         if ($search) {
             $query->where(function ($q) use ($search) {
+                // ... (Logika Search sama seperti sebelumnya) ...
                 $q->where('project_name', 'like', "%{$search}%")
                   ->orWhere('execution_type', 'like', "%{$search}%")
                   ->orWhereHas('lop', function ($lopQ) use ($search) {
@@ -522,38 +530,49 @@ public function importCsv(Request $request)
                   });
             });
         } else {
-            // JIKA TIDAK SEDANG SEARCH, BARULAH FILTER-FILTER INI BERFUNGSI normal
-
-            // 1. FILTER TABS STATUS APPROVAL
-            $query->when($statusFilter === 'pending', function ($q) {
-                $q->whereHas('evidences', function ($sub) {
+            // ==========================================
+            // LOGIKA TAB FILTER YANG AKURAT
+            // ==========================================
+            if ($statusFilter === 'pending') {
+                // MENUNGGU REVIEW: Punya minimal 1 eviden berstatus 'pending'
+                $query->whereHas('evidences', function ($sub) {
                     $sub->where('status', 'pending');
                 });
-            })
-            ->when($statusFilter === 'complete', function ($q) {
-                $q->where(function($sub) {
-                    $sub->where('status', 'completed')
-                      ->orWhereDoesntHave('evidences', function($ev) {
+
+            } elseif ($statusFilter === 'complete') {
+                // SELESAI / READY UT: Status project sudah close/completed 
+                // DAN tidak ada satupun foto yang masih nyangkut (pending/rejected)
+                $query->whereIn('status_project', ['close', 'completed'])
+                      ->whereDoesntHave('evidences', function($ev) {
                           $ev->whereIn('status', ['pending', 'rejected']);
                       });
-                });
-            });
 
-            // 2. SINKRONISASI KAWALANKU: Menggunakan kolom 'assigned_by' dari pro_assign
+            } elseif ($statusFilter === 'active') {
+                // ON PROGRESS (Aktif): 
+                // 1. Sudah ada foto (dari base query whereHas evidences)
+                // 2. TIDAK ada foto pending (Admin sudah beres me-review)
+                // 3. Project BELUM selesai / close
+                $query->whereDoesntHave('evidences', function($ev) {
+                    $ev->where('status', 'pending');
+                })->whereNotIn('status_project', ['close', 'completed', 'drop']);
+            }
+
+            // ... (Filter Kawalanku, Program, Branch sama seperti sebelumnya) ...
             $query->when($myKawal == '1', function ($q) {
                 $q->whereHas('assignment', function ($sub) {
                     $sub->where('assigned_by', auth()->user()->id_user); 
                 });
             });
 
-            // 3. FILTER DROPDOWN PROGRAM
             $query->when($programFilter, function ($q) use ($programFilter) {
-                $q->whereHas('lop', function ($sub) use ($programFilter) {
-                    $sub->where('program_sap', $programFilter);
+                $q->where(function($subQ) use ($programFilter) {
+                    $subQ->where('program', $programFilter)
+                         ->orWhereHas('lop', function ($subLop) use ($programFilter) {
+                             $subLop->where('program_sap', $programFilter);
+                         });
                 });
             });
 
-            // 4. FILTER DROPDOWN BRANCH
             $query->when($branchFilter, function ($q) use ($branchFilter) {
                 $q->whereHas('lop', function ($sub) use ($branchFilter) {
                     $sub->where('branch', $branchFilter);
@@ -563,9 +582,8 @@ public function importCsv(Request $request)
 
         $projects = $query->latest('updated_at')->paginate(10)->withQueryString();
 
-        // Data pendukung komponen dropdown select
         $availableBranches = \App\Models\Lop::whereNotNull('branch')->distinct()->pluck('branch');
-        $availablePrograms = \App\Models\Lop::whereNotNull('program_sap')->distinct()->pluck('program_sap');
+        $availablePrograms = $allowedPrograms;
 
         return view('admin.evidences.approval', compact(
             'projects', 

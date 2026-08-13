@@ -19,275 +19,582 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $role = auth()->user()->role;
+        $user = auth()->user();
+        $role = $user?->role;
 
-        // Sesuai dengan instruksi arsitektur baru: Isolasi Role
-        if ($role == 'waspang') { return redirect()->route('waspang.dashboard'); }
-        if ($role == 'pm') { return redirect()->route('pm.dashboard'); }
-        if ($role == 'teknisi') { return redirect()->route('teknisi.pt2.index'); }
-        if ($role == 'sdi') { return redirect()->route('sdi.index'); }
+        // Isolasi role
+        if ($role === 'waspang') {
+            return redirect()->route('waspang.dashboard');
+        }
+        if ($role === 'pm') {
+            return redirect()->route('pm.dashboard');
+        }
+        if ($role === 'teknisi') {
+            return redirect()->route('teknisi.pt2.index');
+        }
+        if ($role === 'sdi') {
+            return redirect()->route('sdi.index');
+        }
 
-        if ($role == 'admin') {
-            
-            // 1. Setup Mapping Region (Untuk Filter dan Tabel Rekap)
-            $regions = [
-                'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
-                'JATENG DIY' => ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
-                'BALNUS' => ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES']
-            ];
+        if ($role !== 'admin') {
+            abort(403);
+        }
 
-            // 2. Ambil list Program untuk Filter
-            $programs = \App\Models\Project::whereNotNull('program')->where('program', '!=', '')
-                ->distinct()->orderBy('program', 'asc')->pluck('program');
+        $regions = [
+            'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
+            'JATENG DIY' => ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
+            'BALNUS' => ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES'],
+        ];
 
-            // 3. Base Query LOP dengan relasi
-            $query = \App\Models\Lop::with([
-                'project.assignment',
-                'project.assignments.waspang',
-                'project.evidences',
-                'project.boqItems.designatorData',
-                'project.boqItems.designatorDataByCode',
-            ]);
+        // Program Regular yang selalu ditampilkan pada filter & matrix,
+        // termasuk saat count-nya 0.
+        $programs = collect([
+            'OSP',
+            'OLO',
+            'HEM',
+            'NODE B',
+            'EKSBIS',
+        ]);
 
-            // --- DATA MATRIX UNFILTERED (DIPERBARUI DENGAN LOGIKA GOLIVE PT2) ---
-            $allLopsUnfiltered = \App\Models\Lop::with('project')
-                ->whereHas('project', function($q) {
-                    $q->where('status_project', '!=', 'drop');
-                })->get();
+        $programSet = array_fill_keys($programs->all(), true);
 
-            $matrixData = [];
-            foreach ($regions as $regionName => $regionBranches) {
-                
-                $regionLopsUnfiltered = $allLopsUnfiltered->filter(function ($lop) use ($regionBranches) {
-                    return in_array(strtoupper($lop->branch ?? ''), $regionBranches);
-                });
+        /*
+        |--------------------------------------------------------------------------
+        | MATRIX DATA - gunakan query ringan + single pass
+        |--------------------------------------------------------------------------
+        */
+        $branchToRegion = [];
+        foreach ($regions as $regionName => $regionBranches) {
+            foreach ($regionBranches as $branchName) {
+                $branchToRegion[$branchName] = $regionName;
+            }
+        }
 
-                // Helper function untuk menghitung status secara akurat (Termasuk PT2 Go-Live)
-                $calcMatrixStatus = function($lopsCollection) {
-                    $prep = 0;
-                    $inst = 0;
-                    $fin  = 0;
-
-                    foreach ($lopsCollection as $l) {
-                        $proj = $l->project;
-                        if (!$proj) continue;
-
-                        // JIKA PT2 DAN SUDAH GOLIVE -> OTOMATIS MASUK KATEGORI FINISH (COMPLETE)
-                        if ($proj->is_golive == 1) {
-                            $fin++;
-                            continue;
-                        }
-
-                        // JIKA REGULER ATAU BELUM GOLIVE -> IKUTI STATUS PROGRESS LOP
-                        if ($l->status_progress === 'preparation') {
-                            $prep++;
-                        } elseif ($l->status_progress === 'instalasi') {
-                            $inst++;
-                        } elseif ($l->status_progress === 'finishing') {
-                            $fin++;
-                        } else {
-                            // Fallback default jika kosong
-                            $prep++;
-                        }
-                    }
-
-                    return [
-                        'preparation' => $prep,
-                        'instalasi'   => $inst,
-                        'finishing'   => $fin,
-                    ];
-                };
-
-                // Hitung per Program untuk Region utama
-                $regionProgs = [];
-                foreach ($programs as $prog) {
-                    $pLops = $regionLopsUnfiltered->filter(function($l) use ($prog) { return ($l->project->program ?? '') === $prog; });
-                    $regionProgs[$prog] = $calcMatrixStatus($pLops);
-                }
-
-                // Hitung per Program untuk sub-Branch
-                $branchesData = [];
-                foreach ($regionBranches as $bName) {
-                    $bLops = $regionLopsUnfiltered->filter(function($l) use ($bName) { return strtoupper($l->branch ?? '') === $bName; });
-                    
-                    if ($bLops->isEmpty()) continue;
-
-                    $bProgs = [];
-                    foreach ($programs as $prog) {
-                        $bpLops = $bLops->filter(function($l) use ($prog) { return ($l->project->program ?? '') === $prog; });
-                        $bProgs[$prog] = $calcMatrixStatus($bpLops);
-                    }
-                    $branchesData[] = [
-                        'name' => $bName,
-                        'programs' => $bProgs
-                    ];
-                }
-
-                $matrixData[] = [
-                    'region' => $regionName,
-                    'programs' => $regionProgs,
-                    'branches' => $branchesData
+        $newProgramMap = function () use ($programs) {
+            $map = [];
+            foreach ($programs as $program) {
+                $map[$program] = [
+                    'preparation' => 0,
+                    'instalasi' => 0,
+                    'finishing' => 0,
                 ];
             }
-            
-            // ================= TERAPKAN FILTER =================
-            if ($request->filled('program')) {
-                $query->whereHas('project', function ($q) use ($request) {
-                    $q->where('program', $request->program);
-                });
-            }
-            if ($request->filled('region')) {
-                $selectedRegion = strtoupper($request->region);
-                if (isset($regions[$selectedRegion])) {
-                    $query->whereIn(\Illuminate\Support\Facades\DB::raw('UPPER(branch)'), $regions[$selectedRegion]);
-                }
-            }
-            if ($request->filled('branch')) {
-                $query->whereRaw('UPPER(branch) = ?', [strtoupper($request->branch)]);
+            return $map;
+        };
+
+        $matrixAccumulator = [];
+        foreach ($regions as $regionName => $regionBranches) {
+            $matrixAccumulator[$regionName] = [
+                'programs' => $newProgramMap(),
+                'branches' => [],
+            ];
+        }
+
+        $matrixRows = DB::table('lops as l')
+            ->join('projects as p', 'l.project_id', '=', 'p.id_project')
+            ->where('p.status_project', '!=', 'drop')
+            ->get([
+                'l.branch',
+                'l.status_progress',
+                'p.program',
+                'p.is_golive',
+            ]);
+
+        foreach ($matrixRows as $row) {
+            $branch = strtoupper($row->branch ?? '');
+            $regionName = $branchToRegion[$branch] ?? null;
+
+            if (!$regionName) {
+                continue;
             }
 
-            // FILTER STATUS PINTAR (Memisahkan LOP dan PROJECT)
-            if ($request->filled('status')) {
-                if ($request->status === 'drop') {
-                    // Jika filter 'drop', cari dari tabel Project
-                    $query->whereHas('project', function ($q) {
-                        $q->where('status_project', 'drop');
-                    });
-                } else {
-                    // Jika filter 'prepare/progress/finish', cari di tabel LOP
-                    // Dan pastikan project-nya BUKAN drop
-                    $query->where('status_progress', $request->status)
-                          ->whereHas('project', function ($q) {
-                              $q->where('status_project', '!=', 'drop');
-                          });
-                }
+            $program = strtoupper(trim($row->program ?? ''));
+
+            // Matrix Regular hanya menghitung 5 program yang ditentukan.
+            if (!isset($programSet[$program])) {
+                continue;
+            }
+
+            if ((int) $row->is_golive === 1) {
+                $statusKey = 'finishing';
+            } elseif ($row->status_progress === 'instalasi') {
+                $statusKey = 'instalasi';
+            } elseif ($row->status_progress === 'finishing') {
+                $statusKey = 'finishing';
             } else {
-                // Default: Sembunyikan project 'drop' dari perhitungan dashboard aktif
-                $query->whereHas('project', function ($q) {
-                    $q->where('status_project', '!=', 'drop');
-                });
+                $statusKey = 'preparation';
             }
-            // ===================================================
 
-            $lops = $query->get(); // Eksekusi Query setelah difilter
+            $matrixAccumulator[$regionName]['programs'][$program][$statusKey]++;
 
-            // 4. Kalkulasi Data KPI (Otomatis menyesuaikan filter karena $lops sudah difilter)
-            $totalLop = $lops->count();
+            if (!isset($matrixAccumulator[$regionName]['branches'][$branch])) {
+                $matrixAccumulator[$regionName]['branches'][$branch] = [
+                    'programs' => $newProgramMap(),
+                ];
+            }
 
-            $boqReady = $lops->filter(function ($lop) { return $lop->project?->boqItems?->count() > 0; })->count();
-            $belumBoq = max($totalLop - $boqReady, 0);
+            $matrixAccumulator[$regionName]['branches'][$branch]['programs'][$program][$statusKey]++;
+        }
 
-            $assignedLop = $lops->filter(function ($lop) { return $lop->project?->assignment; })->count();
-            $unassignedLop = max($totalLop - $assignedLop, 0);
+        $matrixData = [];
+        foreach ($regions as $regionName => $regionBranches) {
+            $branchesData = [];
 
-            $waitingApproval = $lops->filter(function ($lop) {
-                if (!$lop->project) return false;
-                $summary = $lop->project->progressSummary();
-                return $summary['progress'] > 0 && $summary['progress'] < 100;
-            })->count();
+            foreach ($regionBranches as $branchName) {
+                if (!isset($matrixAccumulator[$regionName]['branches'][$branchName])) {
+                    continue;
+                }
 
-            $completedApproval = $lops->filter(function ($lop) {
-                if (!$lop->project) return false;
-                
-                // LOGIKA BARU: Jika PT2 dan is_golive == 1, maka dianggap 100%
-                if ($lop->project->is_golive == 1) return true;
+                $branchesData[] = [
+                    'name' => $branchName,
+                    'programs' => $matrixAccumulator[$regionName]['branches'][$branchName]['programs'],
+                ];
+            }
 
-                // Jika Reguler, cek progress 100%
-                $summary = $lop->project->progressSummary();
-                return $summary['progress'] == 100;
-            })->count();
+            $matrixData[] = [
+                'region' => $regionName,
+                'programs' => $matrixAccumulator[$regionName]['programs'],
+                'branches' => $branchesData,
+            ];
+        }
 
-            // Ubah cara hitung On Progress agar tidak double-count dengan yang sudah Go-Live
-            $onProgress = $lops->filter(function ($lop) {
-                if (!$lop->project) return false;
-                
-                // Jika sudah Go-Live, tidak masuk On Progress
-                if ($lop->project->is_golive == 1) return false;
 
-                $summary = $lop->project->progressSummary();
-                return $summary['progress'] > 0 && $summary['progress'] < 100;
-            })->count();
-            $completionRate = $totalLop > 0 ? round(($completedApproval / $totalLop) * 100) : 0;
+        /*
+        |--------------------------------------------------------------------------
+        | MATRIX PT 2 - query ringan + single pass
+        |--------------------------------------------------------------------------
+        | PT 2 hanya digunakan untuk Matrix PT 2.
+        | Tidak digabung ke KPI, filter Program, atau matrix Regular.
+        */
+        $emptyPt2Stats = static function () {
+            return [
+                'preparation' => 0,
+                'instalasi' => 0,
+                'finishing' => 0,
+                'total' => 0,
+                'percent' => 0,
+            ];
+        };
 
-            // Evidence & BOQ Global Summary (Tidak terpengaruh filter LOP, bersifat global)
-            $totalEvidence = \App\Models\Evidence::count();
-            $pendingEvidence = \App\Models\Evidence::where('status', 'pending')->count();
-            $approvedEvidence = \App\Models\Evidence::where('status', 'approved')->count();
-            $rejectedEvidence = \App\Models\Evidence::where('status', 'rejected')->count();
+        // Pre-initialize semua Region dan semua Branch agar Branch bernilai 0
+        // tetap muncul pada Matrix PT 2.
+        $pt2Accumulator = [];
 
-            // Stage / Pipeline Summary
-            $stageSummary = [
-                ['label' => 'Belum BOQ', 'value' => $belumBoq, 'color' => 'amber', 'desc' => 'LOP belum memiliki BOQ'],
-                ['label' => 'Belum Assign', 'value' => $unassignedLop, 'color' => 'red', 'desc' => 'LOP belum dibagikan ke Waspang'],
-                ['label' => 'On Progress', 'value' => $onProgress, 'color' => 'blue', 'desc' => 'Sudah assign dan sedang berjalan'],
-                ['label' => 'Waiting Approval', 'value' => $waitingApproval, 'color' => 'orange', 'desc' => 'Progress menunggu review'],
-                ['label' => 'Completed', 'value' => $completedApproval, 'color' => 'emerald', 'desc' => 'Progress selesai 100%'],
+        foreach ($regions as $regionName => $regionBranches) {
+            $pt2Accumulator[$regionName] = [
+                'stats' => $emptyPt2Stats(),
+                'branches' => [],
             ];
 
-            // 5. Build Data Spesifik: Rekap Assignment & Status per REGION
-            $statsByRegion = [];
-            foreach ($regions as $regionName => $regionBranches) {
-                // Filter LOP khusus Region ini
-                $regionLops = $lops->filter(function ($lop) use ($regionBranches) {
-                    return in_array(strtoupper($lop->branch ?? ''), $regionBranches);
+            foreach ($regionBranches as $branchName) {
+                $pt2Accumulator[$regionName]['branches'][$branchName] = $emptyPt2Stats();
+            }
+        }
+
+        $pt2MatrixQuery = DB::table('pt2_lops as l')
+            ->join('pt2_projects as p', 'l.pt2_project_id', '=', 'p.id_pt2_project');
+
+        // Status "drop" mengikuti status project. Selain itu project drop disembunyikan.
+        if ($request->filled('status') && strtolower($request->status) === 'drop') {
+            $pt2MatrixQuery->where('p.status_project', 'drop');
+        } else {
+            $pt2MatrixQuery->where(function ($q) {
+                $q->whereNull('p.status_project')
+                    ->orWhere('p.status_project', '!=', 'drop');
+            });
+        }
+
+        // Region berlaku juga untuk Matrix PT 2.
+        if ($request->filled('region')) {
+            $selectedRegion = strtoupper(trim($request->region));
+
+            if (isset($regions[$selectedRegion])) {
+                $pt2MatrixQuery->whereIn(
+                    DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch)))"),
+                    $regions[$selectedRegion]
+                );
+            }
+        }
+
+        // Branch berlaku juga untuk Matrix PT 2.
+        if ($request->filled('branch')) {
+            $pt2MatrixQuery->whereRaw(
+                "UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch))) = ?",
+                [strtoupper(trim($request->branch))]
+            );
+        }
+
+        /*
+        | Status LOP berlaku untuk Matrix PT 2.
+        | Go-Live selalu dinormalisasi sebagai finishing.
+        */
+        if ($request->filled('status')) {
+            $selectedStatus = strtolower(trim($request->status));
+
+            if ($selectedStatus === 'finishing') {
+                $pt2MatrixQuery->where(function ($q) {
+                    $q->whereRaw('LOWER(l.status_progress) = ?', ['finishing'])
+                        ->orWhere('l.is_golive', 1)
+                        ->orWhere('p.is_golive', 1);
                 });
-
-                if ($regionLops->isEmpty()) continue;
-
-                $calcStats = function ($items) {
-                    $total = $items->count();
-                    $assigned = $items->filter(function ($lop) { return $lop->project?->assignment; })->count();
-                    
-                    $completed = $items->filter(function ($lop) { 
-                        if (!$lop->project) return false;
-
-                        // LOGIKA BARU: Jika PT2 dan sudah Go-Live, hitung sebagai Complete
-                        if ($lop->project->is_golive == 1) return true;
-
-                        // Jika Reguler, cek apakah progress summary 100%
-                        return ($lop->project?->progressSummary()['progress'] ?? 0) == 100; 
-                    })->count();
-
-                    $waiting = $items->filter(function ($lop) {
-                        if (!$lop->project) return false;
-
-                        // Jika sudah Go-Live, tidak masuk hitungan In Review (Waiting)
-                        if ($lop->project->is_golive == 1) return false;
-
-                        $prog = $lop->project?->progressSummary()['progress'] ?? 0;
-                        return $prog > 0 && $prog < 100;
-                    })->count();
-
-                    $percent = $total > 0 ? round(($completed / $total) * 100) : 0;
-                    return compact('total', 'assigned', 'waiting', 'completed', 'percent');
-                };
-
-                // Rekap Total Region
-                $regionData = $calcStats($regionLops);
-                $regionData['region'] = $regionName;
-                $regionData['branches'] = [];
-
-                // Rekap per Branch di dalam Region tersebut
-                foreach ($regionBranches as $branchName) {
-                    $branchLops = $regionLops->filter(function ($lop) use ($branchName) {
-                        return strtoupper($lop->branch ?? '') === $branchName;
+            } elseif (in_array($selectedStatus, ['preparation', 'instalasi'], true)) {
+                $pt2MatrixQuery
+                    ->whereRaw('LOWER(l.status_progress) = ?', [$selectedStatus])
+                    ->where(function ($q) {
+                        $q->whereNull('l.is_golive')
+                            ->orWhere('l.is_golive', '!=', 1);
+                    })
+                    ->where(function ($q) {
+                        $q->whereNull('p.is_golive')
+                            ->orWhere('p.is_golive', '!=', 1);
                     });
-                    if ($branchLops->isNotEmpty()) {
-                        $branchData = $calcStats($branchLops);
-                        $branchData['name'] = $branchName;
-                        $regionData['branches'][] = $branchData;
-                    }
-                }
-                $statsByRegion[] = $regionData;
+            }
+        }
+
+        $pt2Rows = $pt2MatrixQuery->get([
+            DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch))) as branch"),
+            'l.status_progress',
+            DB::raw('COALESCE(l.is_golive, 0) as lop_is_golive'),
+            DB::raw('COALESCE(p.is_golive, 0) as project_is_golive'),
+        ]);
+
+        foreach ($pt2Rows as $row) {
+            $branch = strtoupper(trim($row->branch ?? ''));
+            $regionName = $branchToRegion[$branch] ?? null;
+
+            if (!$regionName || !isset($pt2Accumulator[$regionName]['branches'][$branch])) {
+                continue;
             }
 
-            return view('admin.dashboard', compact(
-                'programs', // Untuk dropdown filter
-                'totalLop', 'boqReady', 'belumBoq', 'assignedLop', 'unassignedLop', 'waitingApproval', 'completedApproval', 'onProgress', 'completionRate',
-                'totalEvidence', 'pendingEvidence', 'approvedEvidence', 'rejectedEvidence',
-                'stageSummary', 'statsByRegion', 'matrixData'
-            ));
+            $isGoLive =
+                (int) ($row->lop_is_golive ?? 0) === 1
+                || (int) ($row->project_is_golive ?? 0) === 1;
+
+            $statusProgress = strtolower(trim($row->status_progress ?? ''));
+
+            if ($isGoLive || $statusProgress === 'finishing') {
+                $statusKey = 'finishing';
+            } elseif ($statusProgress === 'instalasi') {
+                $statusKey = 'instalasi';
+            } else {
+                $statusKey = 'preparation';
+            }
+
+            $pt2Accumulator[$regionName]['stats'][$statusKey]++;
+            $pt2Accumulator[$regionName]['stats']['total']++;
+
+            $pt2Accumulator[$regionName]['branches'][$branch][$statusKey]++;
+            $pt2Accumulator[$regionName]['branches'][$branch]['total']++;
         }
+
+        $selectedMatrixRegion = $request->filled('region')
+            ? strtoupper(trim($request->region))
+            : null;
+
+        $selectedMatrixBranch = $request->filled('branch')
+            ? strtoupper(trim($request->branch))
+            : null;
+
+        $matrixPt2Data = [];
+
+        foreach ($regions as $regionName => $regionBranches) {
+            if ($selectedMatrixRegion && $regionName !== $selectedMatrixRegion) {
+                continue;
+            }
+
+            $regionStats = $pt2Accumulator[$regionName]['stats'];
+            $regionStats['percent'] = $regionStats['total'] > 0
+                ? round(($regionStats['finishing'] / $regionStats['total']) * 100)
+                : 0;
+
+            $branchesData = [];
+
+            foreach ($regionBranches as $branchName) {
+                if ($selectedMatrixBranch && $branchName !== $selectedMatrixBranch) {
+                    continue;
+                }
+
+                $branchStats = $pt2Accumulator[$regionName]['branches'][$branchName];
+                $branchStats['percent'] = $branchStats['total'] > 0
+                    ? round(($branchStats['finishing'] / $branchStats['total']) * 100)
+                    : 0;
+
+                $branchesData[] = [
+                    'name' => $branchName,
+                    'stats' => $branchStats,
+                ];
+            }
+
+            // Jika branch dipilih tetapi branch tersebut bukan milik region ini,
+            // region tersebut tidak perlu ditampilkan.
+            if ($selectedMatrixBranch && empty($branchesData)) {
+                continue;
+            }
+
+            $matrixPt2Data[] = [
+                'region' => $regionName,
+                'stats' => $regionStats,
+                'branches' => $branchesData,
+            ];
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | QUERY LOP FILTERED
+        |--------------------------------------------------------------------------
+        | Hanya eager-load relasi yang benar-benar dipakai oleh index().
+        */
+        $query = Lop::query()->with([
+            'project.assignment',
+            'project.evidences',
+            'project.boqItems.designatorData',
+            'project.boqItems.designatorDataByCode',
+        ]);
+
+        if ($request->filled('program')) {
+            $selectedProgram = strtoupper(trim($request->program));
+
+            if (isset($programSet[$selectedProgram])) {
+                $query->whereHas('project', function ($q) use ($selectedProgram) {
+                    $q->whereRaw('UPPER(program) = ?', [$selectedProgram]);
+                });
+            }
+        }
+
+        if ($request->filled('region')) {
+            $selectedRegion = strtoupper($request->region);
+
+            if (isset($regions[$selectedRegion])) {
+                $query->whereIn(DB::raw('UPPER(branch)'), $regions[$selectedRegion]);
+            }
+        }
+
+        if ($request->filled('branch')) {
+            $query->whereRaw('UPPER(branch) = ?', [strtoupper($request->branch)]);
+        }
+
+        if ($request->filled('status')) {
+            if ($request->status === 'drop') {
+                $query->whereHas('project', function ($q) {
+                    $q->where('status_project', 'drop');
+                });
+            } else {
+                $query->where('status_progress', $request->status)
+                    ->whereHas('project', function ($q) {
+                        $q->where('status_project', '!=', 'drop');
+                    });
+            }
+        } else {
+            $query->whereHas('project', function ($q) {
+                $q->where('status_project', '!=', 'drop');
+            });
+        }
+
+        $lops = $query->get();
+
+        /*
+        |--------------------------------------------------------------------------
+        | KPI + STATS - progressSummary dihitung 1x per project per request
+        |--------------------------------------------------------------------------
+        */
+        $progressCache = [];
+
+        $getProgress = function ($project) use (&$progressCache) {
+            if (!$project) {
+                return 0;
+            }
+
+            $projectKey = (string) ($project->getKey() ?? spl_object_id($project));
+
+            if (!array_key_exists($projectKey, $progressCache)) {
+                $summary = $project->progressSummary();
+                $progressCache[$projectKey] = (int) ($summary['progress'] ?? 0);
+            }
+
+            return $progressCache[$projectKey];
+        };
+
+        $totalLop = $lops->count();
+        $boqReady = 0;
+        $assignedLop = 0;
+        $waitingApproval = 0;
+        $completedApproval = 0;
+        $onProgress = 0;
+
+        $statsAccumulator = [];
+        foreach ($regions as $regionName => $regionBranches) {
+            $statsAccumulator[$regionName] = [
+                'total' => 0,
+                'assigned' => 0,
+                'waiting' => 0,
+                'completed' => 0,
+                'branches' => [],
+            ];
+        }
+
+        foreach ($lops as $lop) {
+            $project = $lop->project;
+
+            if ($project?->boqItems?->isNotEmpty()) {
+                $boqReady++;
+            }
+
+            $isAssigned = (bool) $project?->assignment;
+            if ($isAssigned) {
+                $assignedLop++;
+            }
+
+            if (!$project) {
+                continue;
+            }
+
+            $progress = $getProgress($project);
+            $isGoLive = (int) $project->is_golive === 1;
+            $isCompleted = $isGoLive || $progress === 100;
+            $isWaitingRegion = !$isGoLive && $progress > 0 && $progress < 100;
+
+            // Pertahankan logika KPI lama.
+            if ($progress > 0 && $progress < 100) {
+                $waitingApproval++;
+            }
+
+            if ($isCompleted) {
+                $completedApproval++;
+            }
+
+            if ($isWaitingRegion) {
+                $onProgress++;
+            }
+
+            $branch = strtoupper($lop->branch ?? '');
+            $regionName = $branchToRegion[$branch] ?? null;
+
+            if (!$regionName) {
+                continue;
+            }
+
+            $statsAccumulator[$regionName]['total']++;
+
+            if ($isAssigned) {
+                $statsAccumulator[$regionName]['assigned']++;
+            }
+            if ($isWaitingRegion) {
+                $statsAccumulator[$regionName]['waiting']++;
+            }
+            if ($isCompleted) {
+                $statsAccumulator[$regionName]['completed']++;
+            }
+
+            if (!isset($statsAccumulator[$regionName]['branches'][$branch])) {
+                $statsAccumulator[$regionName]['branches'][$branch] = [
+                    'total' => 0,
+                    'assigned' => 0,
+                    'waiting' => 0,
+                    'completed' => 0,
+                ];
+            }
+
+            $statsAccumulator[$regionName]['branches'][$branch]['total']++;
+
+            if ($isAssigned) {
+                $statsAccumulator[$regionName]['branches'][$branch]['assigned']++;
+            }
+            if ($isWaitingRegion) {
+                $statsAccumulator[$regionName]['branches'][$branch]['waiting']++;
+            }
+            if ($isCompleted) {
+                $statsAccumulator[$regionName]['branches'][$branch]['completed']++;
+            }
+        }
+
+        $belumBoq = max($totalLop - $boqReady, 0);
+        $unassignedLop = max($totalLop - $assignedLop, 0);
+        $completionRate = $totalLop > 0
+            ? round(($completedApproval / $totalLop) * 100)
+            : 0;
+
+        // Satu query untuk seluruh summary evidence.
+        $evidenceStats = Evidence::query()
+            ->selectRaw("
+                COUNT(*) AS total,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+                SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) AS approved,
+                SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) AS rejected
+            ")
+            ->first();
+
+        $totalEvidence = (int) ($evidenceStats->total ?? 0);
+        $pendingEvidence = (int) ($evidenceStats->pending ?? 0);
+        $approvedEvidence = (int) ($evidenceStats->approved ?? 0);
+        $rejectedEvidence = (int) ($evidenceStats->rejected ?? 0);
+
+        $stageSummary = [
+            ['label' => 'Belum BOQ', 'value' => $belumBoq, 'color' => 'amber', 'desc' => 'LOP belum memiliki BOQ'],
+            ['label' => 'Belum Assign', 'value' => $unassignedLop, 'color' => 'red', 'desc' => 'LOP belum dibagikan ke Waspang'],
+            ['label' => 'On Progress', 'value' => $onProgress, 'color' => 'blue', 'desc' => 'Sudah assign dan sedang berjalan'],
+            ['label' => 'Waiting Approval', 'value' => $waitingApproval, 'color' => 'orange', 'desc' => 'Progress menunggu review'],
+            ['label' => 'Completed', 'value' => $completedApproval, 'color' => 'emerald', 'desc' => 'Progress selesai 100%'],
+        ];
+
+        $statsByRegion = [];
+
+        foreach ($regions as $regionName => $regionBranches) {
+            $regionStats = $statsAccumulator[$regionName];
+
+            if ($regionStats['total'] === 0) {
+                continue;
+            }
+
+            $branchesData = [];
+
+            foreach ($regionBranches as $branchName) {
+                $branchStats = $regionStats['branches'][$branchName] ?? null;
+
+                if (!$branchStats || $branchStats['total'] === 0) {
+                    continue;
+                }
+
+                $branchStats['percent'] = round(
+                    ($branchStats['completed'] / $branchStats['total']) * 100
+                );
+                $branchStats['name'] = $branchName;
+
+                $branchesData[] = $branchStats;
+            }
+
+            $statsByRegion[] = [
+                'total' => $regionStats['total'],
+                'assigned' => $regionStats['assigned'],
+                'waiting' => $regionStats['waiting'],
+                'completed' => $regionStats['completed'],
+                'percent' => round(
+                    ($regionStats['completed'] / $regionStats['total']) * 100
+                ),
+                'region' => $regionName,
+                'branches' => $branchesData,
+            ];
+        }
+
+        return view('admin.dashboard', compact(
+            'programs',
+            'totalLop',
+            'boqReady',
+            'belumBoq',
+            'assignedLop',
+            'unassignedLop',
+            'waitingApproval',
+            'completedApproval',
+            'onProgress',
+            'completionRate',
+            'totalEvidence',
+            'pendingEvidence',
+            'approvedEvidence',
+            'rejectedEvidence',
+            'stageSummary',
+            'statsByRegion',
+            'matrixData',
+            'matrixPt2Data'
+        ));
     }
 
     public function show($id)

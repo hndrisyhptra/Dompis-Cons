@@ -43,8 +43,7 @@
         </a>
 
         @php
-            $inboxOpen = request()->routeIs('admin.inbox*')
-                || request()->routeIs('admin.history*');
+            $inboxOpen = request()->routeIs('admin.inbox*') || request()->routeIs('admin.history*');
         @endphp
 
         {{-- INBOX --}}
@@ -83,10 +82,7 @@
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor">
-                    <path stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M19 9l-7 7-7-7"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                 </svg>
             </button>
 
@@ -96,18 +92,26 @@
 
                 <a href="{{ route('admin.inbox') }}"
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
-                {{ request()->routeIs('admin.inbox*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-
+                {{ request()->routeIs('admin.inbox') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-blue-500"></span>
                         Active Project
                     </span>
                 </a>
 
+                {{-- SUB-MENU BARU UNTUK PT 2 --}}
+                <a href="{{ route('admin.inbox.pt2') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.inbox.pt2') ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                    <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
+                        Active PT 2
+                    </span>
+                </a>
+
                 <a href="{{ route('admin.history') }}"
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
-                {{ request()->routeIs('admin.history*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
-
+                {{ request()->routeIs('admin.history*') ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                         History

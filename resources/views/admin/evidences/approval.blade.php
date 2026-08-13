@@ -81,14 +81,18 @@
     {{-- SYSTEM TABS FILTER STATUS --}}
     <div class="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-px overflow-x-auto">
         @php $currentFilter = request('status_filter', 'pending'); @endphp
+        
         <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'pending']) }}" 
            class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'pending' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
             Menunggu Review
         </a>
-        <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'all']) }}" 
-           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'all' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
-            Semua Penugasan
+        
+        {{-- MENGGANTI "Semua Penugasan" MENJADI "On Progress" --}}
+        <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'active']) }}" 
+           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'active' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
+            On Progress
         </a>
+        
         <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'complete']) }}" 
            class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'complete' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
             Selesai / Ready UT

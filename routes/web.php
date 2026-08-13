@@ -54,6 +54,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/admin/inbox', [DashboardController::class, 'adminInbox'])
          ->name('admin.inbox');
+    Route::get('/admin/inbox/pt2', [\App\Http\Controllers\DashboardController::class, 'adminInboxPt2'])->name('admin.inbox.pt2');
 
     Route::get('/admin/history', [DashboardController::class, 'adminHistory'])
         ->name('admin.history');

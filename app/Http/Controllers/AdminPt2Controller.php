@@ -162,6 +162,7 @@ class AdminPt2Controller extends Controller
 
         return view('admin.pt2.approval-list', compact('lops', 'branches'));
     }
+    
 
     /*
     |--------------------------------------------------------------------------
@@ -386,5 +387,26 @@ class AdminPt2Controller extends Controller
             ]);
 
         return back()->with('success', count($request->evidence_ids) . ' Eviden PT2 berhasil disetujui sekaligus.');
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FUNGSI TRACKING & REVIEW LOP PT 2
+    |--------------------------------------------------------------------------
+    */
+    public function tracking($id)
+    {
+        // Ambil data LOP beserta relasi project, teknisi, eviden, dan survey
+        $lop = \App\Models\Pt2Lop::with([
+            'project',
+            'assignment.teknisi',
+            'evidences',
+            'surveys'
+        ])->findOrFail($id);
+
+        // Ambil data project sebagai parent (opsional, jika blade tracking Anda membutuhkannya)
+        $project = $lop->project;
+
+        return view('admin.pt2.tracking', compact('lop', 'project'));
     }
 }

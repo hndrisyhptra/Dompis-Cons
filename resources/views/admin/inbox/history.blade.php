@@ -11,7 +11,7 @@
             <div>
                 <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">History Project</h1>
                 <p class="text-sm text-slate-500 mt-1.5 max-w-md">
-                    Daftar seluruh proyek konstruksi yang telah selesai (100%) dan berhasil review eviden.
+                    Daftar seluruh proyek konstruksi (Reguler & PT 2) yang telah selesai (100%).
                 </p>
             </div>
 
@@ -31,15 +31,58 @@
         </div>
     </div>
 
+    {{-- SYSTEM TABS FILTER PROGRAM --}}
+    <div class="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-px overflow-x-auto">
+        @php $currentFilter = request('program_filter', 'all'); @endphp
+        
+        <a href="{{ request()->fullUrlWithQuery(['program_filter' => 'all', 'page' => 1]) }}" 
+           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'all' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
+            Semua History
+        </a>
+        
+        <a href="{{ request()->fullUrlWithQuery(['program_filter' => 'osp', 'page' => 1]) }}" 
+           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'osp' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
+            OSP
+        </a>
+        
+        <a href="{{ request()->fullUrlWithQuery(['program_filter' => 'node b', 'page' => 1]) }}" 
+           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'node b' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
+            NODE B
+        </a>
+        
+        <a href="{{ request()->fullUrlWithQuery(['program_filter' => 'hem', 'page' => 1]) }}" 
+           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'hem' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
+            HEM
+        </a>
+        
+        <a href="{{ request()->fullUrlWithQuery(['program_filter' => 'olo', 'page' => 1]) }}" 
+           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'olo' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
+            OLO
+        </a>
+        
+        <a href="{{ request()->fullUrlWithQuery(['program_filter' => 'eksternal', 'page' => 1]) }}" 
+           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'eksternal' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
+            Eksternal
+        </a>
+        
+        <a href="{{ request()->fullUrlWithQuery(['program_filter' => 'pt2', 'page' => 1]) }}" 
+           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'pt2' ? 'border-cyan-600 text-cyan-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
+            PT 2
+        </a>
+    </div>
+
     {{-- INTERACTION CONTROLS (SEARCH ENGINE) --}}
-    <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden mt-4">
         <div class="p-4 border-b border-slate-50 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-800/20">
             <form method="GET" action="{{ url()->current() }}">
+                {{-- Hidden input agar tab filter tidak reset saat melakukan pencarian --}}
+                <input type="hidden" name="program_filter" value="{{ request('program_filter', 'all') }}">
+                
                 <div class="relative">
                     <input type="text"
                            name="search"
                            value="{{ request('search') }}"
-                           placeholder="Cari PID SAP, Nama LOP, STO, Branch, atau Waspang..."
+                           placeholder="Cari PID SAP, Nama Project/LOP, STO, Branch, atau Nama Pekerja..."
                            class="w-full pl-11 pr-24 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold shadow-xs focus:ring-2 focus:ring-emerald-500 outline-none transition">
 
                     <div class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
@@ -49,7 +92,7 @@
                     
                     @if(request('search'))
                         <div class="absolute right-3 top-1/2 -translate-y-1/2">
-                            <a href="{{ url()->current() }}" class="text-[11px] font-bold text-rose-600 hover:underline">✕ Clear</a>
+                            <a href="{{ request()->fullUrlWithQuery(['search' => null]) }}" class="text-[11px] font-bold text-rose-600 hover:underline">✕ Clear</a>
                         </div>
                     @endif
                 </div>
@@ -58,16 +101,7 @@
 
         {{-- CONTAINER LIST DATA --}}
         <div class="divide-y divide-slate-100 dark:divide-slate-800/60">
-            @forelse($assignments as $assignment)
-                @php
-                    $project = $assignment->project;
-                    $lop = $project?->lop;
-                    $waspang = $assignment->waspang;
-
-                    $summary = $project?->progressSummary();
-                    $progress = $summary['progress'] ?? 100;
-                @endphp
-
+            @forelse($assignments as $item)
                 <div class="group hover:bg-emerald-50/20 dark:hover:bg-slate-800/30 transition-all duration-150">
                     <div class="px-6 py-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                         
@@ -75,37 +109,47 @@
                         <div class="flex items-start gap-4 min-w-0">
                             {{-- EMERALD BULLET DOT INDICATOR --}}
                             <div class="mt-1.5 shrink-0">
-                                <div class="w-3 h-3 rounded-full bg-emerald-500 shadow-xs shadow-emerald-400"></div>
+                                @if($item->type == 'pt2')
+                                    <div class="w-3 h-3 rounded-full bg-cyan-500 shadow-xs shadow-cyan-400"></div>
+                                @else
+                                    <div class="w-3 h-3 rounded-full bg-emerald-500 shadow-xs shadow-emerald-400"></div>
+                                @endif
                             </div>
 
                             <div class="min-w-0 space-y-1">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="font-mono font-black text-slate-800 dark:text-white text-sm tracking-tight">
-                                        {{ $project->pid_sap ?? 'PID -' }}
+                                        {{ $item->pid }}
                                     </span>
                                     
                                     <span class="px-2.5 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide uppercase bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-100 dark:border-emerald-900/40">
                                         COMPLETE
                                     </span>
-
-                                    <span class="px-2.5 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide uppercase bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-100 dark:border-blue-900/40">
-                                        {{ $progress }}%
-                                    </span>
+                                    
+                                    @if($item->type == 'pt2')
+                                        <span class="px-2.5 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide uppercase bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 border border-cyan-100 dark:border-cyan-900/40">
+                                            PT 2
+                                        </span>
+                                    @else
+                                        <span class="px-2.5 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide uppercase bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-100 dark:border-blue-900/40">
+                                            100%
+                                        </span>
+                                    @endif
                                 </div>
 
                                 <p class="font-black text-slate-700 dark:text-slate-300 text-sm tracking-tight break-words leading-snug">
-                                    {{ $lop->lop_name ?? $project->project_name ?? '-' }}
+                                    {{ $item->name }}
                                 </p>
 
                                 {{-- COMPONENT META SUB --}}
                                 <div class="pt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400 font-bold">
-                                    <span class="flex items-center gap-1">STO: <b class="text-slate-600 dark:text-slate-400">{{ $lop->sto ?? '-' }}</b></span>
+                                    <span class="flex items-center gap-1">STO: <b class="text-slate-600 dark:text-slate-400">{{ $item->sto }}</b></span>
                                     <span class="hidden sm:inline text-slate-200 dark:text-slate-700">•</span>
-                                    <span class="flex items-center gap-1">Branch: <b class="text-slate-600 dark:text-slate-400">{{ $lop->branch ?? '-' }}</b></span>
+                                    <span class="flex items-center gap-1">Branch: <b class="text-slate-600 dark:text-slate-400">{{ $item->branch }}</b></span>
                                     <span class="hidden sm:inline text-slate-200 dark:text-slate-700">•</span>
-                                    <span class="flex items-center gap-1">Program: <b class="text-slate-600 dark:text-slate-400">{{ $lop->program_sap ?? $project->program ?? '-' }}</b></span>
+                                    <span class="flex items-center gap-1">Program: <b class="text-slate-600 dark:text-slate-400">{{ $item->program }}</b></span>
                                     <span class="hidden sm:inline text-slate-200 dark:text-slate-700">•</span>
-                                    <span class="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">Waspang: <b class="font-black">{{ $waspang->name ?? '-' }}</b></span>
+                                    <span class="flex items-center gap-1 {{ $item->type == 'pt2' ? 'text-cyan-600' : 'text-emerald-600' }}">{{ $item->assignee_role }}: <b class="font-black">{{ $item->assignee_name }}</b></span>
                                 </div>
                             </div>
                         </div>
@@ -113,20 +157,22 @@
                        {{-- RIGHT BUTTON GROUP ACTION --}}
                         <div class="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-2 shrink-0 border-t md:border-t-0 border-slate-50 pt-3 md:pt-0">
                             <p class="text-[10px] font-bold text-slate-400 font-mono">
-                                Selesai {{ $assignment->created_at ? $assignment->created_at->diffForHumans() : '-' }}
+                                Selesai {{ $item->date ? \Carbon\Carbon::parse($item->date)->diffForHumans() : '-' }}
                             </p>
 
                             <div class="flex items-center gap-2 mt-0 md:mt-1">
-                                {{-- BUTTON REVIEW BOQ (AKSES REKAP QUANTITY PLAN VS ACTUAL) --}}
-                                <a href="{{ route('admin.projects.review_boq', $project->id_project) }}"
-                                   class="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-500/5 text-slate-700 dark:text-slate-300 hover:text-emerald-600 text-[11px] font-black transition-all inline-flex items-center gap-1.5 shadow-xs">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-list"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>
-                                    Review BOQ
-                                </a>
+                                {{-- TOMBOL REVIEW BOQ (Khusus Reguler) --}}
+                                @if($item->review_boq_url)
+                                    <a href="{{ $item->review_boq_url }}"
+                                       class="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-emerald-500 hover:bg-emerald-500/5 text-slate-700 dark:text-slate-300 hover:text-emerald-600 text-[11px] font-black transition-all inline-flex items-center gap-1.5 shadow-xs">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-list"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg>
+                                        Review BOQ
+                                    </a>
+                                @endif
 
-                                {{-- BUTTON OPEN LOG TRACKING TRACK --}}
-                                <a href="{{ route('admin.projects.tracking', $project->id_project) }}"
-                                   class="h-8 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black transition-all inline-flex items-center shadow-xs shadow-emerald-600/10">
+                                {{-- TOMBOL OPEN TRACKING --}}
+                                <a href="{{ $item->tracking_url }}"
+                                   class="h-8 px-4 rounded-lg {{ $item->type == 'pt2' ? 'bg-cyan-600 hover:bg-cyan-700 shadow-cyan-600/10' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/10' }} text-white text-[11px] font-black transition-all inline-flex items-center shadow-xs">
                                     Tracking
                                 </a>
                             </div>
@@ -146,7 +192,7 @@
                         Belum Ada Project Selesai
                     </h3>
                     <p class="text-xs text-slate-400 mt-1 max-w-xs mx-auto">
-                        Semua proyek konstruksi yang progresnya telah mencapai target 100% dan lolos review eviden akan tercatat di sini.
+                        Semua proyek konstruksi pada filter ini yang progresnya telah mencapai target 100% akan tercatat di sini.
                     </p>
                 </div>
             @endforelse
