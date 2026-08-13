@@ -830,170 +830,1070 @@ class DashboardController extends Controller
      * MENU: REKAP PROGRESS ADMIN (Detail Kabel, Tiang, Pagination)
      */
     public function rekapProgress(Request $request)
-    {
-        // 1. Data Mapping Region (Sama seperti di Javascript)
-        $regions = [
-            'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
-            'JATENG DIY' => ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
-            'BALNUS' => ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES']
+{
+    /*
+    |--------------------------------------------------------------------------
+    | REGION
+    |--------------------------------------------------------------------------
+    */
+    $regions = [
+        'JATIM' => [
+            'SIDOARJO',
+            'SURABAYA',
+            'MADIUN',
+            'JEMBER',
+            'LAMONGAN',
+            'MALANG',
+        ],
+
+        'JATENG DIY' => [
+            'YOGYAKARTA',
+            'SEMARANG',
+            'PURWOKERTO',
+            'PEKALONGAN',
+            'SURAKARTA',
+            'MAGELANG',
+        ],
+
+        'BALNUS' => [
+            'DENPASAR',
+            'KUPANG',
+            'MATARAM',
+            'FLORES',
+        ],
+    ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | TABLE NAME
+    |--------------------------------------------------------------------------
+    |
+    | Mengikuti nama table dari Model.
+    |
+    */
+    $lopTable = (new \App\Models\Lop())->getTable();
+    $projectTable = (new \App\Models\Project())->getTable();
+    $boqTable = (new \App\Models\BoqItem())->getTable();
+    $designatorTable = (new \App\Models\Designator())->getTable();
+
+    $priceTable =
+        (new \App\Models\DesignatorPackagePrice())
+            ->getTable();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER VALUE
+    |--------------------------------------------------------------------------
+    */
+    $selectedProgram = trim(
+        (string) $request->input('program', '')
+    );
+
+    $selectedRegion = strtoupper(
+        trim((string) $request->input('region', ''))
+    );
+
+    $selectedBranch = strtoupper(
+        trim((string) $request->input('branch', ''))
+    );
+
+    $selectedStatus = strtolower(
+        trim((string) $request->input('status', ''))
+    );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PER PAGE
+    |--------------------------------------------------------------------------
+    |
+    | Batasi supaya user tidak bisa mengirim ?per_page=999999
+    |
+    */
+    $perPage = (int) $request->input(
+        'per_page',
+        10
+    );
+
+    if (
+        !in_array(
+            $perPage,
+            [10, 20, 50, 100],
+            true
+        )
+    ) {
+        $perPage = 10;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PROGRAM FILTER
+    |--------------------------------------------------------------------------
+    */
+    $programs = \App\Models\Project::query()
+        ->whereNotNull('program')
+        ->where('program', '!=', '')
+        ->distinct()
+        ->orderBy('program')
+        ->pluck('program');
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | HARGA PACKAGE TERBARU
+    |--------------------------------------------------------------------------
+    |
+    | Bila ada lebih dari satu harga untuk:
+    |
+    | designator_id + package_id
+    |
+    | maka id_price terbesar dianggap harga terbaru.
+    |
+    */
+    $latestPriceIds =
+        \Illuminate\Support\Facades\DB::table(
+            $priceTable
+        )
+        ->selectRaw(
+            'MAX(id_price) AS id_price'
+        )
+        ->groupBy(
+            'designator_id',
+            'package_id'
+        );
+
+
+    $currentPriceSub =
+        \Illuminate\Support\Facades\DB::table(
+            "{$priceTable} as dpp"
+        )
+
+        ->joinSub(
+            $latestPriceIds,
+            'latest_price',
+            function ($join) {
+
+                $join->on(
+                    'latest_price.id_price',
+                    '=',
+                    'dpp.id_price'
+                );
+            }
+        )
+
+        ->select([
+            'dpp.designator_id',
+            'dpp.package_id',
+        ])
+
+        ->selectRaw("
+            CAST(
+                NULLIF(
+                    TRIM(dpp.price),
+                    ''
+                )
+                AS DECIMAL(20,2)
+            ) AS price
+        ");
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | AGGREGATE BOQ PER LOP
+    |--------------------------------------------------------------------------
+    |
+    | Hasil subquery ini hanya satu row per LOP.
+    |
+    | Jadi query utama tidak mengalami row multiplication
+    | karena banyak boq_items.
+    |
+    */
+    $lopProgressSub =
+        \Illuminate\Support\Facades\DB::table(
+            "{$boqTable} as b"
+        )
+
+        ->join(
+            "{$lopTable} as lp",
+            'lp.id_lop',
+            '=',
+            'b.lop_id'
+        )
+
+        ->leftJoin(
+            "{$designatorTable} as d",
+            'd.id_designator',
+            '=',
+            'b.designator_id'
+        )
+
+        ->leftJoinSub(
+            $currentPriceSub,
+            'cp',
+            function ($join) {
+
+                $join->on(
+                    'cp.designator_id',
+                    '=',
+                    'b.designator_id'
+                );
+
+                $join->on(
+                    'cp.package_id',
+                    '=',
+                    'lp.package_id'
+                );
+            }
+        )
+
+        ->select(
+            'b.lop_id'
+        )
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TOTAL NILAI
+        |--------------------------------------------------------------------------
+        |
+        | Tidak menggunakan boq_items.unit_price.
+        |
+        | quantity_plan × harga package terbaru
+        |
+        */
+        ->selectRaw("
+            SUM(
+                CASE
+                    WHEN d.type IN (
+                        'material',
+                        'jasa'
+                    )
+                    THEN
+                        COALESCE(
+                            b.quantity_plan,
+                            0
+                        )
+                        *
+                        COALESCE(
+                            cp.price,
+                            0
+                        )
+                    ELSE 0
+                END
+            )
+            AS total_nilai_boq
+        ")
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | KABEL PLAN
+        |--------------------------------------------------------------------------
+        */
+        ->selectRaw("
+            SUM(
+                CASE
+                    WHEN LOWER(
+                        TRIM(
+                            d.progress_category
+                        )
+                    ) = 'kabel'
+
+                    THEN COALESCE(
+                        b.quantity_plan,
+                        0
+                    )
+
+                    ELSE 0
+                END
+            )
+            AS kabel_plan
+        ")
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | KABEL ACTUAL
+        |--------------------------------------------------------------------------
+        */
+        ->selectRaw("
+            SUM(
+                CASE
+                    WHEN LOWER(
+                        TRIM(
+                            d.progress_category
+                        )
+                    ) = 'kabel'
+
+                    THEN COALESCE(
+                        b.quantity_actual,
+                        0
+                    )
+
+                    ELSE 0
+                END
+            )
+            AS kabel_actual
+        ")
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TIANG PLAN
+        |--------------------------------------------------------------------------
+        */
+        ->selectRaw("
+            SUM(
+                CASE
+                    WHEN LOWER(
+                        TRIM(
+                            d.progress_category
+                        )
+                    ) = 'tiang'
+
+                    THEN COALESCE(
+                        b.quantity_plan,
+                        0
+                    )
+
+                    ELSE 0
+                END
+            )
+            AS tiang_plan
+        ")
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TIANG ACTUAL
+        |--------------------------------------------------------------------------
+        */
+        ->selectRaw("
+            SUM(
+                CASE
+                    WHEN LOWER(
+                        TRIM(
+                            d.progress_category
+                        )
+                    ) = 'tiang'
+
+                    THEN COALESCE(
+                        b.quantity_actual,
+                        0
+                    )
+
+                    ELSE 0
+                END
+            )
+            AS tiang_actual
+        ")
+
+        ->groupBy(
+            'b.lop_id'
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | BASE QUERY
+    |--------------------------------------------------------------------------
+    |
+    | Digunakan bersama oleh:
+    |
+    | - KPI / Card
+    | - Gauge
+    | - Pagination
+    |
+    | Sehingga filter selalu konsisten.
+    |
+    */
+    $baseQuery =
+        \Illuminate\Support\Facades\DB::table(
+            "{$lopTable} as l"
+        )
+
+        ->join(
+            "{$projectTable} as p",
+            'l.project_id',
+            '=',
+            'p.id_project'
+        )
+
+        ->leftJoinSub(
+            $lopProgressSub,
+            'progress',
+            function ($join) {
+
+                $join->on(
+                    'progress.lop_id',
+                    '=',
+                    'l.id_lop'
+                );
+            }
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER PROGRAM
+    |--------------------------------------------------------------------------
+    */
+    if ($selectedProgram !== '') {
+
+        $baseQuery->where(
+            'p.program',
+            $selectedProgram
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER REGION
+    |--------------------------------------------------------------------------
+    */
+    if (
+        $selectedRegion !== ''
+        &&
+        isset(
+            $regions[$selectedRegion]
+        )
+    ) {
+
+        $baseQuery->whereIn(
+            \Illuminate\Support\Facades\DB::raw(
+                'UPPER(TRIM(l.branch))'
+            ),
+            $regions[$selectedRegion]
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER BRANCH
+    |--------------------------------------------------------------------------
+    */
+    if ($selectedBranch !== '') {
+
+        $baseQuery->whereRaw(
+            'UPPER(TRIM(l.branch)) = ?',
+            [$selectedBranch]
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FILTER STATUS
+    |--------------------------------------------------------------------------
+    */
+    if ($selectedStatus !== '') {
+
+        $baseQuery->whereRaw(
+            'LOWER(TRIM(l.status_progress)) = ?',
+            [$selectedStatus]
+        );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | GLOBAL / FILTERED SUMMARY
+    |--------------------------------------------------------------------------
+    |
+    | Jika TIDAK ada filter:
+    |
+    | → Total seluruh LOP
+    | → Total seluruh nilai Jasa + Material
+    |
+    | Jika ada filter:
+    |
+    | → otomatis mengikuti Program / Region /
+    |   Branch / Status.
+    |
+    */
+    $globalStats =
+        (clone $baseQuery)
+
+        ->selectRaw("
+            COUNT(l.id_lop)
+            AS total_segments
+        ")
+
+        ->selectRaw("
+            COALESCE(
+                SUM(
+                    progress.total_nilai_boq
+                ),
+                0
+            )
+            AS total_nilai_boq
+        ")
+
+        ->selectRaw("
+            COALESCE(
+                SUM(
+                    progress.kabel_plan
+                ),
+                0
+            )
+            AS kabel_plan
+        ")
+
+        ->selectRaw("
+            COALESCE(
+                SUM(
+                    progress.kabel_actual
+                ),
+                0
+            )
+            AS kabel_actual
+        ")
+
+        ->selectRaw("
+            COALESCE(
+                SUM(
+                    progress.tiang_plan
+                ),
+                0
+            )
+            AS tiang_plan
+        ")
+
+        ->selectRaw("
+            COALESCE(
+                SUM(
+                    progress.tiang_actual
+                ),
+                0
+            )
+            AS tiang_actual
+        ")
+
+        ->first();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | KPI
+    |--------------------------------------------------------------------------
+    */
+    $totalSegments =
+        (int) (
+            $globalStats->total_segments
+            ?? 0
+        );
+
+
+    $totalNilaiBoq =
+        (float) (
+            $globalStats->total_nilai_boq
+            ?? 0
+        );
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | KABEL
+    |--------------------------------------------------------------------------
+    */
+    $totalKabelPlan =
+        (float) (
+            $globalStats->kabel_plan
+            ?? 0
+        );
+
+
+    $totalKabelActual =
+        (float) (
+            $globalStats->kabel_actual
+            ?? 0
+        );
+
+
+    $totalKabelPersen =
+        $totalKabelPlan > 0
+
+            ? (
+                $totalKabelActual
+                /
+                $totalKabelPlan
+            ) * 100
+
+            : 0;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TIANG
+    |--------------------------------------------------------------------------
+    */
+    $totalTiangPlan =
+        (float) (
+            $globalStats->tiang_plan
+            ?? 0
+        );
+
+
+    $totalTiangActual =
+        (float) (
+            $globalStats->tiang_actual
+            ?? 0
+        );
+
+
+    $totalTiangPersen =
+        $totalTiangPlan > 0
+
+            ? (
+                $totalTiangActual
+                /
+                $totalTiangPlan
+            ) * 100
+
+            : 0;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | TABLE PAGINATION
+    |--------------------------------------------------------------------------
+    |
+    | Tidak perlu GROUP BY lagi.
+    |
+    | progress subquery sudah 1 row / LOP.
+    |
+    */
+    $lopsData =
+        (clone $baseQuery)
+
+        ->select([
+            'l.id_lop',
+            'l.branch',
+            'l.sto',
+            'l.lop_name',
+            'l.status_progress',
+
+            'p.program',
+            'p.id_project',
+        ])
+
+        ->selectRaw("
+            COALESCE(
+                progress.kabel_plan,
+                0
+            )
+            AS kabel_plan
+        ")
+
+        ->selectRaw("
+            COALESCE(
+                progress.kabel_actual,
+                0
+            )
+            AS kabel_actual
+        ")
+
+        ->selectRaw("
+            COALESCE(
+                progress.tiang_plan,
+                0
+            )
+            AS tiang_plan
+        ")
+
+        ->selectRaw("
+            COALESCE(
+                progress.tiang_actual,
+                0
+            )
+            AS tiang_actual
+        ")
+
+        ->selectRaw("
+            COALESCE(
+                progress.total_nilai_boq,
+                0
+            )
+            AS total_nilai_boq
+        ")
+
+        ->orderByDesc(
+            'l.id_lop'
+        )
+
+        ->paginate(
+            $perPage
+        )
+
+        ->withQueryString();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PROJECT CURRENT PAGE
+    |--------------------------------------------------------------------------
+    |
+    | progressSummary() tetap dipakai agar logic lama
+    | tidak berubah.
+    |
+    | Tetapi hanya project di page saat ini yang dimuat.
+    |
+    */
+    $pageProjectIds =
+        collect(
+            $lopsData->items()
+        )
+        ->pluck(
+            'id_project'
+        )
+        ->filter()
+        ->unique()
+        ->values();
+
+
+    $progressByProject =
+        collect();
+
+
+    if (
+        $pageProjectIds->isNotEmpty()
+    ) {
+
+        $pageProjects =
+            \App\Models\Project::query()
+
+            ->with([
+                'evidences',
+                'boqItems',
+            ])
+
+            ->whereIn(
+                'id_project',
+                $pageProjectIds
+            )
+
+            ->get();
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | CACHE PROGRESS PER PROJECT
+        |--------------------------------------------------------------------------
+        |
+        | progressSummary() hanya dihitung sekali
+        | untuk setiap project.
+        |
+        */
+        $progressByProject =
+            $pageProjects
+            ->mapWithKeys(
+                function ($project) {
+
+                    $summary =
+                        $project
+                            ->progressSummary();
+
+                    return [
+                        $project->id_project
+                            =>
+                        (float) (
+                            $summary['progress']
+                            ?? 0
+                        ),
+                    ];
+                }
+            );
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAGE SUMMARY
+    |--------------------------------------------------------------------------
+    */
+    $filterSegments = 0;
+
+    $filterKabelPlan = 0;
+    $filterKabelActual = 0;
+
+    $filterTiangPlan = 0;
+    $filterTiangActual = 0;
+
+
+    $summaryStatus = [
+        'selesai' => 0,
+        'sedang' => 0,
+        'rendah' => 0,
+        'belum' => 0,
+    ];
+
+
+    $tableData = [];
+
+
+    $startNumber =
+        (
+            $lopsData->currentPage()
+            - 1
+        )
+        *
+        $lopsData->perPage();
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | LOOP CURRENT PAGE ONLY
+    |--------------------------------------------------------------------------
+    */
+    foreach (
+        $lopsData
+        as $index => $lop
+    ) {
+
+        $kabelPlan =
+            (float) (
+                $lop->kabel_plan
+                ?? 0
+            );
+
+
+        $kabelActual =
+            (float) (
+                $lop->kabel_actual
+                ?? 0
+            );
+
+
+        $tiangPlan =
+            (float) (
+                $lop->tiang_plan
+                ?? 0
+            );
+
+
+        $tiangActual =
+            (float) (
+                $lop->tiang_actual
+                ?? 0
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PERCENT KABEL
+        |--------------------------------------------------------------------------
+        */
+        $persenKabel =
+            $kabelPlan > 0
+
+                ? (
+                    $kabelActual
+                    /
+                    $kabelPlan
+                ) * 100
+
+                : 0;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | PERCENT TIANG
+        |--------------------------------------------------------------------------
+        */
+        $persenTiang =
+            $tiangPlan > 0
+
+                ? (
+                    $tiangActual
+                    /
+                    $tiangPlan
+                ) * 100
+
+                : 0;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | TABLE DATA
+        |--------------------------------------------------------------------------
+        */
+        $tableData[] = [
+
+            'no'
+                =>
+            $startNumber
+                +
+            $index
+                +
+            1,
+
+
+            'program'
+                =>
+            $lop->program
+                ?? '-',
+
+
+            'branch'
+                =>
+            strtoupper(
+                trim(
+                    $lop->branch
+                    ?? '-'
+                )
+            ),
+
+
+            'sto'
+                =>
+            strtoupper(
+                trim(
+                    $lop->sto
+                    ?? '-'
+                )
+            ),
+
+
+            'nama_lop'
+                =>
+            $lop->lop_name
+                ?? '-',
+
+
+            'kabel_plan'
+                =>
+            $kabelPlan,
+
+
+            'kabel_actual'
+                =>
+            $kabelActual,
+
+
+            'kabel_persen'
+                =>
+            $persenKabel,
+
+
+            'tiang_plan'
+                =>
+            $tiangPlan,
+
+
+            'tiang_actual'
+                =>
+            $tiangActual,
+
+
+            'tiang_persen'
+                =>
+            $persenTiang,
+
+
+            'total_nilai_boq'
+                =>
+            (float) (
+                $lop->total_nilai_boq
+                ?? 0
+            ),
         ];
 
-        // 2. Ambil list unik untuk filter dropdown program
-        $programs = \App\Models\Project::whereNotNull('program')
-            ->where('program', '!=', '')
-            ->distinct()
-            ->orderBy('program', 'asc')
-            ->pluck('program');
 
         /*
         |--------------------------------------------------------------------------
-        | 1. DATA KESELURUHAN (DINAMIS MENGIKUTI FILTER) UNTUK CARD ATAS & GAUGE
+        | SUMMARY PAGE
         |--------------------------------------------------------------------------
         */
-        $statsQuery = \Illuminate\Support\Facades\DB::table('lops as l')
-            ->join('projects as p', 'l.project_id', '=', 'p.id_project')
-            ->leftJoin('boq_items as b', 'l.id_lop', '=', 'b.lop_id')
-            ->leftJoin('designators as d', 'b.designator_id', '=', 'd.id_designator');
+        $filterSegments++;
 
-        // ================= TERAPKAN FILTER =================
-        if ($request->filled('program')) {
-            $statsQuery->where('p.program', $request->program);
-        }
-        if ($request->filled('region')) {
-            $selectedRegion = strtoupper($request->region);
-            if (isset($regions[$selectedRegion])) {
-                $statsQuery->whereIn(\Illuminate\Support\Facades\DB::raw('UPPER(l.branch)'), $regions[$selectedRegion]);
-            }
-        }
-        if ($request->filled('branch')) {
-            $statsQuery->whereRaw('UPPER(l.branch) = ?', [strtoupper($request->branch)]);
-        }
-        if ($request->filled('status')) {
-            $statsQuery->where('l.status_progress', $request->status);
-        }
-        // ===================================================
+        $filterKabelPlan
+            +=
+        $kabelPlan;
 
-        // Jalankan Query untuk Card Atas & Gauge
-        $globalStats = $statsQuery->select([
-            \Illuminate\Support\Facades\DB::raw('COUNT(DISTINCT l.id_lop) as total_segments'),
-            \Illuminate\Support\Facades\DB::raw("SUM(IFNULL(b.quantity_plan, 0) * IFNULL(CAST(b.unit_price AS DECIMAL(20,2)), 0)) as total_nilai_boq"),
-            \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'kabel' THEN IFNULL(b.quantity_plan, 0) ELSE 0 END) as kabel_plan"),
-            \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'kabel' THEN IFNULL(b.quantity_actual, 0) ELSE 0 END) as kabel_actual"),
-            \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'tiang' THEN IFNULL(b.quantity_plan, 0) ELSE 0 END) as tiang_plan"),
-            \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'tiang' THEN IFNULL(b.quantity_actual, 0) ELSE 0 END) as tiang_actual"),
-        ])->first();
+        $filterKabelActual
+            +=
+        $kabelActual;
 
-        // Variabel untuk Card Atas (Sekarang sudah dinamis mengikuti filter)
-        $totalSegments = $globalStats->total_segments ?? 0;
-        $totalNilaiBoq = $globalStats->total_nilai_boq ?? 0;
-        
-        $totalKabelPlan = $globalStats->kabel_plan ?? 0;
-        $totalKabelActual = $globalStats->kabel_actual ?? 0;
-        $totalKabelPersen = $totalKabelPlan > 0 ? ($totalKabelActual / $totalKabelPlan) * 100 : 0;
-        
-        $totalTiangPlan = $globalStats->tiang_plan ?? 0;
-        $totalTiangActual = $globalStats->tiang_actual ?? 0;
-        $totalTiangPersen = $totalTiangPlan > 0 ? ($totalTiangActual / $totalTiangPlan) * 100 : 0;
+        $filterTiangPlan
+            +=
+        $tiangPlan;
+
+        $filterTiangActual
+            +=
+        $tiangActual;
+
 
         /*
         |--------------------------------------------------------------------------
-        | 2. DATA UTAMA TABEL (DENGAN FILTER & PAGINATION)
+        | PROJECT PROGRESS
         |--------------------------------------------------------------------------
         */
-        $query = \Illuminate\Support\Facades\DB::table('lops as l')
-            ->join('projects as p', 'l.project_id', '=', 'p.id_project')
-            ->leftJoin('boq_items as b', 'l.id_lop', '=', 'b.lop_id')
-            ->leftJoin('designators as d', 'b.designator_id', '=', 'd.id_designator')
-            ->select([
-                'l.id_lop', 'l.branch', 'l.sto', 'l.lop_name', 'p.program', 'p.id_project',
-                \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'kabel' THEN IFNULL(b.quantity_plan, 0) ELSE 0 END) as kabel_plan"),
-                \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'kabel' THEN IFNULL(b.quantity_actual, 0) ELSE 0 END) as kabel_actual"),
-                \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'tiang' THEN IFNULL(b.quantity_plan, 0) ELSE 0 END) as tiang_plan"),
-                \Illuminate\Support\Facades\DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'tiang' THEN IFNULL(b.quantity_actual, 0) ELSE 0 END) as tiang_actual"),
-            ]);
+        $projectProgress =
+            (float) (
+                $progressByProject
+                    ->get(
+                        $lop->id_project,
+                        0
+                    )
+            );
 
-        // ================= TERAPKAN FILTER YANG SAMA =================
-        if ($request->filled('program')) {
-            $query->where('p.program', $request->program);
+
+        if (
+            $projectProgress >= 100
+        ) {
+
+            $summaryStatus['selesai']++;
+
+        } elseif (
+            $projectProgress >= 50
+        ) {
+
+            $summaryStatus['sedang']++;
+
+        } elseif (
+            $projectProgress >= 1
+        ) {
+
+            $summaryStatus['rendah']++;
+
+        } else {
+
+            $summaryStatus['belum']++;
         }
-        if ($request->filled('region')) {
-            $selectedRegion = strtoupper($request->region);
-            if (isset($regions[$selectedRegion])) {
-                $query->whereIn(\Illuminate\Support\Facades\DB::raw('UPPER(l.branch)'), $regions[$selectedRegion]);
-            }
-        }
-        if ($request->filled('branch')) {
-            $query->whereRaw('UPPER(l.branch) = ?', [strtoupper($request->branch)]);
-        }
-        if ($request->filled('status')) {
-            $query->where('l.status_progress', $request->status);
-        }
-        // ==============================================================
-
-        $perPage = $request->input('per_page', 10);
-        $lopsData = $query->groupBy('l.id_lop', 'l.branch', 'l.sto', 'l.lop_name', 'p.program', 'p.id_project')
-                          ->paginate($perPage)->withQueryString();
-
-        /*
-        |--------------------------------------------------------------------------
-        | 3. DATA DINAMIS CARD KANAN (SUMMARY HALAMAN INI)
-        |--------------------------------------------------------------------------
-        */
-        $filterSegments = 0;
-        $filterKabelPlan = 0;
-        $filterKabelActual = 0;
-        $filterTiangPlan = 0;
-        $filterTiangActual = 0;
-        $summaryStatus = ['selesai' => 0, 'sedang' => 0, 'rendah' => 0, 'belum' => 0];
-        
-        $tableData = [];
-        $startNumber = ($lopsData->currentPage() - 1) * $lopsData->perPage();
-
-        $pageProjectIds = collect($lopsData->items())->pluck('id_project')->unique();
-        $pageProjects = \App\Models\Project::with(['evidences', 'boqItems'])->whereIn('id_project', $pageProjectIds)->get()->keyBy('id_project');
-
-        foreach ($lopsData as $index => $lop) {
-            $persenKabel = $lop->kabel_plan > 0 ? ($lop->kabel_actual / $lop->kabel_plan) * 100 : 0;
-            $persenTiang = $lop->tiang_plan > 0 ? ($lop->tiang_actual / $lop->tiang_plan) * 100 : 0;
-
-            $tableData[] = [
-                'no' => $startNumber + $index + 1, 
-                'program' => $lop->program ?? '-',
-                'branch' => strtoupper($lop->branch ?? '-'),
-                'sto' => strtoupper($lop->sto ?? '-'),
-                'nama_lop' => $lop->lop_name ?? '-',
-                'kabel_plan' => $lop->kabel_plan,
-                'kabel_actual' => $lop->kabel_actual,
-                'kabel_persen' => $persenKabel,
-                'tiang_plan' => $lop->tiang_plan,
-                'tiang_actual' => $lop->tiang_actual,
-                'tiang_persen' => $persenTiang,
-            ];
-
-            $filterSegments++;
-            $filterKabelPlan += $lop->kabel_plan;
-            $filterKabelActual += $lop->kabel_actual;
-            $filterTiangPlan += $lop->tiang_plan;
-            $filterTiangActual += $lop->tiang_actual;
-
-            $projectProgress = 0;
-            if (isset($pageProjects[$lop->id_project])) {
-                $summary = $pageProjects[$lop->id_project]->progressSummary();
-                $projectProgress = $summary['progress'] ?? 0;
-            }
-
-            if ($projectProgress >= 100) { $summaryStatus['selesai']++; }
-            elseif ($projectProgress >= 50) { $summaryStatus['sedang']++; }
-            elseif ($projectProgress >= 1) { $summaryStatus['rendah']++; }
-            else { $summaryStatus['belum']++; }
-        }
-
-        // Return Data (Tidak perlu lagi mengirim dashKabelPlan dll karena totalKabelPlan sudah mewakili data filtered)
-        return view('admin.dashboard.rekap_progress', compact(
-            'programs',
-            'totalSegments', 'totalNilaiBoq', 'totalKabelPlan', 'totalKabelActual', 'totalKabelPersen', 'totalTiangPlan', 'totalTiangActual', 'totalTiangPersen',
-            'filterSegments', 'filterKabelPlan', 'filterKabelActual', 'filterTiangPlan', 'filterTiangActual', 'summaryStatus',
-            'lopsData', 'tableData'
-        ));
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | VIEW
+    |--------------------------------------------------------------------------
+    */
+    return view(
+        'admin.dashboard.rekap_progress',
+        compact(
+            'regions',
+            'programs',
+            'totalSegments',
+            'totalNilaiBoq',
+            'totalKabelPlan',
+            'totalKabelActual',
+            'totalKabelPersen',
+            'totalTiangPlan',
+            'totalTiangActual',
+            'totalTiangPersen',
+            'filterSegments',
+            'filterKabelPlan',
+            'filterKabelActual',
+            'filterTiangPlan',
+            'filterTiangActual',
+            'summaryStatus',
+            'lopsData',
+            'tableData'
+        )
+    );
+}
 }
