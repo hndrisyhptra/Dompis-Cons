@@ -107,60 +107,64 @@
                                     </div>
                                 @endif
 
-                                <div class="grid grid-cols-3 gap-2 mb-3">
+                                <div class="grid grid-cols-3 gap-x-3 gap-y-4 mb-3">
                                     @foreach($uploaded as $ev)
-                                        <div class="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group flex items-center justify-center transition-all 
-                                            {{ $ev->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-gray-200' }}">
+                                        {{-- WRAPPER ITEM --}}
+                                        <div class="relative pt-2 pr-2">
 
-                                            {{-- INDIKATOR ID FOTO (MENGGUNAKAN ID_PT2_EVIDENCE) --}}
-                                            <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-20 backdrop-blur-sm pointer-events-none">
-                                                @if($ev->status == 'rejected')
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                                                @elseif($ev->status == 'approved')
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                                                @endif
-                                                ID-{{ $ev->id_pt2_evidence }}
-                                            </div>
-
-                                            <img src="{{ asset('storage/' . $ev->file_path) }}" 
-                                                 class="w-full h-full object-cover {{ $ev->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
-
-                                            @if($ev->status == 'rejected')
-                                                @if(!empty($ev->review_note))
-                                                    <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[9px] p-1.5 text-center font-bold z-20 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2 pointer-events-none" title="{{ $ev->review_note }}">
-                                                        {{ $ev->review_note }}
-                                                    </div>
-                                                @endif
-
-                                                {{-- FORM REPLACE EVIDEN PT 2 --}}
-                                                <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_pt2_evidence) }}" enctype="multipart/form-data" 
-                                                      class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
-                                                    @csrf
-                                                    <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-white text-[10px] font-black group">
-                                                        <div class="bg-blue-600 px-3 py-2 rounded-xl shadow-lg flex flex-col items-center gap-1">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                                                            Upload Ulang
-                                                        </div>
-                                                        <input type="file" name="file" class="hidden" onchange="this.form.submit()" accept="image/*">
-                                                    </label>
-                                                </form>
-                                            @endif
-
-                                            @if($ev->status == 'approved')
-                                                <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[8px] text-center py-1 font-black z-20 pointer-events-none">APPROVED</div>
-                                            @elseif($ev->status == 'pending')
-                                                <div class="absolute bottom-0 inset-x-0 bg-amber-500 text-white text-[8px] text-center py-1 font-black z-20 pointer-events-none">PENDING</div>
-                                            @endif
-
-                                            {{-- TOMBOL DELETE EVIDEN PT 2 --}}
+                                            {{-- TOMBOL DELETE --}}
                                             @if($ev->status != 'approved')
-                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_pt2_evidence) }}" class="absolute top-1 right-1 z-20">
-                                                    @csrf @method('DELETE')
-                                                    <button type="submit" class="w-6 h-6 rounded-full bg-black/70 hover:bg-red-600 text-white text-xs flex items-center justify-center font-bold backdrop-blur-sm transition">
-                                                        ×
-                                                    </button>
+                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_pt2_evidence) }}" class="absolute top-0 right-0 z-50" onsubmit="return confirm('Hapus foto eviden ini?')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" title="Hapus foto" class="w-7 h-7 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center text-sm font-black shadow-lg border-2 border-white transition active:scale-90">×</button>
                                                 </form>
                                             @endif
+
+                                            {{-- FOTO CONTAINER --}}
+                                            <div class="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group flex items-center justify-center transition-all {{ $ev->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-gray-200' }}">
+
+                                                {{-- ID FOTO & STATUS ICON --}}
+                                                <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-20 backdrop-blur-sm pointer-events-none">
+                                                    @if($ev->status == 'rejected')
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                                    @elseif($ev->status == 'approved')
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                                    @endif
+                                                    ID-{{ $ev->id_pt2_evidence }}
+                                                </div>
+
+                                                {{-- IMAGE --}}
+                                                <img src="{{ asset('storage/' . $ev->file_path) }}" alt="Evidence {{ $ev->id_pt2_evidence }}" class="w-full h-full object-cover {{ $ev->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
+
+                                                {{-- REJECTED STATE --}}
+                                                @if($ev->status == 'rejected')
+                                                    @if(!empty($ev->review_note))
+                                                        <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[9px] p-1.5 text-center font-bold z-20 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2 pointer-events-none" title="{{ $ev->review_note }}">
+                                                            {{ $ev->review_note }}
+                                                        </div>
+                                                    @endif
+
+                                                    <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_pt2_evidence) }}" enctype="multipart/form-data" class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                        @csrf
+                                                        <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-white text-[10px] font-black">
+                                                            <div class="bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-xl shadow-lg flex flex-col items-center gap-1 transition">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                                                <span>Upload Ulang</span>
+                                                            </div>
+                                                            <input type="file" name="file" accept="image/*" class="hidden" onchange="this.form.submit()">
+                                                        </label>
+                                                    </form>
+                                                @endif
+
+                                                {{-- STATUS FOOTER (APPROVED / PENDING) --}}
+                                                @if($ev->status == 'approved')
+                                                    <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[8px] text-center py-1 font-black z-20 pointer-events-none">APPROVED</div>
+                                                @elseif($ev->status == 'pending')
+                                                    <div class="absolute bottom-0 inset-x-0 bg-amber-500 text-white text-[8px] text-center py-1 font-black z-20 pointer-events-none">PENDING</div>
+                                                @endif
+
+                                            </div>
                                         </div>
                                     @endforeach
                                 </div>

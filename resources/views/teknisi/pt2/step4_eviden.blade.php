@@ -81,58 +81,62 @@
 
                             {{-- Render Foto ODP dari Database --}}
                             @if($uploaded->count() > 0)
-                                <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-200">
+                                <div class="grid grid-cols-3 gap-x-3 gap-y-4 mt-3 pt-3 border-t border-slate-200">
                                     @foreach($uploaded as $ev)
-                                        <div class="relative rounded-xl overflow-hidden border {{ $ev->status == 'rejected' ? 'border-red-500 border-2 shadow-red-200' : 'border-slate-200' }} aspect-square group">
-                                            
-                                            <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-20 backdrop-blur-sm pointer-events-none">
-                                                ID-{{ $ev->id_pt2_evidence }}
+                                        {{-- WRAPPER FOTO --}}
+                                        <div class="relative pt-2 pr-2">
+
+                                            {{-- TOMBOL DELETE - DI LUAR FOTO --}}
+                                            @if($ev->status != 'approved')
+                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_pt2_evidence) }}" class="absolute top-0 right-0 z-50" onsubmit="return confirm('Hapus foto eviden ini?')">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" title="Hapus foto" class="w-7 h-7 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center text-[10px] font-black shadow-lg border-2 border-white transition active:scale-90">✕</button>
+                                                </form>
+                                            @endif
+
+                                            {{-- CONTAINER FOTO --}}
+                                            <div class="relative rounded-xl overflow-hidden aspect-square group bg-slate-100 transition-all {{ $ev->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-slate-200' }}">
+
+                                                {{-- ID EVIDENCE --}}
+                                                <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-20 backdrop-blur-sm pointer-events-none">
+                                                    ID-{{ $ev->id_pt2_evidence }}
+                                                </div>
+
+                                                {{-- FOTO --}}
+                                                <img src="{{ asset('storage/' . $ev->file_path) }}" alt="Evidence {{ $ev->id_pt2_evidence }}" class="w-full h-full object-cover {{ $ev->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
+
+                                                {{-- KHUSUS REJECTED --}}
+                                                @if($ev->status == 'rejected')
+                                                    {{-- REVIEW NOTE --}}
+                                                    @if(!empty($ev->review_note))
+                                                        <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[8px] p-1 text-center font-bold z-20 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2 pointer-events-none" title="{{ $ev->review_note }}">
+                                                            {{ $ev->review_note }}
+                                                        </div>
+                                                    @endif
+
+                                                    {{-- OVERLAY REPLACE --}}
+                                                    <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_pt2_evidence) }}" enctype="multipart/form-data" class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                        @csrf
+                                                        <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-white text-[9px] font-black">
+                                                            <div class="bg-blue-600 hover:bg-blue-700 px-2.5 py-2 rounded-xl shadow-lg flex flex-col items-center gap-1 transition">
+                                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                                                <span>Replace</span>
+                                                            </div>
+                                                            <input type="file" name="file" class="hidden" accept="image/*" onchange="if (this.files.length > 0) { const button = this.previousElementSibling; if (button) { button.style.display = 'none'; } const loading = document.createElement('span'); loading.className = 'animate-pulse text-white mt-1 text-center leading-tight'; loading.innerText = 'Uploading...'; this.parentElement.appendChild(loading); this.form.submit(); }">
+                                                        </label>
+                                                    </form>
+                                                @endif
+
+                                                {{-- STATUS --}}
+                                                @if($ev->status == 'approved')
+                                                    <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[7px] text-center py-0.5 font-black z-20 pointer-events-none">APPROVED</div>
+                                                @elseif($ev->status == 'pending')
+                                                    <div class="absolute bottom-0 inset-x-0 bg-amber-500 text-white text-[7px] text-center py-0.5 font-black z-20 pointer-events-none">PENDING</div>
+                                                @endif
+
                                             </div>
 
-                                            <img src="{{ asset('storage/' . $ev->file_path) }}" class="w-full h-full object-cover {{ $ev->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
-                                            
-                                            {{-- KHUSUS REJECTED ODP --}}
-                                            @if($ev->status == 'rejected')
-                                                @if(!empty($ev->review_note))
-                                                    <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[8px] p-1 text-center font-bold z-20 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2 pointer-events-none" title="{{ $ev->review_note }}">
-                                                        {{ $ev->review_note }}
-                                                    </div>
-                                                @endif
-                                                <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_pt2_evidence) }}" enctype="multipart/form-data" 
-                                                      class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
-                                                    @csrf
-                                                    <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-white text-[9px] font-black group-hover:opacity-100">
-                                                        <div class="bg-blue-600 px-2 py-1.5 rounded-xl shadow-lg flex flex-col items-center gap-1">
-                                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                                                            Replace
-                                                        </div>
-                                                        <input type="file" name="file" class="hidden" accept="image/*" onchange="
-                                                            if(this.files.length > 0) {
-                                                                this.previousElementSibling.style.display = 'none';
-                                                                let span = document.createElement('span');
-                                                                span.className = 'animate-pulse text-white mt-1 text-center leading-tight';
-                                                                span.innerText = 'Uploading...';
-                                                                this.parentElement.appendChild(span);
-                                                                this.form.submit();
-                                                            }
-                                                        ">
-                                                    </label>
-                                                </form>
-                                            @endif
-
-                                            {{-- BADGE STATUS PENDING ATAU APPROVED --}}
-                                            @if($ev->status == 'approved')
-                                                <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[7px] text-center py-0.5 font-black z-20 pointer-events-none">APPROVED</div>
-                                            @elseif($ev->status == 'pending')
-                                                <div class="absolute bottom-0 inset-x-0 bg-amber-500 text-white text-[7px] text-center py-0.5 font-black z-20 pointer-events-none">PENDING</div>
-                                            @endif
-
-                                            @if($ev->status != 'approved')
-                                                <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_pt2_evidence) }}" class="absolute top-1 right-1 z-20">
-                                                    @csrf @method('DELETE')
-                                                    <button type="button" onclick="this.closest('form').submit();" class="w-5 h-5 bg-black/70 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md transition">✕</button>
-                                                </form>
-                                            @endif
                                         </div>
                                     @endforeach
                                 </div>
@@ -196,59 +200,84 @@
                                     <div id="preview-{{ $key }}" class="grid grid-cols-3 gap-2 mt-2 empty:hidden"></div>
 
                                     {{-- Render Foto Splitter dari Database --}}
-                                    @if($uploaded->count() > 0)
-                                        <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-slate-100">
+                                    @if($uploaded->isNotEmpty())
+                                        <div class="grid grid-cols-3 gap-x-3 gap-y-4 mt-2 pt-2 border-t border-slate-100">
                                             @foreach($uploaded as $ev)
-                                                <div class="relative rounded-lg overflow-hidden border {{ $ev->status == 'rejected' ? 'border-red-500 border-2 shadow-red-200' : 'border-slate-200' }} aspect-square group">
-                                                    
-                                                    <div class="absolute top-1 left-1 bg-black/60 text-white text-[8px] font-black px-1 py-0.5 rounded z-20 backdrop-blur-sm pointer-events-none">
-                                                        ID-{{ $ev->id_pt2_evidence }}
-                                                    </div>
+                                                @php
+                                                    $isRejected = $ev->status === 'rejected';
+                                                    $isApproved = $ev->status === 'approved';
+                                                    $isPending  = $ev->status === 'pending';
+                                                @endphp
 
-                                                    <img src="{{ asset('storage/' . $ev->file_path) }}" class="w-full h-full object-cover {{ $ev->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
-                                                    
-                                                    {{-- KHUSUS REJECTED SPLITTER --}}
-                                                    @if($ev->status == 'rejected')
-                                                        @if(!empty($ev->review_note))
-                                                            <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[8px] p-1 text-center font-bold z-20 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2 pointer-events-none" title="{{ $ev->review_note }}">
-                                                                {{ $ev->review_note }}
+                                                {{-- WRAPPER FOTO --}}
+                                                <div class="relative pt-2 pr-2">
+
+                                                    {{-- DELETE: DI LUAR FOTO --}}
+                                                    @unless($isApproved)
+                                                        <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_pt2_evidence) }}" class="absolute top-0 right-0 z-50" onsubmit="return confirm('Hapus eviden ini?')">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="w-6 h-6 rounded-full bg-red-600 hover:bg-red-700 border-2 border-white text-white text-[10px] font-black flex items-center justify-center shadow-md transition active:scale-90" title="Hapus eviden">✕</button>
+                                                        </form>
+                                                    @endunless
+
+                                                    {{-- CONTAINER FOTO --}}
+                                                    <div class="relative aspect-square rounded-lg overflow-hidden group {{ $isRejected ? 'border-2 border-red-500 ring-2 ring-red-100' : 'border border-slate-200' }}">
+
+                                                        {{-- ID --}}
+                                                        <span class="absolute top-1 left-1 z-20 bg-black/60 text-white text-[8px] font-black px-1 py-0.5 rounded backdrop-blur-sm pointer-events-none">
+                                                            ID-{{ $ev->id_pt2_evidence }}
+                                                        </span>
+
+                                                        {{-- FOTO --}}
+                                                        <img src="{{ asset('storage/' . $ev->file_path) }}" alt="Evidence {{ $ev->id_pt2_evidence }}" class="w-full h-full object-cover {{ $isRejected ? 'opacity-80 grayscale-[20%]' : '' }}">
+
+                                                        {{-- REJECTED --}}
+                                                        @if($isRejected)
+                                                            {{-- NOTE --}}
+                                                            @if(!empty($ev->review_note))
+                                                                <div class="absolute bottom-0 inset-x-0 z-20 bg-red-600/95 text-white text-[8px] p-1 text-center font-bold leading-tight border-t border-red-500 line-clamp-2 backdrop-blur-sm pointer-events-none" title="{{ $ev->review_note }}">
+                                                                    {{ $ev->review_note }}
+                                                                </div>
+                                                            @endif
+
+                                                            {{-- REPLACE --}}
+                                                            <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_pt2_evidence) }}" enctype="multipart/form-data" class="absolute inset-0 z-30 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                @csrf
+                                                                <label class="w-full h-full cursor-pointer flex items-center justify-center text-white text-[8px] font-black">
+                                                                    <span class="replace-label bg-blue-600 hover:bg-blue-700 px-2 py-1.5 rounded-xl shadow-lg flex flex-col items-center gap-1">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                                                            <path d="M3 3v5h5"/>
+                                                                        </svg>
+                                                                        Replace
+                                                                    </span>
+                                                                    <input type="file" name="file" class="hidden" accept="image/*" onchange="
+                                                                                                        if(this.files.length > 0) {
+                                                                                                            this.previousElementSibling.style.display = 'none';
+                                                                                                            let span = document.createElement('span');
+                                                                                                            span.className = 'animate-pulse text-white mt-1 text-center';
+                                                                                                            span.innerText = 'Up...';
+                                                                                                            this.parentElement.appendChild(span);
+                                                                                                            this.form.submit();
+                                                                                                        }
+                                                                                                    ">
+                                                                </label>
+                                                            </form>
+                                                        @endif
+
+                                                        {{-- STATUS --}}
+                                                        @if($isApproved)
+                                                            <div class="absolute bottom-0 inset-x-0 z-20 bg-emerald-600 text-white text-[8px] text-center py-1 font-black pointer-events-none">
+                                                                APPROVED
+                                                            </div>
+                                                        @elseif($isPending)
+                                                            <div class="absolute bottom-0 inset-x-0 z-20 bg-amber-500 text-white text-[8px] text-center py-1 font-black pointer-events-none">
+                                                                PENDING
                                                             </div>
                                                         @endif
-                                                        <form method="POST" action="{{ route('teknisi.pt2.replaceEvidence', $ev->id_pt2_evidence) }}" enctype="multipart/form-data" 
-                                                              class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
-                                                            @csrf
-                                                            <label class="cursor-pointer w-full h-full flex flex-col items-center justify-center text-white text-[8px] font-black group-hover:opacity-100">
-                                                                 <div class="bg-blue-600 px-2 py-1.5 rounded-xl shadow-lg flex flex-col items-center gap-1">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                                                                    Replace
-                                                                </div>
-                                                                <input type="file" name="file" class="hidden" accept="image/*" onchange="
-                                                                    if(this.files.length > 0) {
-                                                                        this.previousElementSibling.style.display = 'none';
-                                                                        let span = document.createElement('span');
-                                                                        span.className = 'animate-pulse text-white mt-1 text-center';
-                                                                        span.innerText = 'Up...';
-                                                                        this.parentElement.appendChild(span);
-                                                                        this.form.submit();
-                                                                    }
-                                                                ">
-                                                            </label>
-                                                        </form>
-                                                    @endif
 
-                                                   {{-- BADGE STATUS PENDING ATAU APPROVED --}}
-                                                    @if($ev->status == 'approved')
-                                                        <div class="absolute bottom-0 inset-x-0 bg-emerald-600 text-white text-[8px] text-center py-1 font-black z-20 pointer-events-none">APPROVED</div>
-                                                    @elseif($ev->status == 'pending')
-                                                        <div class="absolute bottom-0 inset-x-0 bg-amber-500 text-white text-[8px] text-center py-1 font-black z-20 pointer-events-none">PENDING</div>
-                                                    @endif
-                                                    
-                                                    @if($ev->status != 'approved')
-                                                        <form method="POST" action="{{ route('teknisi.pt2.deleteEvidence', $ev->id_pt2_evidence) }}" class="absolute top-1 right-1 z-20">
-                                                            @csrf @method('DELETE')
-                                                            <button type="button" onclick="this.closest('form').submit();" class="w-4 h-4 bg-black/70 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[8px] font-black shadow-md transition">✕</button>
-                                                        </form>
-                                                    @endif
+                                                    </div>
                                                 </div>
                                             @endforeach
                                         </div>
