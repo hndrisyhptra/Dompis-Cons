@@ -629,4 +629,30 @@ Route::get(
     [ImportController::class, 'downloadPidImportErrors']
 )->name('admin.import.pid.errors.download');
 
+/*
+|--------------------------------------------------------------------------
+| ROUTE NEW ARSITEKTUR BOQ
+|--------------------------------------------------------------------------
+*/
+
+Route::get(
+    '/admin/import/boq',
+    [ImportController::class, 'boqIndex']
+)->name('admin.import.boq');
+
+Route::post(
+    '/admin/import/boq',
+    [ImportController::class, 'importBoq']
+)->name('admin.import.boq.upload');
+
+Route::get(
+    '/admin/import/boq/status/{uuid}',
+    [ImportController::class, 'importBoqStatus']
+)->name('admin.import.boq.status');
+
+Route::get(
+    '/admin/import/boq/errors/{uuid}/download',
+    [ImportController::class, 'downloadBoqImportErrors']
+)->name('admin.import.boq.errors.download');
+
 require __DIR__.'/auth.php';

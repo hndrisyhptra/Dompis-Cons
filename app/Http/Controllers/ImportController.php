@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx;
 
 use App\Jobs\ProcessPidImportJob;
+use App\Jobs\ProcessBoqImportJob;
 use App\Models\ImportProcess;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -370,238 +371,238 @@ class ImportController extends Controller
         ]);
     }
 
-public function dataPid(\Illuminate\Http\Request $request)
-{
-    $regions = $this->pidRegions();
-    $dataType = $request->input('type', 'regular');
+    public function dataPid(\Illuminate\Http\Request $request)
+    {
+        $regions = $this->pidRegions();
+        $dataType = $request->input('type', 'regular');
 
-    if (!in_array($dataType, ['regular', 'pt2'], true)) {
-        $dataType = 'regular';
-    }
-
-    $perPage = (int) $request->input('per_page', 10);
-    if (!in_array($perPage, [10, 20, 50], true)) {
-        $perPage = 10;
-    }
-
-    $matrixData = [];
-    $grandTotals = [];
-
-    if ($dataType === 'pt2') {
-        /*
-        |--------------------------------------------------------------------------
-        | PT2 PROJECT QUERY - PROJECT PARENT, LOP CHILD
-        |--------------------------------------------------------------------------
-        */
-        $base = \Illuminate\Support\Facades\DB::table('pt2_projects as p');
-        $this->applyPt2PidFilters($base, $request, $regions);
-
-        $programs = \Illuminate\Support\Facades\DB::table('pt2_projects')
-            ->whereNotNull('program')
-            ->where('program', '!=', '')
-            ->distinct()
-            ->orderBy('program')
-            ->pluck('program');
-
-        $totalPid = (clone $base)->count('p.id_pt2_project');
-
-        $pidMatchBoq = (clone $base)
-            ->whereExists(function ($q) {
-                $q->selectRaw('1')
-                    ->from('pt2_boq_items as b')
-                    ->whereColumn('b.pt2_project_id', 'p.id_pt2_project');
-            })
-            ->count('p.id_pt2_project');
-
-        $projectActive = (clone $base)
-            ->where('p.status_project', 'active')
-            ->count('p.id_pt2_project');
-
-        $projectDrop = (clone $base)
-            ->where('p.status_project', 'drop')
-            ->count('p.id_pt2_project');
-
-        $filteredProjectIds = (clone $base)
-            ->select('p.id_pt2_project');
-
-        $totalLop = \Illuminate\Support\Facades\DB::query()
-            ->fromSub($filteredProjectIds, 'fp')
-            ->join('pt2_lops as l', 'l.pt2_project_id', '=', 'fp.id_pt2_project')
-            ->count();
-
-        $projects = (clone $base)
-            ->select([
-                'p.id_pt2_project as id_project',
-                'p.pid',
-                'p.pid_sap',
-                'p.project_name',
-                'p.program',
-                'p.status_project',
-                'p.status',
-                'p.is_golive',
-                'p.sdi_approval_status',
-                'p.branch as project_branch',
-                'p.sto as project_sto',
-                'p.mitra_name as project_mitra',
-            ])
-            ->selectRaw("'pt2' as source_type")
-            ->orderByDesc('p.id_pt2_project')
-            ->paginate($perPage)
-            ->withQueryString();
-
-        $pageProjectIds = collect($projects->items())
-            ->pluck('id_project')
-            ->filter()
-            ->values();
-
-        $lopGroups = collect();
-
-        if ($pageProjectIds->isNotEmpty()) {
-            $assignmentSub = \Illuminate\Support\Facades\DB::table('pt2_assignments')
-                ->select('pt2_lop_id')
-                ->selectRaw('COUNT(*) as assignment_count')
-                ->groupBy('pt2_lop_id');
-
-            $boqSub = \Illuminate\Support\Facades\DB::table('pt2_boq_items')
-                ->select('pt2_lop_id')
-                ->selectRaw('COUNT(*) as boq_count')
-                ->groupBy('pt2_lop_id');
-
-            $lopGroups = \Illuminate\Support\Facades\DB::table('pt2_lops as l')
-                ->leftJoinSub($assignmentSub, 'a', fn ($join) => $join->on('a.pt2_lop_id', '=', 'l.id_pt2_lop'))
-                ->leftJoinSub($boqSub, 'b', fn ($join) => $join->on('b.pt2_lop_id', '=', 'l.id_pt2_lop'))
-                ->whereIn('l.pt2_project_id', $pageProjectIds)
-                ->orderBy('l.pt2_project_id')
-                ->orderBy('l.id_pt2_lop')
-                ->get([
-                    'l.id_pt2_lop',
-                    'l.pt2_project_id',
-                    'l.id_ihld',
-                    'l.lop_name',
-                    'l.pid_sap',
-                    'l.branch',
-                    'l.sto',
-                    'l.batch',
-                    'l.status_progress',
-                    'l.package_id',
-                    'l.is_golive',
-                    'l.sdi_approval_status',
-                    \Illuminate\Support\Facades\DB::raw('COALESCE(a.assignment_count, 0) as assignment_count'),
-                    \Illuminate\Support\Facades\DB::raw('COALESCE(b.boq_count, 0) as boq_count'),
-                ])
-                ->groupBy('pt2_project_id');
-        }
-    } else {
-        /*
-        |--------------------------------------------------------------------------
-        | REGULAR - 1 PID = 1 LOP
-        |--------------------------------------------------------------------------
-        */
-        $base = \Illuminate\Support\Facades\DB::table('projects as p');
-        $this->applyRegularPidFilters($base, $request, $regions);
-
-        $programs = \Illuminate\Support\Facades\DB::table('projects')
-            ->whereNotNull('program')
-            ->where('program', '!=', '')
-            ->whereRaw("UPPER(TRIM(program)) <> 'PT 2'")
-            ->distinct()
-            ->orderBy('program')
-            ->pluck('program');
-
-        $totalPid = (clone $base)->count('p.id_project');
-
-        $pidMatchBoq = (clone $base)
-            ->whereExists(function ($q) {
-                $q->selectRaw('1')
-                    ->from('boq_items as b')
-                    ->whereColumn('b.project_id', 'p.id_project');
-            })
-            ->count('p.id_project');
-
-        $projectActive = (clone $base)
-            ->where('p.status_project', 'active')
-            ->count('p.id_project');
-
-        $projectDrop = (clone $base)
-            ->where('p.status_project', 'drop')
-            ->count('p.id_project');
-
-        $totalLop = (clone $base)
-            ->whereExists(function ($q) {
-                $q->selectRaw('1')
-                    ->from('lops as l')
-                    ->whereColumn('l.project_id', 'p.id_project');
-            })
-            ->count('p.id_project');
-
-        $projects = (clone $base)
-            ->select([
-                'p.id_project',
-                'p.pid',
-                'p.pid_sap',
-                'p.project_name',
-                'p.program',
-                'p.execution_type',
-                'p.status_project',
-                'p.branch as project_branch',
-                'p.sto as project_sto',
-                'p.mitra_name as project_mitra',
-            ])
-            ->selectRaw("'regular' as source_type")
-            ->orderByDesc('p.id_project')
-            ->paginate($perPage)
-            ->withQueryString();
-
-        $pageProjectIds = collect($projects->items())
-            ->pluck('id_project')
-            ->filter()
-            ->values();
-
-        $lopGroups = collect();
-
-        if ($pageProjectIds->isNotEmpty()) {
-            $lopGroups = \Illuminate\Support\Facades\DB::table('lops')
-                ->whereIn('project_id', $pageProjectIds)
-                ->orderBy('id_lop')
-                ->get([
-                    'id_lop',
-                    'project_id',
-                    'id_ihld',
-                    'lop_name',
-                    'pid_sap',
-                    'program_sap',
-                    'tematik',
-                    'sto',
-                    'branch',
-                    'batch',
-                    'no_sp',
-                    'tgl_sp',
-                    'tgl_toc',
-                    'mitra_name',
-                    'status_progress',
-                ])
-                ->groupBy('project_id');
+        if (!in_array($dataType, ['regular', 'pt2'], true)) {
+            $dataType = 'regular';
         }
 
-        /* Matrix Regular-only. Tidak load Project::all(). */
-        [$matrixData, $grandTotals] = $this->buildRegularPidMatrix($regions, $programs);
-    }
+        $perPage = (int) $request->input('per_page', 10);
+        if (!in_array($perPage, [10, 20, 50], true)) {
+            $perPage = 10;
+        }
 
-    return view('admin.import.data-pid', compact(
-        'dataType',
-        'regions',
-        'programs',
-        'projects',
-        'lopGroups',
-        'totalPid',
-        'totalLop',
-        'pidMatchBoq',
-        'projectActive',
-        'projectDrop',
-        'matrixData',
-        'grandTotals'
-    ));
-}
+        $matrixData = [];
+        $grandTotals = [];
+
+        if ($dataType === 'pt2') {
+            /*
+            |--------------------------------------------------------------------------
+            | PT2 PROJECT QUERY - PROJECT PARENT, LOP CHILD
+            |--------------------------------------------------------------------------
+            */
+            $base = \Illuminate\Support\Facades\DB::table('pt2_projects as p');
+            $this->applyPt2PidFilters($base, $request, $regions);
+
+            $programs = \Illuminate\Support\Facades\DB::table('pt2_projects')
+                ->whereNotNull('program')
+                ->where('program', '!=', '')
+                ->distinct()
+                ->orderBy('program')
+                ->pluck('program');
+
+            $totalPid = (clone $base)->count('p.id_pt2_project');
+
+            $pidMatchBoq = (clone $base)
+                ->whereExists(function ($q) {
+                    $q->selectRaw('1')
+                        ->from('pt2_boq_items as b')
+                        ->whereColumn('b.pt2_project_id', 'p.id_pt2_project');
+                })
+                ->count('p.id_pt2_project');
+
+            $projectActive = (clone $base)
+                ->where('p.status_project', 'active')
+                ->count('p.id_pt2_project');
+
+            $projectDrop = (clone $base)
+                ->where('p.status_project', 'drop')
+                ->count('p.id_pt2_project');
+
+            $filteredProjectIds = (clone $base)
+                ->select('p.id_pt2_project');
+
+            $totalLop = \Illuminate\Support\Facades\DB::query()
+                ->fromSub($filteredProjectIds, 'fp')
+                ->join('pt2_lops as l', 'l.pt2_project_id', '=', 'fp.id_pt2_project')
+                ->count();
+
+            $projects = (clone $base)
+                ->select([
+                    'p.id_pt2_project as id_project',
+                    'p.pid',
+                    'p.pid_sap',
+                    'p.project_name',
+                    'p.program',
+                    'p.status_project',
+                    'p.status',
+                    'p.is_golive',
+                    'p.sdi_approval_status',
+                    'p.branch as project_branch',
+                    'p.sto as project_sto',
+                    'p.mitra_name as project_mitra',
+                ])
+                ->selectRaw("'pt2' as source_type")
+                ->orderByDesc('p.id_pt2_project')
+                ->paginate($perPage)
+                ->withQueryString();
+
+            $pageProjectIds = collect($projects->items())
+                ->pluck('id_project')
+                ->filter()
+                ->values();
+
+            $lopGroups = collect();
+
+            if ($pageProjectIds->isNotEmpty()) {
+                $assignmentSub = \Illuminate\Support\Facades\DB::table('pt2_assignments')
+                    ->select('pt2_lop_id')
+                    ->selectRaw('COUNT(*) as assignment_count')
+                    ->groupBy('pt2_lop_id');
+
+                $boqSub = \Illuminate\Support\Facades\DB::table('pt2_boq_items')
+                    ->select('pt2_lop_id')
+                    ->selectRaw('COUNT(*) as boq_count')
+                    ->groupBy('pt2_lop_id');
+
+                $lopGroups = \Illuminate\Support\Facades\DB::table('pt2_lops as l')
+                    ->leftJoinSub($assignmentSub, 'a', fn ($join) => $join->on('a.pt2_lop_id', '=', 'l.id_pt2_lop'))
+                    ->leftJoinSub($boqSub, 'b', fn ($join) => $join->on('b.pt2_lop_id', '=', 'l.id_pt2_lop'))
+                    ->whereIn('l.pt2_project_id', $pageProjectIds)
+                    ->orderBy('l.pt2_project_id')
+                    ->orderBy('l.id_pt2_lop')
+                    ->get([
+                        'l.id_pt2_lop',
+                        'l.pt2_project_id',
+                        'l.id_ihld',
+                        'l.lop_name',
+                        'l.pid_sap',
+                        'l.branch',
+                        'l.sto',
+                        'l.batch',
+                        'l.status_progress',
+                        'l.package_id',
+                        'l.is_golive',
+                        'l.sdi_approval_status',
+                        \Illuminate\Support\Facades\DB::raw('COALESCE(a.assignment_count, 0) as assignment_count'),
+                        \Illuminate\Support\Facades\DB::raw('COALESCE(b.boq_count, 0) as boq_count'),
+                    ])
+                    ->groupBy('pt2_project_id');
+            }
+        } else {
+            /*
+            |--------------------------------------------------------------------------
+            | REGULAR - 1 PID = 1 LOP
+            |--------------------------------------------------------------------------
+            */
+            $base = \Illuminate\Support\Facades\DB::table('projects as p');
+            $this->applyRegularPidFilters($base, $request, $regions);
+
+            $programs = \Illuminate\Support\Facades\DB::table('projects')
+                ->whereNotNull('program')
+                ->where('program', '!=', '')
+                ->whereRaw("UPPER(TRIM(program)) <> 'PT 2'")
+                ->distinct()
+                ->orderBy('program')
+                ->pluck('program');
+
+            $totalPid = (clone $base)->count('p.id_project');
+
+            $pidMatchBoq = (clone $base)
+                ->whereExists(function ($q) {
+                    $q->selectRaw('1')
+                        ->from('boq_items as b')
+                        ->whereColumn('b.project_id', 'p.id_project');
+                })
+                ->count('p.id_project');
+
+            $projectActive = (clone $base)
+                ->where('p.status_project', 'active')
+                ->count('p.id_project');
+
+            $projectDrop = (clone $base)
+                ->where('p.status_project', 'drop')
+                ->count('p.id_project');
+
+            $totalLop = (clone $base)
+                ->whereExists(function ($q) {
+                    $q->selectRaw('1')
+                        ->from('lops as l')
+                        ->whereColumn('l.project_id', 'p.id_project');
+                })
+                ->count('p.id_project');
+
+            $projects = (clone $base)
+                ->select([
+                    'p.id_project',
+                    'p.pid',
+                    'p.pid_sap',
+                    'p.project_name',
+                    'p.program',
+                    'p.execution_type',
+                    'p.status_project',
+                    'p.branch as project_branch',
+                    'p.sto as project_sto',
+                    'p.mitra_name as project_mitra',
+                ])
+                ->selectRaw("'regular' as source_type")
+                ->orderByDesc('p.id_project')
+                ->paginate($perPage)
+                ->withQueryString();
+
+            $pageProjectIds = collect($projects->items())
+                ->pluck('id_project')
+                ->filter()
+                ->values();
+
+            $lopGroups = collect();
+
+            if ($pageProjectIds->isNotEmpty()) {
+                $lopGroups = \Illuminate\Support\Facades\DB::table('lops')
+                    ->whereIn('project_id', $pageProjectIds)
+                    ->orderBy('id_lop')
+                    ->get([
+                        'id_lop',
+                        'project_id',
+                        'id_ihld',
+                        'lop_name',
+                        'pid_sap',
+                        'program_sap',
+                        'tematik',
+                        'sto',
+                        'branch',
+                        'batch',
+                        'no_sp',
+                        'tgl_sp',
+                        'tgl_toc',
+                        'mitra_name',
+                        'status_progress',
+                    ])
+                    ->groupBy('project_id');
+            }
+
+            /* Matrix Regular-only. Tidak load Project::all(). */
+            [$matrixData, $grandTotals] = $this->buildRegularPidMatrix($regions, $programs);
+        }
+
+        return view('admin.import.data-pid', compact(
+            'dataType',
+            'regions',
+            'programs',
+            'projects',
+            'lopGroups',
+            'totalPid',
+            'totalLop',
+            'pidMatchBoq',
+            'projectActive',
+            'projectDrop',
+            'matrixData',
+            'grandTotals'
+        ));
+    }
 
 public function updatePid(\Illuminate\Http\Request $request, \App\Models\Project $project)
 {
@@ -942,251 +943,487 @@ private function buildRegularPidMatrix(array $regions, $programs): array
 
     public function boqIndex()
     {
-        $customers = Customer::active()->get();
-        $packages = PackageModel::all();
+        $customers = Customer::query()
+            ->active()
+            ->orderBy('customer_name')
+            ->get([
+                'id_customer',
+                'customer_name',
+            ]);
 
-        $lastImport = ImportLog::with('uploader')
-            ->where('type', 'boq')
-            ->latest()
-            ->first();
+        $packages = PackageModel::query()
+            ->orderBy('package_name')
+            ->get([
+                'id_package',
+                'customer_id',
+                'package_code',
+                'package_name',
+            ]);
 
-        $importLogs = ImportLog::with('uploader')
-            ->where('type', 'boq')
-            ->latest()
-            ->skip(1)
-            ->take(2)
+        // 5 upload BOQ terakhir dari semua user.
+        $importProcesses = ImportProcess::query()
+            ->with('uploader')
+            ->where('import_type', ImportProcess::TYPE_BOQ)
+            ->latest('id_import')
+            ->limit(5)
             ->get();
 
-        return view('admin.import.boq', compact(
-            'customers', 
-            'packages', 
-            'importLogs', 
-            'lastImport'
-        ));
+        $lastProcess = $importProcesses->first();
+
+        /*
+        |--------------------------------------------------------------------------
+        | BACKGROUND QUEUE HEALTH
+        |--------------------------------------------------------------------------
+        | Portable untuk queue driver database maupun redis.
+        |--------------------------------------------------------------------------
+        */
+        $queuedCount = ImportProcess::query()
+            ->where('import_type', ImportProcess::TYPE_BOQ)
+            ->where('status', ImportProcess::STATUS_QUEUED)
+            ->count();
+
+        $processingCount = ImportProcess::query()
+            ->where('import_type', ImportProcess::TYPE_BOQ)
+            ->where('status', ImportProcess::STATUS_PROCESSING)
+            ->count();
+
+        $oldestQueued = ImportProcess::query()
+            ->where('import_type', ImportProcess::TYPE_BOQ)
+            ->where('status', ImportProcess::STATUS_QUEUED)
+            ->oldest('created_at')
+            ->first([
+                'id_import',
+                'created_at',
+            ]);
+
+        $queuedTooLong =
+            $oldestQueued?->created_at?->lt(now()->subMinutes(5))
+            ?? false;
+
+        if ($processingCount > 0) {
+            $queueHealth = [
+                'state' => 'processing',
+                'label' => 'Memproses',
+                'description' => 'Background worker sedang memproses import BOQ.',
+            ];
+        } elseif ($queuedCount > 0 && $queuedTooLong) {
+            $queueHealth = [
+                'state' => 'warning',
+                'label' => 'Perlu Dicek',
+                'description' => 'Ada import BOQ menunggu lebih dari 5 menit. Periksa queue worker.',
+            ];
+        } elseif ($queuedCount > 0) {
+            $queueHealth = [
+                'state' => 'waiting',
+                'label' => 'Menunggu',
+                'description' => 'Import BOQ sudah masuk antrean dan menunggu worker.',
+            ];
+        } else {
+            $queueHealth = [
+                'state' => 'normal',
+                'label' => 'Normal',
+                'description' => 'Tidak ada antrean BOQ yang tertahan.',
+            ];
+        }
+
+        $queueHealth['queued_count'] = $queuedCount;
+        $queueHealth['processing_count'] = $processingCount;
+        $queueHealth['driver'] = config('queue.default');
+
+        return view(
+            'admin.import.boq',
+            compact(
+                'customers',
+                'packages',
+                'importProcesses',
+                'lastProcess',
+                'queueHealth',
+            )
+        );
     }
+
 
     public function importBoq(Request $request)
     {
-        ini_set('memory_limit', '1024M');
-        set_time_limit(0);
-        
-        $request->validate([
-            'file' => 'required|mimes:xlsx,xls',
-            'mapping_by' => 'required|in:pid,id_ihld,lop_name',
-            'customer_id' => 'required|exists:customers,id_customer',
-            'package_id' => 'required|exists:packages,id_package',
-            'project_type' => 'required|in:internal,external,pt2' 
+        $validated = $request->validate([
+            'file' => [
+                'required',
+                'file',
+                'mimes:xlsx,xls',
+                'max:102400',
+            ],
+
+            // Mapping PID sengaja tidak dibuka pada UI final.
+            'mapping_by' => [
+                'required',
+                'in:id_ihld,lop_name',
+            ],
+
+            'project_type' => [
+                'required',
+                'in:internal,external,pt2',
+            ],
+
+            'customer_id' => [
+                'nullable',
+                'integer',
+                'exists:customers,id_customer',
+            ],
+
+            'package_id' => [
+                'required',
+                'integer',
+                'exists:packages,id_package',
+            ],
         ]);
 
-        $projectType = $request->project_type;
+        $projectType = $validated['project_type'];
 
-        $file = $request->file('file');
-        $fileName = $file->getClientOriginalName();
+        if (in_array($projectType, ['internal', 'pt2'], true)) {
+            $customerId = 1;
+        } else {
+            $customerId = isset($validated['customer_id'])
+                ? (int) $validated['customer_id']
+                : null;
 
-        $reader = new \PhpOffice\PhpSpreadsheet\Reader\Xlsx();
-        $reader->setReadDataOnly(true);
-        $reader->setReadEmptyCells(false);
+            if (!$customerId || $customerId === 1) {
+                throw ValidationException::withMessages([
+                    'customer_id' => 'Customer Exbis wajib dipilih.',
+                ]);
+            }
+        }
 
-        $spreadsheet = $reader->load($file->getRealPath());
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheetName = strtoupper(trim($sheet->getTitle()));
-
-        $package = PackageModel::where('id_package', $request->package_id)
-            ->where('customer_id', $request->customer_id)
+        $package = PackageModel::query()
+            ->where('id_package', $validated['package_id'])
+            ->where('customer_id', $customerId)
             ->first();
 
         if (!$package) {
-            return back()->with('error', "Package tidak valid atau tidak sesuai dengan Customer yang dipilih.");
+            throw ValidationException::withMessages([
+                'package_id' => 'Package tidak valid atau tidak sesuai dengan customer yang dipilih.',
+            ]);
         }
 
-        $highestRow = $sheet->getHighestRow();
-        $highestColumn = $sheet->getHighestColumn();
-        $highestColumnIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
+        $file = $request->file('file');
+        $originalFileName = $file->getClientOriginalName();
 
-        DB::beginTransaction();
+        $storedPath = null;
+        $import = null;
 
         try {
-            $imported = 0; $updated = 0; $skipped = 0;
-            $unmappedLop = 0; $unmappedDesignator = 0; $priceMissing = 0;
-            $matchedLop = 0; $volumeItems = 0; $existingBoqHeaders = 0;
+            $storedPath = $file->store(
+                'imports/boq',
+                'local'
+            );
 
-            $matchedHeaders = []; $unmatchedHeaders = []; $existingHeaders = []; $invalidRows = [];
+            $currentUserId =
+                auth()->user()->id_user
+                ?? auth()->id();
 
-            for ($col = 2; $col <= $highestColumnIndex; $col++) {
+            $import = ImportProcess::query()->create([
+                'uuid' => (string) Str::uuid(),
 
-                $columnLetter = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col);
-                $headerValue = trim((string) $sheet->getCell($columnLetter . '1')->getValue());
+                'import_type' => ImportProcess::TYPE_BOQ,
+                'project_type' => $projectType,
+                'customer_id' => $customerId,
 
-                if ($headerValue === '') continue;
+                'original_file_name' => $originalFileName,
+                'stored_file_path' => $storedPath,
+                'disk' => 'local',
 
-                if ($projectType === 'pt2') {
-                    switch ($request->mapping_by) {
-                        case 'pid':
-                            $project = Pt2Project::where('pid', $headerValue)->orWhere('pid_sap', $headerValue)->first();
-                            $lop = $project ? Pt2Lop::where('pt2_project_id', $project->id_pt2_project)->first() : null;
-                            break;
-                        case 'id_ihld':
-                            $lop = Pt2Lop::where('id_ihld', $headerValue)->first();
-                            break;
-                        case 'lop_name':
-                            $lop = Pt2Lop::whereRaw('LOWER(TRIM(lop_name)) = ?', [strtolower(trim($headerValue))])->first();
-                            break;
-                        default:
-                            $lop = null;
-                    }
-                } else {
-                    switch ($request->mapping_by) {
-                        case 'pid':
-                            $project = Project::where('pid', $headerValue)->orWhere('pid_sap', $headerValue)->first();
-                            $lop = $project ? Lop::where('project_id', $project->id_project)->first() : null;
-                            break;
-                        case 'id_ihld':
-                            $lop = Lop::where('id_ihld', $headerValue)->first();
-                            break;
-                        case 'lop_name':
-                            $lop = Lop::whereRaw('LOWER(TRIM(lop_name)) = ?', [strtolower(trim($headerValue))])->first();
-                            break;
-                        default:
-                            $lop = null;
-                    }
-                }
+                'status' => ImportProcess::STATUS_QUEUED,
+                'current_stage' => 'Menunggu background worker',
+                'progress' => 0,
 
-                if (!$lop) {
-                    $unmappedLop++;
-                    $unmatchedHeaders[] = $headerValue;
-                    continue;
-                }
+                'total_rows' => 0,
+                'processed_rows' => 0,
+                'valid_rows' => 0,
+                'invalid_rows' => 0,
 
-                if ($projectType !== 'pt2') {
-                    $projectCustomerId = Project::where('id_project', $lop->project_id)->value('customer_id');
-                    if ($projectCustomerId != $request->customer_id) {
-                        $unmappedLop++;
-                        $unmatchedHeaders[] = $headerValue;
-                        continue; 
-                    }
-                }
+                'created_count' => 0,
+                'updated_count' => 0,
+                'unchanged_count' => 0,
+                'skipped_count' => 0,
 
-                $matchedLop++;
-                $matchedHeaders[] = $headerValue;
+                'summary' => [
+                    'options' => [
+                        'mapping_by' => $validated['mapping_by'],
+                        'package_id' => (int) $package->id_package,
+                        'package_code' => $package->package_code,
+                        'package_name' => $package->package_name,
+                    ],
+                ],
 
-                if ($projectType === 'pt2') {
-                    $hasExistingBoq = \App\Models\Pt2BoqItem::where('pt2_lop_id', $lop->id_pt2_lop)->exists();
-                } else {
-                    $hasExistingBoq = BoqItem::where('lop_id', $lop->id_lop)->exists();
-                }
-
-                if ($hasExistingBoq) {
-                    $existingBoqHeaders++;
-                    $existingHeaders[] = $headerValue;
-                }
-
-                if (!$lop->package_id) {
-                    $lop->update(['package_id' => $package->id_package]);
-                }
-
-                for ($row = 2; $row <= $highestRow; $row++) {
-
-                    $baseDesignator = strtoupper(trim((string) $sheet->getCell('A' . $row)->getValue()));
-                    $qty = $sheet->getCell($columnLetter . $row)->getCalculatedValue();
-                    $qty = is_numeric($qty) ? (float) $qty : 0;
-
-                    if ($baseDesignator === '' || $qty <= 0) {
-                        $skipped++;
-                        continue;
-                    }
-
-                    $volumeItems++;
-                    $projectCustomerId = ($projectType === 'pt2') ? 1 : Project::where('id_project', $lop->project_id)->value('customer_id');
-
-                    $designators = Designator::forCustomer($projectCustomerId)
-                        ->where(function ($query) use ($baseDesignator) {
-                            $query->where('pair_code', $baseDesignator)
-                                ->orWhere('designator', $baseDesignator);
-                        })->get();
-
-                    if ($designators->count() == 0) {
-                        $unmappedDesignator++;
-                        continue;
-                    }
-
-                    foreach ($designators as $designator) {
-                        $price = DesignatorPackagePrice::where('designator_id', $designator->id_designator)->where('package_id', $package->id_package)->first();
-                        $unitPrice = $price?->price ?? 0;
-                        if (!$price) $priceMissing++;
-                        $totalPrice = $qty * $unitPrice;
-
-                        if ($projectType === 'pt2') {
-                            $existing = \App\Models\Pt2BoqItem::where('pt2_lop_id', $lop->id_pt2_lop)
-                                ->where(function ($q) use ($designator) {
-                                    $q->where('designator_id', $designator->id_designator)->orWhere('designator', $designator->designator);
-                                })->first();
-
-                            if ($existing) {
-                                $skipped++;
-                                continue;
-                            }
-
-                            \App\Models\Pt2BoqItem::create([
-                                'pt2_project_id' => $lop->pt2_project_id,
-                                'pt2_lop_id' => $lop->id_pt2_lop, // <-- UPDATE PK
-                                'designator_id' => $designator->id_designator,
-                                'designator' => $designator->designator,
-                                'item_name' => $designator->item_name,
-                                'unit' => $designator->unit,
-                                'quantity_plan' => $qty,
-                                'quantity_actual' => 0,
-                                'unit_price' => $unitPrice,
-                                'total_price' => $totalPrice,
-                            ]);
-                        } else {
-                            $existing = BoqItem::where('lop_id', $lop->id_lop)
-                                ->where(function ($q) use ($designator) {
-                                    $q->where('designator_id', $designator->id_designator)->orWhere('designator', $designator->designator);
-                                })->first();
-
-                            if ($existing) {
-                                $skipped++;
-                                continue;
-                            }
-
-                            BoqItem::create([
-                                'project_id' => $lop->project_id,
-                                'lop_id' => $lop->id_lop,
-                                'designator_id' => $designator->id_designator,
-                                'designator' => $designator->designator,
-                                'item_name' => $designator->item_name,
-                                'unit' => $designator->unit,
-                                'quantity_plan' => $qty,
-                                'quantity_actual' => 0,
-                                'unit_price' => $unitPrice,
-                                'total_price' => $totalPrice,
-                            ]);
-                        }
-                        $imported++;
-                    }
-                }
-            }
-
-            DB::commit();
-
-            ImportLog::create([
-                'type' => 'boq',
-                'file_name' => $fileName,
-                'uploaded_by' => auth()->user()->id_user ?? auth()->id(),
-                'total_rows' => max($highestRow - 1, 0),
-                'imported' => $imported,
-                'updated' => $updated,
-                'skipped' => $skipped,
-                'status' => 'success',
+                'error_message' => null,
+                'uploaded_by' => $currentUserId,
             ]);
 
-            return back()->with('success', "Import BOQ selesai. Baru: {$imported}, Skip: {$skipped}, Unmapped LOP: {$unmappedLop}.");
+            ProcessBoqImportJob::dispatch(
+                $import->id_import
+            );
+
+            return redirect()
+                ->route(
+                    'admin.import.boq',
+                    [
+                        'import_uuid' => $import->uuid,
+                    ]
+                )
+                ->with(
+                    'success',
+                    "File {$originalFileName} berhasil diterima dan masuk antrean import BOQ."
+                );
 
         } catch (\Throwable $e) {
-            DB::rollBack();
-            \Log::error($e);
-            return back()->with('error', 'Import BOQ gagal : ' . $e->getMessage());
+            if ($import) {
+                $import->update([
+                    'status' => ImportProcess::STATUS_FAILED,
+                    'current_stage' => 'Gagal menyiapkan background import BOQ',
+                    'error_message' => mb_substr(
+                        $e->getMessage(),
+                        0,
+                        65000
+                    ),
+                    'finished_at' => now(),
+                ]);
+            } elseif ($storedPath) {
+                Storage::disk('local')
+                    ->delete($storedPath);
+            }
+
+            report($e);
+
+            return back()
+                ->withInput()
+                ->with(
+                    'error',
+                    'File gagal masuk antrean import BOQ: '
+                    . $e->getMessage()
+                );
         }
+    }
+
+
+    public function importBoqStatus(string $uuid)
+    {
+        /*
+        |--------------------------------------------------------------------------
+        | AUTHORIZATION
+        |--------------------------------------------------------------------------
+        | History BOQ bersifat global untuk user yang punya akses modul Admin Import.
+        | Karena itu endpoint tidak dibatasi uploaded_by.
+        | Route ini HARUS berada pada middleware/permission Admin Import yang sama.
+        |--------------------------------------------------------------------------
+        */
+        $import = ImportProcess::query()
+            ->with('uploader')
+            ->where('uuid', $uuid)
+            ->where('import_type', ImportProcess::TYPE_BOQ)
+            ->firstOrFail();
+
+        $errors = [];
+
+        if ($import->isFinished()) {
+            $errors = $import->errors()
+                ->orderBy('row_number')
+                ->limit(10)
+                ->get([
+                    'row_number',
+                    'pid_sap',
+                    'id_ihld',
+                    'nama_lop',
+                    'error_code',
+                    'message',
+                    'row_data',
+                ])
+                ->map(function ($error) {
+                    $rowData = is_array($error->row_data)
+                        ? $error->row_data
+                        : [];
+
+                    return [
+                        'row_number' => $error->row_number,
+                        'pid_sap' => $error->pid_sap,
+                        'id_ihld' => $error->id_ihld,
+                        'nama_lop' => $error->nama_lop,
+                        'error_code' => $error->error_code,
+                        'message' => $error->message,
+
+                        // BOQ-specific preview fields.
+                        'type' => $rowData['type'] ?? null,
+                        'header' => $rowData['header'] ?? null,
+                        'designator' => $rowData['designator'] ?? null,
+                        'qty' => $rowData['qty'] ?? null,
+                    ];
+                })
+                ->values();
+        }
+
+        $uploaderName =
+            $import->uploader?->name
+            ?? $import->uploader?->full_name
+            ?? $import->uploader?->username
+            ?? $import->uploader?->email
+            ?? (
+                $import->uploaded_by
+                    ? 'User #' . $import->uploaded_by
+                    : '-'
+            );
+
+        return response()->json([
+            'success' => true,
+
+            'data' => [
+                'uuid' => $import->uuid,
+                'file_name' => $import->original_file_name,
+
+                'import_type' => $import->import_type,
+                'project_type' => $import->project_type,
+                'customer_id' => $import->customer_id,
+
+                'status' => $import->status,
+                'stage' => $import->current_stage,
+                'progress' => min(
+                    100,
+                    max(
+                        0,
+                        (int) $import->progress
+                    )
+                ),
+
+                'total_rows' => (int) $import->total_rows,
+                'processed_rows' => (int) $import->processed_rows,
+                'valid_rows' => (int) $import->valid_rows,
+                'invalid_rows' => (int) $import->invalid_rows,
+
+                'created_count' => (int) $import->created_count,
+                'updated_count' => (int) $import->updated_count,
+                'unchanged_count' => (int) $import->unchanged_count,
+                'skipped_count' => (int) $import->skipped_count,
+
+                'summary' => $import->summary ?? [],
+                'error_message' => $import->error_message,
+
+                'uploaded_by' => $import->uploaded_by,
+
+                'uploader' => [
+                    'id' => $import->uploaded_by,
+                    'name' => $uploaderName,
+                    'email' => $import->uploader?->email,
+                ],
+
+                'started_at' => optional(
+                    $import->started_at
+                )?->format('Y-m-d H:i:s'),
+
+                'finished_at' => optional(
+                    $import->finished_at
+                )?->format('Y-m-d H:i:s'),
+
+                'errors' => $errors,
+
+                'error_download_url' =>
+                    (int) $import->invalid_rows > 0
+                        ? route(
+                            'admin.import.boq.errors.download',
+                            $import->uuid
+                        )
+                        : null,
+            ],
+        ])->header(
+            'Cache-Control',
+            'no-store, no-cache, must-revalidate, max-age=0'
+        );
+    }
+
+
+    public function downloadBoqImportErrors(string $uuid)
+    {
+        $import = ImportProcess::query()
+            ->where('uuid', $uuid)
+            ->where('import_type', ImportProcess::TYPE_BOQ)
+            ->firstOrFail();
+
+        if ((int) $import->invalid_rows <= 0) {
+            abort(
+                404,
+                'Import BOQ ini tidak memiliki data invalid.'
+            );
+        }
+
+        $downloadName =
+            'boq-import-errors-'
+            . $import->uuid
+            . '.csv';
+
+        return response()->streamDownload(
+            function () use ($import) {
+                $handle = fopen(
+                    'php://output',
+                    'w'
+                );
+
+                // UTF-8 BOM agar Excel Windows membaca karakter dengan baik.
+                fwrite(
+                    $handle,
+                    "\xEF\xBB\xBF"
+                );
+
+                fputcsv(
+                    $handle,
+                    [
+                        'Type',
+                        'Header / LOP',
+                        'Row',
+                        'PID SAP',
+                        'ID IHLD',
+                        'Nama LOP',
+                        'Designator',
+                        'Qty',
+                        'Error Code',
+                        'Keterangan',
+                    ]
+                );
+
+                $import->errors()
+                    ->orderBy('row_number')
+                    ->chunkById(
+                        500,
+                        function ($errors) use ($handle) {
+                            foreach ($errors as $error) {
+                                $rowData =
+                                    is_array($error->row_data)
+                                        ? $error->row_data
+                                        : [];
+
+                                fputcsv(
+                                    $handle,
+                                    [
+                                        $rowData['type'] ?? null,
+                                        $rowData['header'] ?? null,
+                                        $error->row_number,
+                                        $error->pid_sap,
+                                        $error->id_ihld,
+                                        $error->nama_lop,
+                                        $rowData['designator'] ?? null,
+                                        $rowData['qty'] ?? null,
+                                        $error->error_code,
+                                        $error->message,
+                                    ]
+                                );
+                            }
+                        },
+                        'id_error'
+                    );
+
+                fclose($handle);
+            },
+            $downloadName,
+            [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            ]
+        );
     }
 
     public function dataBoq(Request $request)

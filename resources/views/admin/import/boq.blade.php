@@ -3,7 +3,135 @@
 @section('content')
 
 @php
-    $result = session('import_result');
+    $activeImportUuid = request('import_uuid');
+
+    $history = $importProcesses ?? collect();
+    $lastHistory = $lastProcess ?? $history->first();
+
+    $getUploaderName = function ($process) {
+        if (!$process) {
+            return '-';
+        }
+
+        return $process->uploader?->name
+            ?? $process->uploader?->full_name
+            ?? $process->uploader?->username
+            ?? $process->uploader?->email
+            ?? (
+                $process->uploaded_by
+                    ? 'User #' . $process->uploaded_by
+                    : '-'
+            );
+    };
+
+    $makeInitials = function ($name) {
+        $parts = preg_split(
+            '/\s+/',
+            trim((string) $name)
+        ) ?: [];
+
+        $parts = array_values(
+            array_filter($parts)
+        );
+
+        if (empty($parts)) {
+            return '?';
+        }
+
+        return collect($parts)
+            ->take(2)
+            ->map(
+                fn ($part) =>
+                    mb_strtoupper(
+                        mb_substr(
+                            $part,
+                            0,
+                            1
+                        )
+                    )
+            )
+            ->implode('');
+    };
+
+    $lastUploaderName =
+        $getUploaderName($lastHistory);
+
+    $lastUploaderInitials =
+        $makeInitials($lastUploaderName);
+
+    $queueHealth = $queueHealth ?? [
+        'state' => 'normal',
+        'label' => 'Normal',
+        'description' => 'Tidak ada antrean BOQ yang tertahan.',
+        'queued_count' => 0,
+        'processing_count' => 0,
+        'driver' => config('queue.default'),
+    ];
+
+    $queueHealthClass =
+        match ($queueHealth['state'] ?? 'normal') {
+            'processing' =>
+                'bg-blue-100 text-blue-700',
+
+            'waiting' =>
+                'bg-amber-100 text-amber-700',
+
+            'warning' =>
+                'bg-red-100 text-red-700',
+
+            default =>
+                'bg-emerald-100 text-emerald-700',
+        };
+
+    $queueDotClass =
+        match ($queueHealth['state'] ?? 'normal') {
+            'processing' =>
+                'bg-blue-500 animate-pulse',
+
+            'waiting' =>
+                'bg-amber-500',
+
+            'warning' =>
+                'bg-red-500',
+
+            default =>
+                'bg-emerald-500',
+        };
+
+    $lastStatus = $lastHistory?->status ?? null;
+
+    [$lastStatusLabel, $lastStatusClass] =
+        match ($lastStatus) {
+            'queued' => [
+                'Menunggu',
+                'bg-amber-100 text-amber-700',
+            ],
+
+            'processing' => [
+                'Diproses',
+                'bg-blue-100 text-blue-700',
+            ],
+
+            'completed' => [
+                'Selesai',
+                'bg-emerald-100 text-emerald-700',
+            ],
+
+            'failed' => [
+                'Gagal',
+                'bg-red-100 text-red-700',
+            ],
+
+            'cancelled' => [
+                'Dibatalkan',
+                'bg-slate-200 text-slate-700',
+            ],
+
+            default => [
+                '-',
+                'bg-slate-100 text-slate-500',
+            ],
+        };
 @endphp
 
 <div class="min-h-screen bg-slate-50 dark:bg-slate-950 -m-4 md:-m-6 p-4 md:p-6">
@@ -12,7 +140,9 @@
 
         {{-- HEADER --}}
         <div class="rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+
                 <div>
                     <p class="text-xs font-black text-blue-700 uppercase tracking-widest">
                         Import Data
@@ -22,126 +152,121 @@
                         Bulk Import BOQ
                     </h1>
 
-                    <p class="text-sm text-slate-500 mt-2 max-w-2xl">
-                        Upload BOQ matrix berdasarkan PID SAP atau Nama LOP untuk mapping item designator bervolume.
+                    <p class="text-sm text-slate-500 mt-2 max-w-3xl">
+                        Import BOQ matrix untuk Regular, Exbis, dan Program PT 2 dengan pemetaan LOP, validasi package, dan proses background.
                     </p>
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-3">
+
                     <a href="{{ route('admin.import.boq.template') }}"
-                    class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700">
-                        <span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download-icon lucide-download">
-                                <path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>
-                            </svg>
-                        </span>
-                        <span>Download Template</span>
+                       class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700">
+                        Download Template
                     </a>
 
                     <a href="{{ route('admin.data-boq') }}"
-                    class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20">
-                        <span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-spreadsheet-icon lucide-file-spreadsheet"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
-                                <path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/>
-                            </svg>
-                        </span>
-                        <span>Data BOQ</span>
+                       class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20">
+                        Data BOQ
                     </a>
+
                 </div>
+
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
 
-                <div class="rounded-3xl bg-white border border-slate-200 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-xs text-slate-500 font-bold uppercase">
-                                Format File
-                            </p>
-                            <p class="text-sm font-black text-slate-900 mt-2">
-                                XLSX / XLS
-                            </p>
-                            <p class="text-xs text-slate-500 mt-1">
-                                Format BOQ matrix
-                            </p>
-                        </div>
+                <div class="rounded-3xl bg-blue-50 border border-blue-100 p-5">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-blue-600">
+                        Format File
+                    </p>
 
-                        <div class="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-2xl">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-symlink-icon lucide-file-symlink"><path d="M4 11V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h7"/>
-                                <path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m10 18 3-3-3-3"/>
-                            </svg>
-                        </div>
-                    </div>
+                    <p class="text-lg font-black text-blue-800 mt-1">
+                        XLSX / XLS
+                    </p>
+
+                    <p class="text-xs text-blue-600 mt-1">
+                        Matrix BOQ, maksimal 100 MB.
+                    </p>
                 </div>
 
-                <div class="rounded-3xl bg-white border border-emerald-200 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-xs text-emerald-700 font-bold uppercase">
-                                Mapping Header
-                            </p>
-                            <p class="text-sm font-black text-emerald-700 mt-2">
-                                PID SAP / LOP
-                            </p>
-                            <p class="text-xs text-slate-500 mt-1">
-                                Kolom B1 dan seterusnya
-                            </p>
-                        </div>
+                <div class="rounded-3xl bg-emerald-50 border border-emerald-100 p-5">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-emerald-600">
+                        Mapping LOP
+                    </p>
 
-                        <div class="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-2xl">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link-icon lucide-link">
-                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                            </svg>
-                        </div>
-                    </div>
+                    <p class="text-lg font-black text-emerald-800 mt-1">
+                        ID IHLD / Nama LOP
+                    </p>
+
+                    <p class="text-xs text-emerald-600 mt-1">
+                        Mapping PID tidak digunakan untuk PT 2.
+                    </p>
                 </div>
 
-                <div class="rounded-3xl bg-white border border-indigo-200 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-xs text-indigo-700 font-bold uppercase">
-                                Sheet Package
-                            </p>
-                            <p class="text-sm font-black text-indigo-700 mt-2">
-                                PAKET 5 / 10
-                            </p>
-                            <p class="text-xs text-slate-500 mt-1">
-                                Nama sheet = package
-                            </p>
-                        </div>
+                <div class="rounded-3xl bg-indigo-50 border border-indigo-100 p-5">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-indigo-600">
+                        Existing BOQ
+                    </p>
 
-                        <div class="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-2xl">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-package-icon lucide-package"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/>
-                                <path d="M12 22V12"/><polyline points="3.29 7 12 12 20.71 7"/><path d="m7.5 4.27 9 5.15"/>
-                            </svg>
-                        </div>
-                    </div>
+                    <p class="text-lg font-black text-indigo-800 mt-1">
+                        Tidak Ditimpa
+                    </p>
+
+                    <p class="text-xs text-indigo-600 mt-1">
+                        Re-import identik dihitung Tidak Berubah.
+                    </p>
                 </div>
 
-                <div class="rounded-3xl bg-white border border-amber-200 p-5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-xs text-amber-700 font-bold uppercase">
+                <a
+                    href="{{ $lastHistory ? route('admin.import.boq', ['import_uuid' => $lastHistory->uuid]) : '#' }}"
+                    class="block rounded-3xl bg-amber-50 border border-amber-100 p-5 {{ $lastHistory ? 'hover:border-amber-300' : 'pointer-events-none' }}"
+                >
+                    <div class="flex items-start justify-between gap-3">
+
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-black uppercase tracking-wider text-amber-600">
                                 Upload Terakhir
                             </p>
-                            <p class="text-sm font-black text-amber-700 mt-2 truncate max-w-[160px]">
-                                {{ $lastImport?->uploader?->name ?? '-' }}
-                            </p>
-                            <p class="text-xs text-slate-500 mt-1">
-                                {{ $lastImport?->created_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? '-' }} WIB
+
+                            <p class="text-sm font-black text-amber-800 mt-1 truncate">
+                                {{ $lastHistory?->original_file_name ?? '-' }}
                             </p>
                         </div>
 
-                        <div class="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center text-2xl">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-clock-icon lucide-clipboard-clock"><path d="M16 14v2.2l1.6 1"/><path d="M16 4h2a2 2 0 0 1 2 2v.832"/>
-                                <path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h2"/><circle cx="16" cy="16" r="6"/><rect x="8" y="2" width="8" height="4" rx="1"/>
-                            </svg>
-                        </div>
+                        <span class="shrink-0 px-2.5 py-1 rounded-full text-[8px] font-black uppercase {{ $lastStatusClass }}">
+                            {{ $lastStatusLabel }}
+                        </span>
+
                     </div>
-                </div>
+
+                    @if($lastHistory)
+                        <div class="flex items-center gap-2 mt-3 min-w-0">
+
+                            <div class="w-7 h-7 shrink-0 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center text-[9px] font-black">
+                                {{ $lastUploaderInitials }}
+                            </div>
+
+                            <div class="min-w-0">
+                                <p class="text-[10px] text-amber-700 truncate">
+                                    {{ $lastUploaderName }}
+                                </p>
+
+                                <p class="text-[9px] text-amber-600 mt-0.5">
+                                    {{ strtoupper($lastHistory->project_type ?? '-') }}
+                                    •
+                                    {{ $lastHistory->created_at?->timezone('Asia/Jakarta')->format('d M Y H:i') ?? '-' }} WIB
+                                </p>
+                            </div>
+
+                        </div>
+                    @endif
+
+                </a>
 
             </div>
+
         </div>
+
 
         {{-- ALERT --}}
         @if(session('success'))
@@ -162,494 +287,865 @@
             </div>
         @endif
 
-        {{-- RESULT --}}
-        @if($result)
-            <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
 
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                    <div>
+        {{-- LIVE BACKGROUND RESULT --}}
+        <div
+            id="importStatusPanel"
+            class="hidden bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm"
+        >
+
+            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+
+                <div class="min-w-0">
+
+                    <div class="flex flex-wrap items-center gap-2">
+
                         <h2 class="text-lg font-black text-slate-900 dark:text-white">
-                            Detail Hasil Import BOQ
+                            Status Import BOQ
                         </h2>
-                        <p class="text-sm text-slate-500">
-                            File: <b>{{ $result['file_name'] ?? '-' }}</b>
-                        </p>
-                        <p class="text-xs text-slate-500 mt-1">
-                            Sheet/Package: <b>{{ $result['sheet_name'] ?? '-' }}</b>
-                        </p>
+
+                        <span
+                            id="importStatusBadge"
+                            class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-[9px] font-black uppercase"
+                        >
+                            -
+                        </span>
+
                     </div>
 
-                    <span class="px-4 py-2 rounded-2xl bg-emerald-50 text-emerald-700 text-xs font-black">
-                        IMPORT COMPLETE
-                    </span>
+                    <p
+                        id="progressFileName"
+                        class="text-sm text-slate-500 mt-1 break-words"
+                    >
+                        -
+                    </p>
+
+                    <p
+                        id="progressUploader"
+                        class="text-[11px] text-slate-400 mt-1"
+                    >
+                        Uploader: -
+                    </p>
+
+                    <p
+                        id="progressStage"
+                        class="text-xs font-bold text-blue-600 mt-2"
+                    >
+                        Menunggu status...
+                    </p>
+
                 </div>
 
-                @if(!empty($result['error_message']))
-                    <div class="rounded-3xl bg-red-50 border border-red-200 p-5 mb-5">
-                        <p class="text-sm font-black text-red-700">
-                            Import gagal
-                        </p>
-                        <p class="text-xs text-red-600 mt-1">
-                            {{ $result['error_message'] }}
-                        </p>
-                    </div>
-                @endif
+                <div class="lg:text-right">
+                    <p
+                        id="progressPercentText"
+                        class="text-3xl font-black text-blue-700"
+                    >
+                        0%
+                    </p>
 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div class="rounded-3xl bg-slate-50 dark:bg-slate-800 p-5">
-                        <p class="text-xs text-slate-500 font-bold">Header BOQ</p>
-                        <p class="text-3xl font-black text-slate-900 dark:text-white mt-1">
-                            {{ $result['total_headers'] ?? 0 }}
-                        </p>
-                    </div>
-
-                    <div class="rounded-3xl bg-emerald-50 p-5">
-                        <p class="text-xs text-emerald-700 font-bold">LOP Match</p>
-                        <p class="text-3xl font-black text-emerald-700 mt-1">
-                            {{ $result['matched_lop'] ?? 0 }}
-                        </p>
-                    </div>
-
-                    <div class="rounded-3xl bg-red-50 p-5">
-                        <p class="text-xs text-red-700 font-bold">LOP Tidak Match</p>
-                        <p class="text-3xl font-black text-red-700 mt-1">
-                            {{ $result['unmapped_lop'] ?? 0 }}
-                        </p>
-                    </div>
-
-                    <div class="rounded-3xl bg-blue-50 p-5">
-                        <p class="text-xs text-blue-700 font-bold">
-                            Data Sudah Ada
-                        </p>
-
-                        <p class="text-3xl font-black text-blue-700 mt-1">
-                            {{ $result['existing_boq_headers'] ?? 0 }}
-                        </p>
-
-                        <p class="text-xs text-blue-600 mt-2">
-                            PID SAP / Nama LOP yang sudah memiliki BOQ
-                        </p>
-                    </div>
+                    <p
+                        id="progressRowText"
+                        class="text-[10px] text-slate-400 font-bold mt-1"
+                    >
+                        0 / 0 row
+                    </p>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                    <div class="rounded-3xl bg-blue-50 p-5">
-                        <p class="text-xs text-blue-700 font-bold">Data Baru</p>
-                        <p class="text-2xl font-black text-blue-700 mt-1">
-                            {{ $result['imported'] ?? 0 }}
-                        </p>
-                    </div>
+            </div>
 
-                    <div class="rounded-3xl bg-amber-50 p-5">
-                        <p class="text-xs text-amber-700 font-bold">Update</p>
-                        <p class="text-2xl font-black text-amber-700 mt-1">
-                            {{ $result['updated'] ?? 0 }}
-                        </p>
-                    </div>
 
-                    <div class="rounded-3xl bg-red-50 p-5">
-                        <p class="text-xs text-red-700 font-bold">Designator Tidak Ketemu</p>
-                        <p class="text-2xl font-black text-red-700 mt-1">
-                            {{ $result['unmapped_designator'] ?? 0 }}
-                        </p>
-                    </div>
+            <div class="mt-5 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
 
-                    <div class="rounded-3xl bg-orange-50 p-5">
-                        <p class="text-xs text-orange-700 font-bold">Harga Kosong</p>
-                        <p class="text-2xl font-black text-orange-700 mt-1">
-                            {{ $result['price_missing'] ?? 0 }}
-                        </p>
-                    </div>
+                <div
+                    id="progressBar"
+                    class="h-full bg-blue-600 rounded-full transition-all duration-500"
+                    style="width: 0%"
+                ></div>
+
+            </div>
+
+
+            {{-- GENERIC COUNTERS --}}
+            <div
+                id="importResultStats"
+                class="hidden grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 mt-5"
+            >
+
+                <div class="rounded-2xl bg-slate-50 dark:bg-slate-950 p-4">
+                    <p class="text-[9px] uppercase font-bold text-slate-400">
+                        Processed Row
+                    </p>
+                    <p id="importProcessed" class="text-2xl font-black text-slate-800 dark:text-white mt-1">
+                        0
+                    </p>
                 </div>
 
-                @if(!empty($result['invalid_rows']))
-                    <div class="mt-6 rounded-[2rem] border border-red-200 bg-red-50 overflow-hidden">
-                        <div class="px-5 py-4 border-b border-red-200">
-                            <h3 class="text-sm font-black text-red-700">
-                                Preview Data Bermasalah
-                            </h3>
-                            <p class="text-xs text-red-600 mt-1">
-                                Menampilkan maksimal 10 data pertama yang gagal validasi/matching.
+                <div class="rounded-2xl bg-emerald-50 p-4">
+                    <p class="text-[9px] uppercase font-bold text-emerald-600">
+                        Valid Volume
+                    </p>
+                    <p id="importValid" class="text-2xl font-black text-emerald-700 mt-1">
+                        0
+                    </p>
+                </div>
+
+                <div class="rounded-2xl bg-red-50 p-4">
+                    <p class="text-[9px] uppercase font-bold text-red-600">
+                        Invalid
+                    </p>
+                    <p id="importInvalid" class="text-2xl font-black text-red-700 mt-1">
+                        0
+                    </p>
+                </div>
+
+                <div class="rounded-2xl bg-blue-50 p-4">
+                    <p class="text-[9px] uppercase font-bold text-blue-600">
+                        BOQ Baru
+                    </p>
+                    <p id="importCreated" class="text-2xl font-black text-blue-700 mt-1">
+                        0
+                    </p>
+                </div>
+
+                <div class="rounded-2xl bg-indigo-50 p-4">
+                    <p class="text-[9px] uppercase font-bold text-indigo-600">
+                        Tidak Berubah
+                    </p>
+                    <p id="importUnchanged" class="text-2xl font-black text-indigo-700 mt-1">
+                        0
+                    </p>
+                </div>
+
+                <div class="rounded-2xl bg-slate-100 p-4">
+                    <p class="text-[9px] uppercase font-bold text-slate-500">
+                        Dilewati
+                    </p>
+                    <p id="importSkipped" class="text-2xl font-black text-slate-700 mt-1">
+                        0
+                    </p>
+                </div>
+
+            </div>
+
+
+            {{-- BOQ SPECIFIC SUMMARY --}}
+            <div
+                id="boqSummaryPanel"
+                class="hidden mt-5 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+            >
+
+                <div class="px-4 py-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
+
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+
+                        <div>
+                            <p class="text-xs font-black text-slate-700 dark:text-slate-200">
+                                Ringkasan BOQ
+                            </p>
+
+                            <p
+                                id="boqPackageInfo"
+                                class="text-[10px] text-slate-400 mt-0.5"
+                            >
+                                -
                             </p>
                         </div>
 
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
-                                <thead class="bg-red-100/70">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Type</th>
-                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Header</th>
-                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Row</th>
-                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Designator</th>
-                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Qty</th>
-                                        <th class="px-4 py-3 text-left text-xs font-black text-red-700 uppercase">Keterangan</th>
-                                    </tr>
-                                </thead>
+                        <p
+                            id="boqSheetInfo"
+                            class="text-[10px] font-bold text-slate-500"
+                        >
+                            Sheet: -
+                        </p>
 
-                                <tbody class="divide-y divide-red-200">
-                                    @foreach($result['invalid_rows'] as $invalid)
-                                        <tr>
-                                            <td class="px-4 py-3 font-bold text-red-700">
-                                                {{ $invalid['type'] ?? '-' }}
-                                            </td>
-                                            <td class="px-4 py-3 text-red-700">
-                                                {{ $invalid['header'] ?? '-' }}
-                                            </td>
-                                            <td class="px-4 py-3 text-red-700">
-                                                {{ $invalid['row'] ?? '-' }}
-                                            </td>
-                                            <td class="px-4 py-3 text-red-700">
-                                                {{ $invalid['designator'] ?? '-' }}
-                                            </td>
-                                            <td class="px-4 py-3 text-red-700">
-                                                {{ $invalid['qty'] ?? '-' }}
-                                            </td>
-                                            <td class="px-4 py-3 font-bold text-red-700">
-                                                {{ $invalid['reason'] ?? '-' }}
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
                     </div>
-                @endif
+
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-px bg-slate-200 dark:bg-slate-800">
+
+                    @foreach([
+                        ['boqTotalHeaders', 'Header BOQ'],
+                        ['boqMatchedLop', 'LOP Match'],
+                        ['boqUnmappedLop', 'LOP Tidak Match'],
+                        ['boqExistingHeaders', 'LOP Ada BOQ'],
+                        ['boqVolumeItems', 'Volume > 0'],
+                        ['boqUnmappedDesignator', 'Designator Error'],
+                        ['boqPriceMissing', 'Harga Kosong'],
+                        ['boqPackageConflict', 'Konflik Package'],
+                    ] as [$id, $label])
+
+                        <div class="bg-white dark:bg-slate-900 p-4">
+                            <p class="text-[9px] uppercase font-bold text-slate-400">
+                                {{ $label }}
+                            </p>
+
+                            <p
+                                id="{{ $id }}"
+                                class="text-xl font-black text-slate-800 dark:text-white mt-1"
+                            >
+                                0
+                            </p>
+                        </div>
+
+                    @endforeach
+
+                </div>
 
             </div>
-        @endif
 
-        {{-- LIVE PROGRESS --}}
-        <div id="progressCard"
-             class="hidden bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
 
-            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-                <div>
-                    <h2 class="text-lg font-black text-slate-900 dark:text-white">
-                        Proses Import BOQ Berjalan
-                    </h2>
-                    <p id="progressFileName" class="text-sm text-slate-500">
-                        Membaca file...
-                    </p>
-                </div>
+            {{-- FATAL ERROR --}}
+            <div
+                id="fatalErrorPanel"
+                class="hidden mt-5 rounded-2xl bg-red-50 border border-red-200 p-4"
+            >
+                <p class="text-xs font-black text-red-700">
+                    Background import gagal
+                </p>
 
-                <div class="text-right">
-                    <p id="progressPercentText" class="text-3xl font-black text-blue-700">0%</p>
-                    <p class="text-xs text-slate-500 font-bold">Processing</p>
-                </div>
+                <p
+                    id="fatalErrorText"
+                    class="text-xs text-red-600 mt-1 break-words"
+                >
+                    -
+                </p>
             </div>
 
-            <div class="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-6">
-                <div id="progressBar"
-                     class="h-full bg-gradient-to-r from-blue-600 to-cyan-500 rounded-full transition-all duration-500"
-                     style="width: 0%">
+
+            {{-- INVALID PREVIEW --}}
+            <div
+                id="importErrorPreview"
+                class="hidden mt-5 rounded-2xl border border-red-200 overflow-hidden"
+            >
+
+                <div class="px-4 py-3 bg-red-50 border-b border-red-200">
+                    <p class="text-xs font-black text-red-700">
+                        Preview Data Bermasalah
+                    </p>
+
+                    <p class="text-[10px] text-red-600 mt-1">
+                        Menampilkan maksimal 10 error pertama. Seluruh error dapat di-download sebagai CSV.
+                    </p>
                 </div>
+
+                <div class="overflow-x-auto">
+
+                    <table class="w-full text-xs">
+
+                        <thead class="bg-red-50/50">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Type</th>
+                                <th class="px-3 py-2 text-left">Header / LOP</th>
+                                <th class="px-3 py-2 text-left">Row</th>
+                                <th class="px-3 py-2 text-left">Designator</th>
+                                <th class="px-3 py-2 text-left">Qty</th>
+                                <th class="px-3 py-2 text-left">Keterangan</th>
+                            </tr>
+                        </thead>
+
+                        <tbody
+                            id="importErrorRows"
+                            class="divide-y divide-red-100"
+                        ></tbody>
+
+                    </table>
+
+                </div>
+
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div id="stepReading" class="rounded-3xl bg-blue-50 border border-blue-100 p-4">
-                    <p class="text-2xl mb-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-notebook-pen-icon lucide-notebook-pen"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/>
-                            <path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/>
-                        </svg>
-                    </p>
-                    <p class="text-sm font-black text-blue-700">Reading File</p>
-                    <p class="text-xs text-blue-600 mt-1">Membaca matrix BOQ</p>
+
+            {{-- COMPLETION SUMMARY --}}
+            <div
+                id="importCompletionSummary"
+                class="hidden mt-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 md:p-5"
+            >
+
+                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+
+                    <div class="flex items-start gap-3 min-w-0">
+
+                        <div
+                            id="completionIcon"
+                            class="w-10 h-10 shrink-0 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black"
+                        >
+                            ✓
+                        </div>
+
+                        <div class="min-w-0">
+
+                            <p
+                                id="completionTitle"
+                                class="text-sm font-black text-slate-900 dark:text-white"
+                            >
+                                Import selesai
+                            </p>
+
+                            <p
+                                id="completionText"
+                                class="text-xs text-slate-500 mt-1 leading-relaxed"
+                            >
+                                -
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 shrink-0">
+
+                        <a
+                            href="{{ route('admin.data-boq') }}"
+                            class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-black transition"
+                        >
+                            Lihat Data BOQ
+                        </a>
+
+                        <a
+                            id="downloadErrorButton"
+                            href="#"
+                            class="hidden inline-flex items-center justify-center px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black transition"
+                        >
+                            Download Error CSV
+                        </a>
+
+                        <a
+                            href="{{ route('admin.import.boq') }}"
+                            class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                        >
+                            Import Baru
+                        </a>
+
+                    </div>
+
                 </div>
 
-                <div id="stepValidating" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                    <p class="text-2xl mb-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-list-checks-icon lucide-list-checks">
-                            <path d="M13 5h8"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/>
-                        </svg>
-                    </p>
-                    <p class="text-sm font-black text-slate-700">Validating BOQ</p>
-                    <p class="text-xs text-slate-500 mt-1">Cek package & volume</p>
-                </div>
-
-                <div id="stepMatching" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                    <p class="text-2xl mb-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link-icon lucide-link">
-                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-                        </svg>
-                    </p>
-                    <p class="text-sm font-black text-slate-700">Matching Data</p>
-                    <p class="text-xs text-slate-500 mt-1">LOP & designator</p>
-                </div>
-
-                <div id="stepComplete" class="rounded-3xl bg-slate-50 border border-slate-100 p-4 opacity-50">
-                    <p class="text-2xl mb-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-big-icon lucide-circle-check-big">
-                            <path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/>
-                        </svg>
-                    </p>
-                    <p class="text-sm font-black text-slate-700">Import Complete</p>
-                    <p class="text-xs text-slate-500 mt-1">Menyiapkan hasil</p>
-                </div>
             </div>
+
         </div>
+
 
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
 
-            {{-- MAIN --}}
-            <div class="xl:col-span-8 space-y-6">
+            {{-- MAIN UPLOAD --}}
+            <div class="xl:col-span-8">
 
-                {{-- UPLOAD --}}
                 <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
 
-                    <div class="flex items-start gap-4 mb-6">
-                        <div class="w-14 h-14 rounded-3xl bg-blue-50 text-blue-700 flex items-center justify-center text-2xl">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cloud-upload-icon lucide-cloud-upload">
-                                <path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>
-                            </svg>
-                        </div>
+                    <h2 class="text-lg font-black text-slate-900 dark:text-white">
+                        Upload File BOQ
+                    </h2>
 
-                        <div>
-                            <h2 class="text-lg font-black text-slate-900 dark:text-white">
-                                Upload File BOQ
-                            </h2>
-                            <p class="text-sm text-slate-500">
-                                A1 = Designator, B1 dst = PID SAP / Nama LOP, A2 dst = Designator, isi cell = volume.
-                            </p>
-                        </div>
-                    </div>
+                    <p class="text-sm text-slate-500 mt-1">
+                        Kolom A berisi designator. Kolom B dan seterusnya mewakili LOP. Hanya cell volume &gt; 0 yang diproses.
+                    </p>
 
-                    <form id="importForm"
-                          action="{{ route('admin.import.boq.upload') }}"
-                          method="POST"
-                          enctype="multipart/form-data"
-                          class="space-y-5">
+
+                    <form
+                        id="importForm"
+                        action="{{ route('admin.import.boq.upload') }}"
+                        method="POST"
+                        enctype="multipart/form-data"
+                        class="space-y-5 mt-6"
+                    >
 
                         @csrf
 
-                        <label for="file"
-                               class="group relative flex flex-col items-center justify-center min-h-[240px] rounded-[2rem] border-2 border-dashed border-blue-200 dark:border-slate-700 bg-blue-50/50 dark:bg-slate-950 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer transition">
-
-                            
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cloud-upload-icon lucide-cloud-upload">
-                                    <path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>
-                                </svg>
-                            
+                        <label
+                            for="file"
+                            class="flex flex-col items-center justify-center min-h-[210px] rounded-[2rem] border-2 border-dashed border-blue-200 dark:border-slate-700 bg-blue-50/50 dark:bg-slate-950 cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-800 transition"
+                        >
 
                             <p class="text-base font-black text-slate-900 dark:text-white">
                                 Klik untuk pilih file BOQ
                             </p>
 
-                            <p id="fileName" class="text-sm text-slate-500 mt-1">
+                            <p
+                                id="fileName"
+                                class="text-sm text-slate-500 mt-1"
+                            >
                                 Belum ada file dipilih
+                            </p>
+
+                            <p
+                                id="fileMeta"
+                                class="text-[11px] text-slate-400 mt-1"
+                            >
+                                Maksimal 100 MB
                             </p>
 
                             <p class="text-xs text-slate-400 mt-3">
                                 Support: .xlsx, .xls
                             </p>
 
-                            <input id="file"
-                                   type="file"
-                                   name="file"
-                                   accept=".xlsx,.xls"
-                                   required
-                                   class="hidden"
-                                   onchange="showSelectedFile(this)">
+                            <input
+                                id="file"
+                                type="file"
+                                name="file"
+                                accept=".xlsx,.xls"
+                                required
+                                class="hidden"
+                                onchange="showSelectedFile(this)"
+                            >
+
                         </label>
 
-                       <!-- KATEGORI PROJECT (TOGGLE) -->
-                        <div class="mb-4">
-                            <label class="block text-xs font-black text-slate-500 uppercase mb-2">
-                                Kategori Project <span class="text-red-500">*</span>
-                            </label>
-                            
-                            <div class="flex items-center gap-6 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950">
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="project_type" value="internal" checked onchange="toggleCustomerType()" 
-                                           class="w-4 h-4 text-blue-600 focus:ring-blue-500 border-slate-300">
-                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">TIF</span>
-                                </label>
 
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="project_type" value="external" onchange="toggleCustomerType()" 
-                                           class="w-4 h-4 text-amber-500 focus:ring-amber-500 border-slate-300">
-                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Eksternal Bisnis (Exbis)</span>
-                                </label>
-
-                                {{-- TAMBAHAN: RADIO BUTTON PT 2 --}}
-                                <label class="flex items-center gap-2 cursor-pointer">
-                                    <input type="radio" name="project_type" value="pt2" onchange="toggleCustomerType()" 
-                                           class="w-4 h-4 text-emerald-600 focus:ring-emerald-500 border-slate-300">
-                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Program PT 2</span>
-                                </label>
-                            </div>
-                        </div>
-
-                        <!-- HIDDEN INPUT: Ini yang akan dibaca oleh Controller -->
-                        <input type="hidden" name="customer_id" id="final_customer_id" value="1">
-
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <!-- DROPDOWN EXTERNAL (Hidden by Default) -->
-                            <div id="wrapper_customer_exbis" class="hidden">
-                                <label class="block text-xs font-black text-slate-500 uppercase mb-2">
-                                    Pilih Customer Exbis <span class="text-red-500">*</span>
-                                </label>
-                                <select id="select_customer_exbis" onchange="updateCustomerAndPackages()"
-                                        class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm focus:ring-2 focus:ring-blue-500">
-                                    <option value="">-- Pilih Customer --</option>
-                                    {{-- Hanya tampilkan customer selain TIF (ID 1) --}}
-                                    @foreach(\App\Models\Customer::where('id_customer', '!=', 1)->active()->get() as $c)
-                                        <option value="{{ $c->id_customer }}">{{ $c->customer_name }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-
-                            <!-- DROPDOWN PACKAGE -->
-                            <div id="wrapper_package" class="md:col-span-2 transition-all"> 
-                                <label class="block text-xs font-black text-slate-500 uppercase mb-2">
-                                    Pilih Package <span class="text-red-500">*</span>
-                                </label>
-                                <select name="package_id" id="package_id" required
-                                        class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm disabled:opacity-50">
-                                    <option value="">-- Pilih Package --</option>
-                                </select>
-                            </div>
-                        </div>
-
+                        {{-- PROJECT TYPE --}}
                         <div>
+
+                            <label class="block text-xs font-black text-slate-500 uppercase mb-2">
+                                Kategori Project
+                                <span class="text-red-500">*</span>
+                            </label>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+                                <label class="flex items-center gap-2 p-3 rounded-2xl border border-slate-200 bg-slate-50 dark:bg-slate-950 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="project_type"
+                                        value="internal"
+                                        checked
+                                        onchange="toggleCustomerType()"
+                                    >
+                                    <span class="text-sm font-bold">
+                                        TIF / Regular
+                                    </span>
+                                </label>
+
+                                <label class="flex items-center gap-2 p-3 rounded-2xl border border-amber-200 bg-amber-50 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="project_type"
+                                        value="external"
+                                        onchange="toggleCustomerType()"
+                                    >
+                                    <span class="text-sm font-bold text-amber-700">
+                                        Exbis
+                                    </span>
+                                </label>
+
+                                <label class="flex items-center gap-2 p-3 rounded-2xl border border-emerald-200 bg-emerald-50 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="project_type"
+                                        value="pt2"
+                                        onchange="toggleCustomerType()"
+                                    >
+                                    <span class="text-sm font-bold text-emerald-700">
+                                        Program PT 2
+                                    </span>
+                                </label>
+
+                            </div>
+
+                        </div>
+
+
+                        <input
+                            type="hidden"
+                            name="customer_id"
+                            id="final_customer_id"
+                            value="1"
+                        >
+
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                            {{-- CUSTOMER EXBIS --}}
+                            <div
+                                id="wrapper_customer_exbis"
+                                class="hidden"
+                            >
+
+                                <label class="block text-xs font-black text-slate-500 uppercase mb-2">
+                                    Customer Exbis
+                                    <span class="text-red-500">*</span>
+                                </label>
+
+                                <select
+                                    id="select_customer_exbis"
+                                    onchange="updateCustomerAndPackages()"
+                                    class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm"
+                                >
+                                    <option value="">
+                                        -- Pilih Customer --
+                                    </option>
+
+                                    @foreach($customers as $customer)
+                                        @if((int) $customer->id_customer !== 1)
+                                            <option value="{{ $customer->id_customer }}">
+                                                {{ $customer->customer_name }}
+                                            </option>
+                                        @endif
+                                    @endforeach
+
+                                </select>
+
+                            </div>
+
+
+                            {{-- PACKAGE --}}
+                            <div
+                                id="wrapper_package"
+                                class="md:col-span-2"
+                            >
+
+                                <label class="block text-xs font-black text-slate-500 uppercase mb-2">
+                                    Package
+                                    <span class="text-red-500">*</span>
+                                </label>
+
+                                <select
+                                    name="package_id"
+                                    id="package_id"
+                                    required
+                                    class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm disabled:opacity-50"
+                                >
+                                    <option value="">
+                                        -- Pilih Package --
+                                    </option>
+                                </select>
+
+                            </div>
+
+                        </div>
+
+
+                        {{-- MAPPING --}}
+                        <div>
+
                             <label class="block text-xs font-black text-slate-500 uppercase mb-2">
                                 Mapping Header BOQ
+                                <span class="text-red-500">*</span>
                             </label>
-                            <select name="mapping_by" required
-                                    class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm">
-                                <!-- <option value="pid">By PID SAP</option> -->
-                                <option value="id_ihld">By ID IHLD</option>
-                                <option value="lop_name">By Nama LOP</option>
+
+                            <select
+                                name="mapping_by"
+                                required
+                                class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm"
+                            >
+                                <option value="id_ihld">
+                                    By ID IHLD
+                                </option>
+
+                                <option value="lop_name">
+                                    By Nama LOP
+                                </option>
                             </select>
+
+                            <p class="text-[10px] text-slate-400 mt-2">
+                                ID IHLD lebih direkomendasikan karena lebih unik daripada Nama LOP.
+                            </p>
+
                         </div>
 
-                        <div class="flex flex-col sm:flex-row gap-3">
-                            <button id="uploadButton" type="submit"
-                                    class="flex-1 inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-lg shadow-blue-700/20">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-rocket-icon lucide-rocket"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></svg>
-                                <span>Start Upload</span>
-                            </button>
 
-                            <button type="button" onclick="downloadTemplateWithParams()"
-                                   class="flex-1 inline-flex items-center justify-center gap-2 h-12 px-6 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download-icon lucide-download"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
-                                <span>Download Template</span>
-                            </button>
+                        <div
+                            id="pt2Info"
+                            class="hidden rounded-2xl bg-emerald-50 border border-emerald-200 p-4"
+                        >
+                            <p class="text-xs font-black text-emerald-700 uppercase">
+                                Aturan PT 2
+                            </p>
+
+                            <div class="text-xs text-emerald-700 mt-2 space-y-1 leading-relaxed">
+                                <p>• BOQ ditempel pada level PT2 LOP.</p>
+                                <p>• Satu PID dapat memiliki banyak LOP, sehingga mapping PID tidak digunakan.</p>
+                                <p>• Existing BOQ tidak ditimpa saat re-import.</p>
+                            </div>
                         </div>
+
+
+                        <button
+                            id="uploadButton"
+                            type="submit"
+                            class="w-full sm:w-auto h-12 px-7 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-lg shadow-blue-700/20"
+                        >
+                            Start Upload
+                        </button>
+
                     </form>
+
+
+                    <div
+                        id="uploadingInfo"
+                        class="hidden mt-5 rounded-2xl bg-blue-50 border border-blue-100 p-4 text-sm font-bold text-blue-700"
+                    >
+                        File sedang dikirim ke server. Setelah upload selesai, proses BOQ dilanjutkan oleh background worker.
+                    </div>
+
                 </div>
 
             </div>
 
+
             {{-- SIDEBAR --}}
             <div class="xl:col-span-4 space-y-5">
 
+                {{-- QUEUE HEALTH --}}
                 <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+
+                    <div class="flex items-start justify-between gap-3">
+
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                                System Status
+                            </p>
+
+                            <h2 class="text-sm font-black text-slate-900 dark:text-white mt-0.5">
+                                Background Queue
+                            </h2>
+                        </div>
+
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase {{ $queueHealthClass }}">
+                            <span class="w-1.5 h-1.5 rounded-full {{ $queueDotClass }}"></span>
+                            {{ $queueHealth['label'] ?? 'Normal' }}
+                        </span>
+
+                    </div>
+
+                    <p class="text-[11px] text-slate-500 mt-3 leading-relaxed">
+                        {{ $queueHealth['description'] ?? '-' }}
+                    </p>
+
+                    <div class="grid grid-cols-3 gap-2 mt-4">
+
+                        <div class="rounded-xl bg-slate-50 dark:bg-slate-950 p-2.5">
+                            <p class="text-[9px] uppercase font-bold text-slate-400">
+                                Menunggu
+                            </p>
+
+                            <p class="text-lg font-black text-amber-600 mt-0.5">
+                                {{ number_format($queueHealth['queued_count'] ?? 0) }}
+                            </p>
+                        </div>
+
+                        <div class="rounded-xl bg-slate-50 dark:bg-slate-950 p-2.5">
+                            <p class="text-[9px] uppercase font-bold text-slate-400">
+                                Diproses
+                            </p>
+
+                            <p class="text-lg font-black text-blue-600 mt-0.5">
+                                {{ number_format($queueHealth['processing_count'] ?? 0) }}
+                            </p>
+                        </div>
+
+                        <div class="rounded-xl bg-slate-50 dark:bg-slate-950 p-2.5">
+                            <p class="text-[9px] uppercase font-bold text-slate-400">
+                                Driver
+                            </p>
+
+                            <p class="text-[11px] font-black text-slate-700 dark:text-slate-200 mt-1.5 uppercase truncate">
+                                {{ $queueHealth['driver'] ?? '-' }}
+                            </p>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                {{-- RULES --}}
+                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+
                     <h2 class="text-sm font-black text-slate-900 dark:text-white">
                         Aturan BOQ
                     </h2>
 
                     <div class="mt-4 space-y-3">
-                        <div class="rounded-3xl bg-emerald-50 border border-emerald-100 p-4">
-                            <p class="text-sm font-black text-emerald-700">Sheet = Package</p>
-                            <p class="text-xs text-emerald-600 mt-1">Contoh: PAKET 5 harus ada di master package.</p>
+
+                        <div class="rounded-2xl bg-blue-50 border border-blue-100 p-4">
+                            <p class="text-xs font-black text-blue-700">
+                                Header LOP
+                            </p>
+
+                            <p class="text-[11px] text-blue-600 mt-1">
+                                Kolom B dan seterusnya di-map menggunakan ID IHLD atau Nama LOP.
+                            </p>
                         </div>
 
-                        <div class="rounded-3xl bg-blue-50 border border-blue-100 p-4">
-                            <p class="text-sm font-black text-blue-700">Header Kolom</p>
-                            <p class="text-xs text-blue-600 mt-1">B1 dst berisi PID SAP atau Nama LOP.</p>
+                        <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+                            <p class="text-xs font-black text-emerald-700">
+                                Existing BOQ Aman
+                            </p>
+
+                            <p class="text-[11px] text-emerald-600 mt-1">
+                                Item yang sudah ada tidak mengubah quantity actual atau data operasional.
+                            </p>
                         </div>
 
-                        <div class="rounded-3xl bg-amber-50 border border-amber-100 p-4">
-                            <p class="text-sm font-black text-amber-700">Volume &gt; 0</p>
-                            <p class="text-xs text-amber-600 mt-1">Hanya item designator bervolume yang diimport.</p>
+                        <div class="rounded-2xl bg-amber-50 border border-amber-100 p-4">
+                            <p class="text-xs font-black text-amber-700">
+                                Package Conflict
+                            </p>
+
+                            <p class="text-[11px] text-amber-600 mt-1">
+                                LOP yang sudah memakai package berbeda akan dianggap invalid dan tidak dioverwrite.
+                            </p>
                         </div>
+
                     </div>
+
                 </div>
 
+
+                {{-- HISTORY --}}
                 <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-                    <h2 class="text-sm font-black text-slate-900 dark:text-white">
-                        Upload Terakhir
-                    </h2>
 
-                    <div class="mt-4 rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
-                        <p class="text-xs text-slate-500 font-bold">Nama File</p>
-                        <p class="text-sm font-black text-slate-900 dark:text-white mt-1 break-words">
-                            {{ $lastImport?->file_name ?? '-' }}
-                        </p>
+                    <div class="flex items-center justify-between gap-3">
 
-                        <div class="grid grid-cols-2 gap-3 mt-4">
-                            <div>
-                                <p class="text-xs text-slate-500 font-bold">Uploader</p>
-                                <p class="text-sm font-black text-slate-900 dark:text-white">
-                                    {{ $lastImport?->uploader?->name ?? '-' }}
-                                </p>
-                            </div>
+                        <div>
+                            <h2 class="text-sm font-black text-slate-900 dark:text-white">
+                                History Upload
+                            </h2>
 
-                            <div>
-                                <p class="text-xs text-slate-500 font-bold">Waktu</p>
-                                <p class="text-sm font-black text-slate-900 dark:text-white">
-                                    {{ $lastImport?->created_at?->timezone('Asia/Jakarta')->format('H:i') ?? '-' }} WIB
-                                </p>
-                            </div>
+                            <p class="text-[10px] text-slate-400 mt-0.5">
+                                5 import BOQ terakhir dari semua user.
+                            </p>
                         </div>
 
-                        <p class="text-xs text-slate-500 mt-3">
-                            {{ $lastImport?->created_at?->timezone('Asia/Jakarta')->format('d M Y') ?? '-' }}
-                        </p>
+                        <span class="px-2 py-1 rounded-full bg-slate-100 text-slate-500 text-[9px] font-black">
+                            {{ $history->count() }}/5
+                        </span>
+
                     </div>
-                </div>
 
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-                    <h2 class="text-sm font-black text-slate-900 dark:text-white">
-                        History Upload
-                    </h2>
 
-                    <div class="mt-4 space-y-3">
-                        @forelse($importLogs as $log)
-                            <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-4">
-                                <div class="flex items-center justify-between gap-3">
-                                    <p class="text-xs font-black text-slate-900 dark:text-white truncate">
-                                        {{ $log->file_name ?? '-' }}
-                                    </p>
+                    <div class="mt-4 space-y-2 max-h-[300px] overflow-y-auto pr-1">
 
-                                    <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-black">
-                                        {{ strtoupper($log->status ?? 'success') }}
+                        @forelse($history as $log)
+
+                            @php
+                                $historyUploaderName =
+                                    $getUploaderName($log);
+
+                                $historyUploaderInitials =
+                                    $makeInitials(
+                                        $historyUploaderName
+                                    );
+
+                                [$historyLabel, $historyBadge] =
+                                    match ($log->status) {
+                                        'queued' => [
+                                            'Menunggu',
+                                            'bg-amber-100 text-amber-700',
+                                        ],
+
+                                        'processing' => [
+                                            'Diproses',
+                                            'bg-blue-100 text-blue-700',
+                                        ],
+
+                                        'completed' => [
+                                            'Selesai',
+                                            'bg-emerald-100 text-emerald-700',
+                                        ],
+
+                                        'failed' => [
+                                            'Gagal',
+                                            'bg-red-100 text-red-700',
+                                        ],
+
+                                        'cancelled' => [
+                                            'Batal',
+                                            'bg-slate-200 text-slate-700',
+                                        ],
+
+                                        default => [
+                                            strtoupper(
+                                                $log->status ?? '-'
+                                            ),
+                                            'bg-slate-100 text-slate-500',
+                                        ],
+                                    };
+                            @endphp
+
+
+                            <a
+                                href="{{ route('admin.import.boq', ['import_uuid' => $log->uuid]) }}"
+                                class="block rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-3 hover:border-blue-200 transition"
+                            >
+
+                                <div class="flex items-start justify-between gap-2">
+
+                                    <div class="flex items-start gap-2.5 min-w-0">
+
+                                        <div class="w-7 h-7 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center text-[9px] font-black">
+                                            {{ $historyUploaderInitials }}
+                                        </div>
+
+                                        <div class="min-w-0">
+
+                                            <p class="text-[11px] font-black text-slate-800 dark:text-slate-100 truncate">
+                                                {{ $log->original_file_name ?? '-' }}
+                                            </p>
+
+                                            <p class="text-[9px] text-slate-400 mt-0.5 truncate">
+                                                <span class="font-bold text-slate-500">
+                                                    {{ $historyUploaderName }}
+                                                </span>
+                                                •
+                                                {{ strtoupper($log->project_type ?? '-') }}
+                                                •
+                                                {{ $log->created_at?->timezone('Asia/Jakarta')->format('d M H:i') ?? '-' }} WIB
+                                            </p>
+
+                                        </div>
+
+                                    </div>
+
+                                    <span class="shrink-0 px-2 py-1 rounded-full text-[8px] font-black uppercase {{ $historyBadge }}">
+                                        {{ $historyLabel }}
                                     </span>
+
                                 </div>
 
-                                <p class="text-xs text-slate-500 mt-2">
-                                    Upload oleh <b>{{ $log->uploader?->name ?? '-' }}</b>
-                                </p>
 
-                                <p class="text-xs text-slate-500">
-                                    {{ $log->created_at?->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB
-                                </p>
+                                <div class="flex flex-wrap gap-x-3 gap-y-1 mt-2 ml-9 text-[9px] text-slate-400">
 
-                                <div class="grid grid-cols-3 gap-2 mt-3 text-center">
-                                    <div class="rounded-2xl bg-white dark:bg-slate-900 p-2">
-                                        <p class="text-[10px] text-slate-500">Import</p>
-                                        <p class="font-black text-blue-600">{{ $log->imported }}</p>
-                                    </div>
+                                    <span>
+                                        <b class="text-blue-600">
+                                            {{ number_format($log->created_count ?? 0) }}
+                                        </b>
+                                        baru
+                                    </span>
 
-                                    <div class="rounded-2xl bg-white dark:bg-slate-900 p-2">
-                                        <p class="text-[10px] text-slate-500">Update</p>
-                                        <p class="font-black text-amber-600">{{ $log->updated }}</p>
-                                    </div>
+                                    <span>
+                                        <b class="text-indigo-600">
+                                            {{ number_format($log->unchanged_count ?? 0) }}
+                                        </b>
+                                        tetap
+                                    </span>
 
-                                    <div class="rounded-2xl bg-white dark:bg-slate-900 p-2">
-                                        <p class="text-[10px] text-slate-500">Skip</p>
-                                        <p class="font-black text-red-600">{{ $log->skipped }}</p>
-                                    </div>
+                                    @if((int) ($log->invalid_rows ?? 0) > 0)
+                                        <span>
+                                            <b class="text-red-600">
+                                                {{ number_format($log->invalid_rows) }}
+                                            </b>
+                                            invalid
+                                        </span>
+                                    @endif
+
                                 </div>
-                            </div>
+
+                            </a>
+
                         @empty
-                            <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 p-5 text-center">
+
+                            <div class="rounded-2xl bg-slate-50 dark:bg-slate-950 p-5 text-center">
                                 <p class="text-sm text-slate-500">
-                                    Belum ada history upload.
+                                    Belum ada history import BOQ.
                                 </p>
                             </div>
+
                         @endforelse
+
                     </div>
+
                 </div>
 
             </div>
@@ -657,159 +1153,952 @@
         </div>
 
     </div>
+
 </div>
 
-<script>
-    function showSelectedFile(input) {
-        const fileName = document.getElementById('fileName');
 
-        if (input.files && input.files[0]) {
-            fileName.innerText = input.files[0].name;
-        } else {
-            fileName.innerText = 'Belum ada file dipilih';
-        }
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    const allPackages = @json($packages);
+
+    const activeImportUuid = @js($activeImportUuid);
+
+    const statusUrl = @js(
+        $activeImportUuid
+            ? route(
+                'admin.import.boq.status',
+                $activeImportUuid
+            )
+            : null
+    );
+
+
+    function escapeHtml(value) {
+        const div = document.createElement('div');
+
+        div.textContent = String(
+            value ?? ''
+        );
+
+        return div.innerHTML;
     }
 
-    const importForm = document.getElementById('importForm');
 
-    importForm.addEventListener('submit', function () {
-        const fileInput = document.getElementById('file');
+    function formatNumber(value) {
+        return new Intl.NumberFormat(
+            'id-ID'
+        ).format(
+            Number(value || 0)
+        );
+    }
 
-        if (!fileInput.files.length) {
+
+    window.showSelectedFile = function (input) {
+
+        const fileName =
+            document.getElementById('fileName');
+
+        const fileMeta =
+            document.getElementById('fileMeta');
+
+        const file =
+            input.files?.[0];
+
+        if (!fileName) {
             return;
         }
 
-        document.getElementById('progressCard').classList.remove('hidden');
-        document.getElementById('progressFileName').innerText = fileInput.files[0].name;
+        if (!file) {
+            fileName.innerText =
+                'Belum ada file dipilih';
 
-        document.getElementById('uploadButton').disabled = true;
-        document.getElementById('uploadButton').classList.add('opacity-60', 'cursor-not-allowed');
-        document.getElementById('uploadButton').innerHTML = '<span>⏳</span><span>Uploading...</span>';
-
-        runImportProgress();
-    });
-
-    function setProgress(percent, activeStepId) {
-        document.getElementById('progressBar').style.width = percent + '%';
-        document.getElementById('progressPercentText').innerText = percent + '%';
-
-        const steps = [
-            'stepReading',
-            'stepValidating',
-            'stepMatching',
-            'stepComplete'
-        ];
-
-        steps.forEach(function (id) {
-            const el = document.getElementById(id);
-            el.classList.add('opacity-50', 'bg-slate-50', 'border-slate-100');
-            el.classList.remove('bg-blue-50', 'border-blue-100', 'bg-emerald-50', 'border-emerald-100');
-        });
-
-        const active = document.getElementById(activeStepId);
-
-        if (activeStepId === 'stepComplete') {
-            active.classList.remove('opacity-50', 'bg-slate-50', 'border-slate-100');
-            active.classList.add('bg-emerald-50', 'border-emerald-100');
-        } else {
-            active.classList.remove('opacity-50', 'bg-slate-50', 'border-slate-100');
-            active.classList.add('bg-blue-50', 'border-blue-100');
-        }
-    }
-
-    function runImportProgress() {
-        setTimeout(() => setProgress(20, 'stepReading'), 200);
-        setTimeout(() => setProgress(45, 'stepValidating'), 900);
-        setTimeout(() => setProgress(70, 'stepMatching'), 1600);
-        setTimeout(() => setProgress(95, 'stepComplete'), 2300);
-    }
-</script>
-<script>
-    // PERBAIKAN: Memanggil data langsung dari Model agar tidak bergantung pada Controller
-    const allPackages = @json(\App\Models\Package::all() ?? []); 
-
-    function toggleCustomerType() {
-        try {
-            const typeRadio = document.querySelector('input[name="project_type"]:checked');
-            if (!typeRadio) return; 
-            
-            const type = typeRadio.value;
-            const wrapperExbis = document.getElementById('wrapper_customer_exbis');
-            const selectExbis = document.getElementById('select_customer_exbis');
-            const wrapperPackage = document.getElementById('wrapper_package');
-            const finalCustomerId = document.getElementById('final_customer_id');
-            const form = document.getElementById('importForm'); // <-- Ambil form untuk ubah action
-
-            if (type === 'external') {
-                wrapperExbis.classList.remove('hidden');
-                wrapperPackage.classList.remove('md:col-span-2');
-                selectExbis.required = true;
-                finalCustomerId.value = selectExbis.value; 
-                form.action = "{{ route('admin.import.boq.upload') }}"; // Route OSP/Exbis
-            } else if (type === 'pt2') {
-                wrapperExbis.classList.add('hidden');
-                wrapperPackage.classList.add('md:col-span-2');
-                selectExbis.required = false;
-                selectExbis.value = ""; 
-                finalCustomerId.value = "1"; // Default (asumsi TIF/Default untuk PT2)
-                form.action = "{{ route('admin.import.pt2.upload-boq') }}"; // Route Khusus PT2
-            } else {
-                wrapperExbis.classList.add('hidden');
-                wrapperPackage.classList.add('md:col-span-2');
-                selectExbis.required = false;
-                selectExbis.value = ""; 
-                finalCustomerId.value = "1"; 
-                form.action = "{{ route('admin.import.boq.upload') }}"; // Route OSP
+            if (fileMeta) {
+                fileMeta.innerText =
+                    'Maksimal 100 MB';
             }
 
-            updatePackageDropdown();
-        } catch (error) {
-            console.error("Error pada toggleCustomerType:", error);
+            return;
         }
-    }
 
-    function updateCustomerAndPackages() {
-        try {
-            const selectExbis = document.getElementById('select_customer_exbis');
-            const finalCustomerId = document.getElementById('final_customer_id');
-            
-            finalCustomerId.value = selectExbis.value;
-            updatePackageDropdown();
-        } catch (error) {
-            console.error("Error pada updateCustomerAndPackages:", error);
+        const extension =
+            file.name.includes('.')
+                ? file.name
+                    .split('.')
+                    .pop()
+                    .toUpperCase()
+                : 'FILE';
+
+        const sizeMb =
+            file.size / (1024 * 1024);
+
+        fileName.innerText =
+            file.name;
+
+        if (fileMeta) {
+            fileMeta.innerText =
+                `${extension} • ${sizeMb.toFixed(
+                    sizeMb >= 10 ? 1 : 2
+                )} MB`;
         }
-    }
+    };
+
+
+    window.toggleCustomerType = function () {
+
+        const selected =
+            document.querySelector(
+                'input[name="project_type"]:checked'
+            );
+
+        if (!selected) {
+            return;
+        }
+
+        const type =
+            selected.value;
+
+        const wrapperExbis =
+            document.getElementById(
+                'wrapper_customer_exbis'
+            );
+
+        const selectExbis =
+            document.getElementById(
+                'select_customer_exbis'
+            );
+
+        const wrapperPackage =
+            document.getElementById(
+                'wrapper_package'
+            );
+
+        const customerInput =
+            document.getElementById(
+                'final_customer_id'
+            );
+
+        const pt2Info =
+            document.getElementById(
+                'pt2Info'
+            );
+
+        wrapperExbis.classList.add(
+            'hidden'
+        );
+
+        wrapperPackage.classList.add(
+            'md:col-span-2'
+        );
+
+        pt2Info.classList.add(
+            'hidden'
+        );
+
+        selectExbis.required =
+            false;
+
+        selectExbis.value =
+            '';
+
+        customerInput.value =
+            '1';
+
+        if (type === 'external') {
+
+            wrapperExbis.classList.remove(
+                'hidden'
+            );
+
+            wrapperPackage.classList.remove(
+                'md:col-span-2'
+            );
+
+            selectExbis.required =
+                true;
+
+            customerInput.value =
+                '';
+
+        } else if (type === 'pt2') {
+
+            pt2Info.classList.remove(
+                'hidden'
+            );
+        }
+
+        updatePackageDropdown();
+    };
+
+
+    window.updateCustomerAndPackages = function () {
+
+        const selectExbis =
+            document.getElementById(
+                'select_customer_exbis'
+            );
+
+        const customerInput =
+            document.getElementById(
+                'final_customer_id'
+            );
+
+        customerInput.value =
+            selectExbis.value;
+
+        updatePackageDropdown();
+    };
+
 
     function updatePackageDropdown() {
+
+        const customerId =
+            document.getElementById(
+                'final_customer_id'
+            )?.value;
+
+        const packageSelect =
+            document.getElementById(
+                'package_id'
+            );
+
+        if (!packageSelect) {
+            return;
+        }
+
+        packageSelect.innerHTML =
+            '<option value="">-- Pilih Package --</option>';
+
+        if (!customerId) {
+            packageSelect.disabled =
+                true;
+
+            return;
+        }
+
+        packageSelect.disabled =
+            false;
+
+        allPackages
+            .filter(
+                pkg =>
+                    String(pkg.customer_id)
+                    === String(customerId)
+            )
+            .forEach(pkg => {
+
+                const option =
+                    document.createElement(
+                        'option'
+                    );
+
+                option.value =
+                    pkg.id_package;
+
+                option.textContent =
+                    `${pkg.package_code ?? '-'} - ${pkg.package_name ?? '-'}`;
+
+                packageSelect.appendChild(
+                    option
+                );
+            });
+    }
+
+
+    function renderStatusBadge(status) {
+
+        const badge =
+            document.getElementById(
+                'importStatusBadge'
+            );
+
+        if (!badge) {
+            return;
+        }
+
+        const statusMap = {
+            queued: {
+                label: 'Menunggu',
+                className:
+                    'bg-amber-100 text-amber-700',
+            },
+
+            processing: {
+                label: 'Diproses',
+                className:
+                    'bg-blue-100 text-blue-700',
+            },
+
+            completed: {
+                label: 'Selesai',
+                className:
+                    'bg-emerald-100 text-emerald-700',
+            },
+
+            failed: {
+                label: 'Gagal',
+                className:
+                    'bg-red-100 text-red-700',
+            },
+
+            cancelled: {
+                label: 'Dibatalkan',
+                className:
+                    'bg-slate-200 text-slate-700',
+            },
+        };
+
+        const config =
+            statusMap[status]
+            ?? {
+                label:
+                    status ?? '-',
+
+                className:
+                    'bg-slate-100 text-slate-600',
+            };
+
+        badge.className =
+            'px-3 py-1 rounded-full text-[9px] font-black uppercase '
+            + config.className;
+
+        badge.innerText =
+            config.label;
+    }
+
+
+    function renderBoqSummary(summary) {
+
+        const panel =
+            document.getElementById(
+                'boqSummaryPanel'
+            );
+
+        if (!panel) {
+            return;
+        }
+
+        const hasSummary =
+            summary
+            && (
+                summary.total_headers !== undefined
+                || summary.sheet_name
+            );
+
+        if (!hasSummary) {
+            panel.classList.add(
+                'hidden'
+            );
+
+            return;
+        }
+
+        panel.classList.remove(
+            'hidden'
+        );
+
+        const options =
+            summary.options ?? {};
+
+        const packageInfo =
+            document.getElementById(
+                'boqPackageInfo'
+            );
+
+        const sheetInfo =
+            document.getElementById(
+                'boqSheetInfo'
+            );
+
+        if (packageInfo) {
+            packageInfo.innerText =
+                `Package: ${options.package_code ?? '-'} - ${options.package_name ?? '-'} • Mapping: ${options.mapping_by ?? '-'}`;
+        }
+
+        if (sheetInfo) {
+            sheetInfo.innerText =
+                `Sheet: ${summary.sheet_name ?? '-'}`;
+        }
+
+        const values = {
+            boqTotalHeaders:
+                summary.total_headers,
+
+            boqMatchedLop:
+                summary.matched_lop,
+
+            boqUnmappedLop:
+                summary.unmapped_lop,
+
+            boqExistingHeaders:
+                summary.existing_boq_headers,
+
+            boqVolumeItems:
+                summary.volume_items,
+
+            boqUnmappedDesignator:
+                summary.unmapped_designator,
+
+            boqPriceMissing:
+                summary.price_missing,
+
+            boqPackageConflict:
+                summary.package_conflict,
+        };
+
+        Object.entries(
+            values
+        ).forEach(
+            ([id, value]) => {
+
+                const element =
+                    document.getElementById(
+                        id
+                    );
+
+                if (element) {
+                    element.innerText =
+                        formatNumber(
+                            value
+                        );
+                }
+            }
+        );
+    }
+
+
+    function renderErrors(errors) {
+
+        const preview =
+            document.getElementById(
+                'importErrorPreview'
+            );
+
+        const rows =
+            document.getElementById(
+                'importErrorRows'
+            );
+
+        if (!preview || !rows) {
+            return;
+        }
+
+        if (
+            !Array.isArray(errors)
+            || errors.length === 0
+        ) {
+            preview.classList.add(
+                'hidden'
+            );
+
+            rows.innerHTML =
+                '';
+
+            return;
+        }
+
+        preview.classList.remove(
+            'hidden'
+        );
+
+        rows.innerHTML =
+            errors.map(error => `
+                <tr>
+                    <td class="px-3 py-2">
+                        ${escapeHtml(
+                            error.type
+                            ?? '-'
+                        )}
+                    </td>
+
+                    <td class="px-3 py-2">
+                        ${escapeHtml(
+                            error.header
+                            ?? error.nama_lop
+                            ?? error.id_ihld
+                            ?? error.pid_sap
+                            ?? '-'
+                        )}
+                    </td>
+
+                    <td class="px-3 py-2">
+                        ${escapeHtml(
+                            error.row_number
+                            ?? '-'
+                        )}
+                    </td>
+
+                    <td class="px-3 py-2">
+                        ${escapeHtml(
+                            error.designator
+                            ?? '-'
+                        )}
+                    </td>
+
+                    <td class="px-3 py-2">
+                        ${escapeHtml(
+                            error.qty
+                            ?? '-'
+                        )}
+                    </td>
+
+                    <td class="px-3 py-2 text-red-700 font-semibold">
+                        ${escapeHtml(
+                            error.message
+                            ?? '-'
+                        )}
+                    </td>
+                </tr>
+            `).join('');
+    }
+
+
+    function renderFatalError(data) {
+
+        const panel =
+            document.getElementById(
+                'fatalErrorPanel'
+            );
+
+        const text =
+            document.getElementById(
+                'fatalErrorText'
+            );
+
+        if (!panel || !text) {
+            return;
+        }
+
+        if (
+            data.status === 'failed'
+            && data.error_message
+        ) {
+            panel.classList.remove(
+                'hidden'
+            );
+
+            text.innerText =
+                data.error_message;
+        } else {
+            panel.classList.add(
+                'hidden'
+            );
+
+            text.innerText =
+                '';
+        }
+    }
+
+
+    function renderCompletionSummary(data) {
+
+        const box =
+            document.getElementById(
+                'importCompletionSummary'
+            );
+
+        const icon =
+            document.getElementById(
+                'completionIcon'
+            );
+
+        const title =
+            document.getElementById(
+                'completionTitle'
+            );
+
+        const text =
+            document.getElementById(
+                'completionText'
+            );
+
+        const downloadButton =
+            document.getElementById(
+                'downloadErrorButton'
+            );
+
+        if (
+            !box
+            || !icon
+            || !title
+            || !text
+            || !downloadButton
+        ) {
+            return;
+        }
+
+        const isTerminal =
+            [
+                'completed',
+                'failed',
+                'cancelled',
+            ].includes(
+                data.status
+            );
+
+        if (!isTerminal) {
+            box.classList.add(
+                'hidden'
+            );
+
+            return;
+        }
+
+        box.classList.remove(
+            'hidden'
+        );
+
+        const summary =
+            data.summary ?? {};
+
+        if (
+            data.status
+            === 'completed'
+        ) {
+            icon.className =
+                'w-10 h-10 shrink-0 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black';
+
+            icon.innerText =
+                '✓';
+
+            title.innerText =
+                Number(
+                    data.invalid_rows || 0
+                ) > 0
+                    ? 'Import BOQ selesai dengan catatan'
+                    : 'Import BOQ selesai';
+
+            text.innerText =
+                `${formatNumber(summary.matched_lop)} dari ${formatNumber(summary.total_headers)} header LOP berhasil dimapping. `
+                + `${formatNumber(summary.volume_items)} volume > 0 diperiksa, `
+                + `${formatNumber(data.created_count)} item BOQ dibuat, `
+                + `${formatNumber(data.unchanged_count)} tidak berubah, `
+                + `${formatNumber(summary.unmapped_designator)} designator tidak ditemukan, `
+                + `${formatNumber(summary.price_missing)} item tanpa harga, dan `
+                + `${formatNumber(data.invalid_rows)} error tercatat.`;
+
+        } else if (
+            data.status
+            === 'failed'
+        ) {
+            icon.className =
+                'w-10 h-10 shrink-0 rounded-2xl bg-red-100 text-red-700 flex items-center justify-center font-black';
+
+            icon.innerText =
+                '!';
+
+            title.innerText =
+                'Import BOQ gagal diproses';
+
+            text.innerText =
+                data.error_message
+                || 'Background import berhenti sebelum selesai.';
+
+        } else {
+            icon.className =
+                'w-10 h-10 shrink-0 rounded-2xl bg-slate-200 text-slate-700 flex items-center justify-center font-black';
+
+            icon.innerText =
+                '×';
+
+            title.innerText =
+                'Import BOQ dibatalkan';
+
+            text.innerText =
+                `${formatNumber(data.processed_rows)} row telah diproses sebelum import dibatalkan.`;
+        }
+
+        if (
+            Number(
+                data.invalid_rows || 0
+            ) > 0
+            && data.error_download_url
+        ) {
+            downloadButton.href =
+                data.error_download_url;
+
+            downloadButton.classList.remove(
+                'hidden'
+            );
+        } else {
+            downloadButton.classList.add(
+                'hidden'
+            );
+
+            downloadButton.removeAttribute(
+                'href'
+            );
+        }
+    }
+
+
+    function renderImportStatus(data) {
+
+        const panel =
+            document.getElementById(
+                'importStatusPanel'
+            );
+
+        if (!panel) {
+            return;
+        }
+
+        panel.classList.remove(
+            'hidden'
+        );
+
+        const resultStats =
+            document.getElementById(
+                'importResultStats'
+            );
+
+        if (resultStats) {
+            resultStats.classList.remove(
+                'hidden'
+            );
+        }
+
+        const progress =
+            Math.min(
+                100,
+                Math.max(
+                    0,
+                    Number(
+                        data.progress || 0
+                    )
+                )
+            );
+
+        document.getElementById(
+            'progressBar'
+        ).style.width =
+            progress + '%';
+
+        document.getElementById(
+            'progressPercentText'
+        ).innerText =
+            progress + '%';
+
+        document.getElementById(
+            'progressFileName'
+        ).innerText =
+            data.file_name ?? '-';
+
+        document.getElementById(
+            'progressUploader'
+        ).innerText =
+            'Uploader: '
+            + (
+                data.uploader?.name
+                ?? '-'
+            );
+
+        document.getElementById(
+            'progressStage'
+        ).innerText =
+            data.stage
+            ?? data.status
+            ?? '-';
+
+        document.getElementById(
+            'progressRowText'
+        ).innerText =
+            `${formatNumber(data.processed_rows)} / ${formatNumber(data.total_rows)} row`;
+
+        document.getElementById(
+            'importProcessed'
+        ).innerText =
+            formatNumber(
+                data.processed_rows
+            );
+
+        document.getElementById(
+            'importValid'
+        ).innerText =
+            formatNumber(
+                data.valid_rows
+            );
+
+        document.getElementById(
+            'importInvalid'
+        ).innerText =
+            formatNumber(
+                data.invalid_rows
+            );
+
+        document.getElementById(
+            'importCreated'
+        ).innerText =
+            formatNumber(
+                data.created_count
+            );
+
+        document.getElementById(
+            'importUnchanged'
+        ).innerText =
+            formatNumber(
+                data.unchanged_count
+            );
+
+        document.getElementById(
+            'importSkipped'
+        ).innerText =
+            formatNumber(
+                data.skipped_count
+            );
+
+        renderStatusBadge(
+            data.status
+        );
+
+        renderBoqSummary(
+            data.summary || {}
+        );
+
+        renderFatalError(
+            data
+        );
+
+        renderErrors(
+            data.errors || []
+        );
+
+        renderCompletionSummary(
+            data
+        );
+    }
+
+
+    async function checkImportStatus() {
+
+        if (!statusUrl) {
+            return;
+        }
+
         try {
-            const activeCustomerId = document.getElementById('final_customer_id').value;
-            const packageSelect = document.getElementById('package_id');
-            
-            packageSelect.innerHTML = '<option value="">-- Pilih Package --</option>';
-            
-            if (!activeCustomerId || activeCustomerId === "") {
-                packageSelect.disabled = true;
+            const response =
+                await fetch(
+                    statusUrl,
+                    {
+                        headers: {
+                            'Accept':
+                                'application/json',
+
+                            'X-Requested-With':
+                                'XMLHttpRequest',
+                        },
+
+                        cache:
+                            'no-store',
+                    }
+                );
+
+            if (!response.ok) {
+                throw new Error(
+                    'HTTP '
+                    + response.status
+                );
+            }
+
+            const result =
+                await response.json();
+
+            const data =
+                result.data;
+
+            renderImportStatus(
+                data
+            );
+
+            if (
+                ![
+                    'completed',
+                    'failed',
+                    'cancelled',
+                ].includes(
+                    data.status
+                )
+            ) {
+                setTimeout(
+                    checkImportStatus,
+                    2000
+                );
+            }
+
+        } catch (error) {
+            console.error(
+                'Gagal membaca status import BOQ:',
+                error
+            );
+
+            setTimeout(
+                checkImportStatus,
+                4000
+            );
+        }
+    }
+
+
+    const importForm =
+        document.getElementById(
+            'importForm'
+        );
+
+    importForm?.addEventListener(
+        'submit',
+        function () {
+
+            const file =
+                document.getElementById(
+                    'file'
+                );
+
+            if (
+                !file
+                || !file.files.length
+            ) {
                 return;
             }
 
-            packageSelect.disabled = false;
+            const button =
+                document.getElementById(
+                    'uploadButton'
+                );
 
-            const filteredPackages = allPackages.filter(pkg => pkg.customer_id == activeCustomerId);
-            
-            filteredPackages.forEach(pkg => {
-                const option = document.createElement('option');
-                option.value = pkg.id_package;
-                option.textContent = `${pkg.package_code} - ${pkg.package_name}`;
-                packageSelect.appendChild(option);
-            });
-        } catch (error) {
-            console.error("Error pada updatePackageDropdown:", error);
+            const uploadingInfo =
+                document.getElementById(
+                    'uploadingInfo'
+                );
+
+            if (button) {
+                button.disabled =
+                    true;
+
+                button.classList.add(
+                    'opacity-60',
+                    'cursor-not-allowed'
+                );
+
+                button.innerText =
+                    'Mengunggah file...';
+            }
+
+            uploadingInfo?.classList.remove(
+                'hidden'
+            );
         }
-    }
+    );
 
-    document.addEventListener('DOMContentLoaded', function() {
-        toggleCustomerType();
-    });
+
+    toggleCustomerType();
+
+    if (
+        activeImportUuid
+        && statusUrl
+    ) {
+        checkImportStatus();
+    }
+});
 </script>
 
 @endsection
