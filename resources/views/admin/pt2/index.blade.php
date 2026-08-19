@@ -172,7 +172,6 @@
                                                     <td class="px-4 py-4">
                                                         @if($assignedUser)
                                                             <p class="font-bold text-gray-900 dark:text-white text-xs">{{ $assignedUser->name }}</p>
-                                                            <p class="text-[10px] text-emerald-600 font-bold mt-0.5">Teknisi PT 2</p>
                                                         @else
                                                             <span class="px-2 py-1 bg-gray-100 text-gray-500 text-[10px] font-bold rounded border border-gray-200">Belum Assign</span>
                                                         @endif

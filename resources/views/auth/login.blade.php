@@ -21,9 +21,9 @@
             </h2>
 
             <p class="mt-4 text-xl text-gray-100 leading-relaxed">
-                Digital Operation Monitoring Project Information System
+                Digital Monitoring Project Information System Construction
                 <br>
-                Construction Telkom Akses Area 3
+                Telkom Akses Area 3
             </p>
 
         </div>

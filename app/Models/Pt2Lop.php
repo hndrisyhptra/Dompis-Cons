@@ -42,7 +42,7 @@ class Pt2Lop extends Model
     {
         return $this->hasMany(Pt2Evidence::class, 'pt2_lop_id', 'id_pt2_lop');
     }
-
+    
     // Fungsi Kalkulasi Progress LOP
     public function progressSummary()
     {

@@ -603,10 +603,30 @@ Route::prefix('program')->name('program.')->group(function () {
     Route::get('/olo', [ProgramController::class, 'olo'])->name('olo');
     Route::get('/konstruksi-eksternal', [ProgramController::class, 'konstruk'])->name('konstruk');
 });
+
 /*
 |--------------------------------------------------------------------------
-| AUTH
+| ROUTE NEW ARSITEKTUR PID
 |--------------------------------------------------------------------------
 */
+Route::get(
+    '/admin/import/pid',
+    [ImportController::class, 'pidIndex']
+)->name('admin.import.pid');
+
+Route::post(
+    '/admin/import/pid',
+    [ImportController::class, 'importPid']
+)->name('admin.import.pid.upload');
+
+Route::get(
+    '/admin/import/pid/status/{uuid}',
+    [ImportController::class, 'importPidStatus']
+)->name('admin.import.pid.status');
+
+Route::get(
+    '/admin/import/pid/errors/{uuid}/download',
+    [ImportController::class, 'downloadPidImportErrors']
+)->name('admin.import.pid.errors.download');
 
 require __DIR__.'/auth.php';
