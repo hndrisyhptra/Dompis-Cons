@@ -342,4 +342,9 @@ class Project extends Model
     {
         return $this->hasOne(Pt2Mancore::class, 'project_id', 'id_project');
     }
+
+    public function siteSurveys()
+    {
+        return $this->hasMany(SiteSurvey::class, 'project_id', 'id_project');
+    }
 }

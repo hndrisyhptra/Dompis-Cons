@@ -35,8 +35,8 @@ class UserManagementController extends Controller
             'nik' => 'required|string|max:30|unique:users,nik',
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:100|unique:users,username',
-            // Update: Tambahkan teknisi dan sdi pada daftar in:
-            'role' => 'required|in:admin,waspang,pm,teknisi,sdi',
+            // Update: Tambahkan teknisi, sdi, dan sdi_surveyor pada daftar in:
+            'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor',
             'password' => 'required|string|min:6',
         ]);
 
@@ -61,8 +61,8 @@ class UserManagementController extends Controller
             'nik' => 'required|string|max:30|unique:users,nik,' . $user->id_user . ',id_user',
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:100|unique:users,username,' . $user->id_user . ',id_user',
-            // Update: Tambahkan teknisi dan sdi pada daftar in:
-            'role' => 'required|in:admin,waspang,pm,teknisi,sdi',
+            // Update: Tambahkan teknisi, sdi, dan sdi_surveyor pada daftar in:
+            'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor',
             'password' => 'nullable|string|min:6',
         ]);
 

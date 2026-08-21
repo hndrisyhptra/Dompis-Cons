@@ -47,6 +47,10 @@ class User extends Authenticatable
         return $this->hasMany(Notification::class, 'user_id');
     }
 
+    public function siteSurveys()
+    {
+        return $this->hasMany(SiteSurvey::class, 'surveyor_id', 'id_user');
+    }
 
 }
 

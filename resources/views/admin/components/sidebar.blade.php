@@ -514,6 +514,25 @@
             </span>
         </a>
 
+        <a href="{{ route('admin.site-surveys.index') }}"
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            {{ request()->routeIs('admin.site-surveys.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                @if(request()->routeIs('admin.site-surveys.*'))
+                    <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+                @endif
+
+            <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-list-icon lucide-clipboard-list">
+                    <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>
+                </svg>
+            </div>
+
+            <span>
+                Survey Lapangan
+            </span>
+        </a>
+
         {{-- APPROVAL EVIDEN (DROPDOWN) --}}
         @php
             $approvalOpen = request()->routeIs('admin.evidences.*')

@@ -74,6 +74,7 @@
                             'pm'      => 'PM',
                             'teknisi' => 'Inputer PT2',
                             'sdi'     => 'SDI',
+                            'sdi_surveyor' => 'SDI Surveyor',
                         ];
                         $displayRole = $roleNames[$user->role] ?? strtoupper($user->role);
                     @endphp
@@ -300,6 +301,7 @@
                         <option value="pm">PM</option>
                         <option value="teknisi">Inputer PT2</option>
                         <option value="sdi">SDI</option>
+                        <option value="sdi_surveyor">SDI Surveyor</option>
                     </select>
                 </div>
 

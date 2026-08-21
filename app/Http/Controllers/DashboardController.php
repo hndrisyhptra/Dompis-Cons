@@ -35,6 +35,9 @@ class DashboardController extends Controller
         if ($role === 'sdi') {
             return redirect()->route('sdi.index');
         }
+        if ($role === 'sdi_surveyor') {
+            return redirect()->route('surveyor.index');
+        }
 
         if ($role !== 'admin') {
             abort(403);

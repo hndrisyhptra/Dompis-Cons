@@ -18,6 +18,7 @@ use App\Http\Controllers\AdminPt2Controller;
 use App\Http\Controllers\Pt2AssignmentController;
 use App\Http\Controllers\SdiController;
 use App\Http\Controllers\ProgramController;
+use App\Http\Controllers\SurveyorController;
 
 
 
@@ -577,6 +578,40 @@ Route::middleware(['auth'])->prefix('sdi')->name('sdi.')->group(function () {
     Route::post('/admin/pt2/{id}/send-to-sdi', [AdminPt2Controller::class, 'sendToSdi'])->name('admin.pt2.sendToSdi');
 });
 Route::post('/sdi/pt2/golive/{lop_id}', [App\Http\Controllers\SdiController::class, 'submitGolive'])->name('sdi.eksekusi.golive');
+
+/*
+|--------------------------------------------------------------------------
+| ROLE SDI SURVEYOR - Survey Lapangan (Tagging Tiang, Catuan & Rute Kabel)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->prefix('surveyor')->name('surveyor.')->group(function () {
+    Route::get('/', [SurveyorController::class, 'index'])->name('index');
+    Route::get('/create', [SurveyorController::class, 'create'])->name('create');
+    Route::post('/', [SurveyorController::class, 'store'])->name('store');
+    Route::get('/{id}', [SurveyorController::class, 'show'])->name('show');
+    Route::delete('/{id}', [SurveyorController::class, 'destroy'])->name('destroy');
+    Route::post('/{id}/complete', [SurveyorController::class, 'complete'])->name('complete');
+    Route::get('/{id}/kml', [SurveyorController::class, 'downloadKml'])->name('kml');
+    Route::post('/{id}/ending-site', [SurveyorController::class, 'setEndingSite'])->name('ending-site.store');
+
+    Route::post('/{id}/points', [SurveyorController::class, 'storePoint'])->name('points.store');
+    Route::put('/points/{pointId}', [SurveyorController::class, 'updatePoint'])->name('points.update');
+    Route::delete('/points/{pointId}', [SurveyorController::class, 'destroyPoint'])->name('points.destroy');
+
+    Route::post('/{id}/routes', [SurveyorController::class, 'storeRoute'])->name('routes.store');
+    Route::put('/routes/{routeId}', [SurveyorController::class, 'updateRoute'])->name('routes.update');
+    Route::delete('/routes/{routeId}', [SurveyorController::class, 'destroyRoute'])->name('routes.destroy');
+});
+
+/*
+|--------------------------------------------------------------------------
+| HASIL SURVEY LAPANGAN - TAMPILAN ADMIN / SDI (DESKTOP)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->prefix('admin/site-surveys')->name('admin.site-surveys.')->group(function () {
+    Route::get('/', [SurveyorController::class, 'adminIndex'])->name('index');
+    Route::get('/{id}', [SurveyorController::class, 'adminShow'])->name('show');
+});
 
 // Route Upload PID & BOQ Khusus PT 2 (Arahkan ke fungsi yang sama di controller)
 Route::post('/import/pt2/upload-pid', [App\Http\Controllers\ImportController::class, 'importPid'])->name('admin.import.pt2.upload');
