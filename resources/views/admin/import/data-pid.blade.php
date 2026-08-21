@@ -145,13 +145,22 @@
                     </div>
                 </div>
 
-                <div class="mt-5 flex justify-end gap-3">
+                <div class="mt-5 flex flex-col sm:flex-row sm:justify-end gap-3">
                     @if(request('search') || request('region') || request('branch') || request('program') || request('status_project'))
                         <a href="{{ route('admin.data-pid', ['type' => $dataType]) }}"
-                           class="h-11 px-5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold inline-flex items-center">
+                           class="h-11 px-5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold inline-flex items-center justify-center">
                             Reset
                         </a>
                     @endif
+                    <a href="{{ route('admin.data-pid.export', array_merge(request()->query(), ['type' => $dataType])) }}"
+                       class="h-11 px-5 rounded-xl bg-emerald-600 text-white text-sm font-black hover:bg-emerald-700 inline-flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Download Excel
+                    </a>
                     <button type="submit" class="h-11 px-7 rounded-xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700">Cari</button>
                 </div>
             </form>

@@ -433,6 +433,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/admin/data-pid', [ImportController::class, 'dataPid'])
             ->name('admin.data-pid');
 
+        Route::get('/admin/data-pid/export', [ImportController::class, 'exportPid'])
+            ->name('admin.data-pid.export');
+
         Route::get('/admin/import/boq', [ImportController::class, 'boqIndex'])
             ->name('admin.import.boq');
 

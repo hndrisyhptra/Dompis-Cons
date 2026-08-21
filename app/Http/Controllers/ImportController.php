@@ -604,7 +604,189 @@ class ImportController extends Controller
         ));
     }
 
-public function updatePid(\Illuminate\Http\Request $request, \App\Models\Project $project)
+    public function exportPid(\Illuminate\Http\Request $request)
+    {
+        $regions = $this->pidRegions();
+        $dataType = $request->input('type', 'regular');
+
+        if (!in_array($dataType, ['regular', 'pt2'], true)) {
+            $dataType = 'regular';
+        }
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        if ($dataType === 'pt2') {
+            $sheet->setTitle('Data PID PT2');
+
+            $base = \Illuminate\Support\Facades\DB::table('pt2_projects as p');
+            $this->applyPt2PidFilters($base, $request, $regions);
+
+            $assignmentSub = \Illuminate\Support\Facades\DB::table('pt2_assignments')
+                ->select('pt2_lop_id')
+                ->selectRaw('COUNT(*) as assignment_count')
+                ->groupBy('pt2_lop_id');
+
+            $boqSub = \Illuminate\Support\Facades\DB::table('pt2_boq_items')
+                ->select('pt2_lop_id')
+                ->selectRaw('COUNT(*) as boq_count')
+                ->groupBy('pt2_lop_id');
+
+            $rows = (clone $base)
+                ->leftJoin('pt2_lops as l', 'l.pt2_project_id', '=', 'p.id_pt2_project')
+                ->leftJoinSub($assignmentSub, 'a', fn ($join) => $join->on('a.pt2_lop_id', '=', 'l.id_pt2_lop'))
+                ->leftJoinSub($boqSub, 'b', fn ($join) => $join->on('b.pt2_lop_id', '=', 'l.id_pt2_lop'))
+                ->orderByDesc('p.id_pt2_project')
+                ->orderBy('l.id_pt2_lop')
+                ->get([
+                    'p.pid',
+                    'p.pid_sap',
+                    'p.project_name',
+                    'p.program',
+                    'p.status_project',
+                    'p.status',
+                    'p.is_golive as project_golive',
+                    'p.sdi_approval_status as project_sdi_approval',
+                    'l.id_ihld',
+                    'l.lop_name',
+                    'l.pid_sap as lop_pid_sap',
+                    'l.branch',
+                    'l.sto',
+                    'l.batch',
+                    'l.status_progress',
+                    'l.package_id',
+                    'l.is_golive as lop_golive',
+                    'l.sdi_approval_status as lop_sdi_approval',
+                    \Illuminate\Support\Facades\DB::raw('COALESCE(a.assignment_count, 0) as assignment_count'),
+                    \Illuminate\Support\Facades\DB::raw('COALESCE(b.boq_count, 0) as boq_count'),
+                ]);
+
+            $headers = [
+                'PID', 'PID SAP', 'Nama Project', 'Program', 'Status Project', 'Status',
+                'Go Live Project', 'SDI Approval Project',
+                'ID IHLD', 'Nama LOP', 'PID SAP LOP', 'Branch', 'STO', 'Batch',
+                'Status Progress', 'Package ID', 'Go Live LOP', 'SDI Approval LOP',
+                'Jumlah Assignment', 'Jumlah Item BOQ',
+            ];
+
+            $sheet->fromArray($headers, null, 'A1');
+
+            $rowIndex = 2;
+            foreach ($rows as $row) {
+                $sheet->fromArray([
+                    $row->pid ?? '-',
+                    $row->pid_sap ?? '-',
+                    $row->project_name ?? '-',
+                    $row->program ?? '-',
+                    $row->status_project ?? '-',
+                    $row->status ?? '-',
+                    $row->project_golive ?? '-',
+                    $row->project_sdi_approval ?? '-',
+                    $row->id_ihld ?? '-',
+                    $row->lop_name ?? '-',
+                    $row->lop_pid_sap ?? '-',
+                    $row->branch ?? '-',
+                    $row->sto ?? '-',
+                    $row->batch ?? '-',
+                    $row->status_progress ?? '-',
+                    $row->package_id ?? '-',
+                    $row->lop_golive ?? '-',
+                    $row->lop_sdi_approval ?? '-',
+                    (int) $row->assignment_count,
+                    (int) $row->boq_count,
+                ], null, 'A' . $rowIndex);
+                $rowIndex++;
+            }
+        } else {
+            $sheet->setTitle('Data PID Regular');
+
+            $base = \Illuminate\Support\Facades\DB::table('projects as p');
+            $this->applyRegularPidFilters($base, $request, $regions);
+
+            $rows = (clone $base)
+                ->leftJoin('lops as l', 'l.project_id', '=', 'p.id_project')
+                ->orderByDesc('p.id_project')
+                ->orderBy('l.id_lop')
+                ->get([
+                    'p.pid',
+                    'p.pid_sap',
+                    'p.project_name',
+                    'p.program',
+                    'p.execution_type',
+                    'p.status_project',
+                    'l.id_ihld',
+                    'l.lop_name',
+                    'l.program_sap',
+                    'l.tematik',
+                    'l.sto',
+                    'l.branch',
+                    'l.batch',
+                    'l.no_sp',
+                    'l.tgl_sp',
+                    'l.tgl_toc',
+                    'l.mitra_name',
+                ]);
+
+            $headers = [
+                'PID', 'PID SAP', 'Nama Project', 'Program', 'Execution Type', 'Status Project',
+                'ID IHLD', 'Nama LOP', 'Program SAP', 'Tematik', 'STO', 'Branch', 'Batch',
+                'No SP', 'Tgl SP', 'Tgl TOC', 'Mitra',
+            ];
+
+            $sheet->fromArray($headers, null, 'A1');
+
+            $rowIndex = 2;
+            foreach ($rows as $row) {
+                $sheet->fromArray([
+                    $row->pid ?? '-',
+                    $row->pid_sap ?? '-',
+                    $row->project_name ?? '-',
+                    $row->program ?? '-',
+                    $row->execution_type ?? '-',
+                    $row->status_project ?? '-',
+                    $row->id_ihld ?? '-',
+                    $row->lop_name ?? '-',
+                    $row->program_sap ?? '-',
+                    $row->tematik ?? '-',
+                    $row->sto ?? '-',
+                    $row->branch ?? '-',
+                    $row->batch ?? '-',
+                    $row->no_sp ?? '-',
+                    $row->tgl_sp ?? '-',
+                    $row->tgl_toc ?? '-',
+                    $row->mitra_name ?? '-',
+                ], null, 'A' . $rowIndex);
+                $rowIndex++;
+            }
+        }
+
+        $lastColumn = $sheet->getHighestColumn();
+        $lastRow = $sheet->getHighestRow();
+
+        $sheet->getStyle('A1:' . $lastColumn . '1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:' . $lastColumn . '1')->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('DBEAFE');
+
+        foreach (range('A', $lastColumn) as $columnId) {
+            $sheet->getColumnDimension($columnId)->setAutoSize(true);
+        }
+
+        $sheet->freezePane('A2');
+        $sheet->setAutoFilter('A1:' . $lastColumn . $lastRow);
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+
+        $fileName = 'data-pid-' . $dataType . '-' . now()->format('Y-m-d_His') . '.xlsx';
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    public function updatePid(\Illuminate\Http\Request $request, \App\Models\Project $project)
 {
     /* Hanya Regular. PT2 LOP diedit di workflow PT2/LOP, bukan parent project. */
     $request->validate([
