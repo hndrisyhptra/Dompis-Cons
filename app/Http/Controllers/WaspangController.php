@@ -25,7 +25,7 @@ class WaspangController extends Controller
         $assignedProjectIds = ProjectAssignment::where('waspang_id', $userId)
             ->pluck('project_id');
 
-        $projects = Project::with(['boqItems', 'evidences'])
+        $projects = Project::with(['boqItems.designatorData', 'evidences'])
             ->whereIn('id_project', $assignedProjectIds)
             ->latest()
             ->get();
@@ -72,11 +72,17 @@ class WaspangController extends Controller
                     ->where('status', 'approved')
                     ->count() > 0;
 
+            // Item material = designator berawalan "M-" (konvensi lama) ATAU
+            // type = 'material' di tabel master designators (customer/import
+            // yang tidak pakai prefix M-/J-, mis. Konstruksi Eksternal) --
+            // kalau cuma cek prefix, item material tanpa prefix "M-" akan
+            // hilang total dari progress instalasi meski BOQ-nya valid.
             $materialBoqItems = $boqItems->filter(function ($boq) {
-                return str_starts_with($boq->designator, 'M-');
+                return str_starts_with($boq->designator, 'M-')
+                    || optional($boq->designatorData)->type === 'material';
             });
 
-            $boqTotal = $materialBoqItems->count();$boqTotal = $boqItems->count();
+            $boqTotal = $materialBoqItems->count();
 
             $boqApproved = $materialBoqItems->filter(function ($boq) use ($evidences) {
                 return $evidences
@@ -202,9 +208,11 @@ class WaspangController extends Controller
                 ->where('status', 'approved')
                 ->count() > 0;
 
-        // HANYA MATERIAL
+        // HANYA MATERIAL -- lihat catatan di dashboard() soal kenapa dicek
+        // dua-duanya (prefix "M-" ATAU type master designator = 'material').
         $materialBoqItems = $boqItems->filter(function ($boq) {
-            return str_starts_with($boq->designator, 'M-');
+            return str_starts_with($boq->designator, 'M-')
+                || optional($boq->designatorData)->type === 'material';
         });
 
         $boqTotal = $materialBoqItems->count();
@@ -361,8 +369,14 @@ class WaspangController extends Controller
     {
         $project = $this->getAssignedProject($id);
 
+        // Prefix "M-" ATAU type master designator = 'material' -- lihat
+        // catatan di dashboard(). Tanpa OR ini, BOQ item material yang
+        // designatornya tidak berawalan "M-" (mis. project Konstruksi
+        // Eksternal) tidak akan pernah muncul di Step 2 Instalasi walau
+        // BOQ-nya sudah ke-upload & terlihat di halaman lain.
         $materialBoqItems = $project->boqItems->filter(function ($boq) {
-            return str_starts_with($boq->designator, 'M-');
+            return str_starts_with($boq->designator, 'M-')
+                || optional($boq->designatorData)->type === 'material';
         })->values();
 
         $persiapanComplete = $this->isPersiapanUploaded($id);
@@ -502,7 +516,7 @@ class WaspangController extends Controller
 
         abort_if(!$isAssigned, 403);
 
-        return Project::with(['boqItems', 'evidences'])
+        return Project::with(['boqItems.designatorData', 'evidences'])
             ->findOrFail($id);
     }
 

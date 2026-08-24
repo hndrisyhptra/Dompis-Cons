@@ -135,7 +135,7 @@
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Jenis Titik</label>
                     <div class="grid grid-cols-2 gap-2">
                         <button type="button" data-type="tiang_eksisting" class="point-type-btn px-3 py-2.5 rounded-xl border-2 border-blue-600 bg-blue-50 text-blue-700 text-xs font-bold">
-                            <i class="fa-solid fa-tower-broadcast mr-1"></i> Tiang Eksisting
+                            <i class="fa-solid fa-tower-broadcast mr-1"></i> Tiang
                         </button>
                         <button type="button" data-type="catuan" class="point-type-btn px-3 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 text-xs font-bold">
                             <i class="fa-solid fa-box-archive mr-1"></i> Catuan
