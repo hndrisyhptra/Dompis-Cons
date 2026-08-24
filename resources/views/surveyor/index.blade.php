@@ -9,16 +9,24 @@
 
         <div class="relative flex items-center justify-between">
             <div>
-                <p class="text-blue-200 text-xs font-semibold tracking-wide uppercase">SDI Surveyor</p>
+                <p class="text-blue-200 text-xs font-semibold tracking-wide uppercase">{{ auth()->user()->role === 'waspang' ? 'Survey Lapangan' : 'SDI Surveyor' }}</p>
                 <h1 class="text-white text-xl font-black mt-0.5">Halo, {{ explode(' ', auth()->user()->name)[0] ?? 'Surveyor' }}</h1>
                 <p class="text-blue-200/80 text-xs mt-1">Siap tagging titik & rute hari ini?</p>
             </div>
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button class="w-10 h-10 rounded-2xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center border border-white/10">
-                    <i class="fa-solid fa-arrow-right-from-bracket text-sm"></i>
-                </button>
-            </form>
+            <div class="flex items-center gap-2">
+                @if(auth()->user()->role === 'waspang')
+                    <a href="{{ route('waspang.dashboard') }}" title="Kembali ke Waspang"
+                       class="w-10 h-10 rounded-2xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center border border-white/10">
+                        <i class="fa-solid fa-arrow-left text-sm"></i>
+                    </a>
+                @endif
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button class="w-10 h-10 rounded-2xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center border border-white/10">
+                        <i class="fa-solid fa-arrow-right-from-bracket text-sm"></i>
+                    </button>
+                </form>
+            </div>
         </div>
 
         <div class="relative grid grid-cols-3 gap-3 mt-6">

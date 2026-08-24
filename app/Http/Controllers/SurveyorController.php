@@ -14,8 +14,12 @@ class SurveyorController extends Controller
 {
     /**
      * Role yang boleh mengakses fitur Surveyor.
+     * Fitur Survey Lapangan sekarang menyatu ke role Waspang (tidak perlu
+     * lagi role terpisah sdi_surveyor untuk akun baru); 'sdi_surveyor' tetap
+     * dipertahankan di sini agar akun lama yang masih memakai role tsb tidak
+     * kehilangan akses.
      */
-    private const ALLOWED_ROLES = ['sdi_surveyor', 'admin', 'sdi'];
+    private const ALLOWED_ROLES = ['sdi_surveyor', 'admin', 'sdi', 'waspang'];
 
     private function guardAccess(): \App\Models\User
     {
@@ -219,7 +223,7 @@ class SurveyorController extends Controller
 
         $validated = $request->validate([
             'type' => 'required|in:tiang_eksisting,catuan',
-            'catuan_type' => 'required_if:type,catuan|nullable|in:ODC,ODP,JC',
+            'catuan_type' => 'required_if:type,catuan|nullable|in:ODC,ODP,OTB,JC',
             'name' => 'nullable|string|max:150',
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',

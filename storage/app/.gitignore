@@ -2,3 +2,7 @@
 !private/
 !public/
 !.gitignore
+!baut-templates/
+!baut-templates/*
+!lact-templates/
+!lact-templates/*

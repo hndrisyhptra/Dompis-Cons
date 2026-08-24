@@ -38,6 +38,12 @@
                 &middot; oleh {{ $survey->surveyor->name ?? '-' }}
             </p>
         </div>
+        @if(auth()->user()->role === 'waspang')
+            <a href="{{ route('waspang.dashboard') }}" title="Kembali ke Waspang"
+               class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-house text-sm"></i>
+            </a>
+        @endif
         <button id="btnSurveyMenu" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center shrink-0">
             <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
         </button>
@@ -145,9 +151,10 @@
 
                 <div id="catuanTypeWrap" class="hidden">
                     <label class="block text-xs font-bold text-slate-700 mb-1.5">Tipe Catuan</label>
-                    <div class="grid grid-cols-3 gap-2">
+                    <div class="grid grid-cols-4 gap-2">
                         <button type="button" data-catuan="ODC" class="catuan-type-btn px-2 py-2 rounded-xl border-2 border-slate-200 text-slate-600 text-xs font-bold">ODC</button>
                         <button type="button" data-catuan="ODP" class="catuan-type-btn px-2 py-2 rounded-xl border-2 border-slate-200 text-slate-600 text-xs font-bold">ODP</button>
+                        <button type="button" data-catuan="OTB" class="catuan-type-btn px-2 py-2 rounded-xl border-2 border-slate-200 text-slate-600 text-xs font-bold">OTB</button>
                         <button type="button" data-catuan="JC" class="catuan-type-btn px-2 py-2 rounded-xl border-2 border-slate-200 text-slate-600 text-xs font-bold">JC</button>
                     </div>
                 </div>
