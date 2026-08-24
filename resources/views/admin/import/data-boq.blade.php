@@ -145,6 +145,7 @@
 
                                 $modalItems = $items->map(function ($item) {
                                     return [
+                                        'id_boq' => $item->id_boq,
                                         'designator' => $item->designator ?? '-',
                                         'type' => ucfirst(strtolower($item->type ?? '-')),
                                         'item_name' => $item->item_name ?? '-',
@@ -155,7 +156,32 @@
                                         'total_price' => (float) ($item->total_price ?? 0),
                                     ];
                                 })->values();
+
+                                $modalPayload = [
+                                    'lopId' => $lop->id_lop,
+                                    'projectId' => $lop->project_id,
+                                    'lopName' => $lop->lop_name ?? '-',
+                                    'idIhld' => $lop->id_ihld ?? '-',
+                                    'pidSap' => $lop->project_pid_sap ?? $lop->pid_sap ?? '-',
+                                    'pid' => $lop->project_pid ?? '-',
+                                    'packageName' => $lop->package_name ?? '-',
+                                    'branch' => $lop->branch ?? '-',
+                                    'sto' => $lop->sto ?? '-',
+                                    'mitra' => $lop->mitra_name ?? '-',
+                                    'totalItem' => $items->count(),
+                                    'materialCount' => $materialCount,
+                                    'jasaCount' => $jasaCount,
+                                    'totalJasa' => (float) $totalJasa,
+                                    'totalMaterial' => (float) $totalMaterial,
+                                    'totalPlan' => (float) $totalPlan,
+                                    'items' => $modalItems,
+                                ];
                             @endphp
+
+                            <script>
+                                window.__LOP_MODAL_DATA = window.__LOP_MODAL_DATA || {};
+                                window.__LOP_MODAL_DATA[{{ (int) $lop->id_lop }}] = @json($modalPayload);
+                            </script>
 
                             <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/70 transition">
                                 <td class="px-5 py-4 min-w-[280px]">
@@ -190,23 +216,7 @@
 
                                 <td class="px-5 py-4 text-center whitespace-nowrap">
                                     <button type="button"
-                                            @click='open({
-                                                lopName: @json($lop->lop_name ?? '-'),
-                                                idIhld: @json($lop->id_ihld ?? '-'),
-                                                pidSap: @json($lop->project_pid_sap ?? $lop->pid_sap ?? '-'),
-                                                pid: @json($lop->project_pid ?? '-'),
-                                                packageName: @json($lop->package_name ?? '-'),
-                                                branch: @json($lop->branch ?? '-'),
-                                                sto: @json($lop->sto ?? '-'),
-                                                mitra: @json($lop->mitra_name ?? '-'),
-                                                totalItem: {{ $items->count() }},
-                                                materialCount: {{ $materialCount }},
-                                                jasaCount: {{ $jasaCount }},
-                                                totalJasa: {{ (float) $totalJasa }},
-                                                totalMaterial: {{ (float) $totalMaterial }},
-                                                totalPlan: {{ (float) $totalPlan }},
-                                                items: @json($modalItems),
-                                            })'
+                                            @click="open(@js($modalPayload))"
                                             class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-black hover:bg-blue-100">
                                         Detail
                                     </button>
@@ -331,6 +341,7 @@
                                     <th class="px-4 py-3 text-right text-xs font-black text-slate-500 uppercase">Qty Actual</th>
                                     <th class="px-4 py-3 text-right text-xs font-black text-slate-500 uppercase">Unit Price</th>
                                     <th class="px-4 py-3 text-right text-xs font-black text-slate-500 uppercase">Total</th>
+                                    <th class="px-4 py-3 text-center text-xs font-black text-slate-500 uppercase">Aksi</th>
                                 </tr>
                             </thead>
 
@@ -351,12 +362,24 @@
                                         <td class="px-4 py-3 text-right font-bold text-slate-900 dark:text-white" x-text="formatNumber(item.quantity_actual)"></td>
                                         <td class="px-4 py-3 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap" x-text="formatRupiah(item.unit_price)"></td>
                                         <td class="px-4 py-3 text-right font-black text-blue-700 whitespace-nowrap" x-text="formatRupiah(item.total_price)"></td>
+                                        <td class="px-4 py-3 text-center whitespace-nowrap">
+                                            <form method="POST" :action="boqDeleteUrl(item.id_boq)">
+                                                @csrf
+                                                @method('DELETE')
+                                                <input type="hidden" name="reopen_lop" :value="selected.lopId">
+                                                <button type="submit"
+                                                        @click="if (!confirm('Yakin hapus item designator \'' + item.designator + '\' dari LOP ini?')) $event.preventDefault()"
+                                                        class="px-3 py-1.5 rounded-xl bg-red-50 text-red-700 text-[11px] font-black hover:bg-red-100">
+                                                    Hapus
+                                                </button>
+                                            </form>
+                                        </td>
                                     </tr>
                                 </template>
 
                                 <template x-if="selected.items.length === 0">
                                     <tr>
-                                        <td colspan="8" class="px-5 py-10 text-center text-sm text-slate-500">Tidak ada detail item BOQ.</td>
+                                        <td colspan="9" class="px-5 py-10 text-center text-sm text-slate-500">Tidak ada detail item BOQ.</td>
                                     </tr>
                                 </template>
                             </tbody>
@@ -365,30 +388,83 @@
                                 <tr>
                                     <td colspan="7" class="px-4 py-3 text-right text-xs font-black text-slate-500 uppercase">Total BOQ</td>
                                     <td class="px-4 py-3 text-right font-black text-blue-700 whitespace-nowrap" x-text="formatRupiah(selected.totalPlan)"></td>
+                                    <td></td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
+                </div>
 
-                    <div class="px-5 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex justify-end">
-                        <button type="button"
-                                @click="close()"
-                                class="h-11 px-5 rounded-2xl bg-slate-900 text-white text-sm font-black hover:bg-slate-800">
-                            Tutup
-                        </button>
+                {{-- TAMBAH ITEM DESIGNATOR --}}
+                <div class="rounded-[1.5rem] border border-emerald-200 dark:border-emerald-900 overflow-hidden">
+                    <div class="px-5 py-4 border-b border-emerald-100 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20">
+                        <h3 class="text-sm font-black text-emerald-700">Tambah Item Designator</h3>
+                        <p class="text-xs text-slate-500 mt-1">Pilih designator dari katalog, quantity actual dimulai dari 0.</p>
                     </div>
+
+                    <form method="POST" action="{{ route('projects.boq.store') }}" class="p-5">
+                        @csrf
+                        <input type="hidden" name="project_id" :value="selected.projectId">
+                        <input type="hidden" name="reopen_lop" :value="selected.lopId">
+
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                            <div class="sm:col-span-7">
+                                <label class="block text-xs font-black text-slate-500 uppercase mb-2">Designator</label>
+                                <select name="designator_id[]" required
+                                        class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                    <option value="">Pilih designator...</option>
+                                    @foreach($designators as $designator)
+                                        <option value="{{ $designator->id_designator }}">
+                                            {{ $designator->designator }} — {{ $designator->item_name }} ({{ $designator->unit }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="sm:col-span-3">
+                                <label class="block text-xs font-black text-slate-500 uppercase mb-2">Qty Plan</label>
+                                <input type="number" step="0.01" min="0" name="boq_qty[]" required
+                                       class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <button type="submit"
+                                        class="w-full h-11 rounded-xl bg-emerald-600 text-white text-sm font-black hover:bg-emerald-700">
+                                    + Tambah
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="button"
+                            @click="close()"
+                            class="h-11 px-5 rounded-2xl bg-slate-900 text-white text-sm font-black hover:bg-slate-800">
+                        Tutup
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+@php
+    $boqDeleteUrlTemplate = route('projects.boq.destroy', ['id' => '__ID__']);
+    $reopenLopId = (int) session('reopen_lop', 0);
+@endphp
+
 <script>
+    const BOQ_DELETE_URL_TEMPLATE = @json($boqDeleteUrlTemplate);
+    const REOPEN_LOP_ID = @json($reopenLopId);
+
     function boqDetailModal() {
         return {
             show: false,
 
             selected: {
+                lopId: null,
+                projectId: null,
                 lopName: '-',
                 idIhld: '-',
                 pidSap: '-',
@@ -406,6 +482,12 @@
                 items: [],
             },
 
+            init() {
+                if (REOPEN_LOP_ID && window.__LOP_MODAL_DATA && window.__LOP_MODAL_DATA[REOPEN_LOP_ID]) {
+                    this.open(window.__LOP_MODAL_DATA[REOPEN_LOP_ID]);
+                }
+            },
+
             open(data) {
                 this.selected = {
                     ...this.selected,
@@ -420,6 +502,10 @@
             close() {
                 this.show = false;
                 document.body.classList.remove('overflow-hidden');
+            },
+
+            boqDeleteUrl(idBoq) {
+                return BOQ_DELETE_URL_TEMPLATE.replace('__ID__', idBoq);
             },
 
             formatRupiah(value) {

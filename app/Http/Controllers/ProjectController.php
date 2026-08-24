@@ -396,18 +396,22 @@ public function destroy($id)
     }
 
 // FUNGSI KHUSUS MENGHAPUS ITEM DESIGNATOR SATUAN
-    public function destroyBoq($id)
+    public function destroyBoq(Request $request, $id)
     {
         $boqItem = BoqItem::findOrFail($id);
-        
+
         // Opsional: Cek jika BOQ sudah memiliki eviden, cegah penghapusan
         if ($boqItem->quantity_actual > 0) {
-            return back()->with('error', 'Item ini tidak bisa dihapus karena sudah memiliki progres aktual lapangan.');
+            return back()
+                ->with('error', 'Item ini tidak bisa dihapus karena sudah memiliki progres aktual lapangan.')
+                ->with('reopen_lop', $request->input('reopen_lop'));
         }
 
         $boqItem->delete();
 
-        return back()->with('success', 'Item Designator berhasil dihapus dari project.');
+        return back()
+            ->with('success', 'Item Designator berhasil dihapus dari project.')
+            ->with('reopen_lop', $request->input('reopen_lop'));
     }
 
 public function importCsv(Request $request)
@@ -1028,7 +1032,9 @@ public function importCsv(Request $request)
         $lop = $project->lop;
 
         if (!$lop) {
-            return back()->with('error', 'LOP untuk project ini belum tersedia.');
+            return back()
+                ->with('error', 'LOP untuk project ini belum tersedia.')
+                ->with('reopen_lop', $request->input('reopen_lop'));
         }
 
         foreach ($request->designator_id as $index => $designatorId) {
@@ -1068,7 +1074,9 @@ public function importCsv(Request $request)
             ]);
         }
 
-        return back()->with('success', 'Item BOQ berhasil ditambahkan.');
+        return back()
+            ->with('success', 'Item BOQ berhasil ditambahkan.')
+            ->with('reopen_lop', $request->input('reopen_lop'));
     }
     //RELASI DENGAN LOP
     public function lops()

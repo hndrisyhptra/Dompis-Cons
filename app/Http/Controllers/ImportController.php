@@ -2115,6 +2115,22 @@ private function buildRegularPidMatrix(array $regions, $programs): array
                 'package_name',
             ]);
 
+        /*
+        |--------------------------------------------------------------------------
+        | DESIGNATOR CATALOG (untuk dropdown tambah item)
+        |--------------------------------------------------------------------------
+        */
+        $designators = Designator::forCustomer(Customer::defaultId())
+            ->orderBy('type')
+            ->orderBy('designator')
+            ->get([
+                'id_designator',
+                'designator',
+                'item_name',
+                'unit',
+                'type',
+            ]);
+
         return view(
             'admin.import.data-boq',
             compact(
@@ -2132,7 +2148,9 @@ private function buildRegularPidMatrix(array $regions, $programs): array
                 'totalBoqValue',
 
                 'sudahAssign',
-                'belumAssign'
+                'belumAssign',
+
+                'designators'
             )
         );
     }

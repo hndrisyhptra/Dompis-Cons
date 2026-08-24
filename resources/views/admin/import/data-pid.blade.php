@@ -202,6 +202,7 @@
 
                             $detailData = $dataType === 'regular' ? [
                                 'id_project' => $project->id_project,
+                                'update_url' => route('admin.import.pid.update', $project->id_project),
                                 'pid' => $project->pid ?? '-',
                                 'pid_sap' => $project->pid_sap ?? '-',
                                 'project_name' => $project->project_name ?? '-',

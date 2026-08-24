@@ -552,6 +552,23 @@ Route::prefix('admin/pt2')->name('admin.pt2.')->middleware(['auth'])->group(func
     Route::get('/{id}/dismantle', [\App\Http\Controllers\AdminPt2Controller::class, 'reviewDismantle'])->name('dismantle');
     Route::get('/{id}/mancore', [\App\Http\Controllers\AdminPt2Controller::class, 'reviewMancore'])->name('mancore');
 
+    // BAUT (Berita Acara Uji Terima) - generate dokumen per LOP
+    Route::get('/baut', [\App\Http\Controllers\BautController::class, 'index'])->name('baut.index');
+    Route::get('/baut/{bautId}', [\App\Http\Controllers\BautController::class, 'show'])->name('baut.show');
+    Route::get('/baut/{bautId}/download', [\App\Http\Controllers\BautController::class, 'download'])->name('baut.download');
+    Route::get('/{id}/baut', [\App\Http\Controllers\BautController::class, 'editor'])->name('baut.editor');
+    Route::post('/{id}/baut/draft', [\App\Http\Controllers\BautController::class, 'saveDraft'])->name('baut.saveDraft');
+    Route::post('/{id}/baut/generate', [\App\Http\Controllers\BautController::class, 'generate'])->name('baut.generate');
+
+    // LACT (Laporan Commissioning Test) - generate dokumen per LOP, lanjutan
+    // dari BAUT (baru bisa digenerate setelah BAUT LOP ybs berstatus final)
+    Route::get('/lact', [\App\Http\Controllers\LactController::class, 'index'])->name('lact.index');
+    Route::get('/lact/{lactId}', [\App\Http\Controllers\LactController::class, 'show'])->name('lact.show');
+    Route::get('/lact/{lactId}/download', [\App\Http\Controllers\LactController::class, 'download'])->name('lact.download');
+    Route::get('/{id}/lact', [\App\Http\Controllers\LactController::class, 'editor'])->name('lact.editor');
+    Route::post('/{id}/lact/draft', [\App\Http\Controllers\LactController::class, 'saveDraft'])->name('lact.saveDraft');
+    Route::post('/{id}/lact/generate', [\App\Http\Controllers\LactController::class, 'generate'])->name('lact.generate');
+
     // Aksi Form Survey
     Route::post('/survey/{id}/approve', [\App\Http\Controllers\AdminPt2Controller::class, 'approveSurvey'])->name('survey.approve');
     Route::post('/survey/{id}/reject', [\App\Http\Controllers\AdminPt2Controller::class, 'rejectSurvey'])->name('survey.reject');

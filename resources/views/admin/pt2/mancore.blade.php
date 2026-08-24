@@ -97,10 +97,17 @@
                     ✅ Sudah Go-Live
                 </span>
                 
-                {{-- TOMBOL GENERATE BERKAS: AKTIF --}}
-                <a href="#" class="h-10 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold inline-flex items-center justify-center transition shadow-md gap-2">
-                    📄 Generate Berkas
-                </a>
+                {{-- TOMBOL GENERATE BERKAS --}}
+                @if($bautEvidenceReady ?? false)
+                    <a href="{{ route('admin.pt2.baut.editor', $lop->id_pt2_lop) }}" class="h-10 px-5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold inline-flex items-center justify-center transition shadow-md gap-2">
+                        📄 Generate Berkas
+                    </a>
+                @else
+                    <button type="button" disabled title="Semua eviden pada LOP ini harus berstatus approved terlebih dahulu"
+                            class="h-10 px-5 rounded-xl bg-gray-200 text-gray-400 cursor-not-allowed text-sm font-bold inline-flex items-center justify-center border border-gray-300 gap-2">
+                        📄 Generate Berkas (Eviden Belum Lengkap)
+                    </button>
+                @endif
 
             @elseif($isWaitingSdi)
                 <span class="h-10 px-4 rounded-xl bg-amber-100 text-amber-700 text-sm font-bold inline-flex items-center justify-center border border-amber-200">

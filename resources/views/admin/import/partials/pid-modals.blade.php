@@ -1,3 +1,76 @@
+<div x-show="showDetail"
+     x-cloak
+     x-transition.opacity
+     @keydown.escape.window="close()"
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+
+    <div @click.away="close()"
+         class="bg-white dark:bg-slate-900 w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl">
+
+        <div class="bg-gradient-to-br from-blue-700 to-indigo-700 px-6 py-5 text-white">
+            <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                    <p class="text-xs font-bold opacity-90">Detail Data PID & LOP</p>
+                    <h2 class="text-lg md:text-xl font-black leading-snug break-words" x-text="selected.project_name"></h2>
+                    <p class="text-xs mt-1 opacity-90">
+                        <span x-text="selected.pid"></span> · <span x-text="selected.pid_sap"></span>
+                    </p>
+                </div>
+
+                <button type="button"
+                        @click="close()"
+                        class="w-10 h-10 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-xl shrink-0">
+                    ×
+                </button>
+            </div>
+        </div>
+
+        <div class="p-5 overflow-y-auto max-h-[68vh] space-y-5">
+
+            <div>
+                <h3 class="text-xs font-black text-slate-400 uppercase mb-3">Data Project</h3>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <template x-for="field in projectFields" :key="field.label">
+                        <div class="rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3">
+                            <p class="text-[10px] font-black text-slate-400 uppercase" x-text="field.label"></p>
+                            <p class="text-sm font-bold text-slate-900 dark:text-white mt-1 break-words" x-text="field.value"></p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-xs font-black text-slate-400 uppercase mb-3">Data LOP</h3>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <template x-for="field in lopFields" :key="field.label">
+                        <div class="rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-3">
+                            <p class="text-[10px] font-black text-slate-400 uppercase" x-text="field.label"></p>
+                            <p class="text-sm font-bold text-slate-900 dark:text-white mt-1 break-words" x-text="field.value"></p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="px-5 py-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex justify-end gap-2">
+            <button type="button"
+                    @click="close()"
+                    class="h-11 px-5 rounded-2xl bg-white border border-slate-300 text-slate-700 text-sm font-black">
+                Tutup
+            </button>
+
+            <button type="button"
+                    @click="showDetail = false; showEdit = true"
+                    class="h-11 px-5 rounded-2xl bg-amber-500 text-white text-sm font-black hover:bg-amber-600">
+                Edit Data
+            </button>
+        </div>
+    </div>
+</div>
+
 <div x-show="showEdit"
          x-cloak
          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -146,5 +219,3 @@
             </form>
         </div>
     </div>
-
-</div>

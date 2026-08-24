@@ -274,13 +274,21 @@ class AdminPt2Controller extends Controller
     public function reviewMancore($lop_id)
     {
         $lop = Pt2Lop::with(['project', 'assignment.teknisi'])->findOrFail($lop_id);
-        
+
         $project = $lop->project;
         $project->lop = $lop;
         $project->assignment = $lop->assignment;
         $project->pt2Mancore = MancorePt2::where('pt2_lop_id', $lop_id)->first();
 
-        return view('admin.pt2.mancore', compact('project'));
+        // Gate untuk tombol "Generate Berkas" BAUT: hanya aktif jika SEMUA
+        // eviden PT2 pada LOP ini sudah berstatus approved.
+        $totalEvidence = Pt2Evidence::where('pt2_lop_id', $lop_id)->count();
+        $pendingOrRejected = Pt2Evidence::where('pt2_lop_id', $lop_id)
+            ->where('status', '!=', 'approved')
+            ->count();
+        $bautEvidenceReady = $totalEvidence > 0 && $pendingOrRejected === 0;
+
+        return view('admin.pt2.mancore', compact('project', 'bautEvidenceReady'));
     }
 
     /*

@@ -613,17 +613,72 @@
             </div>
         </div>
 
-        <!-- <a href="#"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
-           
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-handshake-icon lucide-handshake">
-                <path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>
-            </svg>
-           <span>
-                Uji terima
-            </span>
-           
-        </a> -->
+        {{-- RESULT FILE (DROPDOWN) --}}
+        @php
+            $resultFileOpen = request()->routeIs('admin.pt2.baut.*')
+                || request()->routeIs('admin.pt2.lact.*');
+        @endphp
+
+        <div x-data="{ open: {{ $resultFileOpen ? 'true' : 'false' }} }">
+
+            <button type="button"
+                    @click="open = !open"
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    {{ $resultFileOpen ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                <div class="flex items-center gap-3">
+                    @if($resultFileOpen)
+                        <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-indigo-600"></span>
+                    @endif
+
+                    <div class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-600/60 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-handshake-icon lucide-handshake">
+                            <path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>
+                        </svg>
+                    </div>
+
+                    <span>Result File</span>
+                </div>
+
+                <svg :class="open ? 'rotate-180' : ''"
+                    class="w-4 h-4 transition-transform"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+
+            <div x-show="open"
+                x-transition
+                class="mt-1 ml-5 pl-3 border-l border-gray-200 dark:border-gray-700 space-y-1">
+
+                <a href="{{ route('admin.pt2.baut.index') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.pt2.baut.*') ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                    <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        Berkas BAUT
+                    </span>
+                </a>
+
+                <a href="{{ route('admin.pt2.lact.index') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.pt2.lact.*') ? 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                    <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-violet-500"></span>
+                        Berkas LACT
+                    </span>
+                </a>
+
+            </div>
+        </div>
 
         <p class="px-3 pt-5 mb-2 text-xs font-bold uppercase text-gray-400">
             Report
