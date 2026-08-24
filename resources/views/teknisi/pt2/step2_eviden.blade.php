@@ -163,7 +163,7 @@
                                                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                                                                 <span>Upload Ulang</span>
                                                             </div>
-                                                            <input type="file" name="file" accept="image/*" class="hidden" onchange="this.form.submit()">
+                                                            <input type="file" name="file" accept="image/*" class="hidden" onchange="handleReplaceFileChange(this)">
                                                         </label>
                                                     </form>
                                                 @endif
@@ -205,7 +205,59 @@
 {{-- BOTTOM NAV --}}
 @include('teknisi.partials.bottom-nav', ['active' => 'home'])
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.js"></script>
 <script>
+    // === VALIDASI METADATA FOTO (EXIF) =============================
+    // Foto eviden wajib punya metadata (tanggal/lokasi/perangkat) supaya
+    // terbukti diambil langsung dari kamera HP, bukan screenshot atau
+    // kiriman ulang dari WhatsApp/Telegram (yang menghapus EXIF).
+    function checkPhotoMetadata(file) {
+        return new Promise((resolve) => {
+            if (typeof EXIF === 'undefined') { resolve(true); return; }
+            try {
+                EXIF.getData(file, function () {
+                    const tags = EXIF.getAllTags(this) || {};
+                    const hasMeta = !!(tags.DateTimeOriginal || tags.DateTime || tags.GPSLatitude || tags.Make || tags.Model);
+                    resolve(hasMeta);
+                });
+            } catch (err) {
+                resolve(true);
+            }
+        });
+    }
+
+    function alertNoMetadata(fileName) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Foto Tidak Ada Metadata!',
+                text: 'Foto "' + fileName + '" tidak memiliki metadata (EXIF) sehingga tidak bisa diunggah. Pastikan foto diambil langsung dari kamera HP, bukan hasil screenshot atau kiriman ulang WhatsApp/Telegram yang menghapus metadata.',
+                icon: 'warning',
+                confirmButtonColor: '#1D4ED8'
+            });
+        } else {
+            alert('Foto "' + fileName + '" tidak memiliki metadata (EXIF) sehingga tidak bisa diunggah.');
+        }
+    }
+
+    // Dipakai oleh input file "Upload Ulang" (replace eviden rejected) supaya
+    // tetap divalidasi metadata-nya sebelum form auto-submit.
+    async function handleReplaceFileChange(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        if (file.type.startsWith('image/')) {
+            const hasMetadata = await checkPhotoMetadata(file);
+            if (!hasMetadata) {
+                alertNoMetadata(file.name);
+                input.value = '';
+                return;
+            }
+        }
+
+        input.form.submit();
+    }
+
     const requiredKeys = @json(array_keys($requiredEvidences));
     
     let serverData = {
@@ -240,10 +292,15 @@
         if(loadingEl) loadingEl.classList.remove('hidden');
 
         for (let file of files) {
+            const hasMetadata = await checkPhotoMetadata(file);
+            if (!hasMetadata) {
+                alertNoMetadata(file.name);
+                continue;
+            }
             // LANGSUNG MASUKKAN FILE ASLI KE STORE TANPA COMPRESS
-            newFilesStore[key].push(file); 
+            newFilesStore[key].push(file);
         }
-        
+
         inputElement.value = '';
         if(loadingEl) loadingEl.classList.add('hidden');
         renderPreviews(key);

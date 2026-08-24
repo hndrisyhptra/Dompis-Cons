@@ -29,16 +29,24 @@
                 @error('title')<p class="text-[11px] text-red-500 mt-1">{{ $message }}</p>@enderror
             </div>
 
+            @php
+                $oldProjectId = old('project_id');
+                $oldProject = $oldProjectId ? $projects->firstWhere('id_project', (int) $oldProjectId) : null;
+                $oldProjectLabel = $oldProject ? $oldProject->project_name . ($oldProject->pid ? ' (PID: '.$oldProject->pid.')' : '') : '';
+            @endphp
             <div>
                 <label class="block text-xs font-bold text-slate-700 mb-1.5">Kaitkan ke Project (opsional)</label>
-                <select name="project_id" class="w-full h-11 rounded-xl border-slate-200 text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition">
-                    <option value="">-- Tidak dikaitkan / project belum ada di sistem --</option>
-                    @foreach($projects as $project)
-                        <option value="{{ $project->id_project }}" {{ old('project_id') == $project->id_project ? 'selected' : '' }}>
-                            {{ $project->project_name }} @if($project->pid) (PID: {{ $project->pid }}) @endif
-                        </option>
-                    @endforeach
-                </select>
+                <div class="relative">
+                    <input type="text" id="projectSearchInput" autocomplete="off"
+                           placeholder="Ketik nama project atau PID untuk mencari..."
+                           value="{{ $oldProjectLabel }}"
+                           class="w-full h-11 rounded-xl border-slate-200 text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition pr-8">
+                    <i class="fa-solid fa-magnifying-glass absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 text-xs pointer-events-none"></i>
+                    <input type="hidden" name="project_id" id="project_id" value="{{ $oldProjectId }}">
+
+                    <div id="projectSearchResults" class="hidden absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg"></div>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1">Kosongkan jika tidak dikaitkan / project belum ada di sistem.</p>
                 @error('project_id')<p class="text-[11px] text-red-500 mt-1">{{ $message }}</p>@enderror
             </div>
 
@@ -75,3 +83,60 @@
 @section('bottom-nav')
     @include('surveyor.partials.bottom-nav', ['active' => ''])
 @endsection
+
+@push('scripts')
+<script>
+    // === SEARCH PROJECT (Kaitkan ke Project) ============================
+    // List project sudah di-load sekaligus (maks 300 baris) supaya pencarian
+    // bisa langsung filter di browser tanpa perlu request tambahan ke server.
+    const projectSearchData = @json($projects->map(fn($p) => [
+        'id' => $p->id_project,
+        'label' => $p->project_name . ($p->pid ? ' (PID: '.$p->pid.')' : ''),
+    ])->values());
+
+    const projectSearchInput = document.getElementById('projectSearchInput');
+    const projectSearchResults = document.getElementById('projectSearchResults');
+    const projectIdInput = document.getElementById('project_id');
+
+    function renderProjectSearchResults(list) {
+        if (list.length === 0) {
+            projectSearchResults.innerHTML = '<div class="px-3 py-2.5 text-xs text-slate-400">Project tidak ditemukan</div>';
+        } else {
+            projectSearchResults.innerHTML = list.slice(0, 50).map(function (p) {
+                return '<button type="button" data-id="' + p.id + '" data-label="' + p.label.replace(/"/g, '&quot;') + '" ' +
+                    'class="project-option w-full text-left px-3 py-2.5 text-xs font-medium text-slate-700 hover:bg-blue-50 border-b border-slate-50 last:border-0">' +
+                    p.label + '</button>';
+            }).join('');
+        }
+        projectSearchResults.classList.remove('hidden');
+    }
+
+    function filterProjectSearch(query) {
+        const q = query.trim().toLowerCase();
+        return q ? projectSearchData.filter(function (p) { return p.label.toLowerCase().includes(q); }) : projectSearchData;
+    }
+
+    projectSearchInput.addEventListener('focus', function () {
+        renderProjectSearchResults(filterProjectSearch(this.value));
+    });
+
+    projectSearchInput.addEventListener('input', function () {
+        projectIdInput.value = ''; // reset pilihan lama kalau user mengetik ulang
+        renderProjectSearchResults(filterProjectSearch(this.value));
+    });
+
+    projectSearchResults.addEventListener('click', function (e) {
+        const btn = e.target.closest('.project-option');
+        if (!btn) return;
+        projectIdInput.value = btn.dataset.id;
+        projectSearchInput.value = btn.dataset.label;
+        projectSearchResults.classList.add('hidden');
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!projectSearchInput.contains(e.target) && !projectSearchResults.contains(e.target)) {
+            projectSearchResults.classList.add('hidden');
+        }
+    });
+</script>
+@endpush

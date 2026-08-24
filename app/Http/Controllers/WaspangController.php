@@ -842,6 +842,54 @@ class WaspangController extends Controller
         return back()->with('success', 'Eviden berhasil diperbarui. Status kembali pending.');
     }
 
+    /**
+     * Hapus satu foto eviden milik Waspang. Dipakai oleh tombol "×" di pojok
+     * foto pada halaman persiapan/pengukuran/instalasi/finishing.
+     */
+    public function deleteEvidence($id)
+    {
+        $evidence = \App\Models\Evidence::findOrFail($id);
+
+        // Eviden yang sudah approved tidak boleh dihapus (samakan dengan guard
+        // di tampilan: @if($photo->status != 'approved')).
+        if ($evidence->status === 'approved') {
+            return back()->with('error', 'Eviden yang sudah disetujui tidak bisa dihapus.');
+        }
+
+        // 1. Hapus file fisik dari storage
+        if ($evidence->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($evidence->file_path)) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($evidence->file_path);
+        }
+
+        $projectId = $evidence->project_id;
+        $stage = $evidence->stage;
+        $evidenceId = $evidence->id_evidence;
+        $evidenceType = $evidence->evidence_type;
+        $boqItemId = $evidence->boq_item_id;
+
+        // 2. Catat Log Aktivitas SEBELUM baris eviden dihapus, supaya evidence_id
+        //    pada log masih menunjuk ke baris yang valid saat dicatat.
+        \App\Services\ProjectActivityService::log([
+            'project_id' => $projectId,
+            'lop_id' => \App\Models\Lop::where('project_id', $projectId)->value('id_lop'),
+            'evidence_id' => $evidenceId,
+            'activity_type' => 'delete_evidence',
+            'title' => 'Hapus Eviden',
+            'description' => 'Waspang menghapus eviden (ID-'.$evidenceId.').',
+            'stage' => $stage,
+            'status_after' => null,
+            'meta' => [
+                'evidence_type' => $evidenceType,
+                'boq_item_id' => $boqItemId,
+            ],
+        ]);
+
+        // 3. Hapus baris database
+        $evidence->delete();
+
+        return back()->with('success', 'Foto eviden berhasil dihapus.');
+    }
+
     //NOTIFICATION
     public function notifications()
     {

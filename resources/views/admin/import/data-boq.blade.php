@@ -410,15 +410,35 @@
                         <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                             <div class="sm:col-span-7">
                                 <label class="block text-xs font-black text-slate-500 uppercase mb-2">Designator</label>
-                                <select name="designator_id[]" required
-                                        class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
-                                    <option value="">Pilih designator...</option>
-                                    @foreach($designators as $designator)
-                                        <option value="{{ $designator->id_designator }}">
-                                            {{ $designator->designator }} — {{ $designator->item_name }} ({{ $designator->unit }})
-                                        </option>
-                                    @endforeach
-                                </select>
+                                <div @click.outside="designatorSearchOpen = false">
+                                    <input type="text"
+                                           x-model="designatorSearch"
+                                           @focus="designatorSearchOpen = true"
+                                           @input="designatorId = ''"
+                                           autocomplete="off"
+                                           placeholder="Cari designator / item pekerjaan..."
+                                           class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+
+                                    <input type="hidden" name="designator_id[]" :value="designatorId" required>
+
+                                    {{-- Daftar hasil dibiarkan mengikuti alur normal (bukan absolute) supaya
+                                         tidak terpotong/hilang oleh overflow-y-auto pada body modal, dan tetap
+                                         bisa di-scroll normal seperti bagian lain di dalam modal. --}}
+                                    <div x-show="designatorSearchOpen"
+                                         style="display: none;"
+                                         class="mt-1 w-full max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl shadow-lg">
+                                        <template x-for="d in filteredDesignators()" :key="d.id">
+                                            <button type="button"
+                                                    @click="designatorId = d.id; designatorSearch = d.label; designatorSearchOpen = false"
+                                                    class="w-full text-left px-3 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border-b border-slate-50 dark:border-slate-800 last:border-0"
+                                                    x-text="d.label">
+                                            </button>
+                                        </template>
+                                        <template x-if="filteredDesignators().length === 0">
+                                            <div class="px-3 py-2.5 text-xs text-slate-400">Designator tidak ditemukan</div>
+                                        </template>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="sm:col-span-3">
@@ -458,9 +478,28 @@
     const BOQ_DELETE_URL_TEMPLATE = @json($boqDeleteUrlTemplate);
     const REOPEN_LOP_ID = @json($reopenLopId);
 
+    // Katalog designator untuk fitur search "Tambah Item Designator" di bawah,
+    // supaya filter bisa langsung jalan di browser tanpa request tambahan.
+    const ALL_DESIGNATORS = @json($designators->map(fn($d) => [
+        'id' => $d->id_designator,
+        'label' => $d->designator . ' — ' . $d->item_name . ' (' . $d->unit . ')',
+    ])->values());
+
     function boqDetailModal() {
         return {
             show: false,
+
+            // === SEARCH DESIGNATOR (Tambah Item Designator) ===
+            designatorSearch: '',
+            designatorId: '',
+            designatorSearchOpen: false,
+            filteredDesignators() {
+                const q = this.designatorSearch.trim().toLowerCase();
+                const list = q
+                    ? ALL_DESIGNATORS.filter(d => d.label.toLowerCase().includes(q))
+                    : ALL_DESIGNATORS;
+                return list.slice(0, 50);
+            },
 
             selected: {
                 lopId: null,

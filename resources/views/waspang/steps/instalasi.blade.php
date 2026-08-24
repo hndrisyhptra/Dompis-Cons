@@ -162,47 +162,54 @@
                         @if($photos->count() > 0)
                             <div class="grid grid-cols-3 gap-2">
                                 @foreach($photos as $photo)
-                                    <div class="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group transition-all 
-                                        {{ $photo->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-gray-200' }}">
-                                        
-                                        {{-- INDIKATOR ID FOTO (PERMANEN) --}}
-                                        <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-10 backdrop-blur-sm">
+                                    {{-- Wrapper luar ini SENGAJA dipisah dari kartu foto di bawah (yang punya
+                                         class hover/group untuk overlay Upload Ulang), supaya tombol Hapus,
+                                         walau tampil menempel di pojok foto, tidak dianggap bagian dari
+                                         area hover kartu tsb dan tidak ikut memicu overlay Upload Ulang. --}}
+                                    <div class="relative">
+                                        <div class="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group transition-all
+                                            {{ $photo->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-gray-200' }}">
+
+                                            {{-- INDIKATOR ID FOTO (PERMANEN) --}}
+                                            <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-10 backdrop-blur-sm">
+                                                @if($photo->status == 'rejected')
+                                                    <i class="fa-solid fa-circle-exclamation text-red-400"></i>
+                                                @elseif($photo->status == 'approved')
+                                                    <i class="fa-solid fa-check-circle text-green-400"></i>
+                                                @endif
+                                                ID-{{ $photo->id_evidence }}
+                                            </div>
+
+                                            <img src="{{ asset('storage/' . $photo->file_path) }}"
+                                                 class="w-full h-full object-cover {{ $photo->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
+
+                                            {{-- JIKA STATUS REJECTED, TAMPILKAN NOTE & FORM REPLACE --}}
                                             @if($photo->status == 'rejected')
-                                                <i class="fa-solid fa-circle-exclamation text-red-400"></i>
-                                            @elseif($photo->status == 'approved')
-                                                <i class="fa-solid fa-check-circle text-green-400"></i>
+                                                @if(!empty($photo->review_note))
+                                                    <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[9px] p-1.5 text-center font-bold z-10 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2" title="{{ $photo->review_note }}">
+                                                        {{ $photo->review_note }}
+                                                    </div>
+                                                @endif
+
+                                                {{-- OVERLAY GANTI FOTO --}}
+                                                <form method="POST" action="{{ route('waspang.evidence.replace', $photo->id_evidence) }}" enctype="multipart/form-data"
+                                                      class="absolute inset-0 z-20 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
+                                                    @csrf
+                                                    <label class="cursor-pointer bg-blue-600 text-white text-[10px] font-black px-3 py-2 rounded-xl shadow-lg hover:bg-blue-700 transition flex flex-col items-center gap-1">
+                                                        <i class="fa-solid fa-camera-rotate text-sm"></i>
+                                                        Upload Ulang
+                                                        <input type="file" name="file" class="hidden" onchange="handleReplaceFileChange(this)" accept="image/*,.sor,application/pdf">
+                                                    </label>
+                                                </form>
                                             @endif
-                                            ID-{{ $photo->id_evidence }}
                                         </div>
 
-                                        <img src="{{ asset('storage/' . $photo->file_path) }}" 
-                                             class="w-full h-full object-cover {{ $photo->status == 'rejected' ? 'opacity-80 grayscale-[20%]' : '' }}">
-                                        
-                                        {{-- JIKA STATUS REJECTED, TAMPILKAN NOTE & FORM REPLACE --}}
-                                        @if($photo->status == 'rejected')
-                                            @if(!empty($photo->review_note))
-                                                <div class="absolute bottom-0 left-0 right-0 bg-red-600/95 text-white text-[9px] p-1.5 text-center font-bold z-10 backdrop-blur-sm leading-tight border-t border-red-500 line-clamp-2" title="{{ $photo->review_note }}">
-                                                    {{ $photo->review_note }}
-                                                </div>
-                                            @endif
-                                            
-                                            {{-- OVERLAY GANTI FOTO --}}
-                                            <form method="POST" action="{{ route('waspang.evidence.replace', $photo->id_evidence) }}" enctype="multipart/form-data" 
-                                                  class="absolute inset-0 z-20 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
-                                                @csrf
-                                                <label class="cursor-pointer bg-blue-600 text-white text-[10px] font-black px-3 py-2 rounded-xl shadow-lg hover:bg-blue-700 transition flex flex-col items-center gap-1">
-                                                    <i class="fa-solid fa-camera-rotate text-sm"></i>
-                                                    Upload Ulang
-                                                    <input type="file" name="file" class="hidden" onchange="this.form.submit()" accept="image/*,.sor,application/pdf">
-                                                </label>
-                                            </form>
-                                        @endif
-                                        
-                                        {{-- TOMBOL HAPUS --}}
+                                        {{-- TOMBOL HAPUS: sibling dari kartu foto (bukan anak dari elemen ber-group/hover
+                                             di atas), tetap tampil menempel di pojok kanan atas foto. --}}
                                         @if($photo->status != 'approved')
-                                            <form method="POST" action="{{ route('waspang.evidence.delete', $photo->id_evidence) }}" class="absolute top-1 right-1 z-10">
+                                            <form method="POST" action="{{ route('waspang.evidence.delete', $photo->id_evidence) }}" class="absolute -top-1.5 -right-1.5 z-50" onsubmit="return confirm('Hapus eviden ini?')">
                                                 @csrf @method('DELETE')
-                                                <button class="w-5 h-5 rounded-full bg-black/70 hover:bg-red-600 text-white text-xs flex items-center justify-center font-bold backdrop-blur-sm transition">×</button>
+                                                <button type="submit" title="Hapus foto" class="w-7 h-7 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center text-sm font-black shadow-lg border-2 border-white transition active:scale-90">×</button>
                                             </form>
                                         @endif
                                     </div>
@@ -342,8 +349,62 @@
 
 @section('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.js"></script>
+<style>
+    /* uploadModal pakai z-[9999], sedangkan SweetAlert2 default z-index-nya
+       (1060) lebih rendah -- akibatnya alert (termasuk alert metadata foto)
+       muncul di BELAKANG modal upload. Paksa selalu tampil paling depan. */
+    .swal2-container { z-index: 10000 !important; }
+</style>
 <script>
-let selectedFiles = []; 
+let selectedFiles = [];
+
+// === VALIDASI METADATA FOTO (EXIF) ===============================
+// Foto eviden wajib punya metadata (tanggal/lokasi/perangkat) supaya
+// terbukti diambil langsung dari kamera HP, bukan screenshot atau
+// kiriman ulang dari WhatsApp/Telegram (yang menghapus EXIF).
+function checkPhotoMetadata(file) {
+    return new Promise((resolve) => {
+        if (typeof EXIF === 'undefined') { resolve(true); return; }
+        try {
+            EXIF.getData(file, function () {
+                const tags = EXIF.getAllTags(this) || {};
+                const hasMeta = !!(tags.DateTimeOriginal || tags.DateTime || tags.GPSLatitude || tags.Make || tags.Model);
+                resolve(hasMeta);
+            });
+        } catch (err) {
+            resolve(true);
+        }
+    });
+}
+
+function alertNoMetadata(fileName) {
+    Swal.fire({
+        title: 'Foto Tidak Ada Metadata!',
+        text: 'Foto "' + fileName + '" tidak memiliki metadata (EXIF) sehingga tidak bisa diunggah. Pastikan foto diambil langsung dari kamera HP, bukan hasil screenshot atau kiriman ulang WhatsApp/Telegram yang menghapus metadata.',
+        icon: 'warning',
+        confirmButtonColor: '#1D4ED8',
+        customClass: { popup: 'rounded-3xl' }
+    });
+}
+
+// Dipakai oleh input file "Upload Ulang" (replace foto/file rejected) supaya
+// tetap divalidasi metadata-nya sebelum form auto-submit. File .sor/pdf dilewati.
+async function handleReplaceFileChange(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (file.type.startsWith('image/')) {
+        const hasMetadata = await checkPhotoMetadata(file);
+        if (!hasMetadata) {
+            alertNoMetadata(file.name);
+            input.value = '';
+            return;
+        }
+    }
+
+    input.form.submit();
+}
 
 const inputActual = document.getElementById('quantity_actual');
 const reasonBox = document.getElementById('reasonBox');
@@ -420,6 +481,13 @@ document.getElementById('photoInput').addEventListener('change', async function(
     const files = Array.from(e.target.files);
     for (const file of files) {
         if (!file.type.startsWith('image/')) continue;
+
+        const hasMetadata = await checkPhotoMetadata(file);
+        if (!hasMetadata) {
+            alertNoMetadata(file.name);
+            continue;
+        }
+
         const compressed = await compressImage(file, 1280, 0.75);
         selectedFiles.push({ file: compressed, url: URL.createObjectURL(compressed) });
     }
