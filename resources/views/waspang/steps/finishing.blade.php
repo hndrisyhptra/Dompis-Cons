@@ -570,10 +570,10 @@ document.getElementById('photoInput').addEventListener('change', async function(
             continue;
         }
 
-        const compressed = await compressImage(file, 1280, 0.75);
+        // Eviden diunggah TANPA kompresi supaya metadata (EXIF) foto tidak hilang.
         selectedFiles.push({
-            file: compressed,
-            url: URL.createObjectURL(compressed)
+            file: file,
+            url: URL.createObjectURL(file)
         });
     }
     renderEvidencePreview();

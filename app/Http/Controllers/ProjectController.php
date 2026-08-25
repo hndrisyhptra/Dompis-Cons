@@ -520,9 +520,12 @@ public function importCsv(Request $request)
         $allowedPrograms = ['OSP', 'HEM', 'OLO', 'NODE B'];
 
         // BASE QUERY: Harus sudah punya minimal 1 eviden (foto)
+        // NOTE: 'boqItems.designatorDataByCode' ikut di-eager-load supaya
+        // progressSummary() di view tidak memicu query tambahan per project (N+1).
         $query = Project::with([
             'evidences',
             'boqItems.designatorData',
+            'boqItems.designatorDataByCode',
             'assignment.waspang',
             'lop'
         ])->whereHas('evidences')

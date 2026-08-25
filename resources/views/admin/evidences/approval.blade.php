@@ -153,10 +153,14 @@
                             $approvedCount = $items->where('status', 'approved')->count();
                             $rejectedCount = $items->where('status', 'rejected')->count();
 
-                            $progress = $persiapanApproved + $instalasiApproved + $finishingApproved;
-                            $total = $persiapanTotal + $instalasiTotal + $finishingTotal;
-                            
-                            $progressPercent = $total > 0 ? ($progress / $total) * 100 : 0;
+                            // PROGRESS KESELURUHAN: dihitung PER STEP (4 step: Persiapan,
+                            // Instalasi, Pengukuran, Finishing = masing-masing 25%), sama
+                            // persis dengan Project::progressSummary() yang dipakai saat
+                            // approve eviden. Ini FIX untuk bug progress lompat ke 100%
+                            // hanya karena 1 step (mis. Persiapan) selesai duluan, padahal
+                            // step lain (Instalasi/Pengukuran/Finishing) belum diupload.
+                            $summary = $project->progressSummary();
+                            $progressPercent = $summary['progress'] ?? 0;
                             $isComplete = ($progressPercent >= 100);
                         @endphp
 

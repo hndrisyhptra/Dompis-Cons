@@ -332,7 +332,7 @@ class TeknisiPt2Controller extends Controller
                 foreach ($files as $file) {
                     if ($file->isValid()) {
                         $filename = time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-                        $path = $file->storeAs('evidences/pt2/' . $lop->id_pt2_lop, $filename, 'public');
+                        $path = $file->storeAs('evidences/pt2/' . $this->evidencePt2LopFolder($lop->lop_name, $lop->id_pt2_lop), $filename, 'public');
 
                         Pt2Evidence::create([
                             'pt2_project_id' => $lop->pt2_project_id,
@@ -393,13 +393,32 @@ class TeknisiPt2Controller extends Controller
         );
     }
 
+    /**
+     * Nama folder penyimpanan eviden PT2 berdasarkan NAMA LOP (bukan ID lop),
+     * supaya lebih mudah dicari manual di storage/app/public/evidences/pt2.
+     * Fallback ke ID lop kalau nama LOP kosong/belum ada.
+     */
+    private function evidencePt2LopFolder(?string $lopName, $fallbackId): string
+    {
+        $lopName = trim((string) $lopName);
+
+        if ($lopName === '') {
+            return (string) $fallbackId;
+        }
+
+        $safe = preg_replace('/[\/\\\\:*?"<>|]+/', '_', $lopName);
+        $safe = trim($safe, " ._");
+
+        return $safe !== '' ? $safe : (string) $fallbackId;
+    }
+
     public function replaceEvidence(Request $request, $id)
     {
         $request->validate([
             'file' => 'required|file|max:10240',
         ]);
 
-        $evidence = Pt2Evidence::findOrFail($id);
+        $evidence = Pt2Evidence::with('lop')->findOrFail($id);
 
         if ($evidence->file_path && Storage::disk('public')->exists($evidence->file_path)) {
             Storage::disk('public')->delete($evidence->file_path);
@@ -408,11 +427,11 @@ class TeknisiPt2Controller extends Controller
         $file = $request->file('file');
         $originalExtension = strtolower($file->getClientOriginalExtension());
         $extension = $originalExtension ?: 'jpg';
-        
+
         $filename = now()->format('Ymd_His') . '_replace_' . uniqid() . '.' . $extension;
 
         $path = $file->storeAs(
-            'evidences/pt2/' . $evidence->pt2_lop_id,
+            'evidences/pt2/' . $this->evidencePt2LopFolder($evidence->lop->lop_name ?? null, $evidence->pt2_lop_id),
             $filename,
             'public'
         );
@@ -468,7 +487,7 @@ class TeknisiPt2Controller extends Controller
                 foreach ($files as $file) {
                     if ($file->isValid()) {
                         $filename = time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-                        $path = $file->storeAs('evidences/pt2/' . $lop->id_pt2_lop, $filename, 'public');
+                        $path = $file->storeAs('evidences/pt2/' . $this->evidencePt2LopFolder($lop->lop_name, $lop->id_pt2_lop), $filename, 'public');
 
                         Pt2Evidence::create([
                             'pt2_project_id' => $lop->pt2_project_id,
@@ -546,7 +565,7 @@ class TeknisiPt2Controller extends Controller
                 foreach ($files as $file) {
                     if ($file->isValid()) {
                         $filename = time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-                        $path = $file->storeAs('evidences/pt2/' . $lop->id_pt2_lop, $filename, 'public');
+                        $path = $file->storeAs('evidences/pt2/' . $this->evidencePt2LopFolder($lop->lop_name, $lop->id_pt2_lop), $filename, 'public');
 
                         Pt2Evidence::create([
                             'pt2_project_id' => $lop->pt2_project_id,
@@ -621,7 +640,7 @@ class TeknisiPt2Controller extends Controller
                 foreach ($files as $file) {
                     if ($file->isValid()) {
                         $filename = time() . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
-                        $path = $file->storeAs('evidences/pt2/' . $lop->id_pt2_lop, $filename, 'public');
+                        $path = $file->storeAs('evidences/pt2/' . $this->evidencePt2LopFolder($lop->lop_name, $lop->id_pt2_lop), $filename, 'public');
 
                         Pt2Evidence::create([
                             'pt2_project_id' => $lop->pt2_project_id,

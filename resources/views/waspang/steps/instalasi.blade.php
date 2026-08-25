@@ -488,8 +488,8 @@ document.getElementById('photoInput').addEventListener('change', async function(
             continue;
         }
 
-        const compressed = await compressImage(file, 1280, 0.75);
-        selectedFiles.push({ file: compressed, url: URL.createObjectURL(compressed) });
+        // Eviden diunggah TANPA kompresi supaya metadata (EXIF) foto tidak hilang.
+        selectedFiles.push({ file: file, url: URL.createObjectURL(file) });
     }
     renderEvidencePreview();
     document.getElementById('photoInput').value = '';

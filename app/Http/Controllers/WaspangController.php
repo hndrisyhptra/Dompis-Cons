@@ -664,7 +664,7 @@ class WaspangController extends Controller
             'actual_reason' => 'nullable|string', 
         ]);
 
-        $projectFolder = 'project-' . $project->id_project;
+        $projectFolder = $this->evidenceLopFolder($project->id_project);
         $stage = $request->stage;
         $type = $request->evidence_type;
         $lopId = \App\Models\Lop::where('project_id', $project->id_project)->value('id_lop');
@@ -903,6 +903,37 @@ class WaspangController extends Controller
         return true;
     }
 
+    /**
+     * Nama folder penyimpanan eviden berdasarkan NAMA LOP (bukan ID project),
+     * supaya lebih mudah dicari manual di storage/app/public/evidences.
+     * Fallback ke "project-{id}" kalau LOP belum ada / nama LOP kosong.
+     */
+    private function evidenceLopFolder(int $projectId): string
+    {
+        $lopName = \App\Models\Lop::where('project_id', $projectId)->value('lop_name');
+
+        return $this->sanitizeFolderName($lopName, 'project-' . $projectId);
+    }
+
+    /**
+     * Bersihkan nama LOP supaya aman dipakai sebagai nama folder (hilangkan
+     * karakter path separator dkk), tapi tetap pertahankan spasi/huruf/angka
+     * agar nama LOP masih mudah dibaca saat dicari manual.
+     */
+    private function sanitizeFolderName(?string $name, string $fallback): string
+    {
+        $name = trim((string) $name);
+
+        if ($name === '') {
+            return $fallback;
+        }
+
+        $safe = preg_replace('/[\/\\\\:*?"<>|]+/', '_', $name);
+        $safe = trim($safe, " ._");
+
+        return $safe !== '' ? $safe : $fallback;
+    }
+
     public function replace(Request $request, $id)
     {
         $request->validate([
@@ -910,7 +941,7 @@ class WaspangController extends Controller
         ]);
 
         $evidence = \App\Models\Evidence::findOrFail($id);
-        $projectFolder = 'project-' . $evidence->project_id;
+        $projectFolder = $this->evidenceLopFolder($evidence->project_id);
         $stage = $evidence->stage;
         $type = $evidence->evidence_type;
 

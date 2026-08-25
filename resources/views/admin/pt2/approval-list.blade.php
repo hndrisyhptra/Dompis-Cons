@@ -78,7 +78,7 @@
                     <tr class="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
                         <th class="p-4 font-black w-2/6">LOP & Project Induk</th>
                         <th class="p-4 font-black w-1/6">Teknisi Bertugas</th>
-                        <th class="p-4 font-black w-1/4">Kelengkapan 5 Step</th>
+                        <th class="p-4 font-black w-1/4">Kelengkapan Step (+ Opsional)</th>
                         <th class="p-4 font-black text-center w-1/12">Eviden</th>
                         <th class="p-4 font-black text-right w-1/6">Status & Aksi</th>
                     </tr>
@@ -92,16 +92,38 @@
                             $survey = $lop->surveys()->first();
                             $mancore = \App\Models\MancorePt2::where('pt2_lop_id', $lop->id_pt2_lop)->first();
 
-                            // LOGIKA PENGECEKAN 5 STEP PT2
-                            $step1 = ($survey && $evidences->where('stage', 'persiapan')->count() > 0) ? 1 : 0;
-                            $step2 = $evidences->where('stage', 'instalasi')->count() > 0 ? 1 : 0;
-                            $step3 = $evidences->where('stage', 'finishing')->where('evidence_type', 'redaman_port')->count() > 0 ? 1 : 0;
+                            // LOGIKA PENGECEKAN PER STEP PT2 (berdasarkan eviden yang SUDAH DI-APPROVE,
+                            // bukan sekadar ada/tidaknya eviden, supaya progress approval akurat per step)
+                            $persiapanEv = $evidences->where('stage', 'persiapan');
+                            $step1 = ($survey
+                                && $persiapanEv->count() > 0
+                                && $persiapanEv->where('status', 'pending')->count() == 0
+                                && $persiapanEv->where('status', 'rejected')->count() == 0) ? 1 : 0;
+
+                            $instalasiEv = $evidences->where('stage', 'instalasi');
+                            $step2 = ($instalasiEv->count() > 0
+                                && $instalasiEv->where('status', 'pending')->count() == 0
+                                && $instalasiEv->where('status', 'rejected')->count() == 0) ? 1 : 0;
+
+                            $redamanEv = $evidences->where('stage', 'finishing')->where('evidence_type', 'redaman_port');
+                            $step3 = ($redamanEv->count() > 0
+                                && $redamanEv->where('status', 'pending')->count() == 0
+                                && $redamanEv->where('status', 'rejected')->count() == 0) ? 1 : 0;
+
+                            // STEP 4 (Dismantle) = OPSIONAL. Statusnya ditampilkan sebagai info,
+                            // tapi TIDAK dihitung ke progress wajib supaya LOP tanpa dismantle
+                            // tetap bisa mencapai 100% begitu step wajib lainnya selesai.
                             $hasDismantle = \App\Models\DismantlePt2::where('pt2_lop_id', $lop->id_pt2_lop)->exists();
-                            $step4 = 1; // Opt
+                            $dismantleEv = $evidences->where('stage', 'dismantle');
+                            $step4 = ($hasDismantle || $dismantleEv->count() > 0) ? 1 : 0;
+
                             $step5 = $mancore ? 1 : 0;
 
-                            $progress = $step1 + $step2 + $step3 + $step4 + $step5;
-                            $progressPercent = ($progress / 5) * 100;
+                            // PROGRESS WAJIB: Survey, Instalasi, Redaman/Finish, Mancore (4 step).
+                            // Dismantle (step4) dikecualikan dari perhitungan % karena opsional.
+                            $requiredSteps = [$step1, $step2, $step3, $step5];
+                            $progress = array_sum($requiredSteps);
+                            $progressPercent = ($progress / 4) * 100;
 
                             $pendingCount = $evidences->where('status', 'pending')->count();
                             $approvedCount = $evidences->where('status', 'approved')->count();
@@ -149,7 +171,7 @@
                                         <div class="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
                                             <div class="h-full bg-cyan-500 rounded-full transition-all duration-300" style="width: {{ $progressPercent }}%"></div>
                                         </div>
-                                        <span class="text-[10px] font-black text-slate-700 w-9 text-right">{{ $progress }}/5</span>
+                                        <span class="text-[10px] font-black text-slate-700 w-9 text-right">{{ $progress }}/4</span>
                                     </div>
                                     
                                     {{-- Detail Angka Progress --}}
@@ -163,8 +185,8 @@
                                         <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 3 Redaman">
                                             S3: <span class="{{ $step3 ? 'text-cyan-600' : 'text-slate-400' }}">{{ $step3 ? '✓' : '✗' }}</span>
                                         </span>
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 4 Dismantle (Opsional)">
-                                            S4: <span class="{{ $hasDismantle ? 'text-cyan-600' : 'text-slate-400' }}">{{ $hasDismantle ? '✓' : 'Opt' }}</span>
+                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 4 Dismantle (Opsional, tidak dihitung ke progress %)">
+                                            S4: <span class="{{ $step4 ? 'text-cyan-600' : 'text-slate-400' }}">{{ $step4 ? '✓' : 'Opt' }}</span>
                                         </span>
                                         <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500" title="Step 5 Mancore">
                                             S5: <span class="{{ $step5 ? 'text-cyan-600' : 'text-slate-400' }}">{{ $step5 ? '✓' : '✗' }}</span>

@@ -534,8 +534,8 @@ if (photoInputElement) {
                     continue;
                 }
 
-                const compressed = await window.compressImage(file, 1280, 0.75);
-                window.selectedFiles.push({ file: compressed, url: URL.createObjectURL(compressed), is_sor: false, name: file.name });
+                // Eviden diunggah TANPA kompresi supaya metadata (EXIF) foto tidak hilang.
+                window.selectedFiles.push({ file: file, url: URL.createObjectURL(file), is_sor: false, name: file.name });
             }
         }
         
