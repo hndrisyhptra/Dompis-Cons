@@ -154,6 +154,22 @@ class ProjectController extends Controller
             ],
         ]);
 
+        // WEBHOOK EVENT: project baru di-assign -- event pribadi utk waspang/teknisi.
+        $projectForNotif = Project::find($request->project_id);
+        \App\Services\TelegramWebhookEventService::publishToUser(
+            $targetUser,
+            'project_assigned',
+            $isReassign ? 'Project Di-assign Ulang' : 'Project Baru Ditugaskan',
+            "Anda ditugaskan sebagai {$roleTitle} untuk project " . ($projectForNotif->project_name ?? '-') . ' (' . ($projectForNotif->pid ?? '-') . ').',
+            [
+                'project_name' => $projectForNotif->project_name ?? null,
+                'pid' => $projectForNotif->pid ?? null,
+                'role_assigned_as' => $targetUser->role,
+                'is_reassign' => $isReassign,
+            ],
+            ['project_id' => $request->project_id]
+        );
+
         return back()->with('success', 'Assignment berhasil disimpan');
     }
 
@@ -731,7 +747,7 @@ public function importCsv(Request $request)
             'review_note' => 'required|string',
         ]);
 
-        $evidence = Evidence::with(['project', 'boqItem'])->findOrFail($id);
+        $evidence = Evidence::with(['project', 'boqItem', 'uploader'])->findOrFail($id);
 
         $oldStatus = $evidence->status;
         $evidenceLabel = $this->evidenceLabel($evidence);
@@ -748,6 +764,25 @@ public function importCsv(Request $request)
             'message' => 'Eviden ' . $evidence->stage . ' ditolak. Note: "' . $request->review_note . '"',
             'redirect_url' => route('waspang.projects.show', $evidence->project_id),
         ]);
+
+        // WEBHOOK EVENT: eviden direject -- event pribadi utk waspang/teknisi pengunggah.
+        if ($evidence->uploader) {
+            \App\Services\TelegramWebhookEventService::publishToUser(
+                $evidence->uploader,
+                'evidence_rejected',
+                'Eviden Ditolak',
+                "Eviden {$evidenceLabel} pada tahap {$evidence->stage} untuk project " . ($evidence->project->project_name ?? '-') . ' ditolak oleh Admin. Catatan: "' . $request->review_note . '"',
+                [
+                    'evidence_id' => $evidence->id_evidence,
+                    'evidence_label' => $evidenceLabel,
+                    'stage' => $evidence->stage,
+                    'evidence_type' => $evidence->evidence_type,
+                    'project_name' => $evidence->project->project_name ?? null,
+                    'review_note' => $request->review_note,
+                ],
+                ['project_id' => $evidence->project_id]
+            );
+        }
 
         EvidenceRevisionHistory::create([
             'evidence_id' => $evidence->id_evidence,

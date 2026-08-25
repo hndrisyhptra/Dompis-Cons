@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 
 Schedule::command('imports:cleanup --days=30')
     ->dailyAt('02:00');
+
+// Publish event pengingat (role PM): project di-assign tapi tidak ada update >1 hari.
+Schedule::command('webhook:publish-stale-project-reminders --hours=24')
+    ->dailyAt('08:00');

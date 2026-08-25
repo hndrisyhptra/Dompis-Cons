@@ -347,11 +347,50 @@ class TeknisiPt2Controller extends Controller
                 }
             }
             
+            $this->publishPt2StepUploadedEvent($lop, 'Persiapan/Survey (Step 1)');
+
             return redirect()->route('teknisi.pt2.step2Eviden', $lop->id_pt2_lop)
                              ->with('success', 'Eviden Survey berhasil disimpan! Lanjut Step 2.');
         }
 
         return back()->with('error', 'Gagal mengupload eviden. Pastikan foto sudah dipilih.');
+    }
+
+    /**
+     * WEBHOOK EVENT: setiap kali teknisi menyelesaikan upload eviden untuk satu
+     * step PT2, publish event ke telegram_webhook_events utk admin yang
+     * meng-assign LOP ini ke teknisi tsb. Berbeda dari alur Waspang, di sini
+     * setiap step store method SUDAH merepresentasikan satu step penuh, jadi
+     * tidak perlu derivasi "apakah stage sudah lengkap" -- cukup publish tiap
+     * store berhasil.
+     */
+    private function publishPt2StepUploadedEvent($lop, string $stepLabel): void
+    {
+        $assignment = \App\Models\Pt2Assignment::where('pt2_lop_id', $lop->id_pt2_lop)->first();
+        $admin = $assignment?->assigner;
+
+        if (! $admin) {
+            return;
+        }
+
+        $lop->loadMissing('project');
+        $projectName = $lop->project->project_name ?? ('PT2 Project #' . $lop->pt2_project_id);
+
+        \App\Services\TelegramWebhookEventService::publishToUser(
+            $admin,
+            'evidence_step_uploaded',
+            'Eviden PT2 Diupload',
+            'Teknisi ' . (Auth::user()->name ?? '-') . " telah menyelesaikan upload eviden {$stepLabel} untuk {$projectName} — LOP " . ($lop->lop_name ?? $lop->id_pt2_lop) . '. Eviden menunggu review Anda.',
+            [
+                'step_label' => $stepLabel,
+                'project_name' => $projectName,
+                'lop_name' => $lop->lop_name,
+                'uploader_name' => Auth::user()->name ?? null,
+                'uploader_role' => 'teknisi',
+                'is_pt2' => true,
+            ],
+            ['project_id' => $lop->pt2_project_id, 'lop_id' => $lop->id_pt2_lop]
+        );
     }
 
     public function replaceEvidence(Request $request, $id)
@@ -444,6 +483,8 @@ class TeknisiPt2Controller extends Controller
                 }
             }
             
+            $this->publishPt2StepUploadedEvent($lop, 'Instalasi (Step 2)');
+
             return back()->with('success', 'Eviden Instalasi berhasil diupload!');
         }
 
@@ -519,6 +560,8 @@ class TeknisiPt2Controller extends Controller
                     }
                 }
             }
+            $this->publishPt2StepUploadedEvent($lop, 'Redaman/Finishing (Step 3)');
+
             return redirect(url('teknisi/pt2/survey/'.$lop->id_pt2_lop.'/step4'))->with('success', 'Eviden Redaman berhasil disimpan! Lanjut ke Step 4.');
         }
 
@@ -586,12 +629,14 @@ class TeknisiPt2Controller extends Controller
                             'stage' => 'finishing',
                             'evidence_type' => $type,
                             'file_path' => $path,
-                            'status' => 'pending', 
+                            'status' => 'pending',
                             'uploaded_by' => auth()->id(),
                         ]);
                     }
                 }
             }
+
+            $this->publishPt2StepUploadedEvent($lop, 'Dismantle (Step 4)');
         }
 
         return redirect(url('teknisi/pt2/survey/'.$lop->id_pt2_lop.'/step5'))->with('success', 'Data Dismantle & Eviden berhasil disimpan! Lanjut Step 5.');

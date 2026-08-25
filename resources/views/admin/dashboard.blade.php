@@ -372,7 +372,7 @@
                     Matriks Progress Project PT 2
                 </h2>
                 <p class="text-xs text-slate-500 mt-1">
-                    Sumber khusus PT 2. Tidak masuk ke KPI dan filter Program Regular.
+                    Sumber khusus PT 2. Tidak ter filter Program Regular.
                 </p>
             </div>
 

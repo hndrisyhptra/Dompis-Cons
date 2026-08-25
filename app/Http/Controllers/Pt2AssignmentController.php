@@ -48,7 +48,7 @@ class Pt2AssignmentController extends Controller
 
         ProjectActivityService::log([
             // Catatan: Pastikan tabel project_activities Anda bisa menerima ID string/bigint dari PT2
-            'project_id' => $request->pt2_project_id, 
+            'project_id' => $request->pt2_project_id,
             'lop_id' => $request->pt2_lop_id,
             'target_user_id' => $targetUser->id_user,
             'activity_type' => $isReassign ? 'reassign_'.$targetUser->role.'_pt2' : 'assign_'.$targetUser->role.'_pt2',
@@ -62,6 +62,24 @@ class Pt2AssignmentController extends Controller
                 "new_teknisi_name" => $targetUser->name,
             ],
         ]);
+
+        // WEBHOOK EVENT: project PT2 baru di-assign -- event pribadi utk teknisi.
+        $pt2Project = \App\Models\Pt2Project::find($request->pt2_project_id);
+        $pt2Lop = \App\Models\Pt2Lop::find($request->pt2_lop_id);
+        \App\Services\TelegramWebhookEventService::publishToUser(
+            $targetUser,
+            'project_assigned',
+            $isReassign ? 'Project PT2 Di-assign Ulang' : 'Project PT2 Baru Ditugaskan',
+            'Anda ditugaskan sebagai Teknisi untuk ' . ($pt2Project->project_name ?? '-') . ' — LOP ' . ($pt2Lop->lop_name ?? $request->pt2_lop_id) . '.',
+            [
+                'project_name' => $pt2Project->project_name ?? null,
+                'lop_name' => $pt2Lop->lop_name ?? null,
+                'role_assigned_as' => 'teknisi',
+                'is_reassign' => $isReassign,
+                'is_pt2' => true,
+            ],
+            ['project_id' => $request->pt2_project_id, 'lop_id' => $request->pt2_lop_id]
+        );
 
         return back()->with('success', 'Assignment Teknisi ke LOP berhasil disimpan.');
     }

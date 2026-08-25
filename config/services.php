@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'telegram' => [
+        // Token statis untuk mengamankan endpoint webhook (routes/api.php) --
+        // dibagikan ke tim eksternal yang akan mengambil event dari sini.
+        'webhook_api_token' => env('TELEGRAM_WEBHOOK_API_TOKEN'),
+    ],
+
 ];

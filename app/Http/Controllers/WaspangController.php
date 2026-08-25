@@ -781,7 +781,126 @@ class WaspangController extends Controller
             }
         }
 
+        // WEBHOOK EVENT: kalau seluruh eviden wajib tahap ini sudah lengkap
+        // diunggah (menunggu review), publish event SEKALI ke admin yang meng-assign.
+        $this->publishStageSubmittedEvent($project, $stage);
+
         return back()->with('success', 'Eviden berhasil diunggah');
+    }
+
+    /**
+     * Setelah upload eviden pada suatu stage, cek apakah SEMUA jenis eviden wajib
+     * untuk stage tsb sudah diunggah (status apapun selain rejected -- artinya
+     * sedang menunggu review admin), lalu publish event webhook SEKALI ke admin
+     * yang meng-assign waspang ini ke project tsb. Ini TIDAK menunggu approval
+     * admin -- itu urusan terpisah (lihat ProjectController::approveEvidence).
+     */
+    private function publishStageSubmittedEvent($project, string $stage): void
+    {
+        $isComplete = match ($stage) {
+            'persiapan' => $this->stageHasSubmittedTypes($project->id_project, 'persiapan', ['barang_tiba', 'perizinan']),
+            'pengukuran' => $this->stageHasSubmittedTypes($project->id_project, 'pengukuran', ['opm', 'otdr']),
+            'instalasi' => $this->instalasiSubmittedComplete($project),
+            'finishing' => \App\Models\Evidence::where('project_id', $project->id_project)
+                ->where('stage', 'finishing')
+                ->where('status', '!=', 'rejected')
+                ->exists(),
+            default => false,
+        };
+
+        if (! $isComplete) {
+            return;
+        }
+
+        // Guard supaya tidak berulang kali publish event yang sama untuk stage yang sama.
+        $alreadyPublished = \App\Models\ProjectActivityLog::where('project_id', $project->id_project)
+            ->where('stage', $stage)
+            ->where('activity_type', 'webhook_stage_uploaded_published')
+            ->exists();
+
+        if ($alreadyPublished) {
+            return;
+        }
+
+        $assignment = \App\Models\ProjectAssignment::where('project_id', $project->id_project)->first();
+        $admin = $assignment?->admin;
+
+        if ($admin) {
+            \App\Services\TelegramWebhookEventService::publishToUser(
+                $admin,
+                'evidence_step_uploaded',
+                'Eviden Tahap Selesai Diupload',
+                'Waspang ' . (auth()->user()->name ?? '-') . " telah menyelesaikan upload eviden tahap {$stage} untuk project {$project->project_name} (" . ($project->pid ?? '-') . '). Eviden menunggu review Anda.',
+                [
+                    'stage' => $stage,
+                    'project_name' => $project->project_name,
+                    'pid' => $project->pid,
+                    'uploader_name' => auth()->user()->name ?? null,
+                    'uploader_role' => 'waspang',
+                ],
+                ['project_id' => $project->id_project]
+            );
+        }
+
+        \App\Services\ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'activity_type' => 'webhook_stage_uploaded_published',
+            'title' => 'Webhook Event: Eviden Tahap Lengkap',
+            'description' => "Event webhook dipublish utk admin: eviden tahap {$stage} sudah lengkap diupload.",
+            'stage' => $stage,
+        ]);
+    }
+
+    /**
+     * Cek apakah SEMUA evidence_type wajib pada $requiredTypes sudah punya minimal
+     * satu baris eviden (status apapun selain rejected) untuk project+stage tsb.
+     */
+    private function stageHasSubmittedTypes(int $projectId, string $stage, array $requiredTypes): bool
+    {
+        $submittedTypes = \App\Models\Evidence::where('project_id', $projectId)
+            ->where('stage', $stage)
+            ->where('status', '!=', 'rejected')
+            ->pluck('evidence_type')
+            ->unique();
+
+        foreach ($requiredTypes as $type) {
+            if (! $submittedTypes->contains($type)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Instalasi dianggap "selesai diupload" kalau setiap item BOQ material (designator
+     * berawalan "M-", sama seperti Project::progressSummary()) sudah punya minimal satu
+     * eviden progress_boq yang tidak rejected.
+     */
+    private function instalasiSubmittedComplete($project): bool
+    {
+        $materialIds = \App\Models\BoqItem::where('project_id', $project->id_project)
+            ->where('designator', 'like', 'M-%')
+            ->pluck('id_boq');
+
+        if ($materialIds->isEmpty()) {
+            return false;
+        }
+
+        $submittedBoqIds = \App\Models\Evidence::where('project_id', $project->id_project)
+            ->where('stage', 'instalasi')
+            ->where('evidence_type', 'progress_boq')
+            ->where('status', '!=', 'rejected')
+            ->pluck('boq_item_id')
+            ->unique();
+
+        foreach ($materialIds as $boqId) {
+            if (! $submittedBoqIds->contains($boqId)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function replace(Request $request, $id)

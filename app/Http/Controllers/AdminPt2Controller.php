@@ -347,7 +347,7 @@ class AdminPt2Controller extends Controller
             'review_note' => 'required|string',
         ]);
 
-        $evidence = Pt2Evidence::findOrFail($id_pt2_evidence);
+        $evidence = Pt2Evidence::with(['uploader', 'project', 'lop'])->findOrFail($id_pt2_evidence);
 
         $oldStatus = $evidence->status;
         $evidence->status = 'rejected';
@@ -365,6 +365,26 @@ class AdminPt2Controller extends Controller
             'status_before' => $oldStatus,
             'status_after' => 'rejected',
         ]);
+
+        // WEBHOOK EVENT: eviden PT2 direject -- event pribadi utk teknisi pengunggah.
+        if ($evidence->uploader) {
+            \App\Services\TelegramWebhookEventService::publishToUser(
+                $evidence->uploader,
+                'evidence_rejected',
+                'Eviden PT2 Ditolak',
+                "Eviden {$evidence->evidence_type} pada tahap {$evidence->stage} untuk " . ($evidence->project->project_name ?? '-') . ' (LOP ' . ($evidence->lop->lop_name ?? $evidence->pt2_lop_id) . ') ditolak oleh Admin. Catatan: "' . $request->review_note . '"',
+                [
+                    'evidence_id' => $evidence->id_pt2_evidence,
+                    'stage' => $evidence->stage,
+                    'evidence_type' => $evidence->evidence_type,
+                    'project_name' => $evidence->project->project_name ?? null,
+                    'lop_name' => $evidence->lop->lop_name ?? null,
+                    'review_note' => $request->review_note,
+                    'is_pt2' => true,
+                ],
+                ['project_id' => $evidence->pt2_project_id, 'lop_id' => $evidence->pt2_lop_id]
+            );
+        }
 
         return back()->with('success', 'Eviden PT2 berhasil ditolak.');
     }
