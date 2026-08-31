@@ -17,7 +17,7 @@ class SiteSurveyPoint extends Model
     public const TYPE_CATUAN = 'catuan';
     public const TYPE_ENDING_SITE = 'ending_site';
 
-    public const CATUAN_TYPES = ['ODC', 'ODP', 'JC'];
+    public const CATUAN_TYPES = ['ODC', 'ODP', 'OTB', 'JC'];
 
     protected $fillable = [
         'site_survey_id',

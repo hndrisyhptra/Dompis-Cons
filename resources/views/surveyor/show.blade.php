@@ -18,6 +18,7 @@
     .pin-odc { background: #dc2626; }
     .pin-odp { background: #f59e0b; }
     .pin-jc { background: #7c3aed; }
+    .pin-otb { background: #0d9488; }
     .pin-end { background: #059669; }
     .mode-btn.active { background: #1d4ed8 !important; color: white !important; border-color: #1d4ed8 !important; }
     .sheet-backdrop { background: rgba(15,23,42,.55); backdrop-filter: blur(2px); }
@@ -44,6 +45,10 @@
                 <i class="fa-solid fa-house text-sm"></i>
             </a>
         @endif
+        <a href="{{ route('gis-cad.create') }}" title="Export AutoCAD (DXF)"
+           class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-drafting-compass text-sm"></i>
+        </a>
         <button id="btnSurveyMenu" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white flex items-center justify-center shrink-0">
             <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
         </button>
@@ -344,7 +349,7 @@
 
     function iconFor(point) {
         if (point.type === 'catuan') {
-            const map2 = { ODC: 'pin-odc', ODP: 'pin-odp', JC: 'pin-jc' };
+            const map2 = { ODC: 'pin-odc', ODP: 'pin-odp', OTB: 'pin-otb', JC: 'pin-jc' };
             return pinIcon(map2[point.catuan_type] || 'pin-odc', 'fa-box-archive');
         }
         return pinIcon('pin-tiang', 'fa-tower-broadcast');
@@ -626,7 +631,7 @@
 
     function typeBadgeClass(p) {
         if (p.type === 'catuan') {
-            return { ODC: 'bg-red-100 text-red-700', ODP: 'bg-amber-100 text-amber-700', JC: 'bg-purple-100 text-purple-700' }[p.catuan_type] || 'bg-amber-100 text-amber-700';
+            return { ODC: 'bg-red-100 text-red-700', ODP: 'bg-amber-100 text-amber-700', OTB: 'bg-teal-100 text-teal-700', JC: 'bg-purple-100 text-purple-700' }[p.catuan_type] || 'bg-amber-100 text-amber-700';
         }
         return 'bg-blue-100 text-blue-700';
     }

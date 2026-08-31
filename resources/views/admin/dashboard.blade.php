@@ -64,7 +64,7 @@
 
 @endphp
 
-<div class="min-h-screen bg-slate-50 dark:bg-slate-950 -m-4 md:-m-6 p-4 md:p-6">
+<div class="min-h-screen bg-slate-50 dark:bg-slate-950 -m-4 md:-m-6 p-4 md:p-6" x-data="matrixDetailModal()">
 
     <div class="max-w-7xl mx-auto space-y-6">
 
@@ -231,10 +231,12 @@
                                         <span class="font-black text-slate-800 text-sm">{{ $reg['region'] }}</span>
                                     </div>
                                 </td>
-                                <td class="px-3 py-4 text-center font-black text-slate-700 text-sm">{{ $reg['total'] }}</td>
-                                <td class="px-3 py-4 text-center"><span class="px-3 py-1 rounded-lg bg-blue-50 text-blue-700 font-black">{{ $reg['assigned'] }}</span></td>
-                                <td class="px-3 py-4 text-center"><span class="px-3 py-1 rounded-lg bg-amber-50 text-amber-700 font-black">{{ $reg['waiting'] }}</span></td>
-                                <td class="px-3 py-4 text-center"><span class="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black">{{ $reg['completed'] }}</span></td>
+                                <td class="px-3 py-4 text-center font-black text-slate-700 text-sm">
+                                    <span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'total'})">{{ $reg['total'] }}</span>
+                                </td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-blue-50 text-blue-700 font-black hover:bg-blue-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'assigned'})">{{ $reg['assigned'] }}</span></td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-amber-50 text-amber-700 font-black hover:bg-amber-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'waiting'})">{{ $reg['waiting'] }}</span></td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black hover:bg-emerald-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'completed'})">{{ $reg['completed'] }}</span></td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-3">
                                         <div class="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -250,10 +252,12 @@
                                     <td class="px-6 py-3 pl-[3.25rem]">
                                         <span class="font-bold text-slate-600"> • {{ $br['name'] }}</span>
                                     </td>
-                                    <td class="px-3 py-3 text-center font-bold text-slate-600">{{ $br['total'] }}</td>
-                                    <td class="px-3 py-3 text-center"><span class="text-blue-600 font-bold">{{ $br['assigned'] }}</span></td>
-                                    <td class="px-3 py-3 text-center"><span class="text-amber-600 font-bold">{{ $br['waiting'] }}</span></td>
-                                    <td class="px-3 py-3 text-center"><span class="text-emerald-600 font-bold">{{ $br['completed'] }}</span></td>
+                                    <td class="px-3 py-3 text-center font-bold text-slate-600">
+                                        <span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'total'})">{{ $br['total'] }}</span>
+                                    </td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-blue-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'assigned'})">{{ $br['assigned'] }}</span></td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-amber-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'waiting'})">{{ $br['waiting'] }}</span></td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-emerald-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'completed'})">{{ $br['completed'] }}</span></td>
                                     <td class="px-6 py-3 text-right font-black text-slate-500">{{ $br['percent'] }}%</td>
                                 </tr>
                             @endforeach
@@ -318,9 +322,9 @@
                                         $totalProyek = $stats['preparation'] + $stats['instalasi'] + $stats['finishing'];
                                         $persentase = $totalProyek > 0 ? round(($stats['finishing'] / $totalProyek) * 100) : 0;
                                     @endphp
-                                    <td class="px-3 py-4 text-center font-bold text-slate-700 bg-blue-50/20">{{ $stats['preparation'] ?: '-' }}</td>
-                                    <td class="px-3 py-4 text-center font-bold text-slate-700 bg-amber-50/20">{{ $stats['instalasi'] ?: '-' }}</td>
-                                    <td class="px-3 py-4 text-center font-bold text-slate-700 bg-emerald-50/20">{{ $stats['finishing'] ?: '-' }}</td>
+                                    <td class="px-3 py-4 text-center font-bold text-slate-700 bg-blue-50/20"><span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'', program:'{{ $prog }}', metric:'preparation'})">{{ $stats['preparation'] ?: '-' }}</span></td>
+                                    <td class="px-3 py-4 text-center font-bold text-slate-700 bg-amber-50/20"><span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'', program:'{{ $prog }}', metric:'instalasi'})">{{ $stats['instalasi'] ?: '-' }}</span></td>
+                                    <td class="px-3 py-4 text-center font-bold text-slate-700 bg-emerald-50/20"><span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'', program:'{{ $prog }}', metric:'finishing'})">{{ $stats['finishing'] ?: '-' }}</span></td>
                                     <td class="px-3 py-4 text-center font-black text-indigo-700 bg-indigo-50/20 border-r border-slate-200/60">{{ $persentase }}%</td>
                                 @endforeach
                             </tr>
@@ -341,9 +345,9 @@
                                             $totalProyek = $stats['preparation'] + $stats['instalasi'] + $stats['finishing'];
                                             $persentase = $totalProyek > 0 ? round(($stats['finishing'] / $totalProyek) * 100) : 0;
                                         @endphp
-                                        <td class="px-3 py-3 text-center text-blue-600 font-semibold">{{ $stats['preparation'] ?: '-' }}</td>
-                                        <td class="px-3 py-3 text-center text-amber-600 font-semibold">{{ $stats['instalasi'] ?: '-' }}</td>
-                                        <td class="px-3 py-3 text-center text-emerald-600 font-semibold">{{ $stats['finishing'] ?: '-' }}</td>
+                                        <td class="px-3 py-3 text-center text-blue-600 font-semibold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', program:'{{ $prog }}', metric:'preparation'})">{{ $stats['preparation'] ?: '-' }}</span></td>
+                                        <td class="px-3 py-3 text-center text-amber-600 font-semibold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', program:'{{ $prog }}', metric:'instalasi'})">{{ $stats['instalasi'] ?: '-' }}</span></td>
+                                        <td class="px-3 py-3 text-center text-emerald-600 font-semibold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', program:'{{ $prog }}', metric:'finishing'})">{{ $stats['finishing'] ?: '-' }}</span></td>
                                         <td class="px-3 py-3 text-center text-indigo-600 font-black border-r border-slate-200/60">{{ $persentase }}%</td>
                                     @endforeach
                                 </tr>
@@ -433,10 +437,10 @@
                             </div>
                         </td>
 
-                        <td class="px-4 py-4 text-center font-black text-blue-700">{{ $regionStats['preparation'] ?? 0 }}</td>
-                        <td class="px-4 py-4 text-center font-black text-amber-700">{{ $regionStats['instalasi'] ?? 0 }}</td>
-                        <td class="px-4 py-4 text-center font-black text-emerald-700">{{ $regionStats['finishing'] ?? 0 }}</td>
-                        <td class="px-4 py-4 text-center font-black text-indigo-700">{{ $regionStats['total'] ?? 0 }}</td>
+                        <td class="px-4 py-4 text-center font-black text-blue-700"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'', metric:'preparation'})">{{ $regionStats['preparation'] ?? 0 }}</span></td>
+                        <td class="px-4 py-4 text-center font-black text-amber-700"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'', metric:'instalasi'})">{{ $regionStats['instalasi'] ?? 0 }}</span></td>
+                        <td class="px-4 py-4 text-center font-black text-emerald-700"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'', metric:'finishing'})">{{ $regionStats['finishing'] ?? 0 }}</span></td>
+                        <td class="px-4 py-4 text-center font-black text-indigo-700"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'', metric:'total'})">{{ $regionStats['total'] ?? 0 }}</span></td>
 
                         <td class="px-6 py-4">
                             <div class="flex items-center justify-end gap-3">
@@ -466,10 +470,10 @@
                                 <span class="font-bold text-slate-600">• {{ $branch['name'] }}</span>
                             </td>
 
-                            <td class="px-4 py-3 text-center text-blue-600 font-bold">{{ $branchStats['preparation'] ?? 0 }}</td>
-                            <td class="px-4 py-3 text-center text-amber-600 font-bold">{{ $branchStats['instalasi'] ?? 0 }}</td>
-                            <td class="px-4 py-3 text-center text-emerald-600 font-bold">{{ $branchStats['finishing'] ?? 0 }}</td>
-                            <td class="px-4 py-3 text-center text-indigo-600 font-black">{{ $branchStats['total'] ?? 0 }}</td>
+                            <td class="px-4 py-3 text-center text-blue-600 font-bold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'{{ $branch['name'] }}', metric:'preparation'})">{{ $branchStats['preparation'] ?? 0 }}</span></td>
+                            <td class="px-4 py-3 text-center text-amber-600 font-bold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'{{ $branch['name'] }}', metric:'instalasi'})">{{ $branchStats['instalasi'] ?? 0 }}</span></td>
+                            <td class="px-4 py-3 text-center text-emerald-600 font-bold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'{{ $branch['name'] }}', metric:'finishing'})">{{ $branchStats['finishing'] ?? 0 }}</span></td>
+                            <td class="px-4 py-3 text-center text-indigo-600 font-black"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'{{ $branch['name'] }}', metric:'total'})">{{ $branchStats['total'] ?? 0 }}</span></td>
                             <td class="px-6 py-3 text-right text-indigo-600 font-black">{{ $branchStats['percent'] ?? 0 }}%</td>
                         </tr>
                     @endforeach
@@ -486,12 +490,160 @@
 </div>
 
     </div>
+
+    {{-- MODAL DETAIL LOP (KLIK ANGKA PADA TABEL MATRIX) --}}
+    <div x-show="open" x-cloak
+         class="fixed inset-0 z-50 flex items-center justify-center p-4"
+         style="display: none;">
+        <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="close()"></div>
+
+        <div class="relative bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[85vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden"
+             x-show="open" x-transition>
+
+            <div class="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 bg-slate-50/50">
+                <div>
+                    <p class="text-[10px] font-black text-blue-700 uppercase tracking-widest">Detail LOP</p>
+                    <h3 class="text-sm md:text-base font-black text-slate-900 dark:text-white mt-1" x-text="title"></h3>
+                    <p class="text-xs text-slate-500 mt-1">
+                        <span x-text="count"></span> LOP ditemukan
+                    </p>
+                </div>
+                <button type="button" @click="close()"
+                        class="w-9 h-9 shrink-0 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 flex items-center justify-center transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="overflow-y-auto flex-1">
+                <template x-if="loading">
+                    <div class="flex items-center justify-center py-16">
+                        <div class="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                    </div>
+                </template>
+
+                <template x-if="!loading && error">
+                    <div class="px-6 py-10 text-center text-sm font-semibold text-red-500" x-text="error"></div>
+                </template>
+
+                <template x-if="!loading && !error && rows.length === 0">
+                    <div class="px-6 py-10 text-center text-sm text-slate-400 font-medium">Tidak ada LOP untuk kategori ini.</div>
+                </template>
+
+                <template x-if="!loading && !error && rows.length > 0">
+                    <table class="w-full text-xs border-collapse">
+                        <thead class="bg-slate-100/60 text-slate-500 font-bold uppercase tracking-wider text-[10px] sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3 text-left">No</th>
+                                <th class="px-4 py-3 text-left">PID</th>
+                                <th class="px-4 py-3 text-left">Project / LOP</th>
+                                <th class="px-4 py-3 text-left">Branch / STO</th>
+                                <th class="px-4 py-3 text-left">Program</th>
+                                <th class="px-4 py-3 text-left">Status</th>
+                                <th class="px-4 py-3 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200/60">
+                            <template x-for="row in rows" :key="row.no">
+                                <tr class="hover:bg-slate-50 transition">
+                                    <td class="px-4 py-3 text-slate-500 font-semibold" x-text="row.no"></td>
+                                    <td class="px-4 py-3 font-bold text-slate-700" x-text="row.pid"></td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-bold text-slate-800" x-text="row.project_name"></p>
+                                        <p class="text-slate-500" x-text="row.lop_name"></p>
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        <p class="font-semibold text-slate-700" x-text="row.branch"></p>
+                                        <p class="text-slate-400" x-text="row.sto"></p>
+                                    </td>
+                                    <td class="px-4 py-3 text-slate-600 font-semibold" x-text="row.program"></td>
+                                    <td class="px-4 py-3">
+                                        <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-black text-[10px]" x-text="row.status_label"></span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right">
+                                        <a :href="row.detail_url" target="_blank"
+                                           class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-[10px] font-bold hover:bg-slate-700 transition">
+                                            Lihat
+                                        </a>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </template>
+            </div>
+        </div>
+    </div>
 </div>
 
 {{-- SCRIPT FILTER & COLLAPSIBLE --}}
 <script>
     const regionMapping = @json($regionMapping);
     const currentBranch = @json(strtoupper(request('branch', '')));
+
+    // Filter global yang sedang aktif di halaman Dashboard (dipakai sebagai
+    // konteks tambahan saat fetch detail LOP untuk modal klik angka matrix).
+    const activeDashboardFilters = {
+        program: @json(request('program', '')),
+        region: @json(request('region', '')),
+        branch: @json(request('branch', '')),
+        status: @json(request('status', '')),
+    };
+
+    function matrixDetailModal() {
+        return {
+            open: false,
+            loading: false,
+            error: '',
+            title: '',
+            rows: [],
+            count: 0,
+
+            async show(params) {
+                this.open = true;
+                this.loading = true;
+                this.error = '';
+                this.rows = [];
+                this.title = '';
+                this.count = 0;
+
+                const query = new URLSearchParams({
+                    type: params.type || '',
+                    region: params.region || '',
+                    branch: params.branch || '',
+                    program: params.program || '',
+                    metric: params.metric || '',
+                    f_program: activeDashboardFilters.program,
+                    f_region: activeDashboardFilters.region,
+                    f_branch: activeDashboardFilters.branch,
+                    f_status: activeDashboardFilters.status,
+                }).toString();
+
+                try {
+                    const res = await fetch(`{{ route('admin.dashboard.matrix-detail') }}?${query}`, {
+                        headers: { 'Accept': 'application/json' },
+                    });
+
+                    const data = await res.json();
+
+                    if (!res.ok) {
+                        this.error = data.message || 'Gagal memuat data LOP.';
+                    } else {
+                        this.title = data.title;
+                        this.rows = data.rows || [];
+                        this.count = data.count || 0;
+                    }
+                } catch (e) {
+                    this.error = 'Terjadi kesalahan saat memuat data LOP.';
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            close() {
+                this.open = false;
+            },
+        };
+    }
 
     function toggleRegion(regionClass, iconId) {
         const rows = document.querySelectorAll('.' + regionClass);

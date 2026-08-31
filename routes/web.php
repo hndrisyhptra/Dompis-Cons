@@ -19,6 +19,7 @@ use App\Http\Controllers\Pt2AssignmentController;
 use App\Http\Controllers\SdiController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\SurveyorController;
+use App\Http\Controllers\GisCadController;
 
 
 
@@ -48,6 +49,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
+
+    Route::get('/admin/dashboard/matrix-detail', [DashboardController::class, 'matrixDetail'])
+        ->name('admin.dashboard.matrix-detail');
 
     Route::get('/admin/map-monitoring', [DashboardController::class, 'mapMonitoring'])
         ->middleware(['auth'])
@@ -445,6 +449,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/admin/data-boq', [ImportController::class, 'dataBoq'])
             ->name('admin.data-boq');
 
+        Route::get('/admin/data-boq/export', [ImportController::class, 'exportBoq'])
+            ->name('admin.data-boq.export');
+
         Route::get('/admin/import/boq/template', [ImportController::class, 'downloadBoqTemplate'])
             ->name('admin.import.boq.template');
 
@@ -625,12 +632,61 @@ Route::middleware(['auth'])->prefix('surveyor')->name('surveyor.')->group(functi
 
 /*
 |--------------------------------------------------------------------------
+| GIS TO CAD GENERATOR - KML/KMZ atau Data Survey Lapangan -> DXF AutoCAD
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth'])->prefix('gis-cad')->name('gis-cad.')->group(function () {
+    Route::get('/', [GisCadController::class, 'index'])->name('index');
+    Route::get('/create', [GisCadController::class, 'create'])->name('create');
+
+    Route::post('/upload', [GisCadController::class, 'storeUpload'])->name('upload');
+    Route::post('/from-survey/{surveyId}', [GisCadController::class, 'storeFromSurvey'])->name('from-survey');
+
+    Route::get('/{uuid}/review', [GisCadController::class, 'review'])->name('review');
+    Route::post('/{uuid}/review', [GisCadController::class, 'updateReview'])->name('review.update');
+    Route::post('/{uuid}/confirm', [GisCadController::class, 'confirm'])->name('confirm');
+
+    Route::get('/{uuid}', [GisCadController::class, 'show'])->name('show');
+    Route::get('/{uuid}/status', [GisCadController::class, 'status'])->name('status');
+    Route::get('/{uuid}/download/dxf', [GisCadController::class, 'downloadDxf'])->name('download.dxf');
+    Route::get('/{uuid}/download/bom', [GisCadController::class, 'downloadBom'])->name('download.bom');
+    Route::delete('/{uuid}', [GisCadController::class, 'destroy'])->name('destroy');
+});
+
+/*
+|--------------------------------------------------------------------------
 | HASIL SURVEY LAPANGAN - TAMPILAN ADMIN / SDI (DESKTOP)
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth'])->prefix('admin/site-surveys')->name('admin.site-surveys.')->group(function () {
     Route::get('/', [SurveyorController::class, 'adminIndex'])->name('index');
     Route::get('/{id}', [SurveyorController::class, 'adminShow'])->name('show');
+});
+
+/*
+|--------------------------------------------------------------------------
+| GIS TO CAD GENERATOR - TAMPILAN ADMIN (DESKTOP)
+|--------------------------------------------------------------------------
+| Route & controller SAMA PERSIS dengan grup 'gis-cad.*' di atas (mobile) -
+| lihat GisCadController::isAdminContext()/viewName()/routeName(). Yang beda
+| cuma prefix URL & nama route, supaya admin dapat tampilan desktop sendiri.
+*/
+Route::middleware(['auth'])->prefix('admin/gis-cad')->name('admin.gis-cad.')->group(function () {
+    Route::get('/', [GisCadController::class, 'index'])->name('index');
+    Route::get('/create', [GisCadController::class, 'create'])->name('create');
+
+    Route::post('/upload', [GisCadController::class, 'storeUpload'])->name('upload');
+    Route::post('/from-survey/{surveyId}', [GisCadController::class, 'storeFromSurvey'])->name('from-survey');
+
+    Route::get('/{uuid}/review', [GisCadController::class, 'review'])->name('review');
+    Route::post('/{uuid}/review', [GisCadController::class, 'updateReview'])->name('review.update');
+    Route::post('/{uuid}/confirm', [GisCadController::class, 'confirm'])->name('confirm');
+
+    Route::get('/{uuid}', [GisCadController::class, 'show'])->name('show');
+    Route::get('/{uuid}/status', [GisCadController::class, 'status'])->name('status');
+    Route::get('/{uuid}/download/dxf', [GisCadController::class, 'downloadDxf'])->name('download.dxf');
+    Route::get('/{uuid}/download/bom', [GisCadController::class, 'downloadBom'])->name('download.bom');
+    Route::delete('/{uuid}', [GisCadController::class, 'destroy'])->name('destroy');
 });
 
 // Route Upload PID & BOQ Khusus PT 2 (Arahkan ke fungsi yang sama di controller)

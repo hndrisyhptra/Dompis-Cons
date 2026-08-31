@@ -1615,6 +1615,30 @@ private function buildRegularPidMatrix(array $regions, $programs): array
 
         /*
         |--------------------------------------------------------------------------
+        | FILTER TAMBAHAN - DISAMAKAN PERSIS DENGAN DATA PID (Regular)
+        |--------------------------------------------------------------------------
+        | Region & Branch pakai daftar yang sama (pidRegions()), Program &
+        | Status Project juga dibaca dari table `projects` yang sama - BOQ
+        | cuma ada di jalur Regular (pt2_boq_items terpisah), jadi tidak
+        | perlu toggle Regular/PT2 seperti di Data PID.
+        */
+        $regions = $this->pidRegions();
+
+        $perPage = (int) $request->input('per_page', 10);
+        if (!in_array($perPage, [10, 20, 50], true)) {
+            $perPage = 10;
+        }
+
+        $programs = DB::table('projects')
+            ->whereNotNull('program')
+            ->where('program', '!=', '')
+            ->whereRaw("UPPER(TRIM(program)) <> 'PT 2'")
+            ->distinct()
+            ->orderBy('program')
+            ->pluck('program');
+
+        /*
+        |--------------------------------------------------------------------------
         | TABLE NAME
         |--------------------------------------------------------------------------
         | Pakai nama table dari Model agar aman jika nama tabel custom.
@@ -1891,9 +1915,69 @@ private function buildRegularPidMatrix(array $regions, $programs): array
                 }
             )
 
+            /*
+            |--------------------------------------------------------------------------
+            | REGION FILTER
+            |--------------------------------------------------------------------------
+            | l.branch di sini sudah branch milik LOP itu sendiri (bukan
+            | project parent), jadi filter langsung ke kolomnya - tidak
+            | perlu whereExists subquery seperti di applyRegularPidFilters().
+            */
+            ->when(
+                $request->filled('region'),
+                function ($query) use ($request, $regions) {
+                    $region = strtoupper(trim((string) $request->region));
+
+                    if (isset($regions[$region])) {
+                        $query->whereIn(
+                            DB::raw('UPPER(TRIM(l.branch))'),
+                            $regions[$region]
+                        );
+                    }
+                }
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | BRANCH FILTER
+            |--------------------------------------------------------------------------
+            */
+            ->when(
+                $request->filled('branch'),
+                function ($query) use ($request) {
+                    $branch = strtoupper(trim((string) $request->branch));
+
+                    $query->whereRaw('UPPER(TRIM(l.branch)) = ?', [$branch]);
+                }
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | PROGRAM FILTER
+            |--------------------------------------------------------------------------
+            */
+            ->when(
+                $request->filled('program'),
+                function ($query) use ($request) {
+                    $query->where('p.program', $request->program);
+                }
+            )
+
+            /*
+            |--------------------------------------------------------------------------
+            | STATUS PROJECT FILTER
+            |--------------------------------------------------------------------------
+            */
+            ->when(
+                $request->filled('status_project'),
+                function ($query) use ($request) {
+                    $query->where('p.status_project', $request->status_project);
+                }
+            )
+
             ->orderByDesc('l.id_lop')
 
-            ->paginate(10)
+            ->paginate($perPage)
 
             ->withQueryString();
 
@@ -2141,6 +2225,9 @@ private function buildRegularPidMatrix(array $regions, $programs): array
                 'search',
                 'package',
 
+                'regions',
+                'programs',
+
                 'totalLopBoq',
 
                 'totalJasaValue',
@@ -2153,6 +2240,195 @@ private function buildRegularPidMatrix(array $regions, $programs): array
                 'designators'
             )
         );
+    }
+
+    /**
+     * Export Data BOQ ke Excel, mengikuti filter yang sama dengan dataBoq()
+     * (search, package, region, branch, program, status project) - polanya
+     * disamakan persis dengan exportPid() di atas.
+     *
+     * Beda dengan dataBoq() yang menampilkan agregat per LOP (buat tabel +
+     * modal detail per halaman), export ini menghasilkan baris per ITEM BOQ
+     * (satu baris = satu designator di satu LOP) supaya hasil Excel-nya
+     * langsung bisa dipakai/diolah lebih lanjut, dan mencakup SELURUH data
+     * yang cocok dengan filter - bukan cuma halaman yang sedang aktif.
+     */
+    public function exportBoq(Request $request)
+    {
+        $search = trim((string) $request->input('search', ''));
+        $package = $request->input('package');
+        $regions = $this->pidRegions();
+
+        $lopTable = (new Lop())->getTable();
+        $projectTable = (new Project())->getTable();
+        $packageTable = (new PackageModel())->getTable();
+        $boqTable = (new BoqItem())->getTable();
+        $designatorTable = (new Designator())->getTable();
+        $priceTable = (new DesignatorPackagePrice())->getTable();
+
+        /*
+        |----------------------------------------------------------------
+        | HARGA PACKAGE TERBARU
+        |----------------------------------------------------------------
+        | Sama persis dengan currentPriceSub di dataBoq() - harga TIDAK
+        | diambil dari boq_items, tapi dihitung ulang dari harga package
+        | terbaru per kombinasi designator + package.
+        */
+        $latestPriceIdSub = DB::table($priceTable)
+            ->selectRaw('MAX(id_price) AS id_price')
+            ->groupBy('designator_id', 'package_id');
+
+        $currentPriceSub = DB::table("{$priceTable} as dpp")
+            ->joinSub($latestPriceIdSub, 'latest_price', function ($join) {
+                $join->on('latest_price.id_price', '=', 'dpp.id_price');
+            })
+            ->select(['dpp.designator_id', 'dpp.package_id'])
+            ->selectRaw("CAST(NULLIF(dpp.price, '') AS DECIMAL(20,2)) AS price");
+
+        $rows = DB::table("{$boqTable} as bi")
+            ->join("{$lopTable} as l", 'l.id_lop', '=', 'bi.lop_id')
+            ->join("{$designatorTable} as d", 'd.id_designator', '=', 'bi.designator_id')
+            ->leftJoin("{$projectTable} as p", 'p.id_project', '=', 'l.project_id')
+            ->leftJoin("{$packageTable} as pkg", 'pkg.id_package', '=', 'l.package_id')
+            ->leftJoinSub(clone $currentPriceSub, 'cp', function ($join) {
+                $join->on('cp.designator_id', '=', 'bi.designator_id');
+                $join->on('cp.package_id', '=', 'l.package_id');
+            })
+            /*
+            |------------------------------------------------------------
+            | FILTER - HARUS SAMA PERSIS DENGAN dataBoq() supaya jumlah
+            | baris hasil export konsisten dengan yang dilihat user di
+            | tabel sebelum klik Download Excel.
+            |------------------------------------------------------------
+            */
+            ->when($search !== '', function ($query) use ($search) {
+                $keyword = "%{$search}%";
+                $query->where(function ($q) use ($keyword) {
+                    $q->where('l.lop_name', 'like', $keyword)
+                        ->orWhere('l.id_ihld', 'like', $keyword)
+                        ->orWhere('l.sto', 'like', $keyword)
+                        ->orWhere('l.branch', 'like', $keyword)
+                        ->orWhere('p.mitra_name', 'like', $keyword)
+                        ->orWhere('p.pid', 'like', $keyword)
+                        ->orWhere('p.pid_sap', 'like', $keyword)
+                        ->orWhere('p.project_name', 'like', $keyword);
+                });
+            })
+            ->when(!empty($package), function ($query) use ($package) {
+                $query->where('l.package_id', $package);
+            })
+            ->when($request->filled('region'), function ($query) use ($request, $regions) {
+                $region = strtoupper(trim((string) $request->region));
+
+                if (isset($regions[$region])) {
+                    $query->whereIn(DB::raw('UPPER(TRIM(l.branch))'), $regions[$region]);
+                }
+            })
+            ->when($request->filled('branch'), function ($query) use ($request) {
+                $branch = strtoupper(trim((string) $request->branch));
+
+                $query->whereRaw('UPPER(TRIM(l.branch)) = ?', [$branch]);
+            })
+            ->when($request->filled('program'), function ($query) use ($request) {
+                $query->where('p.program', $request->program);
+            })
+            ->when($request->filled('status_project'), function ($query) use ($request) {
+                $query->where('p.status_project', $request->status_project);
+            })
+            ->select([
+                'p.pid',
+                'p.pid_sap as project_pid_sap',
+                'p.project_name',
+                'p.mitra_name',
+                'l.id_ihld',
+                'l.lop_name',
+                'l.pid_sap as lop_pid_sap',
+                'l.branch',
+                'l.sto',
+                'pkg.package_name',
+                'd.designator',
+                'd.type',
+                'd.item_name',
+                'd.unit',
+                'bi.quantity_plan',
+                'bi.quantity_actual',
+            ])
+            ->selectRaw('COALESCE(cp.price, 0) AS unit_price')
+            ->selectRaw('(COALESCE(bi.quantity_plan, 0) * COALESCE(cp.price, 0)) AS total_price')
+            ->orderBy('l.id_lop')
+            ->orderBy('d.type')
+            ->orderBy('d.designator')
+            ->get();
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Data BOQ');
+
+        $headers = [
+            'PID', 'PID SAP Project', 'Nama Project', 'Mitra',
+            'ID IHLD', 'Nama LOP', 'PID SAP LOP', 'Branch', 'STO', 'Package',
+            'Designator', 'Tipe', 'Nama Item', 'Satuan',
+            'Qty Plan', 'Qty Actual', 'Harga Satuan', 'Total Harga',
+        ];
+
+        $sheet->fromArray($headers, null, 'A1');
+
+        $rowIndex = 2;
+        foreach ($rows as $row) {
+            $sheet->fromArray([
+                $row->pid ?? '-',
+                $row->project_pid_sap ?? '-',
+                $row->project_name ?? '-',
+                $row->mitra_name ?? '-',
+                $row->id_ihld ?? '-',
+                $row->lop_name ?? '-',
+                $row->lop_pid_sap ?? '-',
+                $row->branch ?? '-',
+                $row->sto ?? '-',
+                $row->package_name ?? '-',
+                $row->designator ?? '-',
+                $row->type === 'jasa' ? 'Jasa' : ($row->type === 'material' ? 'Material' : ($row->type ?? '-')),
+                $row->item_name ?? '-',
+                $row->unit ?? '-',
+                (float) $row->quantity_plan,
+                (float) $row->quantity_actual,
+                (float) $row->unit_price,
+                (float) $row->total_price,
+            ], null, 'A' . $rowIndex);
+            $rowIndex++;
+        }
+
+        $lastColumn = $sheet->getHighestColumn();
+        $lastRow = $sheet->getHighestRow();
+
+        $sheet->getStyle('A1:' . $lastColumn . '1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:' . $lastColumn . '1')->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('DBEAFE');
+
+        // Format kolom Harga Satuan (Q) & Total Harga (R) sebagai angka ribuan.
+        if ($lastRow >= 2) {
+            $sheet->getStyle('Q2:R' . $lastRow)
+                ->getNumberFormat()
+                ->setFormatCode('#,##0');
+        }
+
+        foreach (range('A', $lastColumn) as $columnId) {
+            $sheet->getColumnDimension($columnId)->setAutoSize(true);
+        }
+
+        $sheet->freezePane('A2');
+        $sheet->setAutoFilter('A1:' . $lastColumn . $lastRow);
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+
+        $fileName = 'data-boq-' . now()->format('Y-m-d_His') . '.xlsx';
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 
     public function downloadPidTemplate()

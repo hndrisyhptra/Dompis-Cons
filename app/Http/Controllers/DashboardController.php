@@ -600,6 +600,287 @@ class DashboardController extends Controller
         ));
     }
 
+    /**
+     * MENU: DASHBOARD - DETAIL LOP UNTUK MODAL KLIK ANGKA PADA TABEL MATRIX
+     *
+     * Dipakai oleh 3 tabel matrix di Dashboard:
+     * - type=assignment -> "Rekap Assignment & Status Project Regular"
+     * - type=regular    -> "Matriks Progress Project Regular"
+     * - type=pt2        -> "Matriks Progress Project PT 2"
+     */
+    public function matrixDetail(Request $request)
+    {
+        $regions = [
+            'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
+            'JATENG DIY' => ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
+            'BALNUS' => ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES'],
+        ];
+
+        $regularProgramSet = array_fill_keys(['OSP', 'OLO', 'HEM', 'NODE B', 'EKSBIS'], true);
+
+        $type = (string) $request->input('type', '');
+        $regionKey = strtoupper(trim((string) $request->input('region', '')));
+        $branchKey = strtoupper(trim((string) $request->input('branch', '')));
+        $metric = (string) $request->input('metric', '');
+        $program = strtoupper(trim((string) $request->input('program', '')));
+
+        if (!isset($regions[$regionKey])) {
+            return response()->json(['message' => 'Region tidak valid.'], 422);
+        }
+
+        $branchList = $branchKey !== '' ? [$branchKey] : $regions[$regionKey];
+
+        $rows = collect();
+        $title = '';
+
+        if ($type === 'assignment') {
+            $query = Lop::query()->with([
+                'project.assignment',
+                'project.evidences',
+                'project.boqItems.designatorData',
+                'project.boqItems.designatorDataByCode',
+            ]);
+
+            if ($request->filled('f_program')) {
+                $selectedProgram = strtoupper(trim((string) $request->f_program));
+                if (isset($regularProgramSet[$selectedProgram])) {
+                    $query->whereHas('project', function ($q) use ($selectedProgram) {
+                        $q->whereRaw('UPPER(program) = ?', [$selectedProgram]);
+                    });
+                }
+            }
+
+            if ($request->filled('f_region')) {
+                $selRegion = strtoupper(trim((string) $request->f_region));
+                if (isset($regions[$selRegion])) {
+                    $query->whereIn(DB::raw('UPPER(branch)'), $regions[$selRegion]);
+                }
+            }
+
+            if ($request->filled('f_branch')) {
+                $query->whereRaw('UPPER(branch) = ?', [strtoupper(trim((string) $request->f_branch))]);
+            }
+
+            if ($request->filled('f_status')) {
+                if ($request->f_status === 'drop') {
+                    $query->whereHas('project', function ($q) {
+                        $q->where('status_project', 'drop');
+                    });
+                } else {
+                    $query->where('status_progress', $request->f_status)
+                        ->whereHas('project', function ($q) {
+                            $q->where('status_project', '!=', 'drop');
+                        });
+                }
+            } else {
+                $query->whereHas('project', function ($q) {
+                    $q->where('status_project', '!=', 'drop');
+                });
+            }
+
+            $query->whereIn(DB::raw('UPPER(branch)'), $branchList);
+
+            $lops = $query->get();
+
+            foreach ($lops as $lop) {
+                $project = $lop->project;
+
+                if (!$project) {
+                    continue;
+                }
+
+                $summary = $project->progressSummary();
+                $progress = (int) ($summary['progress'] ?? 0);
+                $isAssigned = (bool) $project->assignment;
+                $isGoLive = (int) $project->is_golive === 1;
+                $isCompleted = $isGoLive || $progress === 100;
+                $isWaiting = !$isGoLive && $progress > 0 && $progress < 100;
+
+                $match = match ($metric) {
+                    'assigned' => $isAssigned,
+                    'waiting' => $isWaiting,
+                    'completed' => $isCompleted,
+                    default => true,
+                };
+
+                if (!$match) {
+                    continue;
+                }
+
+                $statusLabel = $isGoLive
+                    ? 'Go-Live'
+                    : ($isCompleted
+                        ? 'Completed'
+                        : ($isWaiting
+                            ? 'On Progress'
+                            : ($isAssigned ? 'Assigned' : 'Belum Assign')));
+
+                $rows->push([
+                    'pid' => $project->pid ?: ($project->pid_sap ?: '-'),
+                    'project_name' => $project->project_name ?: '-',
+                    'lop_name' => $lop->lop_name ?: '-',
+                    'branch' => strtoupper((string) ($lop->branch ?? '-')),
+                    'sto' => strtoupper((string) ($lop->sto ?? '-')),
+                    'program' => $project->program ?: '-',
+                    'progress' => $progress,
+                    'status_label' => $statusLabel,
+                    'detail_url' => route('admin.projects.tracking', $project->id_project),
+                ]);
+            }
+
+            $metricLabel = [
+                'assigned' => 'Assign',
+                'waiting' => 'In Review',
+                'completed' => 'Complete (Done)',
+            ][$metric] ?? 'Total LOP';
+
+            $title = 'Rekap Assignment — ' . $regionKey . ($branchKey !== '' ? ' / ' . $branchKey : '') . ' — ' . $metricLabel;
+        } elseif ($type === 'regular') {
+            if (!isset($regularProgramSet[$program])) {
+                return response()->json(['message' => 'Program tidak valid.'], 422);
+            }
+
+            $lopRows = DB::table('lops as l')
+                ->join('projects as p', 'l.project_id', '=', 'p.id_project')
+                ->where('p.status_project', '!=', 'drop')
+                ->whereRaw('UPPER(TRIM(p.program)) = ?', [$program])
+                ->whereIn(DB::raw('UPPER(TRIM(l.branch))'), $branchList)
+                ->select([
+                    'l.id_lop', 'l.lop_name', 'l.branch', 'l.sto', 'l.status_progress',
+                    'p.id_project', 'p.pid', 'p.pid_sap', 'p.project_name', 'p.is_golive',
+                ])
+                ->get();
+
+            foreach ($lopRows as $row) {
+                $statusKey = ((int) $row->is_golive === 1)
+                    ? 'finishing'
+                    : ($row->status_progress === 'instalasi'
+                        ? 'instalasi'
+                        : ($row->status_progress === 'finishing' ? 'finishing' : 'preparation'));
+
+                if ($statusKey !== $metric) {
+                    continue;
+                }
+
+                $rows->push([
+                    'pid' => $row->pid ?: ($row->pid_sap ?: '-'),
+                    'project_name' => $row->project_name ?: '-',
+                    'lop_name' => $row->lop_name ?: '-',
+                    'branch' => strtoupper((string) ($row->branch ?? '-')),
+                    'sto' => strtoupper((string) ($row->sto ?? '-')),
+                    'program' => $program,
+                    'progress' => null,
+                    'status_label' => ucfirst($statusKey),
+                    'detail_url' => route('admin.projects.tracking', $row->id_project),
+                ]);
+            }
+
+            $metricLabel = [
+                'preparation' => 'Prepare',
+                'instalasi' => 'Progress',
+                'finishing' => 'Finish',
+            ][$metric] ?? $metric;
+
+            $title = 'Matriks Regular — ' . $program . ' — ' . $regionKey . ($branchKey !== '' ? ' / ' . $branchKey : '') . ' — ' . $metricLabel;
+        } elseif ($type === 'pt2') {
+            $pt2Query = DB::table('pt2_lops as l')
+                ->join('pt2_projects as p', 'l.pt2_project_id', '=', 'p.id_pt2_project');
+
+            if ($request->filled('f_status') && strtolower((string) $request->f_status) === 'drop') {
+                $pt2Query->where('p.status_project', 'drop');
+            } else {
+                $pt2Query->where(function ($q) {
+                    $q->whereNull('p.status_project')
+                        ->orWhere('p.status_project', '!=', 'drop');
+                });
+            }
+
+            if ($request->filled('f_region')) {
+                $selRegion = strtoupper(trim((string) $request->f_region));
+                if (isset($regions[$selRegion])) {
+                    $pt2Query->whereIn(
+                        DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch)))"),
+                        $regions[$selRegion]
+                    );
+                }
+            }
+
+            if ($request->filled('f_branch')) {
+                $pt2Query->whereRaw(
+                    "UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch))) = ?",
+                    [strtoupper(trim((string) $request->f_branch))]
+                );
+            }
+
+            $pt2Query->whereIn(
+                DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch)))"),
+                $branchList
+            );
+
+            $pt2Rows = $pt2Query->select([
+                'l.id_pt2_lop', 'l.lop_name', 'l.sto',
+                DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch))) as branch"),
+                'l.status_progress',
+                DB::raw('COALESCE(l.is_golive, 0) as lop_is_golive'),
+                DB::raw('COALESCE(p.is_golive, 0) as project_is_golive'),
+                'p.pid', 'p.pid_sap', 'p.project_name',
+            ])->get();
+
+            foreach ($pt2Rows as $row) {
+                $isGoLive = (int) ($row->lop_is_golive ?? 0) === 1
+                    || (int) ($row->project_is_golive ?? 0) === 1;
+
+                $statusProgress = strtolower(trim((string) ($row->status_progress ?? '')));
+
+                if ($isGoLive || $statusProgress === 'finishing') {
+                    $statusKey = 'finishing';
+                } elseif ($statusProgress === 'instalasi') {
+                    $statusKey = 'instalasi';
+                } else {
+                    $statusKey = 'preparation';
+                }
+
+                if ($metric !== 'total' && $statusKey !== $metric) {
+                    continue;
+                }
+
+                $rows->push([
+                    'pid' => $row->pid ?: ($row->pid_sap ?: '-'),
+                    'project_name' => $row->project_name ?: '-',
+                    'lop_name' => $row->lop_name ?: '-',
+                    'branch' => strtoupper((string) ($row->branch ?? '-')),
+                    'sto' => strtoupper((string) ($row->sto ?? '-')),
+                    'program' => 'PT 2',
+                    'progress' => null,
+                    'status_label' => $isGoLive ? 'Go-Live' : ucfirst($statusKey),
+                    'detail_url' => route('admin.pt2.tracking', $row->id_pt2_lop),
+                ]);
+            }
+
+            $metricLabel = [
+                'preparation' => 'Preparation',
+                'instalasi' => 'Instalasi',
+                'finishing' => 'Finishing / Go-Live',
+                'total' => 'Total',
+            ][$metric] ?? $metric;
+
+            $title = 'Matriks PT 2 — ' . $regionKey . ($branchKey !== '' ? ' / ' . $branchKey : '') . ' — ' . $metricLabel;
+        } else {
+            return response()->json(['message' => 'Tipe matrix tidak dikenal.'], 422);
+        }
+
+        $rows = $rows->values()->map(function ($row, $i) {
+            $row['no'] = $i + 1;
+            return $row;
+        });
+
+        return response()->json([
+            'title' => $title,
+            'count' => $rows->count(),
+            'rows' => $rows,
+        ]);
+    }
+
     public function show($id)
     {
         $project = Project::with([

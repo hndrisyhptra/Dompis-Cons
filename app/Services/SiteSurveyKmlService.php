@@ -9,7 +9,7 @@ class SiteSurveyKmlService
 {
     /**
      * Bangun konten file KML lengkap dari satu Site Survey.
-     * Berisi: folder Tiang Eksisting, folder Titik Catuan (ODC/ODP/JC),
+     * Berisi: folder Tiang Eksisting, folder Titik Catuan (ODC/ODP/OTB/JC),
      * folder Rute Kabel, dan Placemark Ending Site.
      */
     public function build(SiteSurvey $survey): string
@@ -148,6 +148,12 @@ class SiteSurveyKmlService
             <IconStyle>
                 <scale>1.1</scale>
                 <Icon><href>http://maps.google.com/mapfiles/kml/paddle/purple-circle.png</href></Icon>
+            </IconStyle>
+        </Style>
+        <Style id="styleCatuanOTB">
+            <IconStyle>
+                <scale>1.1</scale>
+                <Icon><href>http://maps.google.com/mapfiles/kml/paddle/grn-circle.png</href></Icon>
             </IconStyle>
         </Style>
         <Style id="styleEndingSite">

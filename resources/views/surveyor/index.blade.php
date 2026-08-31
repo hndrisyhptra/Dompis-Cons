@@ -62,6 +62,21 @@
             <i class="fa-solid fa-chevron-right text-slate-300"></i>
         </a>
 
+        {{-- CTA: Export AutoCAD --}}
+        <a href="{{ route('gis-cad.create') }}"
+           class="flex items-center justify-between bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3.5 hover:shadow-md transition">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-xl bg-indigo-600/10 text-indigo-700 flex items-center justify-center">
+                    <i class="fa-solid fa-drafting-compass text-lg"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-black text-slate-900">Export AutoCAD (DXF)</p>
+                    <p class="text-[11px] text-slate-500">Dari upload KML/KMZ atau data survey existing</p>
+                </div>
+            </div>
+            <i class="fa-solid fa-chevron-right text-slate-300"></i>
+        </a>
+
         {{-- Search --}}
         <form method="GET" action="{{ route('surveyor.index') }}" class="relative">
             <input type="text" name="search" value="{{ request('search') }}"

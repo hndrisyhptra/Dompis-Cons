@@ -59,9 +59,9 @@
         </div>
 
         {{-- FILTER --}}
-        <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-            <form method="GET" action="{{ route('admin.data-boq') }}" class="grid grid-cols-1 lg:grid-cols-12 gap-3">
-                <div class="lg:col-span-6">
+        <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+            <form method="GET" action="{{ route('admin.data-boq') }}" id="boqFilterForm">
+                <div class="mb-5">
                     <label class="block text-xs font-black text-slate-500 uppercase mb-2">Search</label>
                     <input type="text"
                            name="search"
@@ -70,32 +70,90 @@
                            class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm px-4">
                 </div>
 
-                <div class="lg:col-span-4">
-                    <label class="block text-xs font-black text-slate-500 uppercase mb-2">Package</label>
-                    <select name="package"
-                            class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm px-4">
-                        <option value="">Semua Package</option>
-                        @foreach($packages ?? [] as $pkg)
-                            <option value="{{ $pkg->id_package }}"
-                                @selected((string) ($package ?? '') === (string) $pkg->id_package)>
-                                {{ $pkg->package_name }}
-                            </option>
-                        @endforeach
-                    </select>
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Region</label>
+                        <select name="region" id="regionSelect" onchange="updateBranchDropdown(); this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                            <option value="">Semua Region</option>
+                            @foreach($regions ?? [] as $region => $branches)
+                                <option value="{{ $region }}" @selected(request('region') === $region)>{{ $region }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Branch</label>
+                        <select name="branch" id="branchSelect" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                            <option value="">Semua Branch</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Program</label>
+                        <select name="program" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                            <option value="">Semua Program</option>
+                            @foreach($programs ?? [] as $program)
+                                <option value="{{ $program }}" @selected(request('program') === $program)>{{ $program }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Status Project</label>
+                        <select name="status_project" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                            <option value="">Semua Status</option>
+                            @foreach(['init' => 'Init', 'active' => 'Active', 'close' => 'Close', 'bast' => 'BAST', 'drop' => 'Drop'] as $value => $label)
+                                <option value="{{ $value }}" @selected(request('status_project') === $value)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Package</label>
+                        <select name="package" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                            <option value="">Semua Package</option>
+                            @foreach($packages ?? [] as $pkg)
+                                <option value="{{ $pkg->id_package }}"
+                                    @selected((string) ($package ?? '') === (string) $pkg->id_package)>
+                                    {{ $pkg->package_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Per Page</label>
+                        <select name="per_page" onchange="this.form.submit()"
+                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                            @foreach([10,20,50] as $size)
+                                <option value="{{ $size }}" @selected((int) request('per_page', 10) === $size)>{{ $size }} data</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
 
-                <div class="lg:col-span-2 flex items-end gap-2">
-                    <button type="submit"
-                            class="w-full h-12 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black">
-                        Cari
-                    </button>
-
-                    @if(!empty($search) || !empty($package))
+                <div class="mt-5 flex flex-col sm:flex-row sm:justify-end gap-3">
+                    @if(request('search') || request('region') || request('branch') || request('program') || request('status_project') || request('package'))
                         <a href="{{ route('admin.data-boq') }}"
-                           class="h-12 px-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black inline-flex items-center justify-center">
+                           class="h-11 px-5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold inline-flex items-center justify-center">
                             Reset
                         </a>
                     @endif
+                    <a href="{{ route('admin.data-boq.export', request()->query()) }}"
+                       class="h-11 px-5 rounded-xl bg-emerald-600 text-white text-sm font-black hover:bg-emerald-700 inline-flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Download Excel
+                    </a>
+                    <button type="submit" class="h-11 px-7 rounded-xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700">Cari</button>
                 </div>
             </form>
         </div>
@@ -477,6 +535,27 @@
 <script>
     const BOQ_DELETE_URL_TEMPLATE = @json($boqDeleteUrlTemplate);
     const REOPEN_LOP_ID = @json($reopenLopId);
+
+    // Region -> Branch cascading dropdown, disamakan persis dengan Data PID.
+    const regionMapping = @json($regions ?? []);
+
+    function updateBranchDropdown() {
+        const region = document.getElementById('regionSelect').value;
+        const branchSelect = document.getElementById('branchSelect');
+        const current = @json((string) request('branch'));
+
+        branchSelect.innerHTML = '<option value="">Semua Branch</option>';
+
+        (regionMapping[region] || []).forEach(branch => {
+            const option = document.createElement('option');
+            option.value = branch;
+            option.textContent = branch;
+            option.selected = branch.toUpperCase() === current.toUpperCase();
+            branchSelect.appendChild(option);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', updateBranchDropdown);
 
     // Katalog designator untuk fitur search "Tambah Item Designator" di bawah,
     // supaya filter bisa langsung jalan di browser tanpa request tambahan.

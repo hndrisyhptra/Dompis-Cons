@@ -41,4 +41,14 @@ return [
         'webhook_api_token' => env('TELEGRAM_WEBHOOK_API_TOKEN'),
     ],
 
+    'gis_cad' => [
+        // Fitur "GIS to CAD Generator" (KML/KMZ -> DXF AutoCAD).
+        // Butuh python3 + `pip3 install -r python-worker/requirements.txt`
+        // (ezdxf untuk tulis DXF, pyproj untuk transformasi WGS84 -> UTM)
+        // sudah terpasang di server. Lihat python-worker/README.md.
+        'python_bin' => env('GIS_CAD_PYTHON_BIN', 'python3'),
+        'worker_script' => base_path('python-worker/gis_to_dxf.py'),
+        'timeout' => (int) env('GIS_CAD_TIMEOUT', 300),
+    ],
+
 ];
