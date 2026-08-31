@@ -92,7 +92,8 @@
                                 {{ $status == 'rejected' ? '!' : ($isUploaded ? '✓' : $loop->iteration) }}
                             </div>
                             <div class="min-w-0">
-                                <h3 class="text-sm font-bold text-gray-900 tracking-tight">{{ $boq->designator }}</h3>
+                                <h3 class="text-xs font-bold text-gray-900 tracking-tight leading-snug">{{ $boq->item_name ?: $boq->designator }}</h3>
+                                <p class="text-[11px] text-gray-500 font-mono mt-0.5">{{ $boq->designator ?? '-' }}</p>
                                 <div class="text-[11px] text-gray-400 space-y-0.5 mt-0.5">
                                     <p>Plan: <span class="font-semibold text-gray-700">{{ number_format($boq->quantity_plan, 0, ',', '.') }} {{ $boq->unit }}</span></p>
                                     

@@ -176,6 +176,11 @@
                             <h3 class="text-base font-black text-gray-900 dark:text-white truncate font-mono tracking-tight">
                                 {{ $designatorTitle }}
                             </h3>
+                            @if(!empty($itemName))
+                                <p class="text-xs font-bold text-gray-600 dark:text-gray-300 truncate mt-0.5">
+                                    {{ $itemName }}
+                                </p>
+                            @endif
                             <p class="text-xs font-medium text-gray-500 truncate mt-0.5">
                                 Final {{ $total }} Foto · <span class="text-emerald-600 font-bold">{{ $approvedCount }} Approved</span> · <span class="text-amber-600 font-bold">{{ $pendingCount }} Pending</span>
                             </p>

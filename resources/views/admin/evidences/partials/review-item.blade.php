@@ -47,6 +47,11 @@
                 <h3 class="text-base font-black text-gray-900 dark:text-white truncate font-mono tracking-tight">
                     {{ $title }}
                 </h3>
+                @if(!empty($subtitle_item_name ?? null))
+                    <p class="text-xs font-bold text-gray-600 dark:text-gray-300 truncate mt-0.5">
+                        {{ $subtitle_item_name }}
+                    </p>
+                @endif
                 <p class="text-xs font-medium text-gray-500 truncate mt-0.5">
                     Total {{ $total }} Foto · <span class="text-emerald-600 font-bold">{{ $approvedCount }} Approved</span> · <span class="text-amber-600 font-bold">{{ $pendingCount }} Pending</span>
                 </p>
