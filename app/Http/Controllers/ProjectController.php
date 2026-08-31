@@ -984,8 +984,28 @@ public function importCsv(Request $request)
             }
         ])->findOrFail($id);
 
+        // Ambil peta harga designator (harga terbaru) untuk Package LOP ini,
+        // dipakai untuk menghitung Nilai Material & Nilai Jasa berdasarkan Qty Actual.
+        $packageId = $project->lop?->package_id;
+        $priceMap = collect();
+
+        if ($packageId) {
+            $latestPriceIds = DB::table('designator_package_prices')
+                ->selectRaw('MAX(id_price) AS id_price')
+                ->where('package_id', $packageId)
+                ->groupBy('designator_id');
+
+            $priceMap = DB::table('designator_package_prices as dpp')
+                ->joinSub($latestPriceIds, 'latest_price', function ($join) {
+                    $join->on('latest_price.id_price', '=', 'dpp.id_price');
+                })
+                ->selectRaw("dpp.designator_id, CAST(NULLIF(TRIM(dpp.price), '') AS DECIMAL(20,2)) AS price")
+                ->get()
+                ->pluck('price', 'designator_id');
+        }
+
         // Lempar data ke file review-boq yang baru saja dibuat
-        return view('admin.evidences.review-boq', compact('project'));
+        return view('admin.evidences.review-boq', compact('project', 'priceMap'));
     }
 
     public function downloadPreview($id)

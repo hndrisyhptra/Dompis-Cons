@@ -467,7 +467,10 @@ Route::middleware(['auth'])->group(function () {
     
     // 1. Dashboard PM (Ini route yang memicu error saat login tadi)
     Route::get('/dashboard', [DashboardPmController::class, 'index'])->name('dashboard');
-    
+
+    // 1b. Endpoint JSON untuk modal "klik angka pada tabel matrix" Dashboard PM
+    Route::get('/dashboard/matrix-detail', [DashboardPmController::class, 'matrixDetail'])->name('dashboard.matrix-detail');
+
     // 2. Rekap Progress LOP
     Route::get('/rekap-progress', [DashboardPmController::class, 'rekap'])->name('rekap.progress');
 

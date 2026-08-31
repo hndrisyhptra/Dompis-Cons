@@ -33,10 +33,18 @@
     {{-- GENERATE METRICS RINGKASAN AKURASI (KABEL & TIANG) --}}
     @php
         $boqItems = $project->boqItems ?? collect();
-        
+        $priceMap = $priceMap ?? collect();
+
         $materialBoqItems = $boqItems->filter(function ($boq) {
             $designator = $boq->designatorData ?? $boq->designatorDataByCode;
             return str_starts_with($boq->designator, 'M-') || optional($designator)->type === 'material';
+        });
+
+        // Klasifikasi Jasa disamakan persis dengan detail Data BOQ: murni dari
+        // relasi designator_id -> designators.type (tanpa fallback kode/prefix),
+        // supaya daftar & nilainya konsisten dengan yang tampil di Data BOQ.
+        $jasaBoqItems = $boqItems->filter(function ($boq) {
+            return optional($boq->designatorData)->type === 'jasa';
         });
 
         $kpiItems = $materialBoqItems->filter(function($item) {
@@ -60,6 +68,46 @@
 
         $accKabel = $planKabel > 0 ? round(($actualKabel / $planKabel) * 100) : 0;
         $accTiang = $planTiang > 0 ? round(($actualTiang / $planTiang) * 100) : 0;
+
+        // Harga designator (per Package LOP ini).
+        $hargaDesignator = function ($boq) use ($priceMap) {
+            return (float) ($priceMap[$boq->designator_id] ?? 0);
+        };
+
+        // Nilai Material: harga designator x Qty Actual (realisasi lapangan).
+        $nilaiItem = function ($boq) use ($hargaDesignator) {
+            return $hargaDesignator($boq) * (float) ($boq->quantity_actual ?? 0);
+        };
+
+        // Nilai Jasa: qty actual milik baris Jasa itu sendiri hampir selalu 0 (Waspang di
+        // lapangan hanya meng-update qty actual pada item Material), sehingga Nilai Jasa
+        // dihitung dari harga designator Jasa x quantity_actual item Material PASANGANNYA
+        // (dicocokkan lewat pair_code designator yang sama, mis. J-100 <-> M-100).
+        $materialActualByPairCode = [];
+        foreach ($materialBoqItems as $matBoq) {
+            $pairCode = optional($matBoq->designatorData)->pair_code;
+            if ($pairCode === null || $pairCode === '') {
+                continue;
+            }
+            $materialActualByPairCode[$pairCode] = ($materialActualByPairCode[$pairCode] ?? 0) + (float) ($matBoq->quantity_actual ?? 0);
+        }
+
+        $jasaActualQty = function ($boq) use ($materialActualByPairCode) {
+            $pairCode = optional($boq->designatorData)->pair_code;
+            if ($pairCode !== null && $pairCode !== '' && array_key_exists($pairCode, $materialActualByPairCode)) {
+                return $materialActualByPairCode[$pairCode];
+            }
+            // Fallback: tidak ada item Material pasangan yang cocok, pakai qty actual milik sendiri.
+            return (float) ($boq->quantity_actual ?? 0);
+        };
+
+        $nilaiJasaItem = function ($boq) use ($hargaDesignator, $jasaActualQty) {
+            return $hargaDesignator($boq) * $jasaActualQty($boq);
+        };
+
+        $nilaiMaterial = $materialBoqItems->sum($nilaiItem);
+        $nilaiJasa = $jasaBoqItems->sum($nilaiJasaItem);
+        $totalNilai = $nilaiMaterial + $nilaiJasa;
     @endphp
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -116,6 +164,45 @@
         </div>
     </div>
 
+    {{-- RINGKASAN NILAI (MATERIAL + JASA = TOTAL) BERDASARKAN QTY ACTUAL --}}
+    <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 rounded-3xl shadow-xs">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">Rekapitulasi Nilai BOQ (Sesuai Qty Actual)</h3>
+            @if($priceMap->isEmpty())
+                <span class="px-2.5 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-50 text-amber-600 border border-amber-100 uppercase">
+                    Harga Package Belum Tersedia
+                </span>
+            @endif
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-5 text-center">
+            <div class="flex-1 w-full sm:w-auto bg-slate-50 dark:bg-slate-800/60 rounded-2xl px-5 py-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nilai Material</p>
+                <p class="text-lg font-black text-blue-600 dark:text-blue-400 mt-1 font-mono">Rp {{ number_format($nilaiMaterial, 0, ',', '.') }}</p>
+            </div>
+
+            <span class="text-2xl font-black text-slate-300 dark:text-slate-600 shrink-0">+</span>
+
+            <div class="flex-1 w-full sm:w-auto bg-slate-50 dark:bg-slate-800/60 rounded-2xl px-5 py-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nilai Jasa</p>
+                <p class="text-lg font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">Rp {{ number_format($nilaiJasa, 0, ',', '.') }}</p>
+            </div>
+
+            <span class="text-2xl font-black text-slate-300 dark:text-slate-600 shrink-0">=</span>
+
+            <div class="flex-1 w-full sm:w-auto bg-slate-900 dark:bg-white rounded-2xl px-5 py-4">
+                <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Total Nilai</p>
+                <p class="text-xl font-black text-white dark:text-slate-900 mt-1 font-mono">Rp {{ number_format($totalNilai, 0, ',', '.') }}</p>
+            </div>
+        </div>
+
+        @if($priceMap->isEmpty())
+            <p class="text-[11px] text-amber-600 mt-3 text-center font-semibold">
+                LOP ini belum memiliki Package dengan harga designator, sehingga Nilai Material & Nilai Jasa masih Rp 0.
+            </p>
+        @endif
+    </div>
+
     {{-- TABEL MATERIAL DETIL --}}
     <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden">
         <div class="p-5 border-b border-slate-50 dark:border-slate-800/80 bg-slate-50/30">
@@ -131,6 +218,7 @@
                         <th class="py-3.5 px-4 text-center">Volume Plan</th>
                         <th class="py-3.5 px-4 text-center">Volume Actual</th>
                         <th class="py-3.5 px-4 text-center">Satuan</th>
+                        <th class="py-3.5 px-4 text-right">Nilai Material</th>
                         <th class="py-3.5 px-6 text-center">Status Pemenuhan</th>
                     </tr>
                 </thead>
@@ -138,6 +226,7 @@
                     @forelse($materialBoqItems as $item)
                         @php
                             $isMatch = (float)$item->quantity_actual >= (float)$item->quantity_plan;
+                            $itemNilaiMaterial = $nilaiItem($item);
                         @endphp
                         <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition">
                             <td class="py-4 px-6 font-mono font-bold text-slate-600 dark:text-slate-400">
@@ -156,6 +245,9 @@
                             </td>
                             <td class="py-4 px-4 text-center text-slate-400">
                                 {{ $item->unit }}
+                            </td>
+                            <td class="py-4 px-4 text-right font-mono font-bold text-slate-700 dark:text-slate-300">
+                                Rp {{ number_format($itemNilaiMaterial, 0, ',', '.') }}
                             </td>
                             <td class="py-4 px-6 text-center">
                                 @if((float)$item->quantity_actual > (float)$item->quantity_plan)
@@ -176,12 +268,25 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="py-12 text-center text-slate-400 font-bold bg-white dark:bg-slate-900">
+                            <td colspan="7" class="py-12 text-center text-slate-400 font-bold bg-white dark:bg-slate-900">
                                 📁 Tidak ada record data material pada tabel BOQ proyek ini.
                             </td>
                         </tr>
                     @endforelse
                 </tbody>
+                @if($materialBoqItems->isNotEmpty())
+                    <tfoot>
+                        <tr class="bg-slate-50/80 dark:bg-slate-800/60 border-t-2 border-slate-100 dark:border-slate-800">
+                            <td colspan="5" class="py-3.5 px-6 text-right text-[11px] font-black text-slate-500 uppercase tracking-wider">
+                                Total Nilai Material
+                            </td>
+                            <td class="py-3.5 px-4 text-right font-mono font-black text-blue-600 dark:text-blue-400">
+                                Rp {{ number_format($nilaiMaterial, 0, ',', '.') }}
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                @endif
             </table>
         </div>
     </div>
