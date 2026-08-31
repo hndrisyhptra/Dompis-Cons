@@ -1,0 +1,7 @@
+# Dependency untuk fitur "GIS to CAD Generator" (KML/KMZ -> DXF AutoCAD).
+# Install dengan:
+#   pip3 install -r python-worker/requirements.txt
+# (disarankan pakai virtualenv terpisah dari sistem, lihat README.md)
+
+ezdxf>=1.0,<2.0
+pyproj>=3.4,<4.0
