@@ -133,7 +133,8 @@
                     <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-green-100/80 text-green-700 font-bold dark:bg-green-900/40 dark:text-green-300">Partner</span>
                 </a>
 
-                {{-- Sub-Menu: Konstruksi Eksternal --}}
+                {{-- Sub-Menu: Konstruksi Eksternal (tidak ditampilkan untuk role tif) --}}
+                @if(auth()->user()->role !== 'tif')
                 <a href="{{ route('pm.rekap_progress', ['program' => 'Konstruksi Eksternal']) }}"
                 class="group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition
                 {{ (request('program') == 'Konstruksi Eksternal' && request()->routeIs('pm.rekap_progress')) ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
@@ -143,6 +144,7 @@
                     </span>
                     <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-red-100/80 text-red-700 font-bold dark:bg-red-900/40 dark:text-red-300">External</span>
                 </a>
+                @endif
 
             </div>
         </div>

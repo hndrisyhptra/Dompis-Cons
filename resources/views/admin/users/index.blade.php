@@ -75,6 +75,8 @@
                             'teknisi' => 'Inputer PT2',
                             'sdi'     => 'SDI',
                             'sdi_surveyor' => 'SDI Surveyor',
+                            'superadmin' => 'Super Admin',
+                            'tif' => 'TIF',
                         ];
                         $displayRole = $roleNames[$user->role] ?? strtoupper($user->role);
                     @endphp
@@ -302,6 +304,8 @@
                         <option value="teknisi">Inputer PT2</option>
                         <option value="sdi">SDI</option>
                         <option value="sdi_surveyor">SDI Surveyor</option>
+                        <option value="superadmin">Super Admin</option>
+                        <option value="tif">TIF</option>
                     </select>
                 </div>
 

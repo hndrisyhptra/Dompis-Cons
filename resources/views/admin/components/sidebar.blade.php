@@ -46,7 +46,8 @@
             $inboxOpen = request()->routeIs('admin.inbox*') || request()->routeIs('admin.history*');
         @endphp
 
-        {{-- INBOX --}}
+        {{-- INBOX: tidak ditampilkan untuk role superadmin --}}
+        @if(auth()->user()->role !== 'superadmin')
         <div x-data="{ open: {{ $inboxOpen ? 'true' : 'false' }} }">
 
             <button type="button"
@@ -120,6 +121,7 @@
 
             </div>
         </div>
+        @endif
 
         @php
             // Mendeteksi apakah salah satu dari menu Project / Program sedang aktif
@@ -746,14 +748,16 @@
             </span>
         </a>
 
+        {{-- User Management: hanya ditampilkan untuk role superadmin --}}
+        @if(auth()->user()->role === 'superadmin')
         <a href="{{ route('admin.users.index') }}"
-           class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold 
-           {{ request()->routeIs('admin.users.*') ? text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
-           
+           class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+           {{ request()->routeIs('admin.users.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
            @if(request()->routeIs('admin.users.*'))
                 <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
             @endif
-           
+
             <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-user-icon lucide-shield-user">
                     <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M6.376 18.91a6 6 0 0 1 11.249.003"/><circle cx="12" cy="11" r="4"/>
@@ -763,8 +767,9 @@
             <span>
                 User Management
             </span>
-            
+
         </a>
+        @endif
 
     </nav>
 
@@ -772,7 +777,7 @@
     <div class="p-4 border-t border-gray-200 dark:border-gray-800">
         <div class="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
             <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse shrink-0"></div>
-            <span class="text-xs font-bold text-gray-600 dark:text-gray-400">Admin Access Active</span>
+            <span class="text-xs font-bold text-gray-600 dark:text-gray-400">{{ auth()->user()->role === 'superadmin' ? 'Super Admin Access Active' : 'Admin Access Active' }}</span>
         </div>
     </div>
 

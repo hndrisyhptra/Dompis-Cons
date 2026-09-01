@@ -9,8 +9,20 @@ use Illuminate\Support\Facades\Validator;
 
 class UserManagementController extends Controller
 {
+    /**
+     * User Management hanya boleh dikelola oleh role superadmin.
+     */
+    private function ensureSuperAdmin(): void
+    {
+        if (auth()->user()?->role !== 'superadmin') {
+            abort(403, 'Hanya Super Admin yang dapat mengelola User Management.');
+        }
+    }
+
     public function index(Request $request)
     {
+        $this->ensureSuperAdmin();
+
         $search = $request->search;
 
         // Query dirubah tanpa membatasi hanya status active
@@ -31,12 +43,14 @@ class UserManagementController extends Controller
 
     public function store(Request $request)
     {
+        $this->ensureSuperAdmin();
+
         $request->validate([
             'nik' => 'required|string|max:30|unique:users,nik',
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:100|unique:users,username',
-            // Update: Tambahkan teknisi, sdi, dan sdi_surveyor pada daftar in:
-            'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor',
+            // Update: Tambahkan teknisi, sdi, sdi_surveyor, superadmin, dan tif pada daftar in:
+            'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor,superadmin,tif',
             'password' => 'required|string|min:6',
         ]);
 
@@ -55,14 +69,16 @@ class UserManagementController extends Controller
 
     public function update(Request $request, $id)
     {
+        $this->ensureSuperAdmin();
+
         $user = User::where('id_user', $id)->firstOrFail();
 
         $request->validate([
             'nik' => 'required|string|max:30|unique:users,nik,' . $user->id_user . ',id_user',
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:100|unique:users,username,' . $user->id_user . ',id_user',
-            // Update: Tambahkan teknisi, sdi, dan sdi_surveyor pada daftar in:
-            'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor',
+            // Update: Tambahkan teknisi, sdi, sdi_surveyor, superadmin, dan tif pada daftar in:
+            'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor,superadmin,tif',
             'password' => 'nullable|string|min:6',
         ]);
 
@@ -85,6 +101,8 @@ class UserManagementController extends Controller
 
     public function destroy($id)
     {
+        $this->ensureSuperAdmin();
+
         $user = User::where('id_user', $id)->firstOrFail();
 
         $user->update([
@@ -96,6 +114,8 @@ class UserManagementController extends Controller
 
     public function importCsv(Request $request)
     {
+        $this->ensureSuperAdmin();
+
         $request->validate([
             'file' => 'required|file|mimes:csv,txt|max:5120',
         ]);
@@ -154,8 +174,8 @@ class UserManagementController extends Controller
                 'nik' => 'required|string|max:30',
                 'name' => 'required|string|max:255',
                 'username' => 'required|string|max:100',
-                // Update: Tambahkan teknisi dan sdi pada daftar in:
-                'role' => 'required|in:admin,waspang,pm,teknisi,sdi',
+                // Update: Tambahkan teknisi, sdi, sdi_surveyor, superadmin, dan tif pada daftar in:
+                'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor,superadmin,tif',
                 'password' => 'required|string|min:6',
             ]);
 
@@ -210,6 +230,8 @@ class UserManagementController extends Controller
 
     public function activate($id)
     {
+        $this->ensureSuperAdmin();
+
         $user = User::where('id_user', $id)->firstOrFail();
 
         $user->update([

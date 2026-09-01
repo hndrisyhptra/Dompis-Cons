@@ -26,7 +26,8 @@ class DashboardController extends Controller
         if ($role === 'waspang') {
             return redirect()->route('waspang.dashboard');
         }
-        if ($role === 'pm') {
+        // TIF memakai menu & dashboard yang sama persis dengan PM.
+        if ($role === 'pm' || $role === 'tif') {
             return redirect()->route('pm.dashboard');
         }
         if ($role === 'teknisi') {
@@ -39,7 +40,9 @@ class DashboardController extends Controller
             return redirect()->route('surveyor.index');
         }
 
-        if ($role !== 'admin') {
+        // Super Admin memakai dashboard & seluruh menu Admin (lihat sidebar untuk
+        // perbedaan tampilannya: tanpa Inbox, dengan User Management).
+        if (!in_array($role, ['admin', 'superadmin'], true)) {
             abort(403);
         }
 

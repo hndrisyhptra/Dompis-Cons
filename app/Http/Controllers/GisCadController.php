@@ -19,7 +19,7 @@ use RuntimeException;
  */
 class GisCadController extends Controller
 {
-    private const ALLOWED_ROLES = ['sdi_surveyor', 'admin', 'sdi', 'waspang'];
+    private const ALLOWED_ROLES = ['sdi_surveyor', 'admin', 'sdi', 'waspang', 'superadmin'];
 
     private function guardAccess(): User
     {
@@ -39,7 +39,7 @@ class GisCadController extends Controller
     {
         $query = GisCadExport::query()->where('uuid', $uuid);
 
-        if (!in_array($user->role, ['admin', 'sdi'], true)) {
+        if (!in_array($user->role, ['admin', 'sdi', 'superadmin'], true)) {
             $query->where('requested_by', $user->id_user);
         }
 
@@ -82,7 +82,7 @@ class GisCadController extends Controller
 
         $query = GisCadExport::with(['survey', 'project', 'requester']);
 
-        if (!in_array($user->role, ['admin', 'sdi'], true)) {
+        if (!in_array($user->role, ['admin', 'sdi', 'superadmin'], true)) {
             $query->where('requested_by', $user->id_user);
         }
 
@@ -122,7 +122,7 @@ class GisCadController extends Controller
 
         $surveysQuery = SiteSurvey::with('project')->orderByDesc('id_site_surveys');
 
-        if (!in_array($user->role, ['admin', 'sdi'], true)) {
+        if (!in_array($user->role, ['admin', 'sdi', 'superadmin'], true)) {
             $surveysQuery->where('surveyor_id', $user->id_user);
         }
 
@@ -179,7 +179,7 @@ class GisCadController extends Controller
         $user = $this->guardAccess();
 
         $surveyQuery = SiteSurvey::query();
-        if (!in_array($user->role, ['admin', 'sdi'], true)) {
+        if (!in_array($user->role, ['admin', 'sdi', 'superadmin'], true)) {
             $surveyQuery->where('surveyor_id', $user->id_user);
         }
         $survey = $surveyQuery->findOrFail($surveyId);
