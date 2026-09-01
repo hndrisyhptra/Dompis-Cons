@@ -1378,6 +1378,14 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         | KABEL PLAN
         |--------------------------------------------------------------------------
+        |
+        | PENTING: hanya menjumlahkan baris BOQ bertipe designator "material"
+        | (d.type = 'material'). Designator hasil "Virtual Split" (import tanpa
+        | prefix M-/J- otomatis dipecah jadi 2 baris: material & jasa dengan
+        | quantity_plan yang SAMA dan progress_category yang SAMA) — kalau tidak
+        | dibatasi ke material saja, SUM(quantity_plan) akan dobel (baris material
+        | + baris jasa kembarannya). Pola yang sama dengan
+        | DashboardPmController::kabelTiangByProgram()/rekapProgress().
         */
         ->selectRaw("
             SUM(
@@ -1387,6 +1395,11 @@ class DashboardController extends Controller
                             d.progress_category
                         )
                     ) = 'kabel'
+                    AND LOWER(
+                        TRIM(
+                            d.type
+                        )
+                    ) = 'material'
 
                     THEN COALESCE(
                         b.quantity_plan,
@@ -1413,6 +1426,11 @@ class DashboardController extends Controller
                             d.progress_category
                         )
                     ) = 'kabel'
+                    AND LOWER(
+                        TRIM(
+                            d.type
+                        )
+                    ) = 'material'
 
                     THEN COALESCE(
                         b.quantity_actual,
@@ -1439,6 +1457,11 @@ class DashboardController extends Controller
                             d.progress_category
                         )
                     ) = 'tiang'
+                    AND LOWER(
+                        TRIM(
+                            d.type
+                        )
+                    ) = 'material'
 
                     THEN COALESCE(
                         b.quantity_plan,
@@ -1465,6 +1488,11 @@ class DashboardController extends Controller
                             d.progress_category
                         )
                     ) = 'tiang'
+                    AND LOWER(
+                        TRIM(
+                            d.type
+                        )
+                    ) = 'material'
 
                     THEN COALESCE(
                         b.quantity_actual,

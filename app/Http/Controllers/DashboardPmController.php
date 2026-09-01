@@ -931,12 +931,15 @@ class DashboardPmController extends Controller
                 DB::raw('COUNT(DISTINCT l.id_lop) as total_segments'),
                 
                 // Total Kabel FO Plan vs Actual
-                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'kabel' THEN IFNULL(b.quantity_plan, 0) ELSE 0 END) as total_kabel_plan"),
-                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'kabel' THEN IFNULL(b.quantity_actual, 0) ELSE 0 END) as total_kabel_actual"),
-                
+                // (dibatasi ke d.type = 'material' agar tidak dobel akibat baris
+                // "Virtual Split" material+jasa — pola sama dengan rekapProgress()/
+                // kabelTiangByProgram() di atas)
+                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'kabel' AND LOWER(TRIM(d.type)) = 'material' THEN IFNULL(b.quantity_plan, 0) ELSE 0 END) as total_kabel_plan"),
+                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'kabel' AND LOWER(TRIM(d.type)) = 'material' THEN IFNULL(b.quantity_actual, 0) ELSE 0 END) as total_kabel_actual"),
+
                 // Total Tiang Plan vs Actual
-                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'tiang' THEN IFNULL(b.quantity_plan, 0) ELSE 0 END) as total_tiang_plan"),
-                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'tiang' THEN IFNULL(b.quantity_actual, 0) ELSE 0 END) as total_tiang_actual"),
+                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'tiang' AND LOWER(TRIM(d.type)) = 'material' THEN IFNULL(b.quantity_plan, 0) ELSE 0 END) as total_tiang_plan"),
+                DB::raw("SUM(CASE WHEN TRIM(LOWER(d.progress_category)) = 'tiang' AND LOWER(TRIM(d.type)) = 'material' THEN IFNULL(b.quantity_actual, 0) ELSE 0 END) as total_tiang_actual"),
                 
                 // Menghitung jumlah berkas eviden milik Waspang ini
                 DB::raw("(SELECT COUNT(*) FROM evidences e JOIN pro_assign pa2 ON e.project_id = pa2.project_id WHERE pa2.waspang_id = u.id_user) as total_evidences")
