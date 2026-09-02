@@ -15,6 +15,7 @@
         'waspang'      => 'Inputer',
         'pm'           => 'PM',
         'tif'          => 'TIF',
+        'super_tif'    => 'Super TIF',
         'teknisi'      => 'Inputer PT2',
         'sdi'          => 'SDI',
         'sdi_surveyor' => 'SDI Surveyor',

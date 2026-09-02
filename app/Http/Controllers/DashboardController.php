@@ -42,9 +42,14 @@ class DashboardController extends Controller
 
         // Super Admin memakai dashboard & seluruh menu Admin (lihat sidebar untuk
         // perbedaan tampilannya: tanpa Inbox, dengan User Management).
-        if (!in_array($role, ['admin', 'superadmin'], true)) {
+        // Super TIF memakai tampilan persis seperti Admin, hanya saja seluruh
+        // project program Konstruksi Eksternal disembunyikan (lihat filter
+        // $isSuperTif di bawah).
+        if (!in_array($role, ['admin', 'superadmin', 'super_tif'], true)) {
             abort(403);
         }
+
+        $isSuperTif = $role === 'super_tif';
 
         $regions = [
             'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
@@ -357,6 +362,12 @@ class DashboardController extends Controller
             'project.boqItems.designatorDataByCode',
         ]);
 
+        if ($isSuperTif) {
+            $query->whereHas('project', function ($q) {
+                $q->whereRaw('UPPER(TRIM(program)) != ?', ['KONSTRUKSI EKSTERNAL']);
+            });
+        }
+
         if ($request->filled('program')) {
             $selectedProgram = strtoupper(trim($request->program));
 
@@ -581,7 +592,12 @@ class DashboardController extends Controller
             ];
         }
 
-        return view('admin.dashboard', compact(
+        // Super TIF punya view dashboard sendiri (resources/views/super_tif/dashboard.blade.php)
+        // supaya kolom EKSBIS/Konstruksi Eksternal pada tabel matrix bisa
+        // dihilangkan langsung dari filenya, terpisah dari dashboard admin.
+        $dashboardView = $isSuperTif ? 'super_tif.dashboard' : 'admin.dashboard';
+
+        return view($dashboardView, compact(
             'programs',
             'totalLop',
             'boqReady',
@@ -613,6 +629,10 @@ class DashboardController extends Controller
      */
     public function matrixDetail(Request $request)
     {
+        // Super TIF: sembunyikan seluruh project program Konstruksi Eksternal
+        // dari modal detail matrix, sama seperti dashboard utama.
+        $isSuperTif = auth()->user()?->role === 'super_tif';
+
         $regions = [
             'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
             'JATENG DIY' => ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
@@ -643,6 +663,12 @@ class DashboardController extends Controller
                 'project.boqItems.designatorData',
                 'project.boqItems.designatorDataByCode',
             ]);
+
+            if ($isSuperTif) {
+                $query->whereHas('project', function ($q) {
+                    $q->whereRaw('UPPER(TRIM(program)) != ?', ['KONSTRUKSI EKSTERNAL']);
+                });
+            }
 
             if ($request->filled('f_program')) {
                 $selectedProgram = strtoupper(trim((string) $request->f_program));
@@ -956,13 +982,18 @@ class DashboardController extends Controller
 
     public function mapMonitoring()
     {
-        $projects = Project::with([
+        $projectsQuery = Project::with([
             'evidences',
             'assignments.waspang'
         ])
             ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->get();
+            ->whereNotNull('longitude');
+
+        if (auth()->user()?->role === 'super_tif') {
+            $projectsQuery->whereRaw('UPPER(TRIM(program)) != ?', ['KONSTRUKSI EKSTERNAL']);
+        }
+
+        $projects = $projectsQuery->get();
 
         $evidences = Evidence::with(['project', 'uploader'])
             ->whereNotNull('latitude')
@@ -1002,6 +1033,7 @@ class DashboardController extends Controller
     public function adminInbox(Request $request)
     {
         $search = $request->search;
+        $isSuperTif = auth()->user()?->role === 'super_tif';
 
         $assignments = ProjectAssignment::with([
             'project.lop',
@@ -1013,8 +1045,12 @@ class DashboardController extends Controller
             ->where('assigned_by', auth()->user()->id_user)
             ->latest()
             ->get()
-            ->filter(function ($assignment) {
+            ->filter(function ($assignment) use ($isSuperTif) {
                 if (!$assignment->project) {
+                    return false;
+                }
+
+                if ($isSuperTif && strtoupper(trim((string) $assignment->project->program)) === 'KONSTRUKSI EKSTERNAL') {
                     return false;
                 }
 
@@ -1059,6 +1095,7 @@ class DashboardController extends Controller
     public function adminHistory(Request $request)
     {
         $search = $request->search;
+        $isSuperTif = auth()->user()?->role === 'super_tif';
 
         $assignments = ProjectAssignment::with([
             'project.lop',
@@ -1070,8 +1107,12 @@ class DashboardController extends Controller
             ->where('assigned_by', auth()->user()->id_user)
             ->latest()
             ->get()
-            ->filter(function ($assignment) {
+            ->filter(function ($assignment) use ($isSuperTif) {
                 if (!$assignment->project) {
+                    return false;
+                }
+
+                if ($isSuperTif && strtoupper(trim((string) $assignment->project->program)) === 'KONSTRUKSI EKSTERNAL') {
                     return false;
                 }
 
@@ -1189,6 +1230,10 @@ class DashboardController extends Controller
         trim((string) $request->input('status', ''))
     );
 
+    // Super TIF tidak boleh melihat data program Konstruksi Eksternal sama
+    // sekali di rekap progress, baik lewat filter dropdown maupun default.
+    $isSuperTif = auth()->user()?->role === 'super_tif';
+
 
     /*
     |--------------------------------------------------------------------------
@@ -1219,9 +1264,15 @@ class DashboardController extends Controller
     | PROGRAM FILTER
     |--------------------------------------------------------------------------
     */
-    $programs = \App\Models\Project::query()
+    $programsQuery = \App\Models\Project::query()
         ->whereNotNull('program')
-        ->where('program', '!=', '')
+        ->where('program', '!=', '');
+
+    if ($isSuperTif) {
+        $programsQuery->whereRaw('UPPER(TRIM(program)) != ?', ['KONSTRUKSI EKSTERNAL']);
+    }
+
+    $programs = $programsQuery
         ->distinct()
         ->orderBy('program')
         ->pluck('program');
@@ -1560,6 +1611,13 @@ class DashboardController extends Controller
         $baseQuery->where(
             'p.program',
             $selectedProgram
+        );
+    }
+
+    if ($isSuperTif) {
+        $baseQuery->whereRaw(
+            'UPPER(TRIM(p.program)) != ?',
+            ['KONSTRUKSI EKSTERNAL']
         );
     }
 

@@ -19,7 +19,7 @@ class SurveyorController extends Controller
      * dipertahankan di sini agar akun lama yang masih memakai role tsb tidak
      * kehilangan akses.
      */
-    private const ALLOWED_ROLES = ['sdi_surveyor', 'admin', 'sdi', 'waspang', 'superadmin'];
+    private const ALLOWED_ROLES = ['sdi_surveyor', 'admin', 'sdi', 'waspang', 'superadmin', 'super_tif'];
 
     private function guardAccess(): \App\Models\User
     {
@@ -39,7 +39,7 @@ class SurveyorController extends Controller
     {
         $query = SiteSurvey::query();
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin'], true)) {
+        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true)) {
             $query->where('surveyor_id', $user->id_user);
         }
 
@@ -60,7 +60,7 @@ class SurveyorController extends Controller
         $query = SiteSurvey::with(['project', 'surveyor'])
             ->withCount(['points', 'routes']);
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin'], true)) {
+        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true)) {
             $query->where('surveyor_id', $user->id_user);
         }
 
@@ -277,7 +277,7 @@ class SurveyorController extends Controller
         $user = $this->guardAccess();
         $point = SiteSurveyPoint::with('survey')->findOrFail($pointId);
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin'], true) && $point->survey->surveyor_id !== $user->id_user) {
+        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $point->survey->surveyor_id !== $user->id_user) {
             abort(404);
         }
 
@@ -298,7 +298,7 @@ class SurveyorController extends Controller
         $user = $this->guardAccess();
         $point = SiteSurveyPoint::with('survey')->findOrFail($pointId);
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin'], true) && $point->survey->surveyor_id !== $user->id_user) {
+        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $point->survey->surveyor_id !== $user->id_user) {
             abort(404);
         }
 
@@ -352,7 +352,7 @@ class SurveyorController extends Controller
         $user = $this->guardAccess();
         $route = SiteSurveyRoute::with('survey')->findOrFail($routeId);
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin'], true) && $route->survey->surveyor_id !== $user->id_user) {
+        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $route->survey->surveyor_id !== $user->id_user) {
             abort(404);
         }
 
@@ -378,7 +378,7 @@ class SurveyorController extends Controller
         $user = $this->guardAccess();
         $route = SiteSurveyRoute::with('survey')->findOrFail($routeId);
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin'], true) && $route->survey->surveyor_id !== $user->id_user) {
+        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $route->survey->surveyor_id !== $user->id_user) {
             abort(404);
         }
 

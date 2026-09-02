@@ -26,6 +26,10 @@ class ProjectController extends Controller
 {
    public function index(Request $request)
     {
+        // Role super_tif tidak boleh melihat project program Konstruksi
+        // Eksternal sama sekali (listing, filter dropdown, maupun stat card).
+        $isSuperTif = auth()->user()?->role === 'super_tif';
+
         $query = Project::with([
             'boqItems',
             'assignments.waspang',
@@ -35,6 +39,10 @@ class ProjectController extends Controller
             'boqItems.designatorData',
             'boqItems.designatorDataByCode',
         ]);
+
+        if ($isSuperTif) {
+            $query->whereRaw('UPPER(TRIM(program)) != ?', ['KONSTRUKSI EKSTERNAL']);
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -68,8 +76,12 @@ class ProjectController extends Controller
                 ->onEachSide(1)      // <-- membatasi angka pagination
                 ->withQueryString();
 
-        $programs = Project::whereNotNull('program')
-            ->where('program', '!=', '')
+        $programsQuery = Project::whereNotNull('program')
+            ->where('program', '!=', '');
+        if ($isSuperTif) {
+            $programsQuery->whereRaw('UPPER(TRIM(program)) != ?', ['KONSTRUKSI EKSTERNAL']);
+        }
+        $programs = $programsQuery
             ->distinct()
             ->orderBy('program')
             ->pluck('program');
@@ -86,10 +98,14 @@ class ProjectController extends Controller
             ->orderBy('designator')
             ->get();
 
-        $totalProject = Project::count();
-        $activeProject = Project::where('status_project', 'active')->count();
-        $completedProject = Project::where('status_project', 'close')->count();
-        $waitingUt = Project::where('status_project', 'bast')->count();
+        $statBaseQuery = Project::query();
+        if ($isSuperTif) {
+            $statBaseQuery->whereRaw('UPPER(TRIM(program)) != ?', ['KONSTRUKSI EKSTERNAL']);
+        }
+        $totalProject = (clone $statBaseQuery)->count();
+        $activeProject = (clone $statBaseQuery)->where('status_project', 'active')->count();
+        $completedProject = (clone $statBaseQuery)->where('status_project', 'close')->count();
+        $waitingUt = (clone $statBaseQuery)->where('status_project', 'bast')->count();
 
         return view('admin.projects.index', compact(
             'projects',

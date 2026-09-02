@@ -92,7 +92,12 @@ class ProgramController extends Controller
 
     public function konstruk(Request $request)
     {
-        $data = $this->getProgramData($request, 'Konstruksi Eksternal'); 
+        // Role super_tif tidak boleh melihat project Konstruksi Eksternal sama sekali.
+        if (auth()->user()?->role === 'super_tif') {
+            abort(403, 'Program Konstruksi Eksternal tidak tersedia untuk role ini.');
+        }
+
+        $data = $this->getProgramData($request, 'Konstruksi Eksternal');
         return view('admin.program.konstruk', $data);
     }
 }

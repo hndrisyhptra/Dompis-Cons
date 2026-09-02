@@ -50,7 +50,7 @@ class UserManagementController extends Controller
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:100|unique:users,username',
             // Update: Tambahkan teknisi, sdi, sdi_surveyor, superadmin, dan tif pada daftar in:
-            'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor,superadmin,tif',
+            'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor,superadmin,tif,super_tif',
             'password' => 'required|string|min:6',
         ]);
 
@@ -78,7 +78,7 @@ class UserManagementController extends Controller
             'name' => 'required|string|max:255',
             'username' => 'required|string|max:100|unique:users,username,' . $user->id_user . ',id_user',
             // Update: Tambahkan teknisi, sdi, sdi_surveyor, superadmin, dan tif pada daftar in:
-            'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor,superadmin,tif',
+            'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor,superadmin,tif,super_tif',
             'password' => 'nullable|string|min:6',
         ]);
 
@@ -175,7 +175,7 @@ class UserManagementController extends Controller
                 'name' => 'required|string|max:255',
                 'username' => 'required|string|max:100',
                 // Update: Tambahkan teknisi, sdi, sdi_surveyor, superadmin, dan tif pada daftar in:
-                'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor,superadmin,tif',
+                'role' => 'required|in:admin,waspang,pm,teknisi,sdi,sdi_surveyor,superadmin,tif,super_tif',
                 'password' => 'required|string|min:6',
             ]);
 
