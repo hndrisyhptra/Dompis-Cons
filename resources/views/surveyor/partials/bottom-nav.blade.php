@@ -28,7 +28,7 @@
                     <p class="text-[11px] font-bold text-slate-500 mt-1">Survey Baru</p>
                 </a>
 
-                <a href="{{ route('profile.edit') }}"
+                <a href="{{ route('surveyor.profile') }}"
                    class="flex flex-col items-center gap-1 py-1 {{ $active == 'profil' ? 'text-blue-700' : 'text-slate-500' }}">
                     <i class="fa-solid fa-user-gear text-lg"></i>
                     <span class="text-[11px] font-bold">Profil</span>

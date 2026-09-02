@@ -73,7 +73,14 @@
         <div class="p-5 space-y-5">
 
             {{-- JIKA INI STEP 2/4 (BOQ) --}}
-            @if(isset($description) && !empty($description) && $description !== 'ada')
+            {{--
+                Catatan: nilai 'ada' pada $description dipakai review-instalasi.blade.php
+                sebagai sentinel/trigger untuk menampilkan kotak detail ini (termasuk
+                Qty Plan & Qty Actual dari waspang), BUKAN teks yang dirender. Sebelumnya
+                kondisi ini malah mengecualikan ($description !== 'ada'), sehingga kotak
+                detail (dan Qty Plan/Actual) tidak pernah muncul di Step Instalasi.
+            --}}
+            @if(isset($description) && !empty($description))
                 <div class="bg-white dark:bg-gray-950 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/50 shadow-xs space-y-3">
                     <div class="flex items-center gap-2">
                         <span class="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded text-[10px] font-black uppercase tracking-wider">Detail</span>

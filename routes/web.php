@@ -617,6 +617,7 @@ Route::post('/sdi/pt2/golive/{lop_id}', [App\Http\Controllers\SdiController::cla
 Route::middleware(['auth'])->prefix('surveyor')->name('surveyor.')->group(function () {
     Route::get('/', [SurveyorController::class, 'index'])->name('index');
     Route::get('/create', [SurveyorController::class, 'create'])->name('create');
+    Route::get('/profile', [SurveyorController::class, 'profile'])->name('profile');
     Route::post('/', [SurveyorController::class, 'store'])->name('store');
     Route::get('/{id}', [SurveyorController::class, 'show'])->name('show');
     Route::delete('/{id}', [SurveyorController::class, 'destroy'])->name('destroy');

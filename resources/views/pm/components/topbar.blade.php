@@ -39,14 +39,7 @@
                 </svg>
             </button>
 
-            <div class="hidden sm:block text-right">
-                <p class="text-sm font-bold text-gray-900 dark:text-white">
-                    {{ auth()->user()->name }}
-                </p>
-                <p class="text-xs uppercase text-gray-500">
-                    {{ auth()->user()->role }}
-                </p>
-            </div>
+            <x-profile-account-menu />
 
             <form method="POST" action="{{ route('logout') }}">
                 @csrf

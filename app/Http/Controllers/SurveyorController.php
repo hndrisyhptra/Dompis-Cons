@@ -165,6 +165,16 @@ class SurveyorController extends Controller
         return view('surveyor.create', compact('projects'));
     }
 
+    /**
+     * Halaman Profil (detail akun + ganti password) untuk role sdi_surveyor.
+     */
+    public function profile()
+    {
+        $this->guardAccess();
+
+        return view('surveyor.profile');
+    }
+
     public function store(Request $request)
     {
         $user = $this->guardAccess();

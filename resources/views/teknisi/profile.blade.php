@@ -56,6 +56,22 @@
             </div>
         </div>
 
+        {{-- GANTI PASSWORD --}}
+        <div x-data="{ showPasswordForm: {{ ((isset($errors) && $errors->updatePassword->any()) || session('status') === 'password-updated') ? 'true' : 'false' }} }"
+             class="bg-white border border-slate-200 rounded-3xl mt-4 overflow-hidden shadow-sm">
+
+            <button type="button"
+                    @click="showPasswordForm = !showPasswordForm"
+                    class="w-full px-5 py-4 flex items-center justify-between text-left">
+                <span class="text-sm font-black text-slate-800">Ganti Password</span>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-slate-400 transition-transform" :class="showPasswordForm ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+
+            <div x-show="showPasswordForm" x-collapse class="px-5 pb-5 border-t border-slate-100 pt-4">
+                <x-change-password-form />
+            </div>
+        </div>
+
         {{-- TOMBOL LOGOUT --}}
         <form method="POST" action="{{ route('logout') }}" class="mt-6">
             @csrf
