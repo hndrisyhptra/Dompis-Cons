@@ -647,11 +647,15 @@ class DashboardController extends Controller
         $metric = (string) $request->input('metric', '');
         $program = strtoupper(trim((string) $request->input('program', '')));
 
-        if (!isset($regions[$regionKey])) {
+        // Region kosong = "Semua Region" (dipakai widget ringkasan pipeline
+        // yang klik angkanya global, tidak per-region seperti tabel matrix).
+        if ($regionKey !== '' && !isset($regions[$regionKey])) {
             return response()->json(['message' => 'Region tidak valid.'], 422);
         }
 
-        $branchList = $branchKey !== '' ? [$branchKey] : $regions[$regionKey];
+        $branchList = $branchKey !== ''
+            ? [$branchKey]
+            : ($regionKey !== '' ? $regions[$regionKey] : collect($regions)->flatten()->all());
 
         $rows = collect();
         $title = '';
@@ -724,11 +728,15 @@ class DashboardController extends Controller
                 $isGoLive = (int) $project->is_golive === 1;
                 $isCompleted = $isGoLive || $progress === 100;
                 $isWaiting = !$isGoLive && $progress > 0 && $progress < 100;
+                $hasBoq = (bool) $project->boqItems?->isNotEmpty();
 
                 $match = match ($metric) {
                     'assigned' => $isAssigned,
+                    'unassigned' => !$isAssigned,
                     'waiting' => $isWaiting,
                     'completed' => $isCompleted,
+                    'boq_ready' => $hasBoq,
+                    'belum_boq' => !$hasBoq,
                     default => true,
                 };
 
@@ -753,17 +761,23 @@ class DashboardController extends Controller
                     'program' => $project->program ?: '-',
                     'progress' => $progress,
                     'status_label' => $statusLabel,
+                    'has_boq' => $hasBoq,
                     'detail_url' => route('admin.projects.tracking', $project->id_project),
                 ]);
             }
 
             $metricLabel = [
-                'assigned' => 'Assign',
-                'waiting' => 'In Review',
-                'completed' => 'Complete (Done)',
+                'assigned' => 'Sudah Assign',
+                'unassigned' => 'Belum Assign',
+                'waiting' => 'On Progress',
+                'completed' => 'Completed',
+                'boq_ready' => 'BOQ Ready',
+                'belum_boq' => 'Belum BOQ',
             ][$metric] ?? 'Total LOP';
 
-            $title = 'Rekap Assignment — ' . $regionKey . ($branchKey !== '' ? ' / ' . $branchKey : '') . ' — ' . $metricLabel;
+            $regionLabel = $regionKey !== '' ? $regionKey : 'Semua Region';
+
+            $title = 'Rekap Assignment — ' . $regionLabel . ($branchKey !== '' ? ' / ' . $branchKey : '') . ' — ' . $metricLabel;
         } elseif ($type === 'regular') {
             if (!isset($regularProgramSet[$program])) {
                 return response()->json(['message' => 'Program tidak valid.'], 422);

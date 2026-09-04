@@ -13,23 +13,112 @@
         </div>
     </div>
 
+    @php
+        // Widget "Ringkasan & Alur Progress PT 3": BOQ Ready/Belum BOQ dan
+        // Sudah Assign/Belum Assign ditampilkan berpasangan dalam 1 card,
+        // ditambah On Progress dan Completed - total cuma 4 card ringkas.
+        // Total LOP jadi angka acuan di header widget. SEMUA angka bisa
+        // diklik untuk membuka modal daftar LOP-nya (matrixDetailModal() di
+        // atas, metric harus sinkron dengan DashboardPmController::matrixDetail()).
+        $totalForPercent = $totalLop ?? 0;
+        $pctOf = fn ($value) => $totalForPercent > 0 ? round(($value / $totalForPercent) * 100) : 0;
+
+        $pipelineSteps = [
+            [
+                'metric' => 'boq_ready',
+                'label' => 'BOQ Ready',
+                'value' => $boqReady ?? 0,
+                'icon' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 lucide lucide-package-open"><path d="M12 22v-9"/><path d="M15.17 2.21a1.67 1.67 0 0 1 1.63 0L21 4.57a1.93 1.93 0 0 1 0 3.36L8.82 14.79a1.655 1.655 0 0 1-1.64 0L3 12.43a1.93 1.93 0 0 1 0-3.36z"/><path d="M20 13v3.87a2.06 2.06 0 0 1-1.11 1.83l-6 3.08a1.93 1.93 0 0 1-1.78 0l-6-3.08A2.06 2.06 0 0 1 4 16.87V13"/><path d="M21 12.43a1.93 1.93 0 0 0 0-3.36L8.83 2.2a1.64 1.64 0 0 0-1.63 0L3 4.57a1.93 1.93 0 0 0 0 3.36l12.18 6.86a1.636 1.636 0 0 0 1.63 0z"/></svg>',
+                'icon_bg' => 'bg-blue-50 dark:bg-blue-500/10',
+                'icon_text' => 'text-blue-600 dark:text-blue-400',
+                'bar' => 'bg-blue-500',
+                'sub' => ['metric' => 'belum_boq', 'label' => 'Belum BOQ', 'value' => max($totalForPercent - ($boqReady ?? 0), 0)],
+            ],
+            [
+                'metric' => 'assigned',
+                'label' => 'Sudah Assign',
+                'value' => $assignedLop ?? 0,
+                'icon' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 lucide lucide-user-check"><path d="m16 11 2 2 4-4"/><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>',
+                'icon_bg' => 'bg-indigo-50 dark:bg-indigo-500/10',
+                'icon_text' => 'text-indigo-600 dark:text-indigo-400',
+                'bar' => 'bg-indigo-500',
+                'sub' => ['metric' => 'unassigned', 'label' => 'Belum Assign', 'value' => max($totalForPercent - ($assignedLop ?? 0), 0)],
+            ],
+            [
+                'metric' => 'waiting',
+                'label' => 'On Progress',
+                'value' => $onProgress ?? 0,
+                'icon' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 lucide lucide-activity"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.48 12H2"/></svg>',
+                'icon_bg' => 'bg-sky-50 dark:bg-sky-500/10',
+                'icon_text' => 'text-sky-600 dark:text-sky-400',
+                'bar' => 'bg-sky-500',
+                'sub' => null,
+            ],
+            [
+                'metric' => 'completed',
+                'label' => 'Completed',
+                'value' => $completedApproval ?? 0,
+                'icon' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 lucide lucide-circle-check-big"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>',
+                'icon_bg' => 'bg-emerald-50 dark:bg-emerald-500/10',
+                'icon_text' => 'text-emerald-600 dark:text-emerald-400',
+                'bar' => 'bg-emerald-500',
+                'sub' => null,
+            ],
+        ];
+    @endphp
+
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
-        <h2 class="text-lg font-bold text-gray-900 dark:text-white mb-4">Flow Progres Konstruksi</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            @foreach($stageSummary as $stage)
-                <div class="p-4 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/50 flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm font-bold text-gray-700 dark:text-gray-300">{{ $stage['label'] }}</span>
-                            <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold
-                                {{ $stage['color'] == 'indigo' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300' : '' }}
-                                {{ $stage['color'] == 'amber' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300' : '' }}
-                                {{ $stage['color'] == 'emerald' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300' : '' }}
-                            ">
-                                {{ $stage['value'] }} LOP
-                            </span>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+            <div>
+                <h2 class="text-lg font-bold text-gray-900 dark:text-white">Ringkasan &amp; Alur Progress PT 3</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Klik angka untuk lihat daftar LOP-nya.</p>
+            </div>
+
+            <button type="button"
+                    @click="show({type:'assignment', region:'', branch:'', metric:''})"
+                    class="flex items-center gap-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 self-start sm:self-auto hover:border-indigo-300 dark:hover:border-indigo-700 transition text-left">
+                <div class="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 lucide lucide-file-spreadsheet"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
+                </div>
+                <div>
+                    <p class="text-[10px] font-bold uppercase text-gray-400 leading-none">Total LOP PT 3</p>
+                    <p class="text-xl font-black text-gray-900 dark:text-white leading-tight mt-1 hover:underline decoration-2 underline-offset-2">{{ number_format($totalLop ?? 0) }}</p>
+                </div>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            @foreach($pipelineSteps as $step)
+                @php
+                    $percent = $pctOf($step['value']);
+                    $subPercent = $step['sub'] ? $pctOf($step['sub']['value']) : null;
+                @endphp
+                <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl {{ $step['icon_bg'] }} {{ $step['icon_text'] }} flex items-center justify-center shrink-0">
+                            {!! $step['icon'] !!}
                         </div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">{{ $stage['desc'] }}</p>
+                        <p class="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ $step['label'] }}</p>
+                    </div>
+
+                    <div class="mt-3 flex items-end justify-between gap-3">
+                        <button type="button" class="text-left"
+                                @click="show({type:'assignment', region:'', branch:'', metric:'{{ $step['metric'] }}'})">
+                            <p class="text-2xl font-black text-gray-900 dark:text-white leading-none hover:underline decoration-2 underline-offset-2">{{ number_format($step['value']) }}</p>
+                            <p class="text-[10px] text-gray-400 mt-1">{{ $percent }}% dari total</p>
+                        </button>
+
+                        @if($step['sub'])
+                            <button type="button" class="text-right"
+                                    @click.stop="show({type:'assignment', region:'', branch:'', metric:'{{ $step['sub']['metric'] }}'})">
+                                <p class="text-sm font-bold text-gray-500 dark:text-gray-400 hover:underline decoration-2 underline-offset-2">{{ number_format($step['sub']['value']) }}</p>
+                                <p class="text-[10px] text-gray-400 mt-0.5">{{ $step['sub']['label'] }} · {{ $subPercent }}%</p>
+                            </button>
+                        @endif
+                    </div>
+
+                    <div class="mt-3 h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                        <div class="h-full rounded-full {{ $step['bar'] }}" style="width: {{ min($percent, 100) }}%"></div>
                     </div>
                 </div>
             @endforeach
@@ -97,7 +186,7 @@
     {{-- TABEL REKAP ASSIGNMENT & STATUS PROJECT REGULAR (KLIK ANGKA UNTUK DETAIL) --}}
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
         <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/50">
-            <h2 class="text-sm font-black uppercase tracking-wider text-gray-800 dark:text-gray-200">Rekap Assignment &amp; Status Project Regular</h2>
+            <h2 class="text-sm font-black uppercase tracking-wider text-gray-800 dark:text-gray-200">Rekap Assignment &amp; Status Project PT 3</h2>
             <p class="text-xs text-gray-400 mt-1">Klik nama Region untuk detail per Branch. Klik angka untuk melihat daftar LOP.</p>
         </div>
         <div class="overflow-x-auto">
@@ -166,8 +255,8 @@
     {{-- MATRIX PROGRESS PROJECT REGULAR --}}
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
         <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/50">
-            <h2 class="text-sm font-black uppercase tracking-wider text-gray-800 dark:text-gray-200">Matriks Progress Project Regular</h2>
-            <p class="text-xs text-gray-400 mt-1">Program Regular: OSP, OLO, HEM, NODE B, EKSBIS.</p>
+            <h2 class="text-sm font-black uppercase tracking-wider text-gray-800 dark:text-gray-200">Matriks Progress Project PT 3</h2>
+            <p class="text-xs text-gray-400 mt-1">Program PT 3: OSP, OLO, HEM, NODE B, EKSBIS.</p>
         </div>
         <div class="overflow-x-auto pb-4">
             <table class="w-full text-xs border-collapse">
@@ -251,7 +340,7 @@
             <div class="flex items-center justify-between gap-4">
                 <div>
                     <h2 class="text-sm font-black uppercase tracking-wider text-indigo-900 dark:text-indigo-300">Matriks Progress Project PT 2</h2>
-                    <p class="text-xs text-gray-400 mt-1">Sumber khusus PT 2. Tidak ter-filter Program Regular.</p>
+                    <p class="text-xs text-gray-400 mt-1">Sumber khusus PT 2. Tidak ter-filter Program PT 3.</p>
                 </div>
                 <span class="px-3 py-1.5 rounded-xl bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 text-[10px] font-black shrink-0">PT 2</span>
             </div>
