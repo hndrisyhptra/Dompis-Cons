@@ -20,11 +20,15 @@ class TelegramWebhookEvent extends Model
         'payload',
         'status',
         'delivered_at',
+        'pushed_at',
+        'push_attempts',
+        'push_error',
     ];
 
     protected $casts = [
         'payload' => 'array',
         'delivered_at' => 'datetime',
+        'pushed_at' => 'datetime',
     ];
 
     public function recipientUser()

@@ -2,21 +2,24 @@
 
 namespace App\Services;
 
+use App\Jobs\PushTelegramWebhookEventJob;
 use App\Models\TelegramWebhookEvent;
 use App\Models\User;
 
 /**
- * Menyimpan event notifikasi ke tabel telegram_webhook_events. Dompis Cons
- * HANYA menyediakan data event lewat webhook (API pull) -- TIDAK mengirim
- * pesan Telegram apa pun sendiri. Tim lain yang mengambil event dari sini
- * (lihat TelegramWebhookEventController) akan mengintegrasikannya ke Bot
- * Telegram mereka sendiri.
+ * Menyimpan event notifikasi ke tabel telegram_webhook_events. Selain
+ * disediakan lewat webhook (API pull -- lihat TelegramWebhookEventController,
+ * dipakai tim lain untuk integrasi ke Bot Telegram mereka sendiri), setiap
+ * event yang dipublish di sini juga langsung di-dispatch ke queue job
+ * PushTelegramWebhookEventJob, yang akan POST (JSON) event tsb ke webhook
+ * receiver eksternal (config('services.telegram.webhook_push_url')). Push
+ * ini murni tambahan -- kalau gagal/nonaktif, pull-API tetap jalan normal.
  */
 class TelegramWebhookEventService
 {
     public static function publish(array $data): TelegramWebhookEvent
     {
-        return TelegramWebhookEvent::create([
+        $event = TelegramWebhookEvent::create([
             'event_type' => $data['event_type'],
             'recipient_type' => $data['recipient_type'],
             'recipient_user_id' => $data['recipient_user_id'] ?? null,
@@ -28,6 +31,10 @@ class TelegramWebhookEventService
             'payload' => $data['payload'] ?? null,
             'status' => 'pending',
         ]);
+
+        PushTelegramWebhookEventJob::dispatch($event->id_tele_webhook);
+
+        return $event;
     }
 
     /**

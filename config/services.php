@@ -39,6 +39,15 @@ return [
         // Token statis untuk mengamankan endpoint webhook (routes/api.php) --
         // dibagikan ke tim eksternal yang akan mengambil event dari sini.
         'webhook_api_token' => env('TELEGRAM_WEBHOOK_API_TOKEN'),
+
+        // PUSH: selain bisa di-pull lewat API di atas, setiap event yang
+        // dipublish (TelegramWebhookEventService::publish) juga langsung
+        // di-POST (JSON) ke URL ini lewat queue job PushTelegramWebhookEventJob.
+        // Kosongkan TELEGRAM_WEBHOOK_PUSH_URL atau set PUSH_ENABLED=false
+        // untuk mematikan fitur push ini (pull API tetap jalan seperti biasa).
+        'webhook_push_enabled' => env('TELEGRAM_WEBHOOK_PUSH_ENABLED', true),
+        'webhook_push_url' => env('TELEGRAM_WEBHOOK_PUSH_URL'),
+        'webhook_push_timeout' => (int) env('TELEGRAM_WEBHOOK_PUSH_TIMEOUT', 5),
     ],
 
     'gis_cad' => [
