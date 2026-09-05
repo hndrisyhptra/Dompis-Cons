@@ -28,6 +28,10 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        // Dipakai fitur "Log Activity" di User Management (lihat
+        // UserManagementController) -- kolom last_login_at.
+        Auth::user()?->forceFill(['last_login_at' => now()])->saveQuietly();
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

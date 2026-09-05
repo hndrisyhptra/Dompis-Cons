@@ -23,11 +23,14 @@
 <div class="min-h-screen flex">
 
     {{-- Desktop Sidebar --}}
-    {{-- Role super_tif punya component sidebar sendiri (resources/views/super_tif/components)
-         supaya menu yang ditampilkan/disembunyikan untuk role ini bisa diedit
-         langsung di filenya sendiri, terpisah dari sidebar admin/superadmin. --}}
+    {{-- Role super_tif & officer punya component sidebar sendiri
+         (resources/views/super_tif|officer/components) supaya menu yang
+         ditampilkan/disembunyikan untuk role tsb bisa diedit langsung di
+         filenya sendiri, terpisah dari sidebar admin/superadmin. --}}
     @if(auth()->user()?->role === 'super_tif')
         @include('super_tif.components.sidebar')
+    @elseif(auth()->user()?->role === 'officer')
+        @include('officer.components.sidebar')
     @else
         @include('admin.components.sidebar')
     @endif
@@ -45,6 +48,8 @@
          class="fixed inset-y-0 left-0 z-50 w-64 lg:hidden">
         @if(auth()->user()?->role === 'super_tif')
             @include('super_tif.components.sidebar-mobile')
+        @elseif(auth()->user()?->role === 'officer')
+            @include('officer.components.sidebar-mobile')
         @else
             @include('admin.components.sidebar-mobile')
         @endif

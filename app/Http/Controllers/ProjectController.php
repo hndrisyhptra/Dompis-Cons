@@ -92,7 +92,7 @@ class ProjectController extends Controller
             ->orderBy('branch')
             ->pluck('branch');
 
-        $assignableUsers = User::whereIn('role', ['waspang', 'teknisi'])->get();
+        $assignableUsers = User::roleCode(['waspang', 'teknisi'])->get();
 
         $designators = Designator::forCustomer(Customer::defaultId())
             ->orderBy('designator')

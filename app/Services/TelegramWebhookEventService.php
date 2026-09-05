@@ -32,7 +32,7 @@ class TelegramWebhookEventService
             'status' => 'pending',
         ]);
 
-        PushTelegramWebhookEventJob::dispatch($event->id_tele_webhook);
+        PushTelegramWebhookEventJob::dispatch($event->id_tele_webhook)->onQueue('webhooks');
 
         return $event;
     }

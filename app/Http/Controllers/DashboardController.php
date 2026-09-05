@@ -45,7 +45,11 @@ class DashboardController extends Controller
         // Super TIF memakai tampilan persis seperti Admin, hanya saja seluruh
         // project program Konstruksi Eksternal disembunyikan (lihat filter
         // $isSuperTif di bawah).
-        if (!in_array($role, ['admin', 'superadmin', 'super_tif'], true)) {
+        // Officer memakai dashboard & DATA yang sama persis seperti Admin --
+        // hanya MENU sidebar-nya yang beda (lihat officer/components/sidebar),
+        // jadi cukup ditambahkan ke daftar role yang diizinkan di sini, tanpa
+        // perlu filter data tambahan seperti $isSuperTif.
+        if (!in_array($role, ['admin', 'superadmin', 'super_tif', 'officer'], true)) {
             abort(403);
         }
 

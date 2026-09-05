@@ -228,7 +228,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/designator-prices/import', [DesignatorPriceController::class, 'import'])
         ->name('designator-prices.import');
 
-    Route::post('/users/import', [UserManagementController::class, 'import'])
+    Route::post('/users/import', [UserManagementController::class, 'importCsv'])
         ->name('admin.users.import');
 
     Route::patch('/designators/{id}/toggle-finishing', [DesignatorController::class, 'toggleFinishing'])
@@ -386,11 +386,19 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/admin/users/{id}', [UserManagementController::class, 'destroy'])
         ->name('admin.users.destroy');
-    
+
+    // Reset password ke default (= username) & hapus permanen -- keduanya
+    // superadmin-only (dijaga lagi di controller lewat ensureSuperAdmin()).
+    Route::post('/admin/users/{id}/reset-password', [UserManagementController::class, 'resetPassword'])
+        ->name('admin.users.reset-password');
+
+    Route::delete('/admin/users/{id}/force-delete', [UserManagementController::class, 'forceDelete'])
+        ->name('admin.users.force-delete');
+
 
      Route::get('/admin/projects/{project}/tracking', [DashboardController::class, 'tracking'])
             ->name('admin.projects.tracking');
-    
+
     Route::post('/admin/users/{user}/activate', [App\Http\Controllers\UserManagementController::class, 'activate'])->name('admin.users.activate');
 });
 

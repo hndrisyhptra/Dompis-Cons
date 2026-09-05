@@ -1123,7 +1123,7 @@ class WaspangController extends Controller
             ],
         ]);
 
-        $admins = User::whereIn('role', ['admin', 'pm'])->get();
+        $admins = User::roleCode(['admin', 'pm'])->get();
 
         foreach ($admins as $admin) {
             Notification::create([

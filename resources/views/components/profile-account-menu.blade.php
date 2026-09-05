@@ -9,18 +9,9 @@
 @php
     $__u = auth()->user();
 
-    $__roleLabels = [
-        'admin'        => 'Approval',
-        'superadmin'   => 'Super Admin',
-        'waspang'      => 'Inputer',
-        'pm'           => 'PM',
-        'tif'          => 'TIF',
-        'super_tif'    => 'Super TIF',
-        'teknisi'      => 'Inputer PT2',
-        'sdi'          => 'SDI',
-        'sdi_surveyor' => 'SDI Surveyor',
-    ];
-    $__roleLabel = $__roleLabels[$__u->role] ?? strtoupper($__u->role);
+    // Label diambil langsung dari tabel roles (relasi roleRef) -- bukan
+    // array hardcode lagi (dulu duplikat persis dengan admin/users/index.blade.php).
+    $__roleLabel = $__u->roleRef?->name ?? strtoupper($__u->role ?? '-');
     $__initials = strtoupper(substr($__u->name ?? '?', 0, 2));
 
     $__openInitially = (isset($errors) && $errors->updatePassword->any())

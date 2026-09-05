@@ -951,6 +951,7 @@ class DashboardPmController extends Controller
         |--------------------------------------------------------------------------
         */
         $query = DB::table('users as u')
+            ->join('roles as ur', 'ur.id_roles', '=', 'u.role_id')
             ->join('pro_assign as pa', 'pa.waspang_id', '=', 'u.id_user')
             ->join('projects as p', 'p.id_project', '=', 'pa.project_id')
             ->join('lops as l', 'l.project_id', '=', 'p.id_project')
@@ -974,7 +975,7 @@ class DashboardPmController extends Controller
                 // Menghitung jumlah berkas eviden milik Waspang ini
                 DB::raw("(SELECT COUNT(*) FROM evidences e JOIN pro_assign pa2 ON e.project_id = pa2.project_id WHERE pa2.waspang_id = u.id_user) as total_evidences")
             ])
-            ->where('u.role', 'waspang'); // Pastikan hanya role Waspang yang ditarik
+            ->where('ur.code', 'waspang'); // Pastikan hanya role Waspang yang ditarik
 
         // Terapkan filter Branch jika dipilih
         if ($request->filled('branch')) {

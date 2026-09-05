@@ -53,7 +53,7 @@ class ProgramController extends Controller
             ->orderBy('branch')
             ->pluck('branch');
 
-        $assignableUsers = User::whereIn('role', ['teknisi', 'waspang'])->get();
+        $assignableUsers = User::roleCode(['teknisi', 'waspang'])->get();
         
         // PERBAIKAN: Ambil data designator untuk dilempar ke modal BOQ
         $designators = Designator::orderBy('designator', 'asc')->get();

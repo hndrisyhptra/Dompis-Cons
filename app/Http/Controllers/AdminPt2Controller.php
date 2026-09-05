@@ -70,7 +70,7 @@ class AdminPt2Controller extends Controller
         $projects = $query->latest('updated_at')->paginate($perPage)->onEachSide(1)->withQueryString();
 
         $branches = Pt2Lop::whereNotNull('branch')->where('branch', '!=', '')->distinct()->orderBy('branch')->pluck('branch');
-        $assignableUsers = User::whereIn('role', ['teknisi', 'waspang'])->get();
+        $assignableUsers = User::roleCode(['teknisi', 'waspang'])->get();
 
         return view('admin.pt2.index', compact('projects', 'branches', 'assignableUsers'));
     }

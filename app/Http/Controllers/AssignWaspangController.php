@@ -12,7 +12,7 @@ class AssignWaspangController extends Controller
     {
         $search = $request->search;
 
-        $waspangs = User::where('role', 'waspang')
+        $waspangs = User::roleCode('waspang')
             ->where('status', 'active')
             ->with([
                 'assignments.project.evidences',
@@ -83,7 +83,7 @@ class AssignWaspangController extends Controller
     {
         $search = $request->search;
 
-        $waspang = User::where('role', 'waspang')
+        $waspang = User::roleCode('waspang')
             ->where('id_user', $id)
             ->with([
                 'assignments.project.lop',
