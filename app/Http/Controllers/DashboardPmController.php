@@ -832,6 +832,23 @@ class DashboardPmController extends Controller
             $baseQuery->where('l.branch', $request->branch);
         }
 
+        // Search bebas: nama LOP, STO, branch, PID, PID SAP, nama project
+        // (fitur baru -- sebelumnya halaman ini cuma bisa difilter branch).
+        $search = trim((string) $request->input('search', ''));
+
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+
+            $baseQuery->where(function ($q) use ($like) {
+                $q->where('l.lop_name', 'like', $like)
+                    ->orWhere('l.sto', 'like', $like)
+                    ->orWhere('l.branch', 'like', $like)
+                    ->orWhere('p.pid', 'like', $like)
+                    ->orWhere('p.pid_sap', 'like', $like)
+                    ->orWhere('p.project_name', 'like', $like);
+            });
+        }
+
         /*
         |--------------------------------------------------------------------------
         | 1. DATA STATIS WIDGET ATAS (TOTAL KESELURUHAN PROGRAM AKTIF)
@@ -930,7 +947,7 @@ class DashboardPmController extends Controller
 
         // Pastikan variabel baru ini ikut dikirim ke dalam compact()
         return view('pm.rekap_progress', compact(
-            'activeProgram', 'branches', 'lopsData', 'tableData',
+            'activeProgram', 'branches', 'lopsData', 'tableData', 'search',
             'totalSegments', 'totalKabelPlan', 'totalKabelActual', 'totalKabelPersen',
             'totalTiangPlan', 'totalTiangActual', 'totalTiangPersen',
             'totalNilaiProgram',

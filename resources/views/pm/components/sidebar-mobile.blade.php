@@ -53,10 +53,107 @@
             Operational & Control
         </p>
 
+        {{-- PROJECT ID (menu baru, sama seperti versi desktop di
+             pm/components/sidebar.blade.php -- lihat file itu untuk
+             penjelasan lengkap kenapa ini terpisah dari Rekap Progress). --}}
+        @php
+            $projectIdOpen = request()->routeIs('program.*');
+        @endphp
+
+        <div x-data="{ open: {{ $projectIdOpen ? 'true' : 'false' }} }" class="space-y-1">
+
+            <button type="button"
+                    @click="open = !open"
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 {{ $projectIdOpen ? 'bg-gray-50/50 dark:bg-gray-800/40' : '' }}">
+
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 19.5V4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z"/>
+                            <path d="M8 7h8"/>
+                            <path d="M8 11h8"/>
+                            <path d="M8 15h5"/>
+                        </svg>
+                    </div>
+                    <span>Project ID</span>
+                </div>
+
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+                    class="text-gray-400 transition-transform duration-200"
+                    :class="open ? 'rotate-180' : ''">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </button>
+
+            <div x-show="open"
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="transform opacity-0 scale-95"
+                x-transition:enter-end="transform opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="transform opacity-100 scale-100"
+                x-transition:leave-end="transform opacity-0 scale-95"
+                class="mt-1 ml-5 pl-3 border-l border-gray-200 dark:border-gray-700 space-y-1">
+
+                <a href="{{ route('program.osp') }}"
+                class="group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition
+                {{ request()->routeIs('program.osp') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                    <span class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                        OSP
+                    </span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-100/80 text-blue-700 font-bold dark:bg-blue-900/40 dark:text-blue-300">Fiber</span>
+                </a>
+
+                <a href="{{ route('program.nodeb') }}"
+                class="group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition
+                {{ request()->routeIs('program.nodeb') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                    <span class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                        NODE B
+                    </span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-purple-100/80 text-purple-700 font-bold dark:bg-purple-900/40 dark:text-purple-300">Site</span>
+                </a>
+
+                <a href="{{ route('program.hem') }}"
+                class="group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition
+                {{ request()->routeIs('program.hem') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                    <span class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                        HEM
+                    </span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-100/80 text-amber-700 font-bold dark:bg-amber-900/40 dark:text-amber-300">Home</span>
+                </a>
+
+                <a href="{{ route('program.olo') }}"
+                class="group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition
+                {{ request()->routeIs('program.olo') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                    <span class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                        OLO
+                    </span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-green-100/80 text-green-700 font-bold dark:bg-green-900/40 dark:text-green-300">Partner</span>
+                </a>
+
+                {{-- Konstruksi Eksternal: tidak ditampilkan untuk role tif (PM tetap bisa) --}}
+                @if(auth()->user()->role !== 'tif')
+                <a href="{{ route('program.konstruk') }}"
+                class="group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition
+                {{ request()->routeIs('program.konstruk') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                    <span class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                        Eksternal
+                    </span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-red-100/80 text-red-700 font-bold dark:bg-red-900/40 dark:text-red-300">External</span>
+                </a>
+                @endif
+
+            </div>
+        </div>
+
         {{-- KONTAINER UTAMA MENU DENGAN STATE ALPINE.JS --}}
         {{-- x-data "{ open: true }" membuat dropdown otomatis terbuka jika PM sedang berada di halaman rekap --}}
         <div x-data="{ open: {{ request()->routeIs('pm.rekap_progress') ? 'true' : 'false' }} }" class="space-y-1">
-            
+
             {{-- TOMBOL UTAMA REKAP PROGRESS (Pemicu Dropdown) --}}
             <button type="button" 
                     @click="open = !open"

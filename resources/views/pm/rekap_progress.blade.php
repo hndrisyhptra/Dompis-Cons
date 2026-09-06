@@ -79,14 +79,35 @@
 
     {{-- 2. FULL WIDTH TABLE --}}
     <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200/80 dark:border-gray-800/80 shadow-xs overflow-hidden mb-8">
-        <div class="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <div class="p-5 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h2 class="font-bold text-gray-900 dark:text-white text-sm uppercase tracking-wider">
                 <i class="fa-solid fa-table-list text-blue-600 dark:text-blue-400 mr-2"></i> Detail Progres Segmen
             </h2>
 
-            <form method="GET" id="perPageForm">
+            {{-- Search (fitur baru) + Per Page, satu form GET yang sama supaya
+                 program & filter lain (branch, kalau nanti dipakai) tetap
+                 kebawa lewat withQueryString() di controller. --}}
+            <form method="GET" id="perPageForm" class="flex items-center gap-2 w-full sm:w-auto">
                 <input type="hidden" name="program" value="{{ $activeProgram }}">
-                <select name="per_page" onchange="document.getElementById('perPageForm').submit()" class="h-8 rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 text-xs py-0">
+
+                <input type="text"
+                       name="search"
+                       value="{{ $search ?? '' }}"
+                       placeholder="Cari nama LOP, STO, branch, PID..."
+                       class="h-8 flex-1 sm:w-64 rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 text-xs px-3">
+
+                <button type="submit" class="h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shrink-0">
+                    Cari
+                </button>
+
+                @if(!empty($search))
+                    <a href="{{ route('pm.rekap_progress', ['program' => $activeProgram]) }}"
+                       class="h-8 px-3 inline-flex items-center rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0">
+                        Reset
+                    </a>
+                @endif
+
+                <select name="per_page" onchange="document.getElementById('perPageForm').submit()" class="h-8 rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 text-xs py-0 shrink-0">
                     <option value="10" {{ request('per_page') == 10 ? 'selected' : '' }}>10 baris</option>
                     <option value="50" {{ request('per_page') == 50 ? 'selected' : '' }}>50 baris</option>
                 </select>

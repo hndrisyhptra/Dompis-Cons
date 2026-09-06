@@ -725,6 +725,15 @@ Route::prefix('program')->name('program.')->group(function () {
     Route::get('/hem', [ProgramController::class, 'hem'])->name('hem');
     Route::get('/olo', [ProgramController::class, 'olo'])->name('olo');
     Route::get('/konstruksi-eksternal', [ProgramController::class, 'konstruk'])->name('konstruk');
+
+    // Download Data LOP per program (menu Project ID role TIF/PM) -- mengikuti
+    // filter yang aktif (search/region/branch/status_project), atau seluruh
+    // data kalau tidak ada filter aktif. Lihat ProgramController::exportProgramLop().
+    Route::get('/osp/export', [ProgramController::class, 'exportOsp'])->name('osp.export');
+    Route::get('/node-b/export', [ProgramController::class, 'exportNodeb'])->name('nodeb.export');
+    Route::get('/hem/export', [ProgramController::class, 'exportHem'])->name('hem.export');
+    Route::get('/olo/export', [ProgramController::class, 'exportOlo'])->name('olo.export');
+    Route::get('/konstruksi-eksternal/export', [ProgramController::class, 'exportKonstruk'])->name('konstruk.export');
 });
 
 /*

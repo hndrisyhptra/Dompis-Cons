@@ -26,11 +26,17 @@
     {{-- Role super_tif & officer punya component sidebar sendiri
          (resources/views/super_tif|officer/components) supaya menu yang
          ditampilkan/disembunyikan untuk role tsb bisa diedit langsung di
-         filenya sendiri, terpisah dari sidebar admin/superadmin. --}}
+         filenya sendiri, terpisah dari sidebar admin/superadmin.
+         Role tif & pm memakai sidebar PM (resources/views/pm/components) --
+         beberapa halaman bersama (mis. Tracking Progress) masih pakai
+         layouts.admin, jadi role-nya perlu tetap melihat sidebar PM mereka
+         sendiri di sini, bukan sidebar admin. --}}
     @if(auth()->user()?->role === 'super_tif')
         @include('super_tif.components.sidebar')
     @elseif(auth()->user()?->role === 'officer')
         @include('officer.components.sidebar')
+    @elseif(in_array(auth()->user()?->role, ['tif', 'pm'], true))
+        @include('pm.components.sidebar')
     @else
         @include('admin.components.sidebar')
     @endif
@@ -50,6 +56,8 @@
             @include('super_tif.components.sidebar-mobile')
         @elseif(auth()->user()?->role === 'officer')
             @include('officer.components.sidebar-mobile')
+        @elseif(in_array(auth()->user()?->role, ['tif', 'pm'], true))
+            @include('pm.components.sidebar-mobile')
         @else
             @include('admin.components.sidebar-mobile')
         @endif
