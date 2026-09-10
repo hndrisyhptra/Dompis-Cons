@@ -51,6 +51,19 @@ class Lop extends Model
         'est_golive',
         'mapping_status',
         'package_id',
+        'status_progress_before_hold',
+        'sdi_approval_status',
+        'is_golive',
+        'golive_evidence_path',
+        'golive_at',
+        'permit_category_id',
+        'perizinan_completed_at',
+    ];
+
+    protected $casts = [
+        'perizinan_completed_at' => 'datetime',
+        'is_golive' => 'boolean',
+        'golive_at' => 'datetime',
     ];
 
     public function project()
@@ -67,5 +80,40 @@ class Lop extends Model
     public function boqItems()
     {
         return $this->hasMany(BoqItem::class, 'lop_id', 'id_lop');
+    }
+
+    public function stage()
+    {
+        return $this->belongsTo(ProjectStage::class, 'status_progress', 'code');
+    }
+
+    public function permitCategory()
+    {
+        return $this->belongsTo(PermitCategory::class, 'permit_category_id', 'id');
+    }
+
+    public function measurementChecks()
+    {
+        return $this->hasMany(LopMeasurementCheck::class, 'lop_id', 'id_lop');
+    }
+
+    public function stageHistories()
+    {
+        return $this->hasMany(LopStageHistory::class, 'lop_id', 'id_lop');
+    }
+
+    public function kronologis()
+    {
+        return $this->hasMany(LopKronologi::class, 'lop_id', 'id_lop')->latest('event_date')->latest('id');
+    }
+
+    public function goliveSubmission()
+    {
+        return $this->hasOne(LopGoliveSubmission::class, 'lop_id', 'id_lop');
+    }
+
+    public function goliveVerification()
+    {
+        return $this->hasOne(LopGoliveVerification::class, 'lop_id', 'id_lop');
     }
 }

@@ -1,5 +1,5 @@
 {{--
-    Filter Search + Region + Branch + Status Project + tombol Download Data
+    Filter Search + Region + Branch + Status Progress + tombol Download Data
     LOP untuk halaman Project ID role TIF/PM. Include dengan:
       @include('pm.program.partials.filters', [
           'routeName' => 'program.osp',
@@ -9,7 +9,7 @@
     ProgramController::getProgramData().
 --}}
 @php
-    $hasActiveFilter = request('search') || request('region') || request('branch') || request('status_project');
+    $hasActiveFilter = request('search') || request('region') || request('branch') || request('status_progress');
 @endphp
 
 <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-4 mb-6 shadow-sm">
@@ -53,12 +53,12 @@
             </div>
 
             <div>
-                <label class="block text-xs font-black uppercase tracking-wide text-gray-400 mb-1">Status Project</label>
-                <select name="status_project" onchange="this.form.submit()"
+                <label class="block text-xs font-black uppercase tracking-wide text-gray-400 mb-1">Status Progress</label>
+                <select name="status_progress" onchange="this.form.submit()"
                         class="w-full h-11 rounded-2xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-white text-sm px-4">
                     <option value="">Semua Status</option>
                     @foreach($statusOptions as $value => $label)
-                        <option value="{{ $value }}" @selected(request('status_project') === $value)>{{ $label }}</option>
+                        <option value="{{ $value }}" @selected(request('status_progress') === $value)>{{ $label }}</option>
                     @endforeach
                 </select>
             </div>

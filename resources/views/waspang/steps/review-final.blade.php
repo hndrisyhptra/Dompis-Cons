@@ -1,19 +1,19 @@
 @extends('layouts.waspang') {{-- Sesuaikan dengan layout parent mobile Anda --}}
 
 @section('content')
-<div class="min-h-screen max-w-md mx-auto bg-[#f8fafc] pb-32 font-sans selection:bg-blue-500 selection:text-white">
+<div class="min-h-screen max-w-md mx-auto bg-[#F8FAFC] pb-32 font-sans selection:bg-blue-500 selection:text-white">
 
-    {{-- TOP GLASSMORPHIC STICKY HEADER --}}
-    <div class="sticky top-0 z-50 bg-blue-700/95 backdrop-blur-md text-white px-5 pt-6 pb-5 rounded-b-[2rem] shadow-lg shadow-blue-900/10 transition-all">
+    {{-- TOP GRADIENT STICKY HEADER --}}
+    <div class="sticky top-0 z-50 bg-[#1565D8] backdrop-blur-md text-white px-5 pt-6 pb-5 rounded-b-[2rem] shadow-lg shadow-slate-900/10 transition-all">
         <div class="flex items-center gap-4">
-            <a href="{{ route('waspang.projects.finishing', $project->id_project) }}" 
-               class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-2xl font-medium transition active:scale-95">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left-icon lucide-chevron-left">
-                    <path d="m15 18-6-6 6-6"/>
-                </svg>
+            <a href="{{ route('waspang.projects.finishing', $project->id_project) }}"
+               class="w-10 h-10 shrink-0 rounded-2xl bg-white/15 hover:bg-white/25 inline-flex items-center justify-center transition active:scale-90">
+                <i class="fa-solid fa-chevron-left text-sm"></i>
             </a>
             <div class="min-w-0">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-blue-200/80">Step 4: Validasi Akhir</span>
+                <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-100">
+                    <i class="fa-solid fa-clipboard-check"></i> Step 4: Validasi Akhir
+                </span>
                 <h1 class="text-lg font-black tracking-tight truncate mt-0.5">Review BOQ Final</h1>
             </div>
         </div>
@@ -21,23 +21,23 @@
 
     {{-- Project Info --}}
     <div class="px-4 mt-4">
-        <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
             <div class="mb-3">
-                <p class="text-xs text-gray-400 font-medium">Nama LOP</p>
-                <p class="text-sm font-bold text-gray-900 break-words mt-0.5">{{ $project->project_name }}</p>
+                <p class="text-xs text-slate-400 font-medium">Nama LOP</p>
+                <p class="text-sm font-bold text-slate-900 break-words mt-0.5">{{ $project->project_name }}</p>
             </div>
-            <div class="grid grid-cols-2 gap-3 border-t border-gray-50 pt-3">
+            <div class="grid grid-cols-2 gap-3 border-t border-slate-50 pt-3">
                 <div>
-                    <p class="text-xs text-gray-400 font-medium">STO</p>
-                    <p class="text-xs font-bold text-gray-800 font-mono mt-0.5">{{ $project->lop?->sto ?? '-' }}</p>
+                    <p class="text-xs text-slate-400 font-medium">STO</p>
+                    <p class="text-xs font-bold text-slate-800 font-mono mt-0.5">{{ $project->lop?->sto ?? '-' }}</p>
                 </div>
                 <div>
-                    <p class="text-xs text-gray-400 font-medium">Branch</p>
-                    <p class="text-xs font-bold text-gray-800 mt-0.5">{{ $project->lop?->branch ?? '-' }}</p>
+                    <p class="text-xs text-slate-400 font-medium">Branch</p>
+                    <p class="text-xs font-bold text-slate-800 mt-0.5">{{ $project->lop?->branch ?? '-' }}</p>
                 </div>
-                <div class="col-span-2 border-t border-gray-50 pt-2">
-                    <p class="text-xs text-gray-400 font-medium">Mitra Pelaksana</p>
-                    <p class="text-xs font-bold text-gray-800 mt-0.5 break-words">{{ $project->lop?->mitra_name ?? '-' }}</p>
+                <div class="col-span-2 border-t border-slate-50 pt-2">
+                    <p class="text-xs text-slate-400 font-medium">Mitra Pelaksana</p>
+                    <p class="text-xs font-bold text-slate-800 mt-0.5 break-words">{{ $project->lop?->mitra_name ?? '-' }}</p>
                 </div>
             </div>
         </div>
@@ -87,10 +87,8 @@
                 {{-- CARD TOTAL TARGET PLAN --}}
                 <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col justify-between">
                     <div>
-                        <div class="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mb-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-target-icon lucide-target">
-                                <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
-                            </svg>
+                        <div class="w-7 h-7 rounded-lg bg-blue-100 text-[#1565D8] flex items-center justify-center mb-2">
+                            <i class="fa-solid fa-bullseye text-xs"></i>
                         </div>
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Plan</p>
                     </div>
@@ -110,8 +108,7 @@
                 <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col justify-between">
                     <div>
                         <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center mb-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-check-big-icon lucide-circle-check-big">
-                                <path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>    
+                            <i class="fa-solid fa-circle-check text-xs"></i>
                         </div>
                         <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Actual</p>
                     </div>
@@ -148,13 +145,13 @@
                 <div>
                     <div class="flex justify-between text-[11px] text-slate-500 font-medium mb-1">
                         <span class="flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+                            <span class="w-2 h-2 rounded-full bg-[#1565D8]"></span>
                             Volume Tiang Terpenuhi:
                         </span>
-                        <span class="font-bold text-blue-600">{{ $accuracyTiang }}%</span>
+                        <span class="font-bold text-[#1565D8]">{{ $accuracyTiang }}%</span>
                     </div>
                     <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div class="h-full bg-blue-600 rounded-full transition-all duration-500" style="width: {{ $accuracyTiang }}%"></div>
+                        <div class="h-full bg-[#1565D8] rounded-full transition-all duration-500" style="width: {{ $accuracyTiang }}%"></div>
                     </div>
                 </div>
             </div>

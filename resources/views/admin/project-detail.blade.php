@@ -26,16 +26,16 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 
         <div class="bg-gray-50 rounded-2xl p-6">
-            <p class="text-gray-500">Status</p>
+            <p class="text-gray-500">Status Progress</p>
             <h2 class="text-2xl font-bold mt-2">
-                {{ ucfirst($project->status) }}
+                {{ $project->lop?->stage?->name ?? str($project->lop?->status_progress ?? '-')->replace('_', ' ')->title() }}
             </h2>
         </div>
 
         <div class="bg-gray-50 rounded-2xl p-6">
             <p class="text-gray-500">Jenis Eksekusi</p>
             <h2 class="text-2xl font-bold mt-2">
-                {{ strtoupper($project->jenis_eksekusi) }}
+                {{ strtoupper($project->execution_type ?? $project->jenis_eksekusi ?? '-') }}
             </h2>
         </div>
 

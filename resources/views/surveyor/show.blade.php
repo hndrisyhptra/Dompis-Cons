@@ -272,10 +272,12 @@
 @endsection
 
 @push('scripts')
+<script src="https://unpkg.com/togeojson@0.16.0"></script>
 <script>
 (function () {
     const CSRF = document.querySelector('meta[name="csrf-token"]').content;
     const SURVEY_ID = {{ $survey->id }};
+    const REFERENCE_MAP_URL = @json($referenceMapUrl ?? null);
     const ROUTES = {
         pointStore: @json(route('surveyor.points.store', $survey->id)),
         pointDestroyBase: '{{ url('/surveyor/points') }}',
@@ -324,10 +326,45 @@
         if (initialEnd.lat && initialEnd.lng) renderEndMarker(initialEnd.lat, initialEnd.lng, initialEnd.name);
 
         fitAllIfPossible();
+        loadReferenceMap();
 
         map.on('click', function (e) {
             onMapClick(e.latlng);
         });
+    }
+
+    async function loadReferenceMap() {
+        if (!REFERENCE_MAP_URL || typeof toGeoJSON === 'undefined') return;
+
+        try {
+            const response = await fetch(REFERENCE_MAP_URL, { headers: { Accept: 'application/vnd.google-earth.kml+xml' } });
+            if (!response.ok) return;
+
+            const kml = new DOMParser().parseFromString(await response.text(), 'text/xml');
+            const referenceLayer = L.geoJSON(toGeoJSON.kml(kml), {
+                pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+                    radius: 5,
+                    color: '#64748b',
+                    weight: 2,
+                    fillColor: '#cbd5e1',
+                    fillOpacity: 0.65,
+                }),
+                style: {
+                    color: '#64748b',
+                    weight: 3,
+                    opacity: 0.65,
+                    dashArray: '7 7',
+                },
+            }).addTo(map);
+
+            if (initialPoints.length === 0 && initialRoutes.length === 0 && !initialEnd.lat) {
+                const bounds = referenceLayer.getBounds();
+                if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] });
+            }
+        } catch (error) {
+            // Redesign tetap dapat dilanjutkan memakai basemap bila referensi
+            // KML sedang tidak dapat dimuat (misalnya koneksi lapangan lemah).
+        }
     }
 
     function fitAllIfPossible() {

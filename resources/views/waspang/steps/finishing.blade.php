@@ -2,7 +2,7 @@
 
 @section('content')
 
-<div class="min-h-screen max-w-md mx-auto bg-[#f7f6f2] pb-24">
+<div class="min-h-screen max-w-md mx-auto bg-[#F8FAFC] pb-24">
 
 @php
     $evidences = $project->evidences ?? collect();
@@ -30,23 +30,23 @@
 
 {{-- Project Info --}}
 <div class="px-4 mt-4">
-    <div class="bg-white rounded-2xl border border-gray-200 p-4 shadow-xs">
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
         <div class="mb-3">
-            <p class="text-xs text-gray-400 font-medium">Nama LOP</p>
-            <p class="text-sm font-bold text-gray-900 break-words mt-0.5">{{ $project->project_name }}</p>
+            <p class="text-xs text-slate-400 font-medium">Nama LOP</p>
+            <p class="text-sm font-bold text-slate-900 break-words mt-0.5">{{ $project->project_name }}</p>
         </div>
-        <div class="grid grid-cols-2 gap-3 border-t border-gray-50 pt-3">
+        <div class="grid grid-cols-2 gap-3 border-t border-slate-50 pt-3">
             <div>
-                <p class="text-xs text-gray-400 font-medium">STO</p>
-                <p class="text-xs font-bold text-gray-800 font-mono mt-0.5">{{ $project->lop?->sto ?? '-' }}</p>
+                <p class="text-xs text-slate-400 font-medium">STO</p>
+                <p class="text-xs font-bold text-slate-800 font-mono mt-0.5">{{ $project->lop?->sto ?? '-' }}</p>
             </div>
             <div>
-                <p class="text-xs text-gray-400 font-medium">Branch</p>
-                <p class="text-xs font-bold text-gray-800 mt-0.5">{{ $project->lop?->branch ?? '-' }}</p>
+                <p class="text-xs text-slate-400 font-medium">Branch</p>
+                <p class="text-xs font-bold text-slate-800 mt-0.5">{{ $project->lop?->branch ?? '-' }}</p>
             </div>
-            <div class="col-span-2 border-t border-gray-50 pt-2">
-                <p class="text-xs text-gray-400 font-medium">Mitra Pelaksana</p>
-                <p class="text-xs font-bold text-gray-800 mt-0.5 break-words">{{ $project->lop?->mitra_name ?? '-' }}</p>
+            <div class="col-span-2 border-t border-slate-50 pt-2">
+                <p class="text-xs text-slate-400 font-medium">Mitra Pelaksana</p>
+                <p class="text-xs font-bold text-slate-800 mt-0.5 break-words">{{ $project->lop?->mitra_name ?? '-' }}</p>
             </div>
         </div>
     </div>
@@ -82,8 +82,8 @@
 
 {{-- APPROVAL SUMMARY --}}
 <div class="px-4 mt-4">
-    <div class="bg-white rounded-2xl border border-gray-200 p-4">
-        <h3 class="text-sm font-bold text-gray-900 mb-3">
+    <div class="bg-white rounded-2xl border border-slate-200 p-4">
+        <h3 class="text-sm font-bold text-slate-900 mb-3">
             Ringkasan Approval Eviden
         </h3>
 
@@ -109,8 +109,8 @@
 {{-- FINAL EVIDENCE PER MATERIAL ITEM --}}
 <div class="px-4 mt-5">
     <div>
-        <h2 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Step 4 Finishing</h2>
-        <p class="text-[11px] text-gray-500">Tap item untuk Upload Eviden Final</p>
+        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Step 4 Finishing</h2>
+        <p class="text-[11px] text-slate-500">Tap item untuk Upload Eviden Final</p>
     </div>
 
     <div class="space-y-3 mt-3">
@@ -143,7 +143,7 @@
             @endphp
 
             <div x-data="{ open: {{ $finalStatus == 'rejected' ? 'true' : 'false' }} }"
-                 class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-xs">
+                 class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
 
                 <button type="button"
                         @click="open = !open"
@@ -151,22 +151,22 @@
 
                     <div class="flex items-center gap-3 min-w-0">
                         <div class="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 
-                            {{ $finalStatus == 'rejected' ? 'bg-red-50 text-red-600' : ($finalBoqPhotos->count() > 0 ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-400') }}">
+                            {{ $finalStatus == 'rejected' ? 'bg-red-50 text-red-600' : ($finalBoqPhotos->count() > 0 ? 'bg-green-50 text-green-600' : 'bg-slate-50 text-slate-400') }}">
                             {{ $finalStatus == 'rejected' ? '!' : ($finalBoqPhotos->count() > 0 ? '✓' : $loop->iteration) }}
                         </div>
 
                         <div class="min-w-0">
-                            <h3 class="text-sm font-bold text-gray-900 truncate">
+                            <h3 class="text-sm font-bold text-slate-900 truncate">
                                 {{ $boq->item_name }}
                             </h3>
 
                             <div class="mt-1 space-y-0.5">
-                                <p class="text-xs text-gray-500 font-mono">
+                                <p class="text-xs text-slate-500 font-mono">
                                     {{ $boq->designator ?? '-' }}
                                 </p>
 
                                 <div class="flex items-center gap-3 text-[11px]">
-                                    <span class="text-blue-600 font-semibold">
+                                    <span class="text-[#1565D8] font-semibold">
                                         Plan: <span class="font-bold">{{ number_format($boq->quantity_plan) }}</span> {{ $boq->unit }}
                                     </span>
                                     <span class="text-green-600 font-semibold">
@@ -179,14 +179,14 @@
 
                     <div class="flex items-center gap-2 shrink-0">
                         <span class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide
-                            {{ !$finalStatus ? 'bg-gray-100 text-gray-500' : '' }}
+                            {{ !$finalStatus ? 'bg-slate-100 text-slate-500' : '' }}
                             {{ $finalStatus == 'approved' ? 'bg-green-100 text-green-700' : '' }}
                             {{ $finalStatus == 'pending' ? 'bg-amber-100 text-amber-700' : '' }}
                             {{ $finalStatus == 'rejected' ? 'bg-red-100 text-red-700' : '' }}">
                             {{ $finalStatus ? ucfirst($finalStatus) : 'Belum' }}
                         </span>
 
-                        <i class="fa-solid text-[10px] text-gray-400 transition-transform" :class="open ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                        <i class="fa-solid text-[10px] text-slate-400 transition-transform" :class="open ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
                     </div>
 
                 </button>
@@ -194,11 +194,11 @@
                 <div x-show="open"
                      x-transition
                      x-cloak
-                     class="border-t border-gray-50 bg-gray-50/30 p-4 space-y-4">
+                     class="border-t border-slate-50 bg-slate-50/30 p-4 space-y-4">
 
                     {{-- EVIDEN INSTALASI EXISTING --}}
                     <div>
-                        <p class="text-xs font-bold text-gray-700 mb-2">
+                        <p class="text-xs font-bold text-slate-700 mb-2">
                             Eviden Instalasi Existing (Referensi)
                         </p>
 
@@ -207,7 +207,7 @@
                                 @foreach($instalasiPhotos as $photo)
                                     <a href="{{ asset('storage/' . $photo->file_path) }}"
                                        target="_blank"
-                                       class="relative aspect-square rounded-xl overflow-hidden border border-gray-200 bg-gray-100 group block">
+                                       class="relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group block">
                                         
                                         <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-10 backdrop-blur-sm">
                                             <i class="fa-solid fa-clock-rotate-left text-blue-300"></i>
@@ -220,7 +220,7 @@
                                 @endforeach
                             </div>
                         @else
-                            <p class="text-xs text-gray-400 italic">
+                            <p class="text-xs text-slate-400 italic">
                                 Belum ada eviden instalasi untuk item ini.
                             </p>
                         @endif
@@ -228,7 +228,7 @@
 
                     {{-- EVIDEN FINAL --}}
                     <div class="mt-4">
-                        <p class="text-xs font-bold text-gray-700 mb-2">
+                        <p class="text-xs font-bold text-slate-700 mb-2">
                             Eviden Final
                         </p>
 
@@ -250,8 +250,8 @@
                                          walau tampil menempel di pojok foto, tidak dianggap bagian dari
                                          area hover kartu tsb dan tidak ikut memicu overlay Upload Ulang. --}}
                                     <div class="relative">
-                                        <div class="relative aspect-square rounded-xl overflow-hidden bg-gray-100 group transition-all
-                                            {{ $photo->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-gray-200' }}">
+                                        <div class="relative aspect-square rounded-xl overflow-hidden bg-slate-100 group transition-all
+                                            {{ $photo->status == 'rejected' ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border border-slate-200' }}">
 
                                             {{-- INDIKATOR ID FOTO (PERMANEN) --}}
                                             <div class="absolute top-1 left-1 bg-black/60 text-white text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 z-20 backdrop-blur-sm">
@@ -278,7 +278,7 @@
                                                 <form method="POST" action="{{ route('waspang.evidence.replace', $photo->id_evidence) }}" enctype="multipart/form-data"
                                                       class="absolute inset-0 z-30 flex items-center justify-center bg-black/60 opacity-0 hover:opacity-100 transition-opacity duration-200">
                                                     @csrf
-                                                    <label class="cursor-pointer bg-blue-600 text-white text-[10px] font-black px-3 py-2 rounded-xl shadow-lg hover:bg-blue-700 transition flex flex-col items-center gap-1">
+                                                    <label class="cursor-pointer bg-[#1565D8] text-white text-[10px] font-black px-3 py-2 rounded-xl shadow-lg hover:bg-[#1565D8] transition flex flex-col items-center gap-1">
                                                         <i class="fa-solid fa-camera-rotate text-sm"></i>
                                                         Upload Ulang
                                                         <input type="file" name="file" class="hidden" onchange="handleReplaceFileChange(this)" accept="image/*">
@@ -299,13 +299,13 @@
                                 @endforeach
                             </div>
                         @else
-                            <p class="text-xs text-gray-400 italic mb-3">
+                            <p class="text-xs text-slate-400 italic mb-3">
                                 Belum ada eviden final.
                             </p>
                         @endif
 
                         <button type="button" onclick="openUploadModal('{{ $boq->id_boq }}', @js($boq->item_name), '{{ $boq->designator }}', '{{ $boq->quantity_plan }}', '{{ $boq->unit }}', '{{ $boq->quantity_actual ?? 0 }}')"
-                         class="h-9 w-full rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold transition shadow-xs">
+                         class="h-9 w-full rounded-xl bg-[#1565D8] hover:bg-[#0F4FAF] text-white text-xs font-bold transition shadow-xs">
                             <i class="fa-solid fa-camera mr-1"></i> + Upload Eviden Final
                         </button>
                     </div>
@@ -316,7 +316,7 @@
 
         @empty
 
-            <div class="bg-white rounded-2xl border border-gray-200 p-4 text-center text-xs text-gray-500">
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 text-center text-xs text-slate-500">
                 Tidak ada item material pada BOQ.
             </div>
 
@@ -330,7 +330,7 @@
 <div class="px-4 mt-5">
     @if($readyForUt)
         <a href="{{ route('waspang.projects.review_final', $project->id_project) }}"
-           class="h-11 w-full rounded-2xl bg-blue-700 hover:bg-blue-800 text-white inline-flex items-center justify-center text-sm font-black transition shadow-md gap-2">
+           class="h-11 w-full rounded-2xl bg-[#1565D8] hover:bg-[#0F4FAF] text-white inline-flex items-center justify-center text-sm font-black transition shadow-md gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-check">
                 <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/>
                 <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
@@ -340,7 +340,7 @@
         </a>
     @else
         <button disabled
-                class="h-11 w-full rounded-2xl bg-gray-200 text-gray-400 inline-flex items-center justify-center text-sm font-bold cursor-not-allowed">
+                class="h-11 w-full rounded-2xl bg-slate-200 text-slate-400 inline-flex items-center justify-center text-sm font-bold cursor-not-allowed">
             Menunggu Semua Eviden Approved
         </button>
     @endif
@@ -350,7 +350,7 @@
 <div id="uploadModal" class="hidden fixed inset-0 z-[9999] bg-black/60 px-4 flex items-center justify-center backdrop-blur-xs animate-fade-in">
     <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
-        <div class="bg-blue-700 text-white px-5 py-4 flex items-start justify-between shrink-0">
+        <div class="bg-[#1565D8] text-white px-5 py-4 flex items-start justify-between shrink-0">
             <div>
                 <h2 class="text-lg font-black tracking-tight">
                     Upload Eviden Final
@@ -375,14 +375,14 @@
             <input type="hidden" name="latitude" id="latitude">
             <input type="hidden" name="longitude" id="longitude">
 
-            <div id="selectedBoqBox" class="hidden grid grid-cols-3 gap-2 bg-gray-50 p-3 rounded-2xl border border-gray-100 text-xs shrink-0">
+            <div id="selectedBoqBox" class="hidden grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-xs shrink-0">
                 <div>
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Designator</p>
-                    <p id="selectedBoqDesignator" class="text-xs font-black text-gray-900 mt-0.5">-</p>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Designator</p>
+                    <p id="selectedBoqDesignator" class="text-xs font-black text-slate-900 mt-0.5">-</p>
                 </div>
                 <div>
                     <p class="text-[10px] font-bold text-blue-500 uppercase tracking-wide">Target Plan</p>
-                    <p class="text-xs font-black text-blue-700 mt-0.5">
+                    <p class="text-xs font-black text-[#1565D8] mt-0.5">
                         <span id="selectedBoqPlan">0</span> <span class="selectedBoqUnit text-[10px] font-normal text-blue-400"></span>
                     </p>
                 </div>
@@ -395,23 +395,23 @@
             </div>
 
             <div class="text-xs">
-                <label class="text-xs font-black text-gray-600 block mb-1.5">
+                <label class="text-xs font-black text-slate-600 block mb-1.5">
                     Pilih/Ambil Eviden Final
                 </label>
 
                 <label class="flex flex-col items-center justify-center w-full min-h-[125px] border-2 border-dashed border-blue-300 rounded-2xl bg-blue-50/40 cursor-pointer hover:bg-blue-50 transition p-4">
                     <div class="text-center">
-                        <div class="mx-auto w-11 h-11 rounded-xl bg-blue-700 text-white flex items-center justify-center text-xl font-black shadow-sm">
+                        <div class="mx-auto w-11 h-11 rounded-xl bg-[#1565D8] text-white flex items-center justify-center text-xl font-black shadow-sm">
                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera-icon lucide-camera">
                                 <path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z"/><circle cx="12" cy="13" r="3"/>
                             </svg>
                         </div>
 
-                        <p class="mt-2.5 text-xs font-black text-blue-800">
+                        <p class="mt-2.5 text-xs font-black text-[#0F4FAF]">
                             Pilih Eviden Final
                         </p>
 
-                        <p class="text-[10px] text-gray-400 mt-0.5">
+                        <p class="text-[10px] text-slate-400 mt-0.5">
                             JPG, PNG, WEBP · Auto Compress
                         </p>
                     </div>
@@ -421,7 +421,7 @@
 
                 <div id="previewWrapper" class="mt-3 hidden animate-fade-in">
                     <div class="flex items-center justify-between mb-2">
-                        <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">
+                        <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
                             Preview Foto (<span id="photoCount">0</span>)
                         </p>
 
@@ -435,19 +435,19 @@
             </div>
 
             <div class="text-xs">
-                <label class="text-xs font-black text-gray-600 block">
-                    Catatan Tambahan Finishing <span class="text-gray-400">(Opsional)</span>
+                <label class="text-xs font-black text-slate-600 block">
+                    Catatan Tambahan Finishing <span class="text-slate-400">(Opsional)</span>
                 </label>
 
-                <textarea name="description" rows="3" placeholder="Tulis catatan penutupan progress finishing..." class="mt-1.5 w-full rounded-2xl border border-gray-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-700 outline-none transition resize-none"></textarea>
+                <textarea name="description" rows="3" placeholder="Tulis catatan penutupan progress finishing..." class="mt-1.5 w-full rounded-2xl border border-slate-300 px-3 py-2 text-xs focus:ring-2 focus:ring-blue-100 focus:border-[#1565D8] outline-none transition resize-none"></textarea>
             </div>
 
             <div class="grid grid-cols-2 gap-2 pt-2 shrink-0">
-                <button type="button" onclick="closeUploadModal()" class="h-11 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-black transition">
+                <button type="button" onclick="closeUploadModal()" class="h-11 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-black transition">
                     Batal
                 </button>
 
-                <button type="submit" class="h-11 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-md transition">
+                <button type="submit" class="h-11 rounded-2xl bg-[#1565D8] hover:bg-[#0F4FAF] text-white text-sm font-black shadow-md transition">
                     Upload
                 </button>
             </div>
@@ -495,7 +495,7 @@ function alertNoMetadata(fileName) {
         title: 'Foto Tidak Ada Metadata!',
         text: 'Foto "' + fileName + '" tidak memiliki metadata (EXIF) sehingga tidak bisa diunggah. Pastikan foto diambil langsung dari kamera HP, bukan hasil screenshot atau kiriman ulang WhatsApp/Telegram yang menghapus metadata.',
         icon: 'warning',
-        confirmButtonColor: '#1D4ED8',
+        confirmButtonColor: '#1565D8',
         customClass: { popup: 'rounded-3xl' }
     });
 }
@@ -596,7 +596,7 @@ function renderEvidencePreview() {
 
     selectedFiles.forEach((item, index) => {
         const card = document.createElement('div');
-        card.className = 'relative aspect-square rounded-xl overflow-hidden bg-gray-50 border border-gray-200 shadow-xs';
+        card.className = 'relative aspect-square rounded-xl overflow-hidden bg-slate-50 border border-slate-200 shadow-xs';
         card.innerHTML = `
             <img src="${item.url}" class="w-full h-full object-cover">
             <button type="button" onclick="removeEvidencePhoto(${index})" class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 text-white text-xs font-black flex items-center justify-center transition hover:bg-black">×</button>
@@ -654,7 +654,7 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
     if (selectedFiles.length === 0) {
-        Swal.fire({ title: 'Pilih Foto!', text: 'Mohon lampirkan minimal 1 foto fisik sebagai bukti progress finishing.', icon: 'warning', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
+        Swal.fire({ title: 'Pilih Foto!', text: 'Mohon lampirkan minimal 1 foto fisik sebagai bukti progress finishing.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
         return;
     }
 
@@ -680,11 +680,11 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
             Swal.fire({ title: 'Berhasil Disimpan!', text: 'Eviden progress finishing berhasil diperbarui.', icon: 'success', showConfirmButton: false, timer: 1500, timerProgressBar: true, customClass: { popup: 'rounded-3xl' } })
             .then(() => window.location.reload());
         } else {
-            Swal.fire({ title: 'Gagal Memproses!', text: 'Terjadi kesalahan sistem atau kendala validasi data.', icon: 'error', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
+            Swal.fire({ title: 'Gagal Memproses!', text: 'Terjadi kesalahan sistem atau kendala validasi data.', icon: 'error', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
         }
     })
     .catch(() => {
-        Swal.fire({ title: 'Gangguan Jaringan!', text: 'Gagal menghubungi server. Pastikan koneksi internet di lapangan stabil.', icon: 'warning', confirmButtonColor: '#1D4ED8', customClass: { popup: 'rounded-3xl' } });
+        Swal.fire({ title: 'Gangguan Jaringan!', text: 'Gagal menghubungi server. Pastikan koneksi internet di lapangan stabil.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
     });
 });
 </script>

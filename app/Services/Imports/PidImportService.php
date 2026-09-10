@@ -6,6 +6,7 @@ use App\Models\ImportLog;
 use App\Models\ImportProcess;
 use App\Models\ImportProcessError;
 use App\Models\Lop;
+use App\Models\Package;
 use App\Models\Project;
 use App\Models\Pt2Lop;
 use App\Models\Pt2Project;
@@ -117,7 +118,12 @@ class PidImportService
                 $highestColumn
             );
 
-            $requiredHeaders = ['pid_sap', 'id_ihld', 'nama_lop'];
+            // id_ihld wajib untuk PT2 (kunci dedup 1 PID = banyak LOP per IHLD),
+            // tapi OPSIONAL untuk LOP reguler -- cukup pid_sap + nama_lop yang
+            // wajib (dikonfirmasi pemilik project, lihat ANALISA_REFACTOR_PERSIAPAN.md J.1).
+            $requiredHeaders = $isPt2
+                ? ['pid_sap', 'id_ihld', 'nama_lop']
+                : ['pid_sap', 'nama_lop'];
             $missingHeaders = array_values(
                 array_diff($requiredHeaders, array_values($headers))
             );
@@ -354,13 +360,6 @@ class PidImportService
                     }
                 }
 
-                if (
-                    !$projectGroups[$projectKey]['status_explicit']
-                    && $row['status_explicit']
-                ) {
-                    $projectGroups[$projectKey]['status_project'] = $row['status_project'];
-                    $projectGroups[$projectKey]['status_explicit'] = true;
-                }
             }
         }
 
@@ -465,6 +464,26 @@ class PidImportService
             }
         }
 
+        // Resolusi package_code -> package_id (opsional, khusus LOP reguler).
+        // Diambil sekaligus per chunk, bukan per-baris, biar tidak query
+        // berulang -- daftar packages sendiri kecil (tabel master), jadi
+        // aman diambil semua lalu dicocokkan case-insensitive di memory.
+        $packageIdByCode = [];
+
+        if (!$isPt2) {
+            $hasPackageCode = collect($rows)->contains(
+                fn ($row) => !empty($row['package_code'])
+            );
+
+            if ($hasPackageCode) {
+                foreach (Package::query()->get(['id_package', 'package_code']) as $package) {
+                    if (!empty($package->package_code)) {
+                        $packageIdByCode[$this->key($package->package_code)] = $package->id_package;
+                    }
+                }
+            }
+        }
+
         foreach ($rows as $row) {
             $project = $resolvedProjects[$this->key($row['pid_sap'])] ?? null;
 
@@ -497,16 +516,57 @@ class PidImportService
                 'mitra_name' => $row['mitra_name'],
             ];
 
+            if ($row['status_explicit']) {
+                $payload['status_progress'] = $row['status_progress'];
+            }
+
             if (!$isPt2) {
                 $payload['program_sap'] = $row['program'];
                 $payload['mapping_status'] = 'auto_matched';
+
+                // 24 kolom lops tambahan (opsional) -- lihat ANALISA_REFACTOR_PERSIAPAN.md J.1 & K.1.
+                $payload['tahun_order'] = $row['tahun_order'];
+                $payload['start_tgl'] = $row['start_tgl'];
+                $payload['wo_smile'] = $row['wo_smile'];
+                $payload['nilai_material'] = $row['nilai_material'];
+                $payload['nilai_jasa'] = $row['nilai_jasa'];
+                $payload['nilai_total'] = $row['nilai_total'];
+                $payload['odp_8'] = $row['odp_8'];
+                $payload['odp_16'] = $row['odp_16'];
+                $payload['total_port'] = $row['total_port'];
+                $payload['plan_tiang'] = $row['plan_tiang'];
+                $payload['realisasi_tiang'] = $row['realisasi_tiang'];
+                $payload['plan_kabel'] = $row['plan_kabel'];
+                $payload['realisasi_kabel'] = $row['realisasi_kabel'];
+                $payload['plan_galian'] = $row['plan_galian'];
+                $payload['real_galian'] = $row['real_galian'];
+                $payload['nama_waspang'] = $row['nama_waspang'];
+                $payload['nik_waspang'] = $row['nik_waspang'];
+                $payload['nama_admin'] = $row['nama_admin'];
+                $payload['nik_admin'] = $row['nik_admin'];
+                $payload['est_prep'] = $row['est_prep'];
+                $payload['est_izin'] = $row['est_izin'];
+                $payload['est_delivery'] = $row['est_delivery'];
+                $payload['est_instalasi'] = $row['est_instalasi'];
+                $payload['est_golive'] = $row['est_golive'];
+
+                if (!empty($row['package_code'])) {
+                    $packageId = $packageIdByCode[$this->key($row['package_code'])] ?? null;
+
+                    if ($packageId) {
+                        $payload['package_id'] = $packageId;
+                    }
+                    // Kalau package_code tidak dikenali, sengaja dibiarkan
+                    // kosong (bukan error) -- bisa dilengkapi lewat edit UI.
+                }
             }
 
             $payload = $this->nonBlankPayload($payload);
             $payload[$lopProjectFk] = $projectId;
 
             if ($lop) {
-                // Tidak menyentuh status_progress, BOQ, evidence, assignment, Go-Live, dll.
+                // Status progress hanya disentuh jika kolomnya dikirim eksplisit.
+                // BOQ, evidence, assignment, dan data Go-Live tetap tidak disentuh.
                 $lop->fill($payload);
 
                 if ($lop->isDirty()) {
@@ -516,7 +576,10 @@ class PidImportService
                     $counters['unchanged']++;
                 }
             } else {
-                $payload['status_progress'] = 'preparation';
+                // LOP reguler baru mulai dari 'inisiasi' (tahap pertama flow
+                // Persiapan yang baru); PT2 tetap pakai 'preparation' seperti
+                // semula karena refactor ini tidak menyentuh flow PT2.
+                $payload['status_progress'] ??= $isPt2 ? 'preparation' : 'inisiasi';
                 $lop = $lopClass::create($payload);
                 $counters['lop_created']++;
 
@@ -553,8 +616,8 @@ class PidImportService
             $errorCode = 'missing_required_field';
         }
 
-        if (!$idIhld) {
-            $errors[] = 'ID IHLD wajib diisi';
+        if ($isPt2 && !$idIhld) {
+            $errors[] = 'ID IHLD wajib diisi untuk import PT2';
             $errorCode = 'missing_required_field';
         }
 
@@ -591,7 +654,11 @@ class PidImportService
         }
 
         $rawExecution = $this->cleanValue($data['execution_type'] ?? null);
-        $rawStatus = $this->cleanValue($data['status_project'] ?? null);
+        // status_project tetap dibaca sebagai alias sementara agar template lama
+        // tidak langsung gagal, tetapi hasilnya selalu disimpan ke LOP.
+        $rawStatus = strtolower((string) $this->cleanValue(
+            $data['status_progress'] ?? $data['status_project'] ?? null
+        ));
 
         $executionType = in_array(
             $rawExecution,
@@ -599,11 +666,28 @@ class PidImportService
             true
         ) ? $rawExecution : 'kemitraan';
 
-        $statusProject = in_array(
-            $rawStatus,
-            ['init', 'active', 'close', 'bast', 'drop'],
-            true
-        ) ? $rawStatus : 'active';
+        $legacyStatusMap = $isPt2
+            ? [
+                'init' => 'preparation',
+                'active' => 'preparation',
+                'close' => 'complete',
+                'bast' => 'complete',
+            ]
+            : [
+                'init' => 'inisiasi',
+                'active' => 'inisiasi',
+                'close' => 'finishing',
+                'bast' => 'fi_ogp_golive',
+            ];
+
+        $statusProgress = $legacyStatusMap[$rawStatus] ?? $rawStatus;
+        $allowedStatuses = $isPt2
+            ? ['preparation', 'survey', 'progress', 'instalasi', 'finish', 'finishing', 'dismantle', 'mancore', 'complete', 'golive', 'drop']
+            : ['inisiasi', 'survey', 'perizinan', 'material_delivery', 'persiapan_instalasi', 'instalasi', 'pengukuran', 'finishing', 'fi_ogp_golive', 'golive', 'hold', 'drop'];
+
+        if (!in_array($statusProgress, $allowedStatuses, true)) {
+            $statusProgress = $isPt2 ? 'preparation' : 'inisiasi';
+        }
 
         return [
             'row' => [
@@ -627,9 +711,39 @@ class PidImportService
                 'tgl_sp' => $tglSp,
                 'tgl_toc' => $tglToc,
                 'execution_type' => $executionType,
-                'status_project' => $statusProject,
+                'status_progress' => $statusProgress,
                 'execution_explicit' => !empty($rawExecution),
                 'status_explicit' => !empty($rawStatus),
+
+                // 24 kolom lops tambahan (opsional, khusus LOP reguler --
+                // lihat ANALISA_REFACTOR_PERSIAPAN.md bagian J.1 & K.1).
+                // Tanggal yang tidak valid/tidak diisi cukup jadi null, tidak
+                // memblokir baris (beda dengan tgl_sp/tgl_toc yang wajib).
+                'tahun_order' => $this->cleanInt($data['tahun_order'] ?? null),
+                'start_tgl' => $this->cleanDate($data['start_tgl'] ?? null)[0],
+                'wo_smile' => $this->cleanValue($data['wo_smile'] ?? null),
+                'nilai_material' => $this->cleanValue($data['nilai_material'] ?? null),
+                'nilai_jasa' => $this->cleanValue($data['nilai_jasa'] ?? null),
+                'nilai_total' => $this->cleanValue($data['nilai_total'] ?? null),
+                'odp_8' => $this->cleanInt($data['odp_8'] ?? null),
+                'odp_16' => $this->cleanInt($data['odp_16'] ?? null),
+                'total_port' => $this->cleanInt($data['total_port'] ?? null),
+                'plan_tiang' => $this->cleanValue($data['plan_tiang'] ?? null),
+                'realisasi_tiang' => $this->cleanValue($data['realisasi_tiang'] ?? null),
+                'plan_kabel' => $this->cleanValue($data['plan_kabel'] ?? null),
+                'realisasi_kabel' => $this->cleanValue($data['realisasi_kabel'] ?? null),
+                'plan_galian' => $this->cleanValue($data['plan_galian'] ?? null),
+                'real_galian' => $this->cleanValue($data['real_galian'] ?? null),
+                'nama_waspang' => $this->cleanValue($data['nama_waspang'] ?? null),
+                'nik_waspang' => $this->cleanValue($data['nik_waspang'] ?? null),
+                'nama_admin' => $this->cleanValue($data['nama_admin'] ?? null),
+                'nik_admin' => $this->cleanValue($data['nik_admin'] ?? null),
+                'est_prep' => $this->cleanDate($data['est_prep'] ?? null)[0],
+                'est_izin' => $this->cleanDate($data['est_izin'] ?? null)[0],
+                'est_delivery' => $this->cleanDate($data['est_delivery'] ?? null)[0],
+                'est_instalasi' => $this->cleanDate($data['est_instalasi'] ?? null)[0],
+                'est_golive' => $this->cleanDate($data['est_golive'] ?? null)[0],
+                'package_code' => $this->cleanValue($data['package_code'] ?? null),
             ],
             'errors' => $errors,
             'error_code' => $errorCode,
@@ -727,7 +841,6 @@ class PidImportService
             'branch' => $row['branch'],
             'sto' => $row['sto'],
             'mitra_name' => $row['mitra_name'],
-            'status_project' => $row['status_project'],
         ]);
     }
 
@@ -742,10 +855,6 @@ class PidImportService
         // project_name hanya berubah jika memang dikirim eksplisit di file.
         if (!empty($row['project_name'])) {
             $payload['project_name'] = $row['project_name'];
-        }
-
-        if ($row['status_explicit']) {
-            $payload['status_project'] = $row['status_project'];
         }
 
         return $payload;
@@ -763,7 +872,6 @@ class PidImportService
             'sto' => $row['sto'],
             'mitra_name' => $row['mitra_name'],
             'execution_type' => $row['execution_type'],
-            'status_project' => $row['status_project'],
         ]);
     }
 
@@ -781,10 +889,6 @@ class PidImportService
 
         if ($row['execution_explicit']) {
             $payload['execution_type'] = $row['execution_type'];
-        }
-
-        if ($row['status_explicit']) {
-            $payload['status_project'] = $row['status_project'];
         }
 
         return $payload;
@@ -836,6 +940,25 @@ class PidImportService
         $value = trim((string) $value);
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * Bersihkan angka dari format umum spreadsheet ("1.000", "1,000", " 24 ")
+     * jadi integer bersih. Return null kalau kosong/tidak bisa dibaca sebagai
+     * angka -- dibiarkan null (bukan error) karena kolom-kolom yang memakai
+     * ini semuanya opsional.
+     */
+    private function cleanInt(mixed $value): ?int
+    {
+        $cleaned = $this->cleanValue($value);
+
+        if ($cleaned === null) {
+            return null;
+        }
+
+        $numeric = preg_replace('/[^\d\-]/', '', $cleaned);
+
+        return ($numeric === '' || $numeric === '-') ? null : (int) $numeric;
     }
 
     /**

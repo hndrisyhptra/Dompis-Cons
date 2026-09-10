@@ -165,7 +165,7 @@
                                                     'branch' => $project->lop?->branch,
                                                     'sto' => $project->lop?->sto,
                                                     'mitra_name' => $project->mitra_name ?? $project->lop?->mitra_name,
-                                                    'status' => $project->status_project,
+                                                    'status_progress' => $project->lop?->status_progress,
                                                     'latitude' => $project->latitude,
                                                     'longitude' => $project->longitude,
                                                     'location_address' => $project->location_address,

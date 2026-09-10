@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\ProjectStage;
 use App\Models\Lop;
 use App\Models\User;
 use App\Models\Designator; // <-- TAMBAHKAN MODEL INI
@@ -28,19 +29,15 @@ class ProgramController extends Controller
     }
 
     /**
-     * Opsi Status Project untuk dropdown filter -- disamakan persis dengan
-     * ImportController::dataBoq()/dataPid() (kolom projects.status_project,
-     * lihat validasi di ImportController::updatePid()).
+     * Opsi status mengikuti master status_progress LOP.
      */
-    private function statusProjectOptions(): array
+    private function statusProgressOptions(): array
     {
-        return [
-            'init' => 'Init',
-            'active' => 'Active',
-            'close' => 'Close',
-            'bast' => 'BAST',
-            'drop' => 'Drop',
-        ];
+        return ProjectStage::active()
+            ->orderByRaw('sequence IS NULL, sequence ASC')
+            ->orderBy('label')
+            ->pluck('label', 'code')
+            ->all();
     }
 
     /**
@@ -67,7 +64,7 @@ class ProgramController extends Controller
         $search = $request->input('search');
         $branch = $request->input('branch');
         $region = $request->input('region');
-        $statusProject = $request->input('status_project');
+        $statusProgress = $request->input('status_progress', $request->input('status_project'));
         $regions = $this->pidRegions();
 
         // Gunakan 'lop' (tunggal) karena relasi Project biasa adalah 1-to-1
@@ -108,8 +105,10 @@ class ProgramController extends Controller
             });
         }
 
-        if ($statusProject) {
-            $query->where('status_project', $statusProject);
+        if ($statusProgress) {
+            $query->whereHas('lops', function ($lopQuery) use ($statusProgress) {
+                $lopQuery->where('status_progress', $statusProgress);
+            });
         }
 
         $projects = $query->latest('updated_at')->paginate($request->input('per_page', 10))->withQueryString();
@@ -135,7 +134,7 @@ class ProgramController extends Controller
             'assignableUsers' => $assignableUsers,
             'designators' => $designators, // <-- KIRIM VARIABELNYA KE BLADE
             'regions' => $regions,
-            'statusOptions' => $this->statusProjectOptions(),
+            'statusOptions' => $this->statusProgressOptions(),
             'programName' => $programName,
         ];
     }
@@ -177,7 +176,7 @@ class ProgramController extends Controller
     }
 
     /**
-     * Terapkan filter search/region/branch/status_project ke query DB raw
+     * Terapkan filter search/region/branch/status_progress ke query DB raw
      * (dipakai khusus export supaya tidak perlu load relasi Eloquent yang
      * berat untuk seluruh data yang cocok filter, bukan cuma 1 halaman).
      * Polanya disamakan dengan ImportController::applyRegularPidFilters().
@@ -234,14 +233,20 @@ class ProgramController extends Controller
             });
         }
 
-        if ($request->filled('status_project')) {
-            $query->where('p.status_project', $request->status_project);
+        $statusProgress = $request->input('status_progress', $request->input('status_project'));
+        if ($statusProgress) {
+            $query->whereExists(function ($lopQuery) use ($statusProgress) {
+                $lopQuery->selectRaw('1')
+                    ->from('lops as ls')
+                    ->whereColumn('ls.project_id', 'p.id_project')
+                    ->where('ls.status_progress', $statusProgress);
+            });
         }
     }
 
     /**
      * Export data LOP per program ke Excel -- mengikuti filter yang sedang
-     * aktif di halaman (search/region/branch/status_project), ATAU seluruh
+     * aktif di halaman (search/region/branch/status_progress), ATAU seluruh
      * data kalau tidak ada filter aktif (link "Download Semua" mengarah ke
      * URL tanpa query string). Polanya disamakan dengan
      * ImportController::exportPid()/exportBoq().
@@ -255,7 +260,7 @@ class ProgramController extends Controller
 
         $rows = (clone $base)
             ->leftJoin('lops as l', 'l.project_id', '=', 'p.id_project')
-            ->leftJoin('project_assignments as pa', 'pa.project_id', '=', 'p.id_project')
+            ->leftJoin('pro_assign as pa', 'pa.project_id', '=', 'p.id_project')
             ->leftJoin('users as uw', 'uw.id_user', '=', 'pa.waspang_id')
             ->leftJoin('users as ut', 'ut.id_user', '=', 'pa.teknisi_id')
             ->orderByDesc('p.id_project')
@@ -265,7 +270,7 @@ class ProgramController extends Controller
                 'p.project_name',
                 'p.program',
                 'p.execution_type',
-                'p.status_project',
+                'l.status_progress',
                 'p.mitra_name',
                 'l.id_ihld',
                 'l.lop_name',
@@ -280,7 +285,7 @@ class ProgramController extends Controller
         $sheet->setTitle('Data LOP ' . Str::limit($programName, 25, ''));
 
         $headers = [
-            'PID', 'PID SAP', 'Nama Project', 'Program', 'Execution Type', 'Status Project',
+            'PID', 'PID SAP', 'Nama Project', 'Program', 'Execution Type', 'Status Progress',
             'Mitra', 'ID IHLD', 'Nama LOP', 'Branch', 'STO', 'Waspang', 'Teknisi',
         ];
 
@@ -294,7 +299,7 @@ class ProgramController extends Controller
                 $row->project_name ?? '-',
                 $row->program ?? '-',
                 $row->execution_type ?? '-',
-                $row->status_project ?? '-',
+                $row->status_progress ?? '-',
                 $row->mitra_name ?? '-',
                 $row->id_ihld ?? '-',
                 $row->lop_name ?? '-',

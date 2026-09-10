@@ -151,10 +151,9 @@
                         <select name="status" onchange="document.getElementById('filterForm').submit()"
                                 class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition">
                             <option value="">Semua Status</option>
-                            <option value="preparation" {{ request('status') == 'preparation' ? 'selected' : '' }}>Prepare</option>
-                            <option value="instalasi" {{ request('status') == 'instalasi' ? 'selected' : '' }}>On Progress</option>
-                            <option value="finishing" {{ request('status') == 'finishing' ? 'selected' : '' }}>Finish</option>
-                            <option value="drop" {{ request('status') == 'drop' ? 'selected' : '' }}>Drop</option>
+                            @foreach($statusOptions as $statusCode => $statusLabel)
+                                <option value="{{ $statusCode }}" @selected(request('status') === $statusCode)>{{ $statusLabel }}</option>
+                            @endforeach
                         </select>
                     </div>
 

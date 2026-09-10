@@ -2,19 +2,32 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Project;
-use App\Models\ProjectAssignment;
-use App\Models\Notification;
+use App\Models\BoqItem;
+use App\Models\Designator;
 use App\Models\Evidence;
 use App\Models\EvidenceRevisionHistory;
+use App\Models\KendalaCategory;
 use App\Models\Lop;
+use App\Models\LopKronologi;
+use App\Models\LopMeasurementCheck;
+use App\Models\Notification;
+use App\Models\PermitCategory;
+use App\Models\Project;
+use App\Models\ProjectActivityLog;
+use App\Models\ProjectAssignment;
+use App\Models\ProjectIssue;
+use App\Models\SiteSurvey;
 use App\Models\User;
 use App\Services\ProjectActivityService;
-use App\Models\ProjectIssue;
+use App\Services\SurveyPreparationService;
+use App\Services\TelegramWebhookEventService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-
+use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 class WaspangController extends Controller
 {
@@ -25,7 +38,7 @@ class WaspangController extends Controller
         $assignedProjectIds = ProjectAssignment::where('waspang_id', $userId)
             ->pluck('project_id');
 
-        $projects = Project::with(['boqItems.designatorData', 'evidences'])
+        $projects = Project::with(['boqItems.designatorData', 'evidences', 'lop.stage'])
             ->whereIn('id_project', $assignedProjectIds)
             ->latest()
             ->get();
@@ -37,7 +50,7 @@ class WaspangController extends Controller
         });
 
         $ongoingProjects = $projects->filter(function ($project) {
-            return !$this->isProjectReadyUt($project);
+            return ! $this->isProjectReadyUt($project);
         });
 
         $activeProjectsCount = $ongoingProjects->count();
@@ -52,7 +65,7 @@ class WaspangController extends Controller
 
         $latestProjects = $ongoingProjects->take(3);
 
-       $preparation = 0;
+        $preparation = 0;
         $installation = 0;
         $finish = 0;
 
@@ -107,7 +120,6 @@ class WaspangController extends Controller
                 $preparation++;
             }
         }
-        
 
         return view('waspang.dashboard', [
             'projects' => $projects,
@@ -124,24 +136,23 @@ class WaspangController extends Controller
         ]);
     }
 
-
-    //WASPANG MOBILE
+    // WASPANG MOBILE
     public function show($id)
     {
         return redirect()->route('waspang.projects.persiapan', $id);
     }
 
-    //AKSI CEPAT WASPANG MOBILE
+    // AKSI CEPAT WASPANG MOBILE
     public function inbox()
     {
         $search = request('search');
 
         $projects = Project::with([
-                'lop',
-                'evidences',
-                'boqItems',
-                'issues',
-            ])
+            'lop.stage',
+            'evidences',
+            'boqItems',
+            'issues',
+        ])
             ->whereHas('assignments', function ($q) {
                 $q->where('waspang_id', auth()->user()->id_user);
             })
@@ -158,7 +169,7 @@ class WaspangController extends Controller
             ->latest('updated_at')
             ->get()
             ->filter(function ($project) {
-                return !$this->isProjectReadyUt($project);
+                return ! $this->isProjectReadyUt($project);
             });
 
         return view('waspang.inbox', compact('projects', 'search'));
@@ -171,23 +182,24 @@ class WaspangController extends Controller
         $projects = Project::with([
             'evidences',
             'boqItems',
+            'lop.stage',
         ])
-        ->whereHas('assignments', function ($q) {
-            $q->where('waspang_id', auth()->user()->id_user);
-        })
-        ->when($search, function ($query) use ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('project_name', 'like', "%{$search}%")
-                ->orWhere('sto', 'like', "%{$search}%")
-                ->orWhere('branch', 'like', "%{$search}%")
-                ->orWhere('mitra_name', 'like', "%{$search}%");
+            ->whereHas('assignments', function ($q) {
+                $q->where('waspang_id', auth()->user()->id_user);
+            })
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('project_name', 'like', "%{$search}%")
+                        ->orWhere('sto', 'like', "%{$search}%")
+                        ->orWhere('branch', 'like', "%{$search}%")
+                        ->orWhere('mitra_name', 'like', "%{$search}%");
+                });
+            })
+            ->latest('updated_at')
+            ->get()
+            ->filter(function ($project) {
+                return $this->isProjectReadyUt($project);
             });
-        })
-        ->latest('updated_at')
-        ->get()
-        ->filter(function ($project) {
-            return $this->isProjectReadyUt($project);
-        });
 
         return view('waspang.ready-ut', compact('projects', 'search'));
     }
@@ -197,16 +209,27 @@ class WaspangController extends Controller
         $evidences = $project->evidences ?? collect();
         $boqItems = $project->boqItems ?? collect();
 
-        $persiapanDone =
-            $evidences->where('stage', 'persiapan')
-                ->where('evidence_type', 'barang_tiba')
-                ->where('status', 'approved')
-                ->count() > 0
-            &&
-            $evidences->where('stage', 'persiapan')
-                ->where('evidence_type', 'perizinan')
-                ->where('status', 'approved')
-                ->count() > 0;
+        // Flow baru (Inisiasi/Survey/Perizinan/Material
+        // Delivery) tidak lagi menulis eviden stage='persiapan' -- lihat
+        // catatan sequence-based di Project::progressSummary(). Tanpa fallback
+        // ini, LOP flow baru TIDAK PERNAH dianggap persiapanDone sehingga
+        // TIDAK PERNAH masuk daftar Ready UT walau sudah benar2 selesai.
+        $seq = $project->lop?->stage?->sequence;
+
+        if ($seq !== null && $seq > 6) {
+            $persiapanDone = true;
+        } else {
+            $persiapanDone =
+                $evidences->where('stage', 'persiapan')
+                    ->where('evidence_type', 'barang_tiba')
+                    ->where('status', 'approved')
+                    ->count() > 0
+                &&
+                $evidences->where('stage', 'persiapan')
+                    ->where('evidence_type', 'perizinan')
+                    ->where('status', 'approved')
+                    ->count() > 0;
+        }
 
         // HANYA MATERIAL -- lihat catatan di dashboard() soal kenapa dicek
         // dua-duanya (prefix "M-" ATAU type master designator = 'material').
@@ -251,118 +274,203 @@ class WaspangController extends Controller
 
         return $persiapanDone &&
             $instalasiDone &&
-            //$pengukuranDone &&
+            // $pengukuranDone &&
             $finishingDone;
     }
 
-    //WASPANG STAGE PERSIAPAN, INSTALASI, PENGUKURAN, FINISHING
+    // WASPANG STAGE PERSIAPAN, INSTALASI, PENGUKURAN, FINISHING
+    /**
+     * Persiapan terdiri dari Inisiasi, Survey, Perizinan, dan Material
+     * Delivery. Kode DRM lama hanya diperlakukan sebagai alias Perizinan agar
+     * LOP historis tetap dapat melanjutkan proses tanpa kehilangan data.
+     */
     public function persiapan($id)
     {
-        $userId = auth()->user()->id_user;
+        $project = $this->getAssignedProject($id);
+        $lop = $this->getSingleSurveyLop($project);
+        $project->setRelation('lop', $lop);
 
-        $isAssigned = ProjectAssignment::where('project_id', $id)
-            ->where('waspang_id', $userId)
-            ->exists();
+        $summary = $project->progressSummary();
+        $seq = $summary['effectiveStageSequence'];
+        $stageCode = $summary['effectiveStageCode'];
 
-        abort_if(!$isAssigned, 403);
-
-        $project = Project::with(['boqItems', 'evidences'])
-            ->findOrFail($id);
-
-        $barangTibaApproved = Evidence::where('project_id', $id)
-            ->where('stage', 'persiapan')
-            ->where('evidence_type', 'barang_tiba')
-            ->where('status', 'approved')
-            ->exists();
-
-        $perizinanApproved = Evidence::where('project_id', $id)
-            ->where('stage', 'persiapan')
-            ->where('evidence_type', 'perizinan')
-            ->where('status', 'approved')
-            ->exists();
-
-        $persiapanComplete = $barangTibaApproved && $perizinanApproved;
-
-        $boqTotal = $project->boqItems->count();
-
-        $boqUploaded = Evidence::where('project_id', $id)
-            ->where('stage', 'instalasi')
-            ->where('evidence_type', 'progress_boq')
-            ->whereNotNull('boq_item_id')
-            ->distinct('boq_item_id')
-            ->count('boq_item_id');
-
-        $boqApproved = Evidence::where('project_id', $id)
-            ->where('stage', 'instalasi')
-            ->where('evidence_type', 'progress_boq')
-            ->where('status', 'approved')
-            ->whereNotNull('boq_item_id')
-            ->distinct('boq_item_id')
-            ->count('boq_item_id');
-
-        $instalasiComplete = $boqTotal > 0 && $boqApproved >= $boqTotal;
-
-        $opmApproved = Evidence::where('project_id', $id)
-            ->where('stage', 'pengukuran')
-            ->where('evidence_type', 'opm')
-            ->where('status', 'approved')
-            ->exists();
-
-        $otdrApproved = Evidence::where('project_id', $id)
-            ->where('stage', 'pengukuran')
-            ->where('evidence_type', 'otdr')
-            ->where('status', 'approved')
-            ->exists();
-
-        $pengukuranComplete = $opmApproved && $otdrApproved;
-
-        $finishingComplete = Evidence::where('project_id', $id)
-            ->where('stage', 'finishing')
-            ->where('status', 'approved')
-            ->exists();
-
-        if (!$persiapanComplete) {
-            $currentStage = 'persiapan';
-        } elseif (!$instalasiComplete) {
-            $currentStage = 'instalasi';
-        } elseif (!$pengukuranComplete) {
-            $currentStage = 'pengukuran';
-        } elseif (!$finishingComplete) {
-            $currentStage = 'finishing';
-        } else {
-            $currentStage = 'selesai';
+        // Kompatibilitas data sebelum DRM dihapus dari alur aktif. Jangan
+        // mengubah data pada GET; LOP lama akan dinormalisasi saat aksi
+        // Perizinan selesai dijalankan.
+        if ($stageCode === 'drm') {
+            $stageCode = 'perizinan';
+            $seq = 4;
+            $summary['effectiveStageCode'] = 'perizinan';
+            $summary['effectiveStageSequence'] = 4;
+            $summary['effectiveStageLabel'] = 'Perizinan';
+            $summary['effectiveStageColor'] = 'amber';
+            $summary['effectivePhaseGroup'] = 'persiapan';
+            $summary['progress'] = 30;
         }
 
-        $barangTibaHistories = EvidenceRevisionHistory::where('project_id', $project->id_project)
-            ->where('stage', 'persiapan')
-            ->where('evidence_type', 'barang_tiba')
-            ->latest()
-            ->get();
+        // Status "done"/"active" mengikuti status_progress LOP sebagai
+        // sumber tunggal alur kerja.
+        $step = [
+            'inisiasi' => [
+                'done' => $seq !== null && $seq > 1,
+                'active' => $stageCode === 'inisiasi',
+            ],
+            'survey' => [
+                'done' => $seq !== null && $seq > 2,
+                'active' => $stageCode === 'survey',
+            ],
+            'perizinan' => [
+                'done' => $seq !== null && $seq > 4,
+                'active' => $stageCode === 'perizinan',
+            ],
+            'material_delivery' => [
+                'done' => $seq !== null && $seq > 5,
+                'active' => $stageCode === 'material_delivery',
+            ],
+        ];
 
-        $perizinanHistories = EvidenceRevisionHistory::where('project_id', $project->id_project)
-            ->where('stage', 'persiapan')
-            ->where('evidence_type', 'perizinan')
-            ->latest()
-            ->get();
+        $evidences = $project->evidences ?? collect();
+
+        $perizinanEvidences = $evidences->where('stage', 'perizinan')
+            ->where('evidence_type', '!=', 'ba_kp')
+            ->sortByDesc('created_at')->values();
+        $baKpEvidences = $evidences->where('stage', 'perizinan')
+            ->where('evidence_type', 'ba_kp')
+            ->sortByDesc('created_at')->values();
+        $materialDeliveryEvidences = $evidences->where('stage', 'material_delivery')
+            ->sortByDesc('created_at')->values();
+
+        $boqItems = ($project->boqItems ?? collect())
+            ->where('lop_id', $lop->id_lop)
+            ->sortByDesc('id_boq')
+            ->values();
+        $surveyPreparation = app(SurveyPreparationService::class);
+        $surveyBoqGroups = $surveyPreparation->groupBoqItems($boqItems);
+
+        $surveyMapVersions = $this->surveyMapVersions($project);
+        $currentSurveyMap = $surveyMapVersions->last();
+        $surveyMapConfirmed = $currentSurveyMap
+            ? $this->isSurveyMapConfirmed($project, $lop, $currentSurveyMap['key'])
+            : false;
+
+        $surveyDraft = ProjectActivityLog::query()
+            ->where('project_id', $project->id_project)
+            ->where('lop_id', $lop->id_lop)
+            ->where('activity_type', 'survey_boq_draft_saved')
+            ->latest('id_project_activity')
+            ->first();
+        $surveyDraftVolumes = collect($surveyDraft?->meta['volumes'] ?? []);
+
+        // Daftar master designator utk picker TomSelect "+ Tambah Item BOQ"
+        // (Mode Survey manual) -- ikut pola PT2 (App\Http\Controllers\
+        // TeknisiPt2Controller::step1()) tapi pakai TomSelect (sudah dipakai
+        // di admin/projects, lihat layouts/waspang.blade.php) drpd filter-list
+        // custom, supaya tidak reinvent & tetap 1 keluarga UX dgn admin.
+        $designators = Designator::forCustomer($project->customer_id)
+            ->orderBy('designator')
+            ->get(['id_designator', 'customer_id', 'designator', 'item_name', 'unit', 'type', 'pair_code']);
+        $additionalDesignatorOptions = $surveyPreparation->groupDesignatorOptions($designators, $surveyBoqGroups);
+
+        $kronologis = $lop->kronologis()->with('creator')->get();
+
+        $permitCategories = PermitCategory::active()->get();
+        $kendalaCategories = KendalaCategory::active()->get();
 
         return view('waspang.show', compact(
             'project',
-            'barangTibaApproved',
-            'perizinanApproved',
-            'persiapanComplete',
-            'boqTotal',
-            'boqUploaded',
-            'boqApproved',
-            'instalasiComplete',
-            'opmApproved',
-            'otdrApproved',
-            'pengukuranComplete',
-            'finishingComplete',
-            'currentStage',
-            'barangTibaHistories',
-            'perizinanHistories'
+            'lop',
+            'summary',
+            'seq',
+            'stageCode',
+            'step',
+            'perizinanEvidences',
+            'baKpEvidences',
+            'materialDeliveryEvidences',
+            'boqItems',
+            'designators',
+            'surveyBoqGroups',
+            'surveyMapVersions',
+            'currentSurveyMap',
+            'surveyMapConfirmed',
+            'surveyDraftVolumes',
+            'additionalDesignatorOptions',
+            'kronologis',
+            'permitCategories',
+            'kendalaCategories'
         ));
-    
+    }
+
+    /**
+     * STEP 2 -- Persiapan Instalasi (revisi stepper: sebelumnya sequence 6
+     * ini murni pass-through, sekarang jadi HALAMAN SENDIRI dgn 2 kartu
+     * eviden -- Barang Tiba & Perizinan -- persis pola Step 1 Persiapan
+     * SEBELUM refactor 5 sub-step (Stage 4d). Sengaja REUSE stage='persiapan'
+     * evidence_type='barang_tiba'/'perizinan' (bukan kode baru) supaya:
+     * 1. Fallback evidence-based `persiapanDone` di Project::progressSummary()
+     *    (sequence<=6 -> cek 2 boolean ini) otomatis tetap akurat tanpa ubah.
+     * 2. UI approval admin yg SUDAH ADA (cek stage='persiapan') otomatis
+     *    berfungsi utk step ini juga, tidak perlu bikin approval flow baru.
+     */
+    public function persiapanInstalasi($id)
+    {
+        $project = $this->getAssignedProject($id);
+        $lop = $project->lop;
+
+        abort_if(! $lop, 404, 'LOP belum tersedia untuk project ini.');
+
+        // Gate: cuma bisa diakses kalau Step 1 (5 sub-step Persiapan) sudah
+        // tuntas (sequence > 5 = sudah di persiapan_instalasi atau lebih).
+        $seq = $lop->stage?->sequence;
+        abort_if($seq !== null && $seq < 6, 403, 'Selesaikan Step 1 Persiapan terlebih dahulu.');
+
+        $evidences = $project->evidences ?? collect();
+
+        $barangTibaPhotos = $evidences->where('stage', 'persiapan')->where('evidence_type', 'barang_tiba')->sortByDesc('created_at')->values();
+        $barangTibaUploaded = $barangTibaPhotos->count() > 0;
+        $barangTibaStatus = null;
+        if ($barangTibaUploaded) {
+            if ($barangTibaPhotos->where('status', 'rejected')->count() > 0) {
+                $barangTibaStatus = 'rejected';
+            } elseif ($barangTibaPhotos->where('status', 'pending')->count() > 0) {
+                $barangTibaStatus = 'pending';
+            } else {
+                $barangTibaStatus = 'approved';
+            }
+        }
+
+        $perizinanPhotos = $evidences->where('stage', 'persiapan')->where('evidence_type', 'perizinan')->sortByDesc('created_at')->values();
+        $perizinanUploaded = $perizinanPhotos->count() > 0;
+        $perizinanStatus = null;
+        if ($perizinanUploaded) {
+            if ($perizinanPhotos->where('status', 'rejected')->count() > 0) {
+                $perizinanStatus = 'rejected';
+            } elseif ($perizinanPhotos->where('status', 'pending')->count() > 0) {
+                $perizinanStatus = 'pending';
+            } else {
+                $perizinanStatus = 'approved';
+            }
+        }
+
+        $persiapanInstalasiUploadedComplete = $barangTibaUploaded && $perizinanUploaded;
+
+        // Kendala & Kronologi universal (sama pola dgn persiapan()) -- Step 2
+        // ini juga wajib punya tombol Lapor Kendala/Update Kronologi.
+        $kronologis = $lop->kronologis()->with('creator')->get();
+        $kendalaCategories = KendalaCategory::active()->get();
+
+        return view('waspang.steps.persiapan-instalasi', compact(
+            'project',
+            'lop',
+            'barangTibaPhotos',
+            'barangTibaUploaded',
+            'barangTibaStatus',
+            'perizinanPhotos',
+            'perizinanUploaded',
+            'perizinanStatus',
+            'persiapanInstalasiUploadedComplete',
+            'kronologis',
+            'kendalaCategories'
+        ));
     }
 
     public function instalasi($id)
@@ -381,7 +489,7 @@ class WaspangController extends Controller
 
         $persiapanComplete = $this->isPersiapanUploaded($id);
 
-        abort_if(!$persiapanComplete, 403);
+        abort_if(! $persiapanComplete, 403);
 
         $boqTotal = $materialBoqItems->count();
         $boqUploaded = 0;
@@ -404,7 +512,7 @@ class WaspangController extends Controller
 
         $revisionHistories = [];
         foreach ($materialBoqItems as $boq) {
-            $revisionHistories[$boq->id_boq] = \App\Models\EvidenceRevisionHistory::where('project_id', $project->id_project)
+            $revisionHistories[$boq->id_boq] = EvidenceRevisionHistory::where('project_id', $project->id_project)
                 ->where('stage', 'instalasi')
                 ->where('evidence_type', 'progress_boq')
                 ->whereHas('evidence', function ($q) use ($boq) {
@@ -427,12 +535,24 @@ class WaspangController extends Controller
         $project = Project::with([
             'evidences',
             'boqItems',
+            'lop.stage',
         ])->findOrFail($id);
 
         $revisionHistories = [
             'otdr' => EvidenceRevisionHistory::where('project_id', $project->id_project)
                 ->where('stage', 'pengukuran')
                 ->where('evidence_type', 'otdr')
+                ->latest()
+                ->get(),
+
+            // File SOR & Eviden Lainnya sekarang dicek dgn evidence_type
+            // KANONIK (file_sor/eviden_lainnya, samakan dgn
+            // LopMeasurementCheck::ITEMS) TAPI eviden lama sebelum Stage 4
+            // masih tersimpan dgn nama lama (otdr_sor/lainnya) -- gabungkan
+            // riwayatnya (whereIn) supaya histori revisi lama tidak hilang.
+            'file_sor' => EvidenceRevisionHistory::where('project_id', $project->id_project)
+                ->where('stage', 'pengukuran')
+                ->whereIn('evidence_type', ['file_sor', 'otdr_sor'])
                 ->latest()
                 ->get(),
 
@@ -447,12 +567,880 @@ class WaspangController extends Controller
                 ->where('evidence_type', 'kedalaman')
                 ->latest()
                 ->get(),
+
+            'eviden_lainnya' => EvidenceRevisionHistory::where('project_id', $project->id_project)
+                ->where('stage', 'pengukuran')
+                ->whereIn('evidence_type', ['eviden_lainnya', 'lainnya'])
+                ->latest()
+                ->get(),
         ];
+
+        // Stage 4: gate nyata pengukuran (lihat Project::progressSummary())
+        // -- ambil baris lop_measurement_checks yang SUDAH ADA per item
+        // (tidak auto-create di sini, murni baca; baris baru hanya dibuat
+        // saat waspang menandai "Tidak Ada" atau saat admin approve eviden,
+        // lihat toggleMeasurementCheck() & ProjectController::approveEvidence()).
+        $measurementChecks = $project->lop
+            ? LopMeasurementCheck::where('lop_id', $project->lop->id_lop)->get()->keyBy('item_key')
+            : collect();
 
         return view('waspang.steps.pengukuran', compact(
             'project',
-            'revisionHistories'
-            ));
+            'revisionHistories',
+            'measurementChecks'
+        ));
+    }
+
+    /**
+     * Toggle "Tidak Ada" (N/A) untuk 1 item pengukuran (Stage 4 -- gate
+     * nyata lop_measurement_checks, lihat Project::progressSummary()).
+     * Hanya boleh ditandai N/A kalau item tsb BELUM ada eviden sama sekali
+     * (apapun statusnya) -- kalau sudah ada foto/file, waspang harus hapus
+     * dulu (atau eviden itu nanti di-approve admin & otomatis mengisi
+     * evidence_id lewat ProjectController::approveEvidence()).
+     */
+    public function toggleMeasurementCheck(Request $request, $project, $itemKey)
+    {
+        $project = $this->getAssignedProject($project);
+
+        abort_unless(in_array($itemKey, LopMeasurementCheck::ITEMS, true), 404);
+
+        $request->validate([
+            'is_not_applicable' => 'required|boolean',
+            'note' => 'nullable|string|max:500',
+        ]);
+
+        $lop = Lop::where('project_id', $project->id_project)->first();
+
+        abort_if(! $lop, 404, 'LOP belum tersedia untuk project ini.');
+
+        $wantsNotApplicable = $request->boolean('is_not_applicable');
+
+        if ($wantsNotApplicable) {
+            // Alias nama lama -> nama kanonik, lihat catatan di pengukuran().
+            $legacyAliases = [
+                'file_sor' => ['file_sor', 'otdr_sor'],
+                'eviden_lainnya' => ['eviden_lainnya', 'lainnya'],
+            ];
+            $typesToCheck = $legacyAliases[$itemKey] ?? [$itemKey];
+
+            $hasAnyEvidence = Evidence::where('project_id', $project->id_project)
+                ->where('stage', 'pengukuran')
+                ->whereIn('evidence_type', $typesToCheck)
+                ->exists();
+
+            if ($hasAnyEvidence) {
+                return back()->with('error', 'Item ini sudah punya eviden terupload. Hapus dulu eviden yang ada sebelum menandai "Tidak Ada".');
+            }
+        }
+
+        $check = LopMeasurementCheck::firstOrNew([
+            'lop_id' => $lop->id_lop,
+            'item_key' => $itemKey,
+        ]);
+
+        $check->is_not_applicable = $wantsNotApplicable;
+        $check->note = $wantsNotApplicable ? $request->note : null;
+        $check->checked_by = auth()->user()->id_user;
+        $check->save();
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'toggle_measurement_na',
+            'title' => $wantsNotApplicable ? 'Item Pengukuran Ditandai Tidak Ada' : 'Batal Tandai Tidak Ada',
+            'description' => 'Waspang menandai item pengukuran "'.(LopMeasurementCheck::LABELS[$itemKey] ?? $itemKey).'" sebagai '.($wantsNotApplicable ? 'Tidak Ada (N/A)' : 'berlaku kembali').'.',
+            'stage' => 'pengukuran',
+            'meta' => [
+                'item_key' => $itemKey,
+                'is_not_applicable' => $wantsNotApplicable,
+                'note' => $check->note,
+            ],
+        ]);
+
+        return back()->with('success', $wantsNotApplicable ? 'Item ditandai Tidak Ada.' : 'Penanda Tidak Ada dibatalkan.');
+    }
+
+    // ==================================================================
+    // STAGE 4d -- SUB-STEP PERSIAPAN BARU (Survey/Perizinan/Material
+    // Delivery). Lihat ANALISA_REFACTOR_PERSIAPAN.md bag. Q.2 utk spec asal.
+    // ==================================================================
+
+    /**
+     * Sub-step Survey (Mode Input Manual): tambah 1 item BOQ dgn memilih
+     * designator (TomSelect, lihat resources/views/waspang/show.blade.php)
+     * + qty manual. Upsert per lop_id+designator_id -- kalau item yg sama
+     * sudah pernah ditambah, qty-nya DITAMBAHKAN (bukan ditimpa), supaya
+     * waspang bisa nambah bertahap tanpa harus tahu qty sebelumnya.
+     */
+    public function storeBoqItemManual(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $project->lop;
+
+        abort_if(! $lop, 404, 'LOP belum tersedia untuk project ini.');
+
+        $request->validate([
+            'designator_id' => 'required|exists:designators,id_designator',
+            'quantity_plan' => 'required|numeric|min:0.01',
+        ]);
+
+        $designator = Designator::findOrFail($request->designator_id);
+
+        $existing = BoqItem::where('lop_id', $lop->id_lop)
+            ->where('designator_id', $designator->id_designator)
+            ->first();
+
+        if ($existing) {
+            $existing->quantity_plan = (float) $existing->quantity_plan + (float) $request->quantity_plan;
+            $existing->save();
+            $boq = $existing;
+            $actionLabel = 'ditambah qty (item sudah ada)';
+        } else {
+            $boq = BoqItem::create([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'designator_id' => $designator->id_designator,
+                'designator' => $designator->designator,
+                'item_name' => $designator->item_name,
+                'unit' => $designator->unit,
+                'quantity_plan' => $request->quantity_plan,
+                'quantity_actual' => 0,
+            ]);
+            $actionLabel = 'ditambah baru';
+        }
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'survey_boq_add',
+            'title' => 'Tambah Item BOQ (Survey)',
+            'description' => "Waspang menambahkan item BOQ survey: {$designator->designator} - {$designator->item_name} ({$actionLabel}), qty {$request->quantity_plan} {$designator->unit}.",
+            'stage' => 'survey',
+            'meta' => [
+                'boq_item_id' => $boq->id_boq,
+                'designator_id' => $designator->id_designator,
+                'quantity_plan' => $request->quantity_plan,
+            ],
+        ]);
+
+        return back()->with('success', 'Item BOQ berhasil ditambahkan.');
+    }
+
+    /**
+     * Hapus 1 item BOQ hasil Survey -- hanya boleh selama belum ada eviden
+     * instalasi yg menempel ke item tsb (supaya tidak menghapus riwayat
+     * progress yg sudah berjalan).
+     */
+    public function deleteBoqItemSurvey($project, $boq)
+    {
+        $project = $this->getAssignedProject($project);
+
+        $boqItem = BoqItem::where('id_boq', $boq)
+            ->where('project_id', $project->id_project)
+            ->firstOrFail();
+
+        $hasEvidence = Evidence::where('boq_item_id', $boqItem->id_boq)->exists();
+
+        if ($hasEvidence) {
+            return back()->with('error', 'Item ini sudah punya eviden instalasi terkait, tidak bisa dihapus.');
+        }
+
+        $lopId = $boqItem->lop_id;
+        $label = $boqItem->designator.' - '.$boqItem->item_name;
+        $boqItem->delete();
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lopId,
+            'activity_type' => 'survey_boq_delete',
+            'title' => 'Hapus Item BOQ (Survey)',
+            'description' => "Waspang menghapus item BOQ survey: {$label}.",
+            'stage' => 'survey',
+        ]);
+
+        return back()->with('success', 'Item BOQ berhasil dihapus.');
+    }
+
+    /**
+     * Template Excel flat (2 kolom) khusus Survey waspang -- BEDA dari
+     * template Bulk Import BOQ admin (ImportController::downloadBoqTemplate,
+     * matriks 1 kolom per LOP) yg tidak cocok utk konteks 1 project/waspang.
+     */
+    public function downloadBoqTemplateWaspang()
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Template BOQ Survey');
+
+        $sheet->setCellValue('A1', 'Kode Designator');
+        $sheet->setCellValue('B1', 'Quantity Plan');
+        $sheet->getStyle('A1:B1')->getFont()->setBold(true);
+
+        $sheet->setCellValue('A2', 'M-CONTOH-001');
+        $sheet->setCellValue('B2', 10);
+
+        $sheet->getColumnDimension('A')->setWidth(32);
+        $sheet->getColumnDimension('B')->setWidth(16);
+
+        $filename = 'template_boq_survey_waspang.xlsx';
+        $tmpDir = storage_path('app/tmp');
+
+        if (! is_dir($tmpDir)) {
+            mkdir($tmpDir, 0775, true);
+        }
+
+        $path = $tmpDir.'/'.uniqid().'_'.$filename;
+
+        $writer = IOFactory::createWriter($spreadsheet, 'Xlsx');
+        $writer->save($path);
+
+        return response()->download($path, $filename)->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Import massal item BOQ Survey dari file Excel (template flat 2 kolom
+     * di atas) -- upsert per lop_id+designator_id (sama seperti input
+     * manual), designator dicocokkan dari master `designators` via kode
+     * persis (kolom A). Baris dgn kode designator yg tidak ditemukan di
+     * master dilewati & dilaporkan balik ke waspang.
+     */
+    public function importBoqExcelWaspang(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $project->lop;
+
+        abort_if(! $lop, 404, 'LOP belum tersedia untuk project ini.');
+
+        $request->validate([
+            'boq_file' => 'required|file|mimes:xlsx,xls|max:5120',
+        ]);
+
+        $spreadsheet = IOFactory::load($request->file('boq_file')->getRealPath());
+        $sheet = $spreadsheet->getActiveSheet();
+        $rows = $sheet->toArray(null, true, true, true);
+
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+        $skippedLabels = [];
+
+        foreach ($rows as $rowIndex => $row) {
+            if ($rowIndex == 1) {
+                continue; // baris header
+            }
+
+            $designatorCode = trim((string) ($row['A'] ?? ''));
+            $qty = $row['B'] ?? null;
+
+            if ($designatorCode === '' || $qty === null || $qty === '') {
+                continue;
+            }
+
+            $designator = Designator::where('designator', $designatorCode)->first();
+
+            if (! $designator) {
+                $skipped++;
+                $skippedLabels[] = $designatorCode;
+
+                continue;
+            }
+
+            $existing = BoqItem::where('lop_id', $lop->id_lop)
+                ->where('designator_id', $designator->id_designator)
+                ->first();
+
+            if ($existing) {
+                $existing->quantity_plan = (float) $qty;
+                $existing->save();
+                $updated++;
+            } else {
+                BoqItem::create([
+                    'project_id' => $project->id_project,
+                    'lop_id' => $lop->id_lop,
+                    'designator_id' => $designator->id_designator,
+                    'designator' => $designator->designator,
+                    'item_name' => $designator->item_name,
+                    'unit' => $designator->unit,
+                    'quantity_plan' => $qty,
+                    'quantity_actual' => 0,
+                ]);
+                $created++;
+            }
+        }
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'survey_boq_import',
+            'title' => 'Import Excel BOQ (Survey)',
+            'description' => "Waspang import BOQ via Excel: {$created} baru, {$updated} diperbarui, {$skipped} dilewati (kode designator tidak ditemukan).",
+            'stage' => 'survey',
+            'meta' => [
+                'created' => $created,
+                'updated' => $updated,
+                'skipped' => $skipped,
+                'skipped_labels' => $skippedLabels,
+            ],
+        ]);
+
+        if ($skipped > 0) {
+            $preview = implode(', ', array_slice($skippedLabels, 0, 5)).(count($skippedLabels) > 5 ? ', ...' : '');
+
+            return back()->with('error', "Import selesai: {$created} baru, {$updated} diperbarui. {$skipped} baris dilewati -- kode designator tidak ditemukan di master ({$preview}).");
+        }
+
+        return back()->with('success', "Import BOQ berhasil: {$created} item baru, {$updated} item diperbarui.");
+    }
+
+    /**
+     * Buat/lanjutkan draft redesign dari accordion Persiapan > Survey.
+     * Nama survey selalu mengikuti LOP, bukan input bebas pengguna.
+     */
+    public function startSurveyRedesign($project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $this->getSingleSurveyLop($project);
+
+        if ($lop->status_progress !== 'survey') {
+            return back()->with('error', 'Redesign hanya dapat dilakukan saat LOP berada di tahap Survey.');
+        }
+
+        if ($this->surveyMapVersions($project)->isEmpty()) {
+            return back()->with('error', 'KML desain awal dari Admin belum tersedia.');
+        }
+
+        $survey = SiteSurvey::query()
+            ->where('project_id', $project->id_project)
+            ->where('surveyor_id', auth()->user()->id_user)
+            ->where('status', 'draft')
+            ->latest('id_site_surveys')
+            ->first();
+
+        if (! $survey) {
+            $survey = SiteSurvey::create([
+                'project_id' => $project->id_project,
+                'project_name' => $lop->lop_name,
+                'title' => $lop->lop_name,
+                'surveyor_id' => auth()->user()->id_user,
+                'status' => 'draft',
+                'notes' => 'Redesign dari sub-step Persiapan > Survey.',
+            ]);
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'survey_redesign_started',
+                'title' => 'Redesign Survey Dimulai',
+                'description' => 'Waspang memulai redesign peta untuk LOP '.$lop->lop_name.'.',
+                'stage' => 'survey',
+                'meta' => ['site_survey_id' => $survey->id],
+            ]);
+        }
+
+        return redirect()->route('surveyor.show', $survey->id);
+    }
+
+    /** Simpan keputusan "Sesuai" untuk versi peta yang sedang aktif. */
+    public function confirmSurveyMap($project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $this->getSingleSurveyLop($project);
+
+        if ($lop->status_progress !== 'survey') {
+            return back()->with('error', 'LOP sudah tidak berada di tahap Survey.');
+        }
+
+        $currentMap = $this->surveyMapVersions($project)->last();
+
+        if (! $currentMap) {
+            return back()->with('error', 'Belum ada peta yang dapat dikonfirmasi.');
+        }
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'survey_map_confirmed',
+            'title' => 'Desain Survey Dinyatakan Sesuai',
+            'description' => 'Waspang menyatakan desain peta aktif sudah sesuai.',
+            'stage' => 'survey',
+            'meta' => [
+                'map_key' => $currentMap['key'],
+                'map_label' => $currentMap['label'],
+            ],
+        ]);
+
+        return back()->with('success', 'Desain peta dikonfirmasi sesuai. Silakan finalisasi volume Survey.');
+    }
+
+    /** Tambah pasangan designator baru dengan Volume Plan kosong. */
+    public function addSurveyBoqItem(Request $request, $project, SurveyPreparationService $surveyPreparation)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $this->getSingleSurveyLop($project);
+
+        if ($lop->status_progress !== 'survey') {
+            return back()->with('error', 'BOQ Survey hanya dapat diubah pada tahap Survey.');
+        }
+
+        if (! $this->currentSurveyMapIsConfirmed($project, $lop)) {
+            return back()->with('error', 'Konfirmasi desain peta dengan tombol Sesuai terlebih dahulu.');
+        }
+
+        $validated = $request->validate([
+            'designator_id' => 'required|integer|exists:designators,id_designator',
+            'volume_survey' => 'required|integer|min:0',
+        ]);
+
+        $selected = Designator::forCustomer($project->customer_id)
+            ->where('id_designator', $validated['designator_id'])
+            ->firstOrFail();
+        $matchingDesignators = $surveyPreparation->matchingDesignators($selected);
+        $designatorIds = $matchingDesignators->pluck('id_designator');
+
+        $alreadyExists = BoqItem::query()
+            ->where('project_id', $project->id_project)
+            ->where('lop_id', $lop->id_lop)
+            ->whereIn('designator_id', $designatorIds)
+            ->exists();
+
+        if ($alreadyExists) {
+            return back()->with('error', 'Designator atau pasangannya sudah ada di BOQ Plan.');
+        }
+
+        DB::transaction(function () use ($matchingDesignators, $project, $lop, $validated): void {
+            foreach ($matchingDesignators as $designator) {
+                BoqItem::create([
+                    'project_id' => $project->id_project,
+                    'lop_id' => $lop->id_lop,
+                    'designator_id' => $designator->id_designator,
+                    'designator' => $designator->designator,
+                    'item_name' => $designator->item_name,
+                    'unit' => $designator->unit,
+                    'quantity_plan' => null,
+                    'quantity_actual' => $validated['volume_survey'],
+                ]);
+            }
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'survey_boq_additional_added',
+                'title' => 'Tambah Designator Survey',
+                'description' => 'Waspang menambahkan designator hasil Survey: '.$matchingDesignators->pluck('designator')->implode(' / ').'.',
+                'stage' => 'survey',
+                'meta' => [
+                    'designator_ids' => $matchingDesignators->pluck('id_designator')->values()->all(),
+                    'volume_survey' => (float) $validated['volume_survey'],
+                ],
+            ]);
+        });
+
+        return back()->with('success', 'Designator tambahan berhasil ditambahkan ke draf Survey.');
+    }
+
+    /** Hapus hanya item tambahan; item BOQ Plan dari Admin tetap terkunci. */
+    public function deleteSurveyBoqItem($project, $boq, SurveyPreparationService $surveyPreparation)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $this->getSingleSurveyLop($project);
+
+        if ($lop->status_progress !== 'survey') {
+            return back()->with('error', 'BOQ Survey hanya dapat diubah pada tahap Survey.');
+        }
+
+        $groups = $surveyPreparation->groupBoqItems(
+            BoqItem::with(['designatorData', 'designatorDataByCode'])->where('project_id', $project->id_project)->where('lop_id', $lop->id_lop)->get()
+        );
+        $group = $groups->first(fn (array $item) => in_array((int) $boq, $item['item_ids'], true));
+
+        if (! $group || ! $group['is_additional']) {
+            return back()->with('error', 'BOQ Plan dari Admin terkunci dan tidak dapat dihapus.');
+        }
+
+        if (Evidence::whereIn('boq_item_id', $group['item_ids'])->exists()) {
+            return back()->with('error', 'Designator sudah mempunyai eviden dan tidak dapat dihapus.');
+        }
+
+        DB::transaction(function () use ($project, $lop, $group): void {
+            BoqItem::query()
+                ->where('project_id', $project->id_project)
+                ->where('lop_id', $lop->id_lop)
+                ->whereIn('id_boq', $group['item_ids'])
+                ->delete();
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'survey_boq_additional_deleted',
+                'title' => 'Hapus Designator Tambahan Survey',
+                'description' => 'Waspang menghapus designator tambahan '.$group['designator'].'.',
+                'stage' => 'survey',
+                'meta' => ['item_ids' => $group['item_ids']],
+            ]);
+        });
+
+        return back()->with('success', 'Designator tambahan berhasil dihapus.');
+    }
+
+    /** Simpan volume sementara tanpa memindahkan tahapan. */
+    public function saveSurveyBoqDraft(Request $request, $project, SurveyPreparationService $surveyPreparation)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $this->getSingleSurveyLop($project);
+
+        if ($lop->status_progress !== 'survey') {
+            return back()->with('error', 'LOP sudah tidak berada di tahap Survey.');
+        }
+
+        if (! $this->currentSurveyMapIsConfirmed($project, $lop)) {
+            return back()->with('error', 'Konfirmasi desain peta dengan tombol Sesuai terlebih dahulu.');
+        }
+
+        $validated = $request->validate([
+            'volumes' => 'required|array|min:1',
+            'volumes.*' => 'nullable|integer|min:0',
+        ]);
+        $groups = $this->currentSurveyBoqGroups($project, $lop, $surveyPreparation);
+        $volumes = DB::transaction(function () use ($project, $lop, $groups, $validated): array {
+            $volumes = $this->persistSurveyVolumes($groups, $validated['volumes'], false);
+
+            if ($volumes === []) {
+                return [];
+            }
+
+            $previousVolumes = ProjectActivityLog::query()
+                ->where('project_id', $project->id_project)
+                ->where('lop_id', $lop->id_lop)
+                ->where('activity_type', 'survey_boq_draft_saved')
+                ->latest('id_project_activity')
+                ->value('meta');
+            $previousVolumes = is_string($previousVolumes) ? json_decode($previousVolumes, true) : $previousVolumes;
+            $previousVolumes = is_array($previousVolumes) ? $previousVolumes : [];
+            $allVolumes = array_replace($previousVolumes['volumes'] ?? [], $volumes);
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'survey_boq_draft_saved',
+                'title' => 'Draf Finalisasi Survey Disimpan',
+                'description' => 'Waspang menyimpan sementara volume hasil Survey.',
+                'stage' => 'survey',
+                'meta' => ['volumes' => $allVolumes],
+            ]);
+
+            return $volumes;
+        });
+
+        if ($volumes === []) {
+            return back()->with('error', 'Isi minimal satu Volume Survey sebelum menyimpan draf.');
+        }
+
+        return back()->with('success', 'Draf Volume Survey berhasil disimpan.');
+    }
+
+    /**
+     * Finalisasi Survey: seluruh volume wajib diisi, lalu status berpindah
+     * langsung ke Perizinan. BOQ Plan tidak pernah diubah; hanya
+     * quantity_actual yang disimpan.
+     */
+    public function finishSurvey(Request $request, $project, SurveyPreparationService $surveyPreparation)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $this->getSingleSurveyLop($project);
+
+        if ($lop->status_progress !== 'survey') {
+            return back()->with('error', 'LOP sudah tidak berada di tahap Survey.');
+        }
+
+        if (! $this->currentSurveyMapIsConfirmed($project, $lop)) {
+            return back()->with('error', 'Konfirmasi desain peta dengan tombol Sesuai terlebih dahulu.');
+        }
+
+        $validated = $request->validate([
+            'volumes' => 'required|array|min:1',
+            'volumes.*' => 'required|integer|min:0',
+        ]);
+        $groups = $this->currentSurveyBoqGroups($project, $lop, $surveyPreparation);
+
+        if ($groups->isEmpty()) {
+            return back()->with('error', 'BOQ Plan belum tersedia untuk LOP ini.');
+        }
+
+        DB::transaction(function () use ($project, $lop, $groups, $validated): void {
+            $volumes = $this->persistSurveyVolumes($groups, $validated['volumes'], true);
+            $lop->update(['status_progress' => 'perizinan']);
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'survey_finalized',
+                'title' => 'Survey Selesai',
+                'description' => 'Waspang memfinalisasi '.$groups->count().' baris BOQ Survey dan melanjutkan ke Perizinan.',
+                'status_before' => 'survey',
+                'status_after' => 'perizinan',
+                'stage' => 'survey',
+                'meta' => ['volumes' => $volumes],
+            ]);
+        });
+
+        return back()->with('success', 'Survey selesai. Lanjut ke Perizinan.');
+    }
+
+    /**
+     * Pilih kategori perizinan (master `permit_categories`) utk LOP ini.
+     */
+    public function updatePerizinanCategory(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $project->lop;
+
+        abort_if(! $lop, 404, 'LOP belum tersedia untuk project ini.');
+
+        $request->validate([
+            'permit_category_id' => 'required|exists:permit_categories,id',
+        ]);
+
+        $lop->update(['permit_category_id' => $request->permit_category_id]);
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'update_permit_category',
+            'title' => 'Update Kategori Perizinan',
+            'description' => 'Waspang memilih kategori perizinan: '.optional(PermitCategory::find($request->permit_category_id))->name,
+            'stage' => 'perizinan',
+        ]);
+
+        return back()->with('success', 'Kategori perizinan berhasil disimpan.');
+    }
+
+    /**
+     * Radio "Perizinan Selesai" -- syarat: minimal 1 kronologi perizinan
+     * sudah pernah diinput (setiap aktivitas perizinan wajib kronologi, sesuai
+     * spec user), lalu wajib upload BA KP (pdf) + minimal 1 eviden foto.
+     * Menandai lops.perizinan_completed_at & transisi status_progress:
+     * perizinan -> material_delivery.
+     */
+    public function togglePerizinanSelesai(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $project->lop;
+
+        abort_if(! $lop, 404, 'LOP belum tersedia untuk project ini.');
+
+        if (! in_array($lop->status_progress, ['drm', 'perizinan'], true)) {
+            return back()->with('error', 'LOP sudah tidak berada di tahap Perizinan.');
+        }
+
+        $statusBefore = $lop->status_progress;
+
+        $hasKronologi = LopKronologi::where('lop_id', $lop->id_lop)
+            ->where('stage_code', 'perizinan')
+            ->exists();
+
+        if (! $hasKronologi) {
+            return back()->with('error', 'Input minimal 1 kronologi perizinan sebelum menandai Perizinan Selesai.');
+        }
+
+        $request->validate([
+            'ba_kp_file' => 'required|file|mimes:pdf|max:10240',
+            'photos' => 'required|array|min:1',
+            'photos.*' => 'image|max:10240',
+        ]);
+
+        $projectFolder = $this->evidenceLopFolder($project->id_project);
+
+        $baKpFile = $request->file('ba_kp_file');
+        $baKpPath = $baKpFile->storeAs(
+            "evidences/{$projectFolder}/perizinan/ba_kp",
+            now()->format('Ymd_His').'_'.uniqid().'.pdf',
+            'public'
+        );
+
+        Evidence::create([
+            'project_id' => $project->id_project,
+            'uploaded_by' => auth()->user()->id_user,
+            'stage' => 'perizinan',
+            'evidence_type' => 'ba_kp',
+            'file_path' => $baKpPath,
+            'status' => 'pending',
+        ]);
+
+        foreach ($request->file('photos') as $photo) {
+            $path = $photo->storeAs(
+                "evidences/{$projectFolder}/perizinan/eviden_perizinan",
+                now()->format('Ymd_His').'_'.uniqid().'.jpg',
+                'public'
+            );
+
+            Evidence::create([
+                'project_id' => $project->id_project,
+                'uploaded_by' => auth()->user()->id_user,
+                'stage' => 'perizinan',
+                'evidence_type' => 'eviden_perizinan',
+                'file_path' => $path,
+                'status' => 'pending',
+            ]);
+        }
+
+        $lop->update([
+            'perizinan_completed_at' => now(),
+            'status_progress' => 'material_delivery',
+        ]);
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'stage_transition',
+            'title' => 'Perizinan Selesai',
+            'description' => 'Waspang menandai Perizinan selesai & mengunggah BA KP, lanjut ke Material Delivery.',
+            'status_before' => $statusBefore,
+            'status_after' => 'material_delivery',
+            'stage' => 'perizinan',
+        ]);
+
+        return back()->with('success', 'Perizinan selesai. Lanjut ke Material Delivery.');
+    }
+
+    /**
+     * Tombol "Selesai Material Delivery" -- syarat: minimal 1 eviden foto
+     * material delivery sudah diunggah. Transisi status_progress:
+     * material_delivery -> persiapan_instalasi (Persiapan tuntas, gate
+     * halaman Instalasi otomatis terbuka -- lihat isPersiapanUploaded()).
+     */
+    public function finishMaterialDelivery(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $project->lop;
+
+        abort_if(! $lop, 404, 'LOP belum tersedia untuk project ini.');
+
+        if ($lop->status_progress !== 'material_delivery') {
+            return back()->with('error', 'LOP sudah tidak berada di tahap Material Delivery.');
+        }
+
+        $hasEvidence = Evidence::where('project_id', $project->id_project)
+            ->where('stage', 'material_delivery')
+            ->exists();
+
+        if (! $hasEvidence) {
+            return back()->with('error', 'Upload minimal 1 eviden foto material delivery sebelum melanjutkan.');
+        }
+
+        $lop->update(['status_progress' => 'persiapan_instalasi']);
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'stage_transition',
+            'title' => 'Material Delivery Selesai',
+            'description' => 'Waspang menyelesaikan Material Delivery. Persiapan tuntas, lanjut ke Instalasi.',
+            'status_before' => 'material_delivery',
+            'status_after' => 'persiapan_instalasi',
+            'stage' => 'material_delivery',
+        ]);
+
+        return back()->with('success', 'Material Delivery selesai. Persiapan tuntas, lanjut ke Instalasi.');
+    }
+
+    /**
+     * Tombol final "Next Step 3 - Instalasi" di halaman Step 2 Persiapan
+     * Instalasi (2 kartu Barang Tiba/Perizinan) -- syarat SAMA seperti pola
+     * halaman Persiapan lama sebelum refactor Stage 4d: kedua eviden sudah
+     * ter-upload (status apapun, TIDAK wajib approved dulu) & tidak ada yg
+     * berstatus rejected. Transisi status_progress: persiapan_instalasi ->
+     * instalasi, lalu REDIRECT ke halaman Instalasi (bukan back(), krn
+     * tujuannya memang pindah halaman).
+     */
+    public function finishPersiapanInstalasi(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $project->lop;
+
+        abort_if(! $lop, 404, 'LOP belum tersedia untuk project ini.');
+
+        if ($lop->status_progress !== 'persiapan_instalasi') {
+            return back()->with('error', 'LOP sudah tidak berada di tahap Persiapan Instalasi.');
+        }
+
+        $barangTibaEvidences = Evidence::where('project_id', $project->id_project)
+            ->where('stage', 'persiapan')
+            ->where('evidence_type', 'barang_tiba')
+            ->get();
+
+        $perizinanEvidences = Evidence::where('project_id', $project->id_project)
+            ->where('stage', 'persiapan')
+            ->where('evidence_type', 'perizinan')
+            ->get();
+
+        if ($barangTibaEvidences->isEmpty() || $perizinanEvidences->isEmpty()) {
+            return back()->with('error', 'Upload Eviden Barang Tiba dan Eviden Perizinan terlebih dahulu.');
+        }
+
+        if ($barangTibaEvidences->where('status', 'rejected')->isNotEmpty() || $perizinanEvidences->where('status', 'rejected')->isNotEmpty()) {
+            return back()->with('error', 'Perbaiki dulu eviden yang ditolak (upload ulang) sebelum melanjutkan.');
+        }
+
+        $lop->update(['status_progress' => 'instalasi']);
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'stage_transition',
+            'title' => 'Persiapan Instalasi Selesai',
+            'description' => 'Waspang menyelesaikan Step 2 Persiapan Instalasi (Barang Tiba & Perizinan), lanjut ke Step 3 Instalasi.',
+            'status_before' => 'persiapan_instalasi',
+            'status_after' => 'instalasi',
+            'stage' => 'persiapan_instalasi',
+        ]);
+
+        return redirect()->route('waspang.projects.instalasi', $project->id_project)
+            ->with('success', 'Step 2 Persiapan Instalasi selesai. Lanjut ke Step 3 Instalasi.');
+    }
+
+    /**
+     * Tombol "Update Kronologi" UNIVERSAL -- muncul di setiap
+     * step/sub-step (lihat waspang/partials/kronologi-modal.blade.php),
+     * tag stage_code diisi otomatis oleh JS sesuai konteks step yg sedang
+     * dibuka saat tombol ditekan.
+     */
+    public function storeKronologi(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $project->lop;
+
+        abort_if(! $lop, 404, 'LOP belum tersedia untuk project ini.');
+
+        $request->validate([
+            'stage_code' => 'required|string|max:50',
+            'event_date' => 'required|date',
+            'note' => 'required|string|max:2000',
+        ]);
+
+        $kronologi = LopKronologi::create([
+            'lop_id' => $lop->id_lop,
+            'project_id' => $project->id_project,
+            'stage_code' => $request->stage_code,
+            'event_date' => $request->event_date,
+            'note' => $request->note,
+            'created_by' => auth()->user()->id_user,
+        ]);
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'update_kronologi',
+            'title' => 'Update Kronologi',
+            'description' => 'Waspang menambahkan kronologi ('.$request->stage_code.'): '.Str::limit($request->note, 150),
+            'stage' => $request->stage_code,
+            'meta' => [
+                'kronologi_id' => $kronologi->id,
+                'event_date' => $request->event_date,
+            ],
+        ]);
+
+        return back()->with('success', 'Kronologi berhasil disimpan.');
     }
 
     public function finishing($id)
@@ -460,6 +1448,7 @@ class WaspangController extends Controller
         $project = Project::with([
             'evidences',
             'boqItems',
+            'lop.stage',
         ])->findOrFail($id);
 
         return view('waspang.steps.finishing', compact('project'));
@@ -479,7 +1468,7 @@ class WaspangController extends Controller
             },
             'evidences' => function ($query) {
                 $query->where('status', 'approved');
-            }
+            },
         ]);
 
         // 3. Pisahkan item berdasarkan arsitektur modul Anda (KPI vs Non-KPI / Material)
@@ -487,25 +1476,183 @@ class WaspangController extends Controller
 
         // Anda bisa memilah item material saja atau semua item sesuai kebutuhan cetak UT
         $materialBoqItems = $boqItems->filter(function ($boq) {
-            return str_starts_with($boq->designator, 'M-') 
+            return str_starts_with($boq->designator, 'M-')
                 || optional($boq->designatorData)->type === 'material';
         })->values();
 
         // 4. Hitung ringkasan akumulasi total untuk widget pencapaian di atas halaman
         $summary = [
-            'total_items'  => $materialBoqItems->count(),
-            'total_plan'   => $materialBoqItems->sum('quantity_plan'),
+            'total_items' => $materialBoqItems->count(),
+            'total_plan' => $materialBoqItems->sum('quantity_plan'),
             'total_actual' => $materialBoqItems->sum('quantity_actual'),
-            'matched'      => $materialBoqItems->filter(function($item) {
-                return (float)$item->quantity_actual >= (float)$item->quantity_plan;
-            })->count()
+            'matched' => $materialBoqItems->filter(function ($item) {
+                return (float) $item->quantity_actual >= (float) $item->quantity_plan;
+            })->count(),
         ];
 
         // 5. Lempar ke view review komparasi khusus mobile
         return view('waspang.steps.review-final', compact('project', 'materialBoqItems', 'summary'));
     }
 
-    //WASPANG STAGE HELPER PRIVATE
+    /**
+     * Ambiguitas LOP harus dihentikan sebelum ada mutasi Survey. Ini adalah
+     * pengaman sementara sampai seluruh route lama dipindah dari project_id
+     * ke lop_id secara eksplisit.
+     */
+    private function getSingleSurveyLop(Project $project): Lop
+    {
+        $lops = $project->relationLoaded('lops')
+            ? $project->lops
+            : $project->lops()->limit(2)->get();
+
+        abort_if($lops->isEmpty(), 404, 'LOP belum tersedia untuk project ini.');
+        abort_if(
+            $lops->count() !== 1,
+            409,
+            'Project memiliki lebih dari satu LOP. Pilih LOP secara eksplisit sebelum menjalankan Survey.'
+        );
+
+        return $lops->first();
+    }
+
+    private function surveyMapVersions(Project $project)
+    {
+        $versions = collect();
+        $knownPaths = [];
+
+        $adminMapLogs = ProjectActivityLog::query()
+            ->where('project_id', $project->id_project)
+            ->whereIn('activity_type', ['survey_admin_kml_archived', 'survey_admin_kml_uploaded'])
+            ->oldest('id_project_activity')
+            ->get();
+
+        foreach ($adminMapLogs as $log) {
+            $path = $log->meta['kml_path'] ?? null;
+
+            if (! $path || isset($knownPaths[$path]) || ! Storage::disk('public')->exists($path)) {
+                continue;
+            }
+
+            $knownPaths[$path] = true;
+            $versions->push([
+                'key' => 'admin:'.sha1($path),
+                'label' => 'Desain Admin',
+                'source' => 'admin',
+                'url' => Storage::url($path),
+                'created_at' => $log->created_at?->toIso8601String(),
+                'sort_at' => $log->created_at?->getTimestamp() ?? 0,
+            ]);
+        }
+
+        if ($project->kml_file && ! isset($knownPaths[$project->kml_file]) && Storage::disk('public')->exists($project->kml_file)) {
+            $versions->push([
+                'key' => 'admin:'.sha1($project->kml_file),
+                'label' => 'Desain Admin',
+                'source' => 'admin',
+                'url' => Storage::url($project->kml_file),
+                'created_at' => $project->created_at?->toIso8601String(),
+                'sort_at' => $project->created_at?->getTimestamp() ?? 0,
+            ]);
+        }
+
+        $redesignNumber = 0;
+        $completedSurveys = SiteSurvey::query()
+            ->where('project_id', $project->id_project)
+            ->where('status', 'completed')
+            ->oldest('completed_at')
+            ->oldest('id_site_surveys')
+            ->get();
+
+        foreach ($completedSurveys as $survey) {
+            $redesignNumber++;
+            $versions->push([
+                'key' => 'redesign:'.$survey->id,
+                'label' => 'Redesign '.$redesignNumber,
+                'source' => 'redesign',
+                'url' => route('surveyor.kml', $survey->id),
+                'created_at' => $survey->completed_at?->toIso8601String(),
+                'sort_at' => $survey->completed_at?->getTimestamp() ?? $survey->id,
+            ]);
+        }
+
+        $versions = $versions->sortBy('sort_at')->values();
+        $adminTotal = $versions->where('source', 'admin')->count();
+        $adminNumber = 0;
+
+        return $versions->map(function (array $version) use ($adminTotal, &$adminNumber): array {
+            if ($version['source'] === 'admin' && $adminTotal > 1) {
+                $adminNumber++;
+                $version['label'] = 'Desain Admin '.$adminNumber;
+            }
+
+            unset($version['sort_at']);
+
+            return $version;
+        });
+    }
+
+    private function isSurveyMapConfirmed(Project $project, Lop $lop, string $mapKey): bool
+    {
+        $confirmation = ProjectActivityLog::query()
+            ->where('project_id', $project->id_project)
+            ->where('lop_id', $lop->id_lop)
+            ->where('activity_type', 'survey_map_confirmed')
+            ->latest('id_project_activity')
+            ->first();
+
+        return ($confirmation?->meta['map_key'] ?? null) === $mapKey;
+    }
+
+    private function currentSurveyMapIsConfirmed(Project $project, Lop $lop): bool
+    {
+        $currentMap = $this->surveyMapVersions($project)->last();
+
+        return $currentMap
+            ? $this->isSurveyMapConfirmed($project, $lop, $currentMap['key'])
+            : false;
+    }
+
+    private function currentSurveyBoqGroups(Project $project, Lop $lop, SurveyPreparationService $surveyPreparation)
+    {
+        return $surveyPreparation->groupBoqItems(
+            BoqItem::with(['designatorData', 'designatorDataByCode'])
+                ->where('project_id', $project->id_project)
+                ->where('lop_id', $lop->id_lop)
+                ->get()
+        );
+    }
+
+    private function persistSurveyVolumes($groups, array $submittedVolumes, bool $requireAll): array
+    {
+        $saved = [];
+
+        foreach ($groups as $group) {
+            $field = (string) $group['representative_id'];
+            $hasValue = array_key_exists($field, $submittedVolumes)
+                && $submittedVolumes[$field] !== null
+                && $submittedVolumes[$field] !== '';
+
+            if ($requireAll && ! $hasValue) {
+                throw ValidationException::withMessages([
+                    "volumes.{$field}" => 'Volume Survey wajib diisi.',
+                ]);
+            }
+
+            if (! $hasValue) {
+                continue;
+            }
+
+            $value = (float) $submittedVolumes[$field];
+            BoqItem::query()
+                ->whereIn('id_boq', $group['item_ids'])
+                ->update(['quantity_actual' => $value]);
+            $saved[$field] = $value;
+        }
+
+        return $saved;
+    }
+
+    // WASPANG STAGE HELPER PRIVATE
     private function getAssignedProject($id)
     {
         $userId = auth()->user()->id_user;
@@ -514,19 +1661,19 @@ class WaspangController extends Controller
             ->where('waspang_id', $userId)
             ->exists();
 
-        abort_if(!$isAssigned, 403);
+        abort_if(! $isAssigned, 403);
 
-        return Project::with(['boqItems.designatorData', 'evidences'])
+        return Project::with(['boqItems.designatorData', 'boqItems.designatorDataByCode', 'evidences', 'lop.stage', 'lops.stage'])
             ->findOrFail($id);
     }
 
-    //HELPER
+    // HELPER
     private function isPersiapanComplete($projectId)
     {
         $barangTibaUploaded = Evidence::where('project_id', $projectId)
-        ->where('stage', 'persiapan')
-        ->where('evidence_type', 'barang_tiba')
-        ->exists();
+            ->where('stage', 'persiapan')
+            ->where('evidence_type', 'barang_tiba')
+            ->exists();
 
         $perizinanUploaded = Evidence::where('project_id', $projectId)
             ->where('stage', 'persiapan')
@@ -538,6 +1685,22 @@ class WaspangController extends Controller
 
     private function isPersiapanUploaded($projectId)
     {
+        // Revisi stepper (Step 2 "Persiapan Instalasi" kini halaman sendiri,
+        // BUKAN pass-through lagi): gerbang ke halaman Instalasi (Step 3)
+        // sekarang baru terbuka begitu LOP BENAR-BENAR sudah di 'instalasi'
+        // atau lebih (sequence > 6) -- bukan lagi cuma sequence > 5
+        // (persiapan_instalasi), krn sequence 6 sekarang py syarat sendiri
+        // (2 eviden Barang Tiba & Perizinan, lihat
+        // WaspangController::finishPersiapanInstalasi()). Fallback ke 2
+        // eviden lama HANYA utk LOP lama sebelum flow baru ini / kode tak
+        // dikenal.
+        $lopStageSequence = Lop::where('project_id', $projectId)
+            ->first()?->stage?->sequence;
+
+        if ($lopStageSequence !== null && $lopStageSequence > 6) {
+            return true;
+        }
+
         $barangTibaUploaded = Evidence::where('project_id', $projectId)
             ->where('stage', 'persiapan')
             ->where('evidence_type', 'barang_tiba')
@@ -562,7 +1725,7 @@ class WaspangController extends Controller
         $uploaded = 0;
 
         foreach ($project->boqItems as $boq) {
-            $exists = \App\Models\Evidence::where('project_id', $project->id_project)
+            $exists = Evidence::where('project_id', $project->id_project)
                 ->where('stage', 'instalasi')
                 ->where('evidence_type', 'progress_boq')
                 ->where('boq_item_id', $boq->id_boq)
@@ -608,9 +1771,9 @@ class WaspangController extends Controller
         $evidences = $project->evidences ?? collect();
 
         return $evidences->where('stage', 'persiapan')
-                ->where('evidence_type', 'barang_tiba')
-                ->where('status', 'approved')
-                ->count() > 0
+            ->where('evidence_type', 'barang_tiba')
+            ->where('status', 'approved')
+            ->count() > 0
             &&
             $evidences->where('stage', 'persiapan')
                 ->where('evidence_type', 'perizinan')
@@ -646,13 +1809,17 @@ class WaspangController extends Controller
         return $boqApproved == $boqTotal;
     }
 
-    // UPLOAD FOTO di FOLDER 
+    // UPLOAD FOTO di FOLDER
     public function uploadEvidence(Request $request, $id)
     {
         $project = $this->getAssignedProject($id);
 
         $request->validate([
-            'stage' => 'required|in:persiapan,instalasi,pengukuran,finishing',
+            // Sub-step Persiapan (Survey/Perizinan/Material Delivery) tidak
+            // lagi menumpang di
+            // stage='persiapan' generik, masing2 sub-step punya stage sendiri
+            // -- lihat catatan sequence-based di Project::progressSummary()).
+            'stage' => 'required|in:persiapan,instalasi,pengukuran,finishing,survey,perizinan,material_delivery',
             'evidence_type' => 'required|string|max:100',
             'photos' => 'required|array',
             'photos.*' => 'required|file|max:10240', // Max 10MB
@@ -661,22 +1828,22 @@ class WaspangController extends Controller
             'longitude' => 'nullable',
             'boq_item_id' => 'nullable',
             'quantity_actual' => 'nullable|numeric|min:0',
-            'actual_reason' => 'nullable|string', 
+            'actual_reason' => 'nullable|string',
         ]);
 
         $projectFolder = $this->evidenceLopFolder($project->id_project);
         $stage = $request->stage;
         $type = $request->evidence_type;
-        $lopId = \App\Models\Lop::where('project_id', $project->id_project)->value('id_lop');
+        $lopId = Lop::where('project_id', $project->id_project)->value('id_lop');
 
         foreach ($request->file('photos') as $photo) {
-            
+
             $originalExtension = strtolower($photo->getClientOriginalExtension());
             $isSor = ($originalExtension === 'sor');
             // Jika file dari JS (blob) kadang tidak punya ekstensi, kita default ke jpg
             $extension = $isSor ? 'sor' : ($originalExtension ?: 'jpg');
-            
-            $filename = now()->format('Ymd_His') . '_' . uniqid() . '.' . $extension;
+
+            $filename = now()->format('Ymd_His').'_'.uniqid().'.'.$extension;
 
             // Simpan ke direktori terstruktur
             $path = $photo->storeAs(
@@ -685,7 +1852,7 @@ class WaspangController extends Controller
                 'public'
             );
 
-            $evidence = \App\Models\Evidence::create([
+            $evidence = Evidence::create([
                 'project_id' => $project->id_project,
                 'boq_item_id' => $request->boq_item_id,
                 'uploaded_by' => auth()->user()->id_user,
@@ -701,13 +1868,13 @@ class WaspangController extends Controller
             $evidence->load('boqItem');
             $evidenceLabel = $this->evidenceLabel($evidence);
 
-            \App\Services\ProjectActivityService::log([
+            ProjectActivityService::log([
                 'project_id' => $evidence->project_id,
                 'lop_id' => $lopId,
                 'evidence_id' => $evidence->id_evidence,
                 'activity_type' => 'upload_evidence',
                 'title' => 'Upload Eviden',
-                'description' => 'Waspang upload eviden: ' . $evidenceLabel . ($isSor ? ' [File SOR]' : ''),
+                'description' => 'Waspang upload eviden: '.$evidenceLabel.($isSor ? ' [File SOR]' : ''),
                 'stage' => $evidence->stage,
                 'status_after' => 'pending',
                 'meta' => [
@@ -724,19 +1891,19 @@ class WaspangController extends Controller
 
         // UPDATE QUANTITY ACTUAL & REASON
         if ($request->boq_item_id) {
-            $boqItem = \App\Models\BoqItem::where('id_boq', $request->boq_item_id)->first();
-            
+            $boqItem = BoqItem::where('id_boq', $request->boq_item_id)->first();
+
             if ($boqItem) {
-                $designator = \Illuminate\Support\Facades\DB::table('designators')
+                $designator = DB::table('designators')
                     ->where('id_designator', $boqItem->designator_id)
                     ->first();
 
                 if ($request->has('quantity_actual') && $request->quantity_actual !== null) {
-                    
-                    $actualValue = (float)$request->quantity_actual;
-                    
+
+                    $actualValue = (float) $request->quantity_actual;
+
                     $updateData = [
-                        'quantity_actual' => $actualValue
+                        'quantity_actual' => $actualValue,
                     ];
 
                     if ($actualValue == 0 && $request->has('actual_reason')) {
@@ -745,15 +1912,15 @@ class WaspangController extends Controller
                         $updateData['actual_reason'] = null;
                     }
 
-                    \App\Models\BoqItem::where('id_boq', $request->boq_item_id)
+                    BoqItem::where('id_boq', $request->boq_item_id)
                         ->update($updateData);
 
-                    \App\Services\ProjectActivityService::log([
+                    ProjectActivityService::log([
                         'project_id' => $project->id_project,
                         'lop_id' => $lopId,
                         'activity_type' => 'update_quantity_actual',
                         'title' => 'Update Kuantitas Aktual',
-                        'description' => 'Waspang mengupdate kuantitas aktual item: ' . ($designator->designator ?? '') . ' menjadi ' . $actualValue,
+                        'description' => 'Waspang mengupdate kuantitas aktual item: '.($designator->designator ?? '').' menjadi '.$actualValue,
                         'stage' => $stage,
                         'status_after' => 'updated',
                         'meta' => [
@@ -762,14 +1929,13 @@ class WaspangController extends Controller
                             'actual_reason' => $updateData['actual_reason'],
                         ],
                     ]);
-                } 
-                else {
-                    \App\Services\ProjectActivityService::log([
+                } else {
+                    ProjectActivityService::log([
                         'project_id' => $project->id_project,
                         'lop_id' => $lopId,
                         'activity_type' => 'upload_evidence_regular',
                         'title' => 'Upload Eviden Pendukung',
-                        'description' => 'Waspang mengupload foto tambahan untuk item: ' . ($designator->designator ?? ''),
+                        'description' => 'Waspang mengupload foto tambahan untuk item: '.($designator->designator ?? ''),
                         'stage' => $stage,
                         'status_after' => 'pending',
                         'meta' => [
@@ -801,7 +1967,7 @@ class WaspangController extends Controller
             'persiapan' => $this->stageHasSubmittedTypes($project->id_project, 'persiapan', ['barang_tiba', 'perizinan']),
             'pengukuran' => $this->stageHasSubmittedTypes($project->id_project, 'pengukuran', ['opm', 'otdr']),
             'instalasi' => $this->instalasiSubmittedComplete($project),
-            'finishing' => \App\Models\Evidence::where('project_id', $project->id_project)
+            'finishing' => Evidence::where('project_id', $project->id_project)
                 ->where('stage', 'finishing')
                 ->where('status', '!=', 'rejected')
                 ->exists(),
@@ -813,7 +1979,7 @@ class WaspangController extends Controller
         }
 
         // Guard supaya tidak berulang kali publish event yang sama untuk stage yang sama.
-        $alreadyPublished = \App\Models\ProjectActivityLog::where('project_id', $project->id_project)
+        $alreadyPublished = ProjectActivityLog::where('project_id', $project->id_project)
             ->where('stage', $stage)
             ->where('activity_type', 'webhook_stage_uploaded_published')
             ->exists();
@@ -822,15 +1988,15 @@ class WaspangController extends Controller
             return;
         }
 
-        $assignment = \App\Models\ProjectAssignment::where('project_id', $project->id_project)->first();
+        $assignment = ProjectAssignment::where('project_id', $project->id_project)->first();
         $admin = $assignment?->admin;
 
         if ($admin) {
-            \App\Services\TelegramWebhookEventService::publishToUser(
+            TelegramWebhookEventService::publishToUser(
                 $admin,
                 'evidence_step_uploaded',
                 'Eviden Tahap Selesai Diupload',
-                'Waspang ' . (auth()->user()->name ?? '-') . " telah menyelesaikan upload eviden tahap {$stage} untuk project {$project->project_name} (" . ($project->pid ?? '-') . '). Eviden menunggu review Anda.',
+                'Waspang '.(auth()->user()->name ?? '-')." telah menyelesaikan upload eviden tahap {$stage} untuk project {$project->project_name} (".($project->pid ?? '-').'). Eviden menunggu review Anda.',
                 [
                     'stage' => $stage,
                     'project_name' => $project->project_name,
@@ -842,7 +2008,7 @@ class WaspangController extends Controller
             );
         }
 
-        \App\Services\ProjectActivityService::log([
+        ProjectActivityService::log([
             'project_id' => $project->id_project,
             'activity_type' => 'webhook_stage_uploaded_published',
             'title' => 'Webhook Event: Eviden Tahap Lengkap',
@@ -857,7 +2023,7 @@ class WaspangController extends Controller
      */
     private function stageHasSubmittedTypes(int $projectId, string $stage, array $requiredTypes): bool
     {
-        $submittedTypes = \App\Models\Evidence::where('project_id', $projectId)
+        $submittedTypes = Evidence::where('project_id', $projectId)
             ->where('stage', $stage)
             ->where('status', '!=', 'rejected')
             ->pluck('evidence_type')
@@ -879,7 +2045,7 @@ class WaspangController extends Controller
      */
     private function instalasiSubmittedComplete($project): bool
     {
-        $materialIds = \App\Models\BoqItem::where('project_id', $project->id_project)
+        $materialIds = BoqItem::where('project_id', $project->id_project)
             ->where('designator', 'like', 'M-%')
             ->pluck('id_boq');
 
@@ -887,7 +2053,7 @@ class WaspangController extends Controller
             return false;
         }
 
-        $submittedBoqIds = \App\Models\Evidence::where('project_id', $project->id_project)
+        $submittedBoqIds = Evidence::where('project_id', $project->id_project)
             ->where('stage', 'instalasi')
             ->where('evidence_type', 'progress_boq')
             ->where('status', '!=', 'rejected')
@@ -910,9 +2076,9 @@ class WaspangController extends Controller
      */
     private function evidenceLopFolder(int $projectId): string
     {
-        $lopName = \App\Models\Lop::where('project_id', $projectId)->value('lop_name');
+        $lopName = Lop::where('project_id', $projectId)->value('lop_name');
 
-        return $this->sanitizeFolderName($lopName, 'project-' . $projectId);
+        return $this->sanitizeFolderName($lopName, 'project-'.$projectId);
     }
 
     /**
@@ -929,7 +2095,7 @@ class WaspangController extends Controller
         }
 
         $safe = preg_replace('/[\/\\\\:*?"<>|]+/', '_', $name);
-        $safe = trim($safe, " ._");
+        $safe = trim($safe, ' ._');
 
         return $safe !== '' ? $safe : $fallback;
     }
@@ -940,25 +2106,25 @@ class WaspangController extends Controller
             'file' => 'required|file|max:10240', // Maks 10MB
         ]);
 
-        $evidence = \App\Models\Evidence::findOrFail($id);
+        $evidence = Evidence::findOrFail($id);
         $projectFolder = $this->evidenceLopFolder($evidence->project_id);
         $stage = $evidence->stage;
         $type = $evidence->evidence_type;
 
         // 1. Hapus file fisik lama dari storage
-        if ($evidence->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($evidence->file_path)) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($evidence->file_path);
+        if ($evidence->file_path && Storage::disk('public')->exists($evidence->file_path)) {
+            Storage::disk('public')->delete($evidence->file_path);
         }
 
         // 2. Siapkan file baru
         $file = $request->file('file');
-        
+
         $originalExtension = strtolower($file->getClientOriginalExtension());
         $isSor = ($originalExtension === 'sor');
         // File dari JS kompresi (blob) akan dibaca tanpa ekstensi, jadikan default jpg.
         $extension = $isSor ? 'sor' : ($originalExtension ?: 'jpg');
-        
-        $filename = now()->format('Ymd_His') . '_replace_' . uniqid() . '.' . $extension;
+
+        $filename = now()->format('Ymd_His').'_replace_'.uniqid().'.'.$extension;
 
         // 3. Simpan di direktori yang sama dengan tempat file lama bersarang
         $path = $file->storeAs(
@@ -974,9 +2140,9 @@ class WaspangController extends Controller
         $evidence->save();
 
         // 5. Catat Log Aktivitas (Opsional agar History Rapi)
-        \App\Services\ProjectActivityService::log([
+        ProjectActivityService::log([
             'project_id' => $evidence->project_id,
-            'lop_id' => \App\Models\Lop::where('project_id', $evidence->project_id)->value('id_lop'),
+            'lop_id' => Lop::where('project_id', $evidence->project_id)->value('id_lop'),
             'evidence_id' => $evidence->id_evidence,
             'activity_type' => 'replace_evidence',
             'title' => 'Upload Ulang Eviden (Perbaikan)',
@@ -998,7 +2164,7 @@ class WaspangController extends Controller
      */
     public function deleteEvidence($id)
     {
-        $evidence = \App\Models\Evidence::findOrFail($id);
+        $evidence = Evidence::findOrFail($id);
 
         // Eviden yang sudah approved tidak boleh dihapus (samakan dengan guard
         // di tampilan: @if($photo->status != 'approved')).
@@ -1007,8 +2173,8 @@ class WaspangController extends Controller
         }
 
         // 1. Hapus file fisik dari storage
-        if ($evidence->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($evidence->file_path)) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($evidence->file_path);
+        if ($evidence->file_path && Storage::disk('public')->exists($evidence->file_path)) {
+            Storage::disk('public')->delete($evidence->file_path);
         }
 
         $projectId = $evidence->project_id;
@@ -1019,9 +2185,9 @@ class WaspangController extends Controller
 
         // 2. Catat Log Aktivitas SEBELUM baris eviden dihapus, supaya evidence_id
         //    pada log masih menunjuk ke baris yang valid saat dicatat.
-        \App\Services\ProjectActivityService::log([
+        ProjectActivityService::log([
             'project_id' => $projectId,
-            'lop_id' => \App\Models\Lop::where('project_id', $projectId)->value('id_lop'),
+            'lop_id' => Lop::where('project_id', $projectId)->value('id_lop'),
             'evidence_id' => $evidenceId,
             'activity_type' => 'delete_evidence',
             'title' => 'Hapus Eviden',
@@ -1040,7 +2206,7 @@ class WaspangController extends Controller
         return back()->with('success', 'Foto eviden berhasil dihapus.');
     }
 
-    //NOTIFICATION
+    // NOTIFICATION
     public function notifications()
     {
         $notifications = Notification::where('user_id', auth()->user()->id_user)
@@ -1067,27 +2233,52 @@ class WaspangController extends Controller
         return back()->with('success', 'Notifikasi berhasil di besihkan');
     }
 
-    //UPDATE KENDALA
+    // UPDATE KENDALA
     public function storeIssue(Request $request, $project)
     {
         $project = $this->getAssignedProject($project);
 
         $request->validate([
-            'issue_type' => 'required|string|max:100',
+            // Stage 4d: tombol kendala BARU (di tiap sub-step Persiapan) pakai
+            // dropdown master KendalaCategory -- tapi form kendala LAMA (lihat
+            // waspang/inbox.blade.php) masih kirim `issue_type` bebas tanpa
+            // `kendala_category_id` sama sekali. Supaya keduanya tetap jalan
+            // tanpa saling mematahkan, wajibkan SALAH SATU dari keduanya
+            // (bukan keduanya wajib).
+            'kendala_category_id' => 'nullable|exists:kendala_categories,id',
+            'issue_type' => 'nullable|string|max:100',
+            // Stage 4d: tag opsional -- dari sub-step/step mana kendala ini
+            // dilaporkan (survey/drm/perizinan/material_delivery/persiapan/
+            // instalasi/pengukuran/finishing/dst). Nullable supaya tombol
+            // kendala lama (tanpa konteks step) tetap jalan apa adanya.
+            'stage_code' => 'nullable|string|max:50',
             'description' => 'required|string|max:2000',
             'photos' => 'nullable|array',
             'photos.*' => 'image|mimes:jpg,jpeg,png,webp|max:4096',
         ]);
+
+        if (! $request->kendala_category_id && ! $request->issue_type) {
+            return back()->with('error', 'Pilih jenis/kategori kendala terlebih dahulu.');
+        }
+
+        $kendalaCategory = $request->kendala_category_id
+            ? KendalaCategory::find($request->kendala_category_id)
+            : null;
+
+        // issue_type (kolom lama, teks bebas) diisi dari nama kategori kalau
+        // kendala_category_id yg dikirim (tombol baru), atau langsung dari
+        // input issue_type kalau form lama yg dipakai.
+        $issueTypeValue = $kendalaCategory->name ?? $request->issue_type;
 
         $lopId = Lop::where('project_id', $project->id_project)->value('id_lop');
 
         $photoPaths = [];
 
         if ($request->hasFile('photos')) {
-            $projectFolder = 'project-' . $project->id_project;
+            $projectFolder = 'project-'.$project->id_project;
 
             foreach ($request->file('photos') as $photo) {
-                $filename = now()->format('Ymd_His') . '_' . uniqid() . '.jpg';
+                $filename = now()->format('Ymd_His').'_'.uniqid().'.jpg';
 
                 $path = $photo->storeAs(
                     "issues/{$projectFolder}",
@@ -1102,8 +2293,10 @@ class WaspangController extends Controller
         $issue = ProjectIssue::create([
             'project_id' => $project->id_project,
             'lop_id' => $lopId,
+            'stage_code' => $request->stage_code,
+            'kendala_category_id' => $request->kendala_category_id,
             'user_id' => auth()->user()->id_user,
-            'issue_type' => $request->issue_type,
+            'issue_type' => $issueTypeValue,
             'description' => $request->description,
             'photo_paths' => $photoPaths,
             'status' => 'kendala',
@@ -1114,7 +2307,7 @@ class WaspangController extends Controller
             'lop_id' => $lopId,
             'activity_type' => 'update_kendala',
             'title' => 'Update Kendala',
-            'description' => 'Waspang melaporkan kendala: ' . $request->description,
+            'description' => 'Waspang melaporkan kendala: '.$request->description,
             'status_after' => 'kendala',
             'meta' => [
                 'issue_id' => $issue->id,
@@ -1131,7 +2324,7 @@ class WaspangController extends Controller
                 'project_id' => $project->id_project,
                 'type' => 'kendala',
                 'title' => 'Kendala Baru dari Waspang',
-                'message' => 'Project ' . $project->project_name . ' terkendala: ' . $request->description,
+                'message' => 'Project '.$project->project_name.' terkendala: '.$request->description,
                 'redirect_url' => route('admin.projects.tracking', $project->id_project),
             ]);
         }
@@ -1149,7 +2342,7 @@ class WaspangController extends Controller
             ->latest()
             ->first();
 
-        if (!$issue) {
+        if (! $issue) {
             return back()->with('error', 'Tidak ada kendala aktif pada project ini.');
         }
 
@@ -1179,7 +2372,6 @@ class WaspangController extends Controller
         return view('waspang.profile');
     }
 
-
     private function evidenceLabel($evidence)
     {
         $typeLabels = [
@@ -1196,13 +2388,12 @@ class WaspangController extends Controller
         $typeLabel = $typeLabels[$evidence->evidence_type] ?? ucfirst(str_replace('_', ' ', $evidence->evidence_type));
 
         if ($evidence->boqItem) {
-            return $stageLabel . ' | ' .
-                $typeLabel . ' | ' .
-                ($evidence->boqItem->designator ?? '-') . ' - ' .
+            return $stageLabel.' | '.
+                $typeLabel.' | '.
+                ($evidence->boqItem->designator ?? '-').' - '.
                 ($evidence->boqItem->item_name ?? '-');
         }
 
-        return $stageLabel . ' | ' . $typeLabel;
+        return $stageLabel.' | '.$typeLabel;
     }
-
 }

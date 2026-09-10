@@ -19,8 +19,13 @@ return Application::configure(basePath: dirname(__DIR__))
 
     // Dipakai oleh routes/api.php untuk mengamankan endpoint webhook
     // (lihat App\Http\Middleware\VerifyWebhookApiToken).
+    //
+    // 'role' (2026-09-08): middleware role-based backend, dipakai di
+    // routes/web.php sebagai ->middleware('role:admin,superadmin,...').
+    // Lihat App\Http\Middleware\CheckRole untuk detailnya.
     $middleware->alias([
         'verify.webhook.token' => \App\Http\Middleware\VerifyWebhookApiToken::class,
+        'role' => \App\Http\Middleware\CheckRole::class,
     ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

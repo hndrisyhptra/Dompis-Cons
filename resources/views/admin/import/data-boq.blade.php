@@ -102,12 +102,12 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Status Project</label>
-                        <select name="status_project" onchange="this.form.submit()"
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Status Progress</label>
+                        <select name="status_progress" onchange="this.form.submit()"
                                 class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Status</option>
-                            @foreach(['init' => 'Init', 'active' => 'Active', 'close' => 'Close', 'bast' => 'BAST', 'drop' => 'Drop'] as $value => $label)
-                                <option value="{{ $value }}" @selected(request('status_project') === $value)>{{ $label }}</option>
+                            @foreach($statusOptions as $value => $label)
+                                <option value="{{ $value }}" @selected(request('status_progress') === $value)>{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -138,7 +138,7 @@
                 </div>
 
                 <div class="mt-5 flex flex-col sm:flex-row sm:justify-end gap-3">
-                    @if(request('search') || request('region') || request('branch') || request('program') || request('status_project') || request('package'))
+                    @if(request('search') || request('region') || request('branch') || request('program') || request('status_progress') || request('package'))
                         <a href="{{ route('admin.data-boq') }}"
                            class="h-11 px-5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold inline-flex items-center justify-center">
                             Reset

@@ -47,12 +47,12 @@
                 </select>
             </div>
             <div>
-                <label class="block text-xs font-black uppercase text-gray-400 mb-1">Status Project</label>
-                <select name="status_project" onchange="this.form.submit()" class="w-full h-11 rounded-2xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-white text-sm focus:ring-emerald-500">
+                <label class="block text-xs font-black uppercase text-gray-400 mb-1">Status Progress</label>
+                <select name="status_progress" onchange="this.form.submit()" class="w-full h-11 rounded-2xl border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-white text-sm focus:ring-emerald-500">
                     <option value="">Semua Status</option>
-                    <option value="active" {{ request('status_project') == 'active' ? 'selected' : '' }}>Active</option>
-                    <option value="close" {{ request('status_project') == 'close' ? 'selected' : '' }}>Close</option>
-                    <option value="drop" {{ request('status_project') == 'drop' ? 'selected' : '' }}>Drop (Batal)</option>
+                    @foreach($statusOptions as $statusCode => $statusLabel)
+                        <option value="{{ $statusCode }}" {{ request('status_progress') === $statusCode ? 'selected' : '' }}>{{ $statusLabel }}</option>
+                    @endforeach
                 </select>
             </div>
         </div>

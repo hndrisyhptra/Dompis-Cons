@@ -54,7 +54,7 @@ class PublishStaleProjectReminders extends Command
 
     protected function publishStaleMainProjects(Carbon $threshold, int $thresholdHours): int
     {
-        $assignments = ProjectAssignment::with(['project', 'waspang', 'teknisi'])
+        $assignments = ProjectAssignment::with(['project.lop', 'waspang', 'teknisi'])
             ->where(function ($q) {
                 $q->whereNotNull('waspang_id')->orWhereNotNull('teknisi_id');
             })
@@ -65,7 +65,9 @@ class PublishStaleProjectReminders extends Command
         foreach ($assignments as $assignment) {
             $project = $assignment->project;
 
-            if (! $project || $project->status_project === 'close') {
+            $lop = $project?->lop;
+
+            if (! $project || ! $lop || in_array($lop->status_progress, ['golive', 'drop'], true)) {
                 continue;
             }
 

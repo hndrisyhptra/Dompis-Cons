@@ -8,6 +8,7 @@ use App\Models\BoqItem;
 use App\Models\Designator;
 use App\Models\Evidence;
 use App\Models\ProjectAssignment;
+use App\Models\ProjectStage;
 use App\Models\ImportLog;
 use App\Models\Customer;
 use App\Models\Pt2Project;
@@ -387,6 +388,23 @@ class ImportController extends Controller
 
         $matrixData = [];
         $grandTotals = [];
+        $statusOptions = $dataType === 'pt2'
+            ? [
+                'preparation' => 'Preparation',
+                'survey' => 'Survey',
+                'progress' => 'Progress',
+                'finish' => 'Finish',
+                'dismantle' => 'Dismantle',
+                'mancore' => 'Mancore',
+                'complete' => 'Complete',
+                'golive' => 'Go-Live',
+                'drop' => 'Drop (Batal)',
+            ]
+            : ProjectStage::active()
+                ->orderByRaw('sequence IS NULL, sequence ASC')
+                ->orderBy('label')
+                ->pluck('label', 'code')
+                ->all();
 
         if ($dataType === 'pt2') {
             /*
@@ -415,11 +433,21 @@ class ImportController extends Controller
                 ->count('p.id_pt2_project');
 
             $projectActive = (clone $base)
-                ->where('p.status_project', 'active')
+                ->whereExists(function ($lopQuery) {
+                    $lopQuery->selectRaw('1')
+                        ->from('pt2_lops as ls')
+                        ->whereColumn('ls.pt2_project_id', 'p.id_pt2_project')
+                        ->where('ls.status_progress', '!=', 'drop');
+                })
                 ->count('p.id_pt2_project');
 
             $projectDrop = (clone $base)
-                ->where('p.status_project', 'drop')
+                ->whereExists(function ($lopQuery) {
+                    $lopQuery->selectRaw('1')
+                        ->from('pt2_lops as ls')
+                        ->whereColumn('ls.pt2_project_id', 'p.id_pt2_project')
+                        ->where('ls.status_progress', 'drop');
+                })
                 ->count('p.id_pt2_project');
 
             $filteredProjectIds = (clone $base)
@@ -437,10 +465,6 @@ class ImportController extends Controller
                     'p.pid_sap',
                     'p.project_name',
                     'p.program',
-                    'p.status_project',
-                    'p.status',
-                    'p.is_golive',
-                    'p.sdi_approval_status',
                     'p.branch as project_branch',
                     'p.sto as project_sto',
                     'p.mitra_name as project_mitra',
@@ -520,11 +544,21 @@ class ImportController extends Controller
                 ->count('p.id_project');
 
             $projectActive = (clone $base)
-                ->where('p.status_project', 'active')
+                ->whereExists(function ($lopQuery) {
+                    $lopQuery->selectRaw('1')
+                        ->from('lops as ls')
+                        ->whereColumn('ls.project_id', 'p.id_project')
+                        ->where('ls.status_progress', '!=', 'drop');
+                })
                 ->count('p.id_project');
 
             $projectDrop = (clone $base)
-                ->where('p.status_project', 'drop')
+                ->whereExists(function ($lopQuery) {
+                    $lopQuery->selectRaw('1')
+                        ->from('lops as ls')
+                        ->whereColumn('ls.project_id', 'p.id_project')
+                        ->where('ls.status_progress', 'drop');
+                })
                 ->count('p.id_project');
 
             $totalLop = (clone $base)
@@ -543,7 +577,6 @@ class ImportController extends Controller
                     'p.project_name',
                     'p.program',
                     'p.execution_type',
-                    'p.status_project',
                     'p.branch as project_branch',
                     'p.sto as project_sto',
                     'p.mitra_name as project_mitra',
@@ -585,7 +618,7 @@ class ImportController extends Controller
             }
 
             /* Matrix Regular-only. Tidak load Project::all(). */
-            [$matrixData, $grandTotals] = $this->buildRegularPidMatrix($regions, $programs);
+            [$matrixData, $grandTotals] = $this->buildRegularPidMatrix($regions, $programs, $statusOptions);
         }
 
         return view('admin.import.data-pid', compact(
@@ -599,6 +632,7 @@ class ImportController extends Controller
             'pidMatchBoq',
             'projectActive',
             'projectDrop',
+            'statusOptions',
             'matrixData',
             'grandTotals'
         ));
@@ -643,10 +677,6 @@ class ImportController extends Controller
                     'p.pid_sap',
                     'p.project_name',
                     'p.program',
-                    'p.status_project',
-                    'p.status',
-                    'p.is_golive as project_golive',
-                    'p.sdi_approval_status as project_sdi_approval',
                     'l.id_ihld',
                     'l.lop_name',
                     'l.pid_sap as lop_pid_sap',
@@ -662,8 +692,7 @@ class ImportController extends Controller
                 ]);
 
             $headers = [
-                'PID', 'PID SAP', 'Nama Project', 'Program', 'Status Project', 'Status',
-                'Go Live Project', 'SDI Approval Project',
+                'PID', 'PID SAP', 'Nama Project', 'Program',
                 'ID IHLD', 'Nama LOP', 'PID SAP LOP', 'Branch', 'STO', 'Batch',
                 'Status Progress', 'Package ID', 'Go Live LOP', 'SDI Approval LOP',
                 'Jumlah Assignment', 'Jumlah Item BOQ',
@@ -678,10 +707,6 @@ class ImportController extends Controller
                     $row->pid_sap ?? '-',
                     $row->project_name ?? '-',
                     $row->program ?? '-',
-                    $row->status_project ?? '-',
-                    $row->status ?? '-',
-                    $row->project_golive ?? '-',
-                    $row->project_sdi_approval ?? '-',
                     $row->id_ihld ?? '-',
                     $row->lop_name ?? '-',
                     $row->lop_pid_sap ?? '-',
@@ -713,7 +738,6 @@ class ImportController extends Controller
                     'p.project_name',
                     'p.program',
                     'p.execution_type',
-                    'p.status_project',
                     'l.id_ihld',
                     'l.lop_name',
                     'l.program_sap',
@@ -725,12 +749,15 @@ class ImportController extends Controller
                     'l.tgl_sp',
                     'l.tgl_toc',
                     'l.mitra_name',
+                    'l.status_progress',
+                    'l.sdi_approval_status',
+                    'l.is_golive',
                 ]);
 
             $headers = [
-                'PID', 'PID SAP', 'Nama Project', 'Program', 'Execution Type', 'Status Project',
+                'PID', 'PID SAP', 'Nama Project', 'Program', 'Execution Type', 'Status Progress',
                 'ID IHLD', 'Nama LOP', 'Program SAP', 'Tematik', 'STO', 'Branch', 'Batch',
-                'No SP', 'Tgl SP', 'Tgl TOC', 'Mitra',
+                'No SP', 'Tgl SP', 'Tgl TOC', 'Mitra', 'SDI Approval', 'Is Golive',
             ];
 
             $sheet->fromArray($headers, null, 'A1');
@@ -743,7 +770,7 @@ class ImportController extends Controller
                     $row->project_name ?? '-',
                     $row->program ?? '-',
                     $row->execution_type ?? '-',
-                    $row->status_project ?? '-',
+                    $row->status_progress ?? '-',
                     $row->id_ihld ?? '-',
                     $row->lop_name ?? '-',
                     $row->program_sap ?? '-',
@@ -755,6 +782,8 @@ class ImportController extends Controller
                     $row->tgl_sp ?? '-',
                     $row->tgl_toc ?? '-',
                     $row->mitra_name ?? '-',
+                    $row->sdi_approval_status ?? '-',
+                    $row->is_golive ?? 0,
                 ], null, 'A' . $rowIndex);
                 $rowIndex++;
             }
@@ -786,16 +815,29 @@ class ImportController extends Controller
         ]);
     }
 
-    public function updatePid(\Illuminate\Http\Request $request, \App\Models\Project $project)
+public function updatePid(\Illuminate\Http\Request $request, \App\Models\Project $project)
 {
     /* Hanya Regular. PT2 LOP diedit di workflow PT2/LOP, bukan parent project. */
+    if (! $request->filled('status_progress') && $request->filled('status_project')) {
+        $legacyMap = [
+            'init' => 'inisiasi',
+            'active' => $project->lop?->status_progress ?? 'inisiasi',
+            'close' => 'finishing',
+            'bast' => 'fi_ogp_golive',
+            'drop' => 'drop',
+        ];
+        $request->merge([
+            'status_progress' => $legacyMap[strtolower((string) $request->status_project)] ?? 'inisiasi',
+        ]);
+    }
+
     $request->validate([
         'pid'              => 'required|string|max:100',
         'pid_sap'          => 'nullable|string|max:100',
         'nama_lop'         => 'required|string|max:255',
         'program'          => 'nullable|string|max:150',
         'execution_type'   => 'required|in:kemitraan,swakelola,turnkey',
-        'status_project'   => 'required|in:init,active,close,bast,drop',
+        'status_progress'  => 'required|exists:project_stages,code',
         'id_ihld'          => 'nullable|string|max:100',
         'tematik'          => 'nullable|string|max:150',
         'sto'              => 'nullable|string|max:50',
@@ -817,7 +859,6 @@ class ImportController extends Controller
             'sto'            => $request->sto,
             'mitra_name'     => $request->mitra_name,
             'execution_type' => $request->execution_type,
-            'status_project' => $request->status_project,
         ]);
 
         $lop = \App\Models\Lop::where('project_id', $project->id_project)->first();
@@ -837,12 +878,12 @@ class ImportController extends Controller
             'tgl_toc'        => $request->tgl_toc,
             'mitra_name'     => $request->mitra_name,
             'mapping_status' => 'auto_matched',
+            'status_progress' => $request->status_progress,
         ];
 
         if ($lop) {
             $lop->update($payload);
         } else {
-            $payload['status_progress'] = 'preparation';
             \App\Models\Lop::create($payload);
         }
     });
@@ -960,8 +1001,14 @@ private function applyRegularPidFilters($query, \Illuminate\Http\Request $reques
         $query->where('p.program', $request->program);
     }
 
-    if ($request->filled('status_project')) {
-        $query->where('p.status_project', $request->status_project);
+    $statusProgress = $request->input('status_progress', $request->input('status_project'));
+    if ($statusProgress) {
+        $query->whereExists(function ($lopQuery) use ($statusProgress) {
+            $lopQuery->selectRaw('1')
+                ->from('lops as ls')
+                ->whereColumn('ls.project_id', 'p.id_project')
+                ->where('ls.status_progress', $statusProgress);
+        });
     }
 }
 
@@ -1021,12 +1068,18 @@ private function applyPt2PidFilters($query, \Illuminate\Http\Request $request, a
         $query->where('p.program', $request->program);
     }
 
-    if ($request->filled('status_project')) {
-        $query->where('p.status_project', $request->status_project);
+    $statusProgress = $request->input('status_progress', $request->input('status_project'));
+    if ($statusProgress) {
+        $query->whereExists(function ($lopQuery) use ($statusProgress) {
+            $lopQuery->selectRaw('1')
+                ->from('pt2_lops as ls')
+                ->whereColumn('ls.pt2_project_id', 'p.id_pt2_project')
+                ->where('ls.status_progress', $statusProgress);
+        });
     }
 }
 
-private function buildRegularPidMatrix(array $regions, $programs): array
+private function buildRegularPidMatrix(array $regions, $programs, array $statusOptions): array
 {
     $programList = collect($programs)->values()->all();
     $programSet = array_fill_keys($programList, true);
@@ -1038,13 +1091,7 @@ private function buildRegularPidMatrix(array $regions, $programs): array
         }
     }
 
-    $emptyStats = static fn () => [
-        'init' => 0,
-        'active' => 0,
-        'close' => 0,
-        'bast' => 0,
-        'drop' => 0,
-    ];
+    $emptyStats = static fn () => array_fill_keys(array_keys($statusOptions), 0);
 
     $acc = [];
     $grandTotals = [];
@@ -1070,7 +1117,7 @@ private function buildRegularPidMatrix(array $regions, $programs): array
         ->get([
             'p.id_project',
             'p.program',
-            'p.status_project',
+            'l.status_progress',
             'l.branch',
         ]);
 
@@ -1078,9 +1125,9 @@ private function buildRegularPidMatrix(array $regions, $programs): array
         $branch = strtoupper(trim((string) $row->branch));
         $region = $branchToRegion[$branch] ?? null;
         $program = trim((string) $row->program);
-        $status = strtolower(trim((string) $row->status_project));
+        $status = strtolower(trim((string) $row->status_progress));
 
-        if (!$region || !isset($programSet[$program]) || !in_array($status, ['init', 'active', 'close', 'bast', 'drop'], true)) {
+        if (!$region || !isset($programSet[$program]) || !array_key_exists($status, $statusOptions)) {
             continue;
         }
 
@@ -1618,11 +1665,16 @@ private function buildRegularPidMatrix(array $regions, $programs): array
         | FILTER TAMBAHAN - DISAMAKAN PERSIS DENGAN DATA PID (Regular)
         |--------------------------------------------------------------------------
         | Region & Branch pakai daftar yang sama (pidRegions()), Program &
-        | Status Project juga dibaca dari table `projects` yang sama - BOQ
+        | Status Progress dibaca dari `lops.status_progress` - BOQ
         | cuma ada di jalur Regular (pt2_boq_items terpisah), jadi tidak
         | perlu toggle Regular/PT2 seperti di Data PID.
         */
         $regions = $this->pidRegions();
+        $statusOptions = ProjectStage::active()
+            ->orderByRaw('sequence IS NULL, sequence ASC')
+            ->orderBy('label')
+            ->pluck('label', 'code')
+            ->all();
 
         $perPage = (int) $request->input('per_page', 10);
         if (!in_array($perPage, [10, 20, 50], true)) {
@@ -1965,13 +2017,13 @@ private function buildRegularPidMatrix(array $regions, $programs): array
 
             /*
             |--------------------------------------------------------------------------
-            | STATUS PROJECT FILTER
+            | STATUS PROGRESS FILTER
             |--------------------------------------------------------------------------
             */
             ->when(
-                $request->filled('status_project'),
+                $request->filled('status_progress'),
                 function ($query) use ($request) {
-                    $query->where('p.status_project', $request->status_project);
+                    $query->where('l.status_progress', $request->status_progress);
                 }
             )
 
@@ -2237,14 +2289,15 @@ private function buildRegularPidMatrix(array $regions, $programs): array
                 'sudahAssign',
                 'belumAssign',
 
-                'designators'
+                'designators',
+                'statusOptions'
             )
         );
     }
 
     /**
      * Export Data BOQ ke Excel, mengikuti filter yang sama dengan dataBoq()
-     * (search, package, region, branch, program, status project) - polanya
+     * (search, package, region, branch, program, status progress) - polanya
      * disamakan persis dengan exportPid() di atas.
      *
      * Beda dengan dataBoq() yang menampilkan agregat per LOP (buat tabel +
@@ -2332,8 +2385,8 @@ private function buildRegularPidMatrix(array $regions, $programs): array
             ->when($request->filled('program'), function ($query) use ($request) {
                 $query->where('p.program', $request->program);
             })
-            ->when($request->filled('status_project'), function ($query) use ($request) {
-                $query->where('p.status_project', $request->status_project);
+            ->when($request->filled('status_progress'), function ($query) use ($request) {
+                $query->where('l.status_progress', $request->status_progress);
             })
             ->select([
                 'p.pid',
@@ -2433,13 +2486,19 @@ private function buildRegularPidMatrix(array $regions, $programs): array
 
     public function downloadPidTemplate()
     {
+        // Kolom wajib HANYA pid_sap dan nama_lop (id_ihld wajib khusus untuk
+        // import PT2; untuk LOP reguler boleh dikosongkan). Semua kolom lain
+        // di bawah ini opsional -- kalau dikosongkan saat upload, bisa
+        // dilengkapi belakangan lewat edit data LOP di UI. Daftar ini sudah
+        // mencakup seluruh kolom tabel `lops` (lihat ANALISA_REFACTOR_PERSIAPAN.md
+        // bagian J.1 & K untuk rincian audit-nya).
         $headers = [
             'pid',
             'pid_sap',
             'nama_lop',
             'program',
             'execution_type',
-            'status_project',
+            'status_progress',
             'id_ihld',
             'tematik',
             'sto',
@@ -2449,6 +2508,31 @@ private function buildRegularPidMatrix(array $regions, $programs): array
             'tgl_sp',
             'tgl_toc',
             'mitra_name',
+            'tahun_order',
+            'start_tgl',
+            'wo_smile',
+            'nilai_material',
+            'nilai_jasa',
+            'nilai_total',
+            'odp_8',
+            'odp_16',
+            'total_port',
+            'plan_tiang',
+            'realisasi_tiang',
+            'plan_kabel',
+            'realisasi_kabel',
+            'plan_galian',
+            'real_galian',
+            'nama_waspang',
+            'nik_waspang',
+            'nama_admin',
+            'nik_admin',
+            'est_prep',
+            'est_izin',
+            'est_delivery',
+            'est_instalasi',
+            'est_golive',
+            'package_code',
         ];
 
         $sample = [
@@ -2457,7 +2541,7 @@ private function buildRegularPidMatrix(array $regions, $programs): array
             'LOP AREA 1',
             'OSP',
             'kemitraan',
-            'active',
+            'inisiasi',
             'IHLD001',
             'FTTH',
             'SDA',
@@ -2467,6 +2551,31 @@ private function buildRegularPidMatrix(array $regions, $programs): array
             '2026-06-23',
             '2026-06-30',
             'MITRA A',
+            '2026',
+            '2026-07-01',
+            'WO001',
+            '150000000',
+            '50000000',
+            '200000000',
+            '2',
+            '1',
+            '24',
+            '10',
+            '10',
+            '500',
+            '480',
+            '15',
+            '15',
+            'NAMA WASPANG',
+            '3201xxxxxxxxxxxx',
+            'NAMA ADMIN',
+            '3201yyyyyyyyyyyy',
+            '2026-07-05',
+            '2026-07-10',
+            '2026-07-15',
+            '2026-07-20',
+            '2026-08-01',
+            'PKG-001',
         ];
 
         $filename = 'template_import_pid.csv';

@@ -128,7 +128,7 @@
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 shrink-0 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-xs font-bold uppercase">
+                                <div class="w-8 h-8 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold uppercase dark:bg-blue-500">
                                     {{ mb_substr($user->name, 0, 1) }}
                                 </div>
                                 <div class="min-w-0">

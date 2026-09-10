@@ -138,13 +138,11 @@
                             </div>
 
                             <div>
-                                <label class="text-xs font-black text-slate-500">Status Project</label>
-                                <select name="status_project" x-model="selected.status_project" class="mt-1 w-full rounded-2xl border-slate-300 text-sm">
-                                    <option value="init">Init</option>
-                                    <option value="active">Active</option>
-                                    <option value="close">Close</option>
-                                    <option value="bast">Bast</option>
-                                    <option value="drop">Drop</option>
+                                <label class="text-xs font-black text-slate-500">Status Progress</label>
+                                <select name="status_progress" x-model="selected.status_progress" class="mt-1 w-full rounded-2xl border-slate-300 text-sm">
+                                    @foreach($statusOptions as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
                                 </select>
                             </div>
                         </div>

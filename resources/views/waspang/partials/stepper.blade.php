@@ -1,163 +1,238 @@
 @php
-    // 1. DATA PROJECT & EVIDENCES
-    $evidences = $project->evidences ?? collect();
-    $boqItems = $project->boqItems ?? collect();
-    
-    // Filter BOQ Material (M-)
-    $materialBoqItems = $boqItems->filter(fn($boq) => str_starts_with($boq->designator, 'M-'));
-    $boqTotal = $materialBoqItems->count();
+    // Revisi stepper (6-tahap, sebelumnya 5): "Persiapan Instalasi"
+    // (sequence 6) yg tadinya cuma pass-through di dalam Step 1 Persiapan,
+    // sekarang jadi HALAMAN SENDIRI (Step 2) dgn 2 kartu Barang Tiba/
+    // Perizinan -- persis pola Step 1 Persiapan sebelum refactor 5 sub-step
+    // Stage 4d (lihat WaspangController::persiapanInstalasi()). Stepper
+    // tetap membaca POSISI NYATA LOP dari Project::progressSummary()
+    // (project_stages 11-tahap), bukan dihitung ulang dari evidence lama.
+    //
+    // 6 kolom & RANGE sequence yg diwakili:
+    //   1. Persiapan            -> sequence 1-5  (inisiasi..material_delivery, 5 sub-step)
+    //   2. Persiapan Instalasi  -> sequence 6    (halaman sendiri, Barang Tiba/Perizinan)
+    //   3. Instalasi            -> sequence 7
+    //   4. Pengukuran           -> sequence 8
+    //   5. Finishing            -> sequence 9
+    //   6. Selesai              -> sequence 10-11 (FI-OGP Golive/Golive) -- belum ada
+    //      halaman waspang sendiri, jadi cuma indikator status (tidak bisa diklik).
+    $summary = $project->progressSummary();
+    $seq = $summary['effectiveStageSequence'];
 
-    // 2. CEK KELENGKAPAN STEP 1 (PERSIAPAN)
-    $barangTibaPhotos = $evidences->where('stage', 'persiapan')->where('evidence_type', 'barang_tiba');
-    $perizinanPhotos = $evidences->where('stage', 'persiapan')->where('evidence_type', 'perizinan');
-    
-    $barangTibaUploaded = $barangTibaPhotos->count() > 0;
-    $perizinanUploaded = $perizinanPhotos->count() > 0;
-    $step1Done = $barangTibaUploaded && $perizinanUploaded;
+    $rejectedByStage = fn (string $stage) => ($project->evidences ?? collect())
+        ->where('stage', $stage)->where('status', 'rejected')->isNotEmpty();
 
-    // Cek Rejected Step 1
-    $step1Rejected = $barangTibaPhotos->where('status', 'rejected')->isNotEmpty() || 
-                     $perizinanPhotos->where('status', 'rejected')->isNotEmpty();
+    $step1Rejected = $rejectedByStage('persiapan') && ($seq === null || $seq <= 5);
+    $step2Rejected = $rejectedByStage('persiapan') && ($seq === null || $seq === 6);
+    $step3Rejected = $rejectedByStage('instalasi');
+    $step4Rejected = $rejectedByStage('pengukuran');
+    $step5Rejected = $rejectedByStage('finishing');
 
-    // 3. CEK KELENGKAPAN STEP 2 (INSTALASI)
-    $boqUploaded = $materialBoqItems->filter(function ($boq) use ($evidences) {
-        return $evidences->where('stage', 'instalasi')
-                         ->where('evidence_type', 'progress_boq')
-                         ->where('boq_item_id', $boq->id_boq)
-                         ->count() > 0;
-    })->count();
-    
-    $step2Done = $boqTotal > 0 && $boqUploaded >= $boqTotal;
-    
-    // Cek Rejected Step 2
-    $step2Rejected = $evidences->where('stage', 'instalasi')->where('status', 'rejected')->isNotEmpty();
+    // "Selesai" (checkmark hijau) & "terbuka" (boleh diklik) murni dari
+    // posisi sequence -- fallback ke boolean lama HANYA kalau LOP/kode
+    // stage tak dikenal (edge-case, lihat Project::progressSummary()).
+    $step1Done = $seq !== null ? $seq > 5 : false;
+    $step2Done = $seq !== null ? $seq > 6 : ($summary['persiapanDone'] ?? false);
+    $step3Done = $seq !== null ? $seq > 7 : ($summary['instalasiDone'] ?? false);
+    $step4Done = $seq !== null ? $seq > 8 : ($summary['pengukuranDone'] ?? false);
+    $step5Done = $seq !== null ? $seq > 9 : ($summary['finishingDone'] ?? false);
+    $step6Done = $seq !== null ? $seq > 9 : false; // Selesai = sudah lewat Finishing (FI-OGP Golive/Golive)
 
-    // 4. CEK KELENGKAPAN STEP 3 (PENGUKURAN)
-    // Berdasarkan logika lama, Pengukuran Complete mengikuti Instalasi Complete (Bisa disesuaikan jika ada bukti ukur)
-    $step3Done = $step2Done; 
-    
-    // Cek Rejected Step 3 (Misal stage pengukuran)
-    $step3Rejected = $evidences->where('stage', 'pengukuran')->where('status', 'rejected')->isNotEmpty();
-
-    // 5. CEK KELENGKAPAN STEP 4 (FINISHING)
-    $finishingUploaded = $materialBoqItems->filter(function ($boq) use ($evidences) {
-        return $evidences->where('stage', 'finishing')->where('boq_item_id', $boq->id_boq)->count() > 0;
-    })->count();
-    
-    $step4Done = $boqTotal > 0 && $finishingUploaded >= $boqTotal;
-    
-    // Cek Rejected Step 4
-    $step4Rejected = $evidences->where('stage', 'finishing')->where('status', 'rejected')->isNotEmpty();
-
-    // 6. DETEKSI HALAMAN AKTIF & TOMBOL BACK
     $route = Route::currentRouteName();
-    
-    $isStep1 = $route === 'waspang.projects.show';
-    $isStep2 = $route === 'waspang.projects.instalasi';
-    $isStep3 = $route === 'waspang.projects.pengukuran'; 
-    $isStep4 = $route === 'waspang.projects.finishing'; 
+    // FIX (Stage 4d): 'waspang.projects.show' cuma dipakai utk redirect ke
+    // 'waspang.projects.persiapan' (lihat WaspangController::show()) -- route
+    // itu SENDIRI tidak pernah jadi currentRouteName() saat halaman Persiapan
+    // benar2 tampil, jadi $isStep1 sebelumnya SELALU false (bug laten,
+    // stepper tidak pernah highlight Step 1 aktif). Tambahkan
+    // 'waspang.projects.persiapan' sebagai match yg valid.
+    $isStep1 = in_array($route, ['waspang.projects.show', 'waspang.projects.persiapan'], true);
+    $isStep2 = $route === 'waspang.projects.persiapan-instalasi';
+    $isStep3 = $route === 'waspang.projects.instalasi';
+    $isStep4 = $route === 'waspang.projects.pengukuran';
+    $isStep5 = $route === 'waspang.projects.finishing';
 
-    $backUrl = route('waspang.inbox'); 
-    $title = 'Step 1 - Persiapan';
+    $step2Open = $isStep2 || $step1Done || ($seq !== null && $seq >= 6);
+    $step3Open = $isStep3 || $step2Done || ($seq !== null && $seq >= 7);
+    $step4Open = $isStep4 || $step3Done || ($seq !== null && $seq >= 8);
+    $step5Open = $isStep5 || $step4Done || ($seq !== null && $seq >= 9);
+
+    $backUrl = route('waspang.inbox');
+    $title = 'Step 1 · Persiapan';
 
     if ($isStep1) {
-        $backUrl = route('waspang.inbox'); 
-        $title = 'Step 1 - Persiapan';
+        $backUrl = route('waspang.inbox');
+        $title = 'Step 1 · Persiapan';
     } elseif ($isStep2) {
-        $backUrl = route('waspang.projects.show', $project->id_project); 
-        $title = 'Step 2 - Instalasi';
+        $backUrl = route('waspang.projects.show', $project->id_project);
+        $title = 'Step 2 · Persiapan Instalasi';
     } elseif ($isStep3) {
-        $backUrl = route('waspang.projects.instalasi', $project->id_project);
-        $title = 'Step 3 - Pengukuran';
+        $backUrl = route('waspang.projects.persiapan-instalasi', $project->id_project);
+        $title = 'Step 3 · Instalasi';
     } elseif ($isStep4) {
-        $backUrl = route('waspang.projects.pengukuran', $project->id_project); 
-        $title = 'Step 4 - Finishing';
+        $backUrl = route('waspang.projects.instalasi', $project->id_project);
+        $title = 'Step 4 · Pengukuran';
+    } elseif ($isStep5) {
+        $backUrl = route('waspang.projects.pengukuran', $project->id_project);
+        $title = 'Step 5 · Finishing';
     }
+
+    // Titik warna kecil pada chip tahap -- daftar KELAS STATIS (bukan
+    // interpolasi "bg-{$color}-400") supaya tetap ke-scan & ke-compile oleh
+    // Tailwind JIT. Samakan dgn nilai `project_stages.color` yg diseed.
+    $stageDotClass = match ($summary['effectiveStageColor'] ?? null) {
+        'slate' => 'bg-slate-300',
+        'amber' => 'bg-amber-300',
+        'blue' => 'bg-blue-300',
+        'indigo' => 'bg-blue-300',
+        'emerald' => 'bg-emerald-300',
+        'purple' => 'bg-purple-300',
+        'green' => 'bg-green-300',
+        'orange' => 'bg-orange-300',
+        'red' => 'bg-red-300',
+        default => 'bg-white',
+    };
+
+    $segments = [
+        [
+            'number' => 1,
+            'label' => 'Persiapan',
+            'href' => route('waspang.projects.show', $project->id_project),
+            'open' => true,
+            'done' => $step1Done,
+            'active' => $isStep1,
+            'rejected' => $step1Rejected,
+        ],
+        [
+            'number' => 2,
+            'label' => 'Persiapan Instalasi',
+            'href' => route('waspang.projects.persiapan-instalasi', $project->id_project),
+            'open' => $step2Open,
+            'done' => $step2Done,
+            'active' => $isStep2,
+            'rejected' => $step2Rejected,
+        ],
+        [
+            'number' => 3,
+            'label' => 'Instalasi',
+            'href' => route('waspang.projects.instalasi', $project->id_project),
+            'open' => $step3Open,
+            'done' => $step3Done,
+            'active' => $isStep3,
+            'rejected' => $step3Rejected,
+        ],
+        [
+            'number' => 4,
+            'label' => 'Pengukuran',
+            'href' => route('waspang.projects.pengukuran', $project->id_project),
+            'open' => $step4Open,
+            'done' => $step4Done,
+            'active' => $isStep4,
+            'rejected' => $step4Rejected,
+        ],
+        [
+            'number' => 5,
+            'label' => 'Finishing',
+            'href' => route('waspang.projects.finishing', $project->id_project),
+            'open' => $step5Open,
+            'done' => $step5Done,
+            'active' => $isStep5,
+            'rejected' => $step5Rejected,
+        ],
+        [
+            'number' => 6,
+            'label' => 'Selesai',
+            'href' => null, // belum ada halaman waspang -- murni indikator status
+            'open' => false,
+            'done' => $step6Done,
+            'active' => false,
+            'rejected' => false,
+        ],
+    ];
 @endphp
 
-<div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem]">
-    
+<div class="bg-[#1565D8] text-white px-5 pt-6 pb-6 rounded-b-[2rem] shadow-lg shadow-slate-900/10">
+
     {{-- HEADER KEMBALI & JUDUL --}}
     <div class="flex items-center gap-3">
-        <a href="{{ $backUrl }}" 
-            class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-2xl font-medium transition active:scale-95">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left"><path d="m15 18-6-6 6-6"/></svg>
+        <a href="{{ $backUrl }}"
+            class="w-10 h-10 shrink-0 rounded-2xl bg-white/15 hover:bg-white/25 inline-flex items-center justify-center transition active:scale-90">
+            <i class="fa-solid fa-chevron-left text-sm"></i>
         </a>
-        <h1 class="text-xl font-bold">{{ $title }}</h1>
+        <div class="min-w-0">
+            <h1 class="text-lg font-black tracking-tight truncate">{{ $title }}</h1>
+            <p class="text-[11px] text-blue-100 font-medium truncate">{{ $project->project_name }}</p>
+        </div>
     </div>
 
-    {{-- STEPPER PROGRESS BAR (Bebas Klik asalkan Step Sebelumnya Selesai) --}}
-    <div class="relative px-2 mt-4 mb-2">
-        {{-- Garis Penghubung --}}
-        <div class="absolute top-4 left-10 right-10 h-1 bg-blue-300/60 rounded-full"></div>
-        
-        <div class="relative grid grid-cols-4 text-center">
-            
-            {{-- STEP 1: PERSIAPAN --}}
-            <a href="{{ route('waspang.projects.show', $project->id_project) }}" class="z-10 block transition hover:scale-110">
-                <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm transition-all
-                    {{ $step1Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500/50' : 
-                       ($step1Done ? 'bg-green-100 text-green-700' : 
-                       ($isStep1 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-400 text-white')) }}">
-                    {{ $step1Rejected ? '!' : ($step1Done ? '✓' : '1') }}
-                </div>
-                <p class="mt-2 text-xs font-bold {{ $step1Rejected ? 'text-red-300' : ($step1Done || $isStep1 ? 'text-white' : 'text-blue-100') }}">Persiapan</p>
-            </a>
+    {{-- CHIP POSISI NYATA LOP (project_stages) --}}
+    <div class="mt-3.5 flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-center gap-1.5 bg-white/15 border border-white/20 backdrop-blur-sm rounded-full pl-2 pr-3 py-1 text-[11px] font-bold">
+            <span class="w-1.5 h-1.5 rounded-full {{ $stageDotClass }}"></span>
+            Posisi: {{ $summary['effectiveStageLabel'] ?? '-' }}
+        </span>
 
-            {{-- STEP 2: INSTALASI --}}
-            @if($step1Done || $isStep2)
-                <a href="{{ route('waspang.projects.instalasi', $project->id_project) }}" class="z-10 block transition hover:scale-110">
-                    <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm transition-all
-                        {{ $step2Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500/50' : 
-                           ($step2Done ? 'bg-green-100 text-green-700' : 
-                           ($isStep2 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-400 text-white')) }}">
-                        {{ $step2Rejected ? '!' : ($step2Done ? '✓' : '2') }}
+        @if($summary['isHold'] ?? false)
+            <span class="inline-flex items-center gap-1.5 bg-amber-400/90 text-amber-950 rounded-full px-3 py-1 text-[11px] font-black">
+                <i class="fa-solid fa-pause"></i> LOP di-HOLD
+            </span>
+        @elseif($summary['isDrop'] ?? false)
+            <span class="inline-flex items-center gap-1.5 bg-red-500/90 text-white rounded-full px-3 py-1 text-[11px] font-black">
+                <i class="fa-solid fa-ban"></i> LOP di-DROP
+            </span>
+        @endif
+    </div>
+
+    {{-- STEPPER UTAMA: 1-6 (Persiapan / Persiapan Instalasi / Instalasi / Pengukuran / Finishing / Selesai) --}}
+    <div class="relative mt-5 px-1">
+        {{-- garis penghubung --}}
+        <div class="absolute top-4 left-4 right-4 h-0.5 bg-white/25 rounded-full"></div>
+
+        <div class="relative grid grid-cols-6 text-center gap-0.5">
+            @foreach($segments as $seg)
+                @php
+                    // Aturan warna sesuai spesifikasi:
+                    // - Aktif   -> circle biru & text biru, background putih
+                    // - Selesai -> icon check hijau
+                    // - Belum aktif -> abu-abu
+                    // - Ditolak (state tambahan, di luar 3 aturan di atas) -> merah
+                    $circleClass = match(true) {
+                        $seg['rejected'] => 'bg-white text-red-600 ring-2 ring-red-500',
+                        $seg['active'] => 'bg-white text-[#1565D8] ring-2 ring-[#1565D8]',
+                        $seg['done'] => 'bg-white text-emerald-600 ring-2 ring-emerald-500',
+                        default => 'bg-slate-100 text-slate-400',
+                    };
+                    $labelClass = match(true) {
+                        $seg['rejected'] => 'text-red-100',
+                        $seg['active'], $seg['done'] => 'text-white',
+                        default => 'text-blue-200/70',
+                    };
+                @endphp
+
+                @if($seg['open'] && $seg['href'])
+                    <a href="{{ $seg['href'] }}" class="z-10 flex flex-col items-center gap-1 transition active:scale-95">
+                        <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-sm {{ $circleClass }}">
+                            @if($seg['rejected'])
+                                <i class="fa-solid fa-exclamation"></i>
+                            @elseif($seg['done'])
+                                <i class="fa-solid fa-check"></i>
+                            @else
+                                {{ $seg['number'] }}
+                            @endif
+                        </div>
+                        <p class="text-[9px] font-bold leading-tight {{ $labelClass }}">{{ $seg['label'] }}</p>
+                    </a>
+                @else
+                    <div class="z-10 flex flex-col items-center gap-1 {{ $seg['open'] ? '' : 'opacity-90' }}">
+                        <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-sm {{ $circleClass }}">
+                            @if($seg['done'])
+                                <i class="fa-solid fa-check"></i>
+                            @else
+                                {{ $seg['number'] }}
+                            @endif
+                        </div>
+                        <p class="text-[9px] font-bold leading-tight {{ $labelClass }}">{{ $seg['label'] }}</p>
                     </div>
-                    <p class="mt-2 text-xs font-bold {{ $step2Rejected ? 'text-red-300' : ($step2Done || $isStep2 ? 'text-white' : 'text-blue-100') }}">Instalasi</p>
-                </a>
-            @else
-                <div class="z-10 block opacity-50 cursor-not-allowed">
-                    <div class="mx-auto w-8 h-8 rounded-full bg-blue-400 text-white flex items-center justify-center text-sm font-bold">2</div>
-                    <p class="mt-2 text-xs font-bold text-blue-200">Instalasi</p>
-                </div>
-            @endif
-
-            {{-- STEP 3: PENGUKURAN --}}
-            @if($step2Done || $isStep3)
-                <a href="{{ route('waspang.projects.pengukuran', $project->id_project) }}" class="z-10 block transition hover:scale-110">
-                    <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm transition-all
-                        {{ $step3Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500/50' : 
-                           ($step3Done ? 'bg-green-100 text-green-700' : 
-                           ($isStep3 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-400 text-white')) }}">
-                        {{ $step3Rejected ? '!' : ($step3Done ? '✓' : '3') }}
-                    </div>
-                    <p class="mt-2 text-xs font-bold {{ $step3Rejected ? 'text-red-300' : ($step3Done || $isStep3 ? 'text-white' : 'text-blue-100') }}">Pengukuran</p>
-                </a>
-            @else
-                <div class="z-10 block opacity-50 cursor-not-allowed">
-                    <div class="mx-auto w-8 h-8 rounded-full bg-blue-400 text-white flex items-center justify-center text-sm font-bold">3</div>
-                    <p class="mt-2 text-xs font-bold text-blue-200">Pengukuran</p>
-                </div>
-            @endif
-
-            {{-- STEP 4: FINISHING --}}
-            @if($step3Done || $isStep4)
-                <a href="{{ route('waspang.projects.finishing', $project->id_project) }}" class="z-10 block transition hover:scale-110">
-                    <div class="mx-auto w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm transition-all
-                        {{ $step4Rejected ? 'bg-red-100 text-red-600 ring-4 ring-red-500/50' : 
-                           ($step4Done ? 'bg-green-100 text-green-700' : 
-                           ($isStep4 ? 'bg-white text-blue-700 ring-4 ring-blue-700' : 'bg-blue-400 text-white')) }}">
-                        {{ $step4Rejected ? '!' : ($step4Done ? '✓' : '4') }}
-                    </div>
-                    <p class="mt-2 text-xs font-bold {{ $step4Rejected ? 'text-red-300' : ($step4Done || $isStep4 ? 'text-white' : 'text-blue-100') }}">Finishing</p>
-                </a>
-            @else
-                <div class="z-10 block opacity-50 cursor-not-allowed">
-                    <div class="mx-auto w-8 h-8 rounded-full bg-blue-400 text-white flex items-center justify-center text-sm font-bold">4</div>
-                    <p class="mt-2 text-xs font-bold text-blue-200">Finishing</p>
-                </div>
-            @endif
-
+                @endif
+            @endforeach
         </div>
     </div>
 </div>

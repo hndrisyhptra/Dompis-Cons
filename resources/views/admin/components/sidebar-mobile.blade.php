@@ -251,6 +251,10 @@
                 || request()->routeIs('packages.*')
                 || request()->routeIs('designator-prices.*');
 
+            $masterAlurOpen = request()->routeIs('admin.project-stages.*')
+                || request()->routeIs('admin.kendala-categories.*')
+                || request()->routeIs('admin.permit-categories.*');
+
             $importDataOpen = request()->routeIs('admin.import.pid*')
                 || request()->routeIs('admin.import.lop*')
                 || request()->routeIs('admin.import.lop.mapping*')
@@ -330,6 +334,81 @@
             </div>
         </div>
 
+        {{-- MASTER ALUR & KATEGORI (Stage 3 refactor): khusus superadmin,
+             dikonfirmasi pemilik project 2026-09-08 -- admin biasa TIDAK
+             perlu akses ini walau berbagi file sidebar yang sama dengan
+             superadmin. --}}
+        @if(auth()->user()->role === 'superadmin')
+        <div x-data="{ open: {{ $masterAlurOpen ? 'true' : 'false' }} }">
+
+            <button type="button"
+                    @click="open = !open"
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    {{ $masterAlurOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                <div class="flex items-center gap-3">
+                    @if($masterAlurOpen)
+                        <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+                    @endif
+
+                    <div class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-600/40 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                            width="20" height="20" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                            <polyline points="2 17 12 22 22 17"/>
+                            <polyline points="2 12 12 17 22 12"/>
+                        </svg>
+                    </div>
+
+                    <span>Master Alur PT3</span>
+                </div>
+
+                <svg :class="open ? 'rotate-180' : ''"
+                    class="w-4 h-4 transition-transform"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+
+            <div x-show="open"
+                x-transition
+                class="mt-1 ml-5 pl-3 border-l border-gray-200 dark:border-gray-700 space-y-1">
+
+                <a href="{{ route('admin.project-stages.index') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.project-stages.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                   <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        Tahapan Alur
+                    </span>
+                </a>
+
+                <a href="{{ route('admin.kendala-categories.index') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.kendala-categories.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                    <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                        Kategori Kendala
+                    </span>
+                </a>
+
+                <a href="{{ route('admin.permit-categories.index') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.permit-categories.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                   <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                        Kategori Perizinan
+                    </span>
+                </a>
+
+            </div>
+        </div>
+        @endif
 
         {{-- IMPORT DATA --}}
         <div x-data="{ open: {{ $importDataOpen ? 'true' : 'false' }} }">

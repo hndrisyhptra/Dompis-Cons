@@ -1,7 +1,7 @@
 @extends('layouts.waspang')
 
 @section('content')
-<div class="min-h-screen max-w-md mx-auto bg-[#f8fafc] pb-24 font-sans">
+<div class="min-h-screen max-w-md mx-auto bg-[#F8FAFC] pb-24 font-sans">
 
     {{-- ALERT NOTIFIKASI SYSTEM --}}
     @if(session('success'))
@@ -17,10 +17,10 @@
     @endif
 
     {{-- HEADER --}}
-    <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem] shadow-md">
+    <div class="bg-[#1565D8] text-white px-5 pt-6 pb-5 rounded-b-[2rem] shadow-lg shadow-slate-900/10">
         <div class="flex items-center gap-3">
-            <a href="{{ route('waspang.dashboard') }}" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-2xl font-medium transition active:scale-95">
-                ‹
+            <a href="{{ route('waspang.dashboard') }}" class="w-10 h-10 shrink-0 rounded-2xl bg-white/15 hover:bg-white/25 inline-flex items-center justify-center transition active:scale-90">
+                <i class="fa-solid fa-chevron-left text-sm"></i>
             </a>
             <div>
                 <h1 class="text-xl font-black tracking-tight">Inbox LOP</h1>
@@ -37,9 +37,9 @@
                     name="search"
                     value="{{ request('search') }}"
                     placeholder="Cari LOP, STO, branch, mitra..."
-                    class="w-full h-11 rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-bold shadow-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-700 outline-none transition">
+                    class="w-full h-11 rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-bold shadow-xs focus:ring-2 focus:ring-blue-100 focus:border-[#1565D8] outline-none transition">
                 <div class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
-                    🔍
+                    <i class="fa-solid fa-magnifying-glass"></i>
                 </div>
             </div>
         </form>
@@ -53,7 +53,7 @@
                 $boqItems = $project->boqItems ?? collect();
 
                 // 1. STAGE PERSIAPAN (Wajib Approved)
-                $persiapanDone = $evidences->where('stage', 'persiapan')->where('evidence_type', 'barang_tiba')->where('status', 'approved')->count() > 0 
+                $persiapanDone = $evidences->where('stage', 'persiapan')->where('evidence_type', 'barang_tiba')->where('status', 'approved')->count() > 0
                     && $evidences->where('stage', 'persiapan')->where('evidence_type', 'perizinan')->where('status', 'approved')->count() > 0;
 
                 // 2. STAGE INSTALASI (Wajib Approved Semua Item Material)
@@ -70,7 +70,7 @@
                 $hasOtdr = $evidences->where('stage', 'pengukuran')->where('evidence_type', 'otdr')->count() > 0;
                 $hasOpm = $evidences->where('stage', 'pengukuran')->where('evidence_type', 'opm')->count() > 0;
                 $hasDalam = $evidences->where('stage', 'pengukuran')->where('evidence_type', 'kedalaman')->count() > 0;
-                
+
                 $pengukuranApproved = $evidences->where('stage', 'pengukuran')->where('status', 'approved')->count() == $evidences->where('stage', 'pengukuran')->count();
                 $pengukuranDone = ($hasOtdr || $hasOpm || $hasDalam) ? $pengukuranApproved : true;
 
@@ -88,17 +88,17 @@
                 $allStepDone = ($progress === 100);
 
                 // DYNAMIC TEMPLATE DESIGN STYLES
-                $borderColor = $allStepDone ? 'border-l-emerald-600' : 'border-l-blue-600';
-                $progressColor = $allStepDone ? 'bg-emerald-500' : 'bg-blue-600';
+                $borderColor = $allStepDone ? 'border-l-emerald-600' : 'border-l-[#1565D8]';
+                $progressColor = $allStepDone ? 'bg-emerald-500' : 'bg-[#1565D8]';
 
                 $lastUpdate = optional($evidences->sortByDesc('updated_at')->first())->updated_at ?? $project->updated_at;
             @endphp
 
             <div class="bg-white border border-slate-100 border-l-[4px] {{ $borderColor }} rounded-3xl p-4 shadow-xs">
-                
+
                 <div class="flex justify-between items-start gap-3">
                     <div class="min-w-0">
-                        <h2 class="text-base font-black text-slate-800 tracking-tight leading-tight">
+                        <h2 class="text-base font-black text-slate-900 tracking-tight leading-tight">
                             {{ $project->project_name }}
                         </h2>
                         <p class="text-[11px] text-slate-400 font-bold mt-1">
@@ -118,7 +118,7 @@
                         {{ $persiapanDone ? '✓ Persiapan' : '○ Persiapan' }}
                     </span>
 
-                    <span class="px-2 py-0.5 rounded-md border {{ $instalasiDone ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-400' }}">
+                    <span class="px-2 py-0.5 rounded-md border {{ $instalasiDone ? 'bg-blue-50 border-blue-200 text-[#1565D8]' : 'bg-slate-50 border-slate-200 text-slate-400' }}">
                         {{ $instalasiDone ? '✓ Instalasi' : '○ Instalasi' }}
                     </span>
 
@@ -141,13 +141,13 @@
                 <div class="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-50">
                     <div>
                         <p class="text-[10px] text-slate-400 font-medium">Total Progress</p>
-                        <p class="text-sm font-black text-blue-700">{{ $progress }}%</p>
+                        <p class="text-sm font-black text-[#1565D8]">{{ $progress }}%</p>
                     </div>
 
                     <div class="text-right">
                         <p class="text-[10px] text-slate-400 font-medium">Update Terakhir</p>
                         <p class="text-[11px] font-black text-slate-700">{{ $lastUpdate ? $lastUpdate->diffForHumans() : '-' }}</p>
-                        <a href="{{ route('waspang.projects.show', $project->id_project) }}" class="inline-block text-[11px] font-black text-blue-600 mt-0.5 hover:underline">
+                        <a href="{{ route('waspang.projects.show', $project->id_project) }}" class="inline-block text-[11px] font-black text-[#1565D8] mt-0.5 hover:underline">
                             Detail Stage →
                         </a>
                     </div>
@@ -185,7 +185,7 @@
                             </button>
 
                             <a href="{{ route('waspang.projects.show', $project->id_project) }}"
-                               class="h-10 inline-flex items-center justify-center rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-black shadow-sm transition">
+                               class="h-10 inline-flex items-center justify-center rounded-xl bg-[#1565D8] hover:bg-[#0F4FAF] text-white text-xs font-black shadow-sm transition">
                                 Upload Eviden
                             </a>
                         @endif
@@ -195,7 +195,7 @@
                 {{-- KOTAK INFORMASI JIKA ADA KENDALA AKTIF --}}
                 @if($kendalaIssue)
                     <div class="mt-3 rounded-xl bg-orange-50/60 border border-orange-100 p-3 flex gap-2 items-start animate-fade-in">
-                        <span class="text-orange-600 font-bold text-xs">⚠️</span>
+                        <i class="fa-solid fa-triangle-exclamation text-orange-600 text-xs mt-0.5"></i>
                         <div class="min-w-0">
                             <p class="text-[11px] font-black text-orange-800">Konstruksi Terhenti Lapangan:</p>
                             <p class="text-[11px] text-orange-700 mt-0.5 break-words line-clamp-2">{{ $kendalaIssue->description }}</p>
@@ -208,7 +208,7 @@
             {{-- MODAL BOX POPUP KENDALA --}}
             <div id="kendalaModal-{{ $project->id_project }}" class="hidden fixed inset-0 z-[9999] bg-black/60 px-4 flex items-center justify-center backdrop-blur-xs">
                 <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-fade-in">
-                    
+
                     <div class="bg-orange-600 text-white px-5 py-4 flex items-start justify-between">
                         <div>
                             <h2 class="text-base font-black">Laporkan Kendala</h2>
@@ -343,7 +343,7 @@
         const wrapper = document.querySelector(`.issue-preview-wrapper[data-project-id="${projectId}"]`);
         const grid = document.querySelector(`.issue-preview-grid[data-project-id="${projectId}"]`);
         if (!wrapper || !grid) return;
-        
+
         grid.innerHTML = '';
         if (uploader.files.length === 0) { wrapper.classList.add('hidden'); return; }
         wrapper.classList.remove('hidden');

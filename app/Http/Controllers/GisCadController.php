@@ -19,7 +19,12 @@ use RuntimeException;
  */
 class GisCadController extends Controller
 {
-    private const ALLOWED_ROLES = ['sdi_surveyor', 'admin', 'sdi', 'waspang', 'superadmin', 'super_tif'];
+    // FIX (2026-09-08): 'officer' ditambahkan -- sidebar officer sendiri
+    // (resources/views/officer/components/sidebar.blade.php) sudah link ke
+    // admin.gis-cad.index & admin.site-surveys.index, tapi constant ini
+    // belum pernah diupdate saat role officer ditambahkan, jadi link itu
+    // sebelumnya selalu berujung 403.
+    private const ALLOWED_ROLES = ['sdi_surveyor', 'admin', 'sdi', 'waspang', 'superadmin', 'super_tif', 'officer'];
 
     private function guardAccess(): User
     {

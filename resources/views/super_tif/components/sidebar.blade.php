@@ -42,7 +42,7 @@
             <span>Dashboard</span>
         </a>
 
-        <!-- @php
+        @php
             $inboxOpen = request()->routeIs('admin.inbox*') || request()->routeIs('admin.history*');
         @endphp
 
@@ -121,7 +121,7 @@
 
             </div>
         </div>
-        @endif -->
+        @endif
 
         @php
             // Mendeteksi apakah salah satu dari menu Project / Program sedang aktif
@@ -236,7 +236,7 @@
                 </div>
         </div>
 
-        <!-- @php
+        @php
             $masterDesignatorOpen = request()->routeIs('designators.*')
                 || request()->routeIs('packages.*')
                 || request()->routeIs('designator-prices.*');
@@ -318,7 +318,7 @@
                 </a>
 
             </div>
-        </div> -->
+        </div>
 
 
         {{-- IMPORT DATA --}}

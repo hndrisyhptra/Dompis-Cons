@@ -408,10 +408,10 @@
                             sto: @js($project->sto),
                             mitra_name: @js($project->mitra_name),
                             jenis_eksekusi: '{{ $project->jenis_eksekusi }}',
-                            status: '{{ $project->status }}',
+                            status_progress: @js($project->lop?->status_progress),
                             latitude: @js($project->latitude),
                             longitude: @js($project->longitude),
-                            location_address: @js($project->location_address)
+                            location_address: @js($project->location_address),
                             boq_items: @js($project->boqItems->map(function($boq) {
                                 return [
                                     'id_boq' => $boq->id_boq,

@@ -54,16 +54,16 @@ class AdminPt2Controller extends Controller
         if ($request->filled('region')) {
             $selectedRegion = strtoupper($request->region);
             if (isset($regions[$selectedRegion])) {
-                $query->whereIn(DB::raw('UPPER(branch)'), $regions[$selectedRegion]);
+                $query->whereHas('lops', fn ($lop) => $lop->whereIn(DB::raw('UPPER(branch)'), $regions[$selectedRegion]));
             }
         }
 
         if ($request->filled('branch')) {
-            $query->whereRaw('UPPER(branch) = ?', [strtoupper($request->branch)]);
+            $query->whereHas('lops', fn ($lop) => $lop->whereRaw('UPPER(branch) = ?', [strtoupper($request->branch)]));
         }
 
-        if ($request->filled('status_project')) {
-            $query->where('status_project', $request->status_project);
+        if ($request->filled('status_progress')) {
+            $query->whereHas('lops', fn ($lop) => $lop->where('status_progress', $request->status_progress));
         }
 
         $perPage = $request->input('per_page', 10);
@@ -72,7 +72,19 @@ class AdminPt2Controller extends Controller
         $branches = Pt2Lop::whereNotNull('branch')->where('branch', '!=', '')->distinct()->orderBy('branch')->pluck('branch');
         $assignableUsers = User::roleCode(['teknisi', 'waspang'])->get();
 
-        return view('admin.pt2.index', compact('projects', 'branches', 'assignableUsers'));
+        $statusOptions = [
+            'preparation' => 'Preparation',
+            'survey' => 'Survey',
+            'progress' => 'Progress',
+            'finish' => 'Finish',
+            'dismantle' => 'Dismantle',
+            'mancore' => 'Mancore',
+            'complete' => 'Complete',
+            'golive' => 'Go-Live',
+            'drop' => 'Drop (Batal)',
+        ];
+
+        return view('admin.pt2.index', compact('projects', 'branches', 'assignableUsers', 'statusOptions'));
     }
 
    /*

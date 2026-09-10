@@ -124,12 +124,12 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Status Project</label>
-                        <select name="status_project" onchange="this.form.submit()"
+                        <label class="block text-xs font-black text-slate-500 uppercase mb-2">Status Progress</label>
+                        <select name="status_progress" onchange="this.form.submit()"
                                 class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Status</option>
-                            @foreach(['init' => 'Init', 'active' => 'Active', 'close' => 'Close', 'bast' => 'BAST', 'drop' => 'Drop'] as $value => $label)
-                                <option value="{{ $value }}" @selected(request('status_project') === $value)>{{ $label }}</option>
+                            @foreach($statusOptions as $value => $label)
+                                <option value="{{ $value }}" @selected(request('status_progress') === $value)>{{ $label }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -146,7 +146,7 @@
                 </div>
 
                 <div class="mt-5 flex flex-col sm:flex-row sm:justify-end gap-3">
-                    @if(request('search') || request('region') || request('branch') || request('program') || request('status_project'))
+                    @if(request('search') || request('region') || request('branch') || request('program') || request('status_progress'))
                         <a href="{{ route('admin.data-pid', ['type' => $dataType]) }}"
                            class="h-11 px-5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold inline-flex items-center justify-center">
                             Reset
@@ -198,7 +198,15 @@
                         @php
                             $projectLops = $lopGroups->get($project->id_project, collect());
                             $firstLop = $projectLops->first();
-                            $status = strtolower($project->status_project ?? 'active');
+                            $status = strtolower($firstLop?->status_progress ?? 'inisiasi');
+                            $statusClass = match ($status) {
+                                'golive' => 'bg-emerald-50 text-emerald-700',
+                                'inisiasi' => 'bg-blue-50 text-blue-700',
+                                'fi_ogp_golive' => 'bg-purple-50 text-purple-700',
+                                'hold' => 'bg-amber-50 text-amber-700',
+                                'drop' => 'bg-red-50 text-red-700',
+                                default => 'bg-slate-100 text-slate-700',
+                            };
 
                             $detailData = $dataType === 'regular' ? [
                                 'id_project' => $project->id_project,
@@ -208,7 +216,7 @@
                                 'project_name' => $project->project_name ?? '-',
                                 'program' => $project->program ?? '-',
                                 'execution_type' => $project->execution_type ?? '-',
-                                'status_project' => $project->status_project ?? '-',
+                                'status_progress' => $firstLop?->status_progress ?? '-',
                                 'id_ihld' => $firstLop?->id_ihld ?? '-',
                                 'lop_name' => $firstLop?->lop_name ?? $project->project_name ?? '-',
                                 'sto' => $firstLop?->sto ?? '-',
@@ -267,13 +275,8 @@
                                 </td>
 
                                 <td class="px-5 py-4 text-center whitespace-nowrap">
-                                    <span class="px-3 py-1.5 rounded-full text-xs font-black
-                                        {{ $status === 'active' ? 'bg-emerald-50 text-emerald-700' : '' }}
-                                        {{ $status === 'init' ? 'bg-blue-50 text-blue-700' : '' }}
-                                        {{ $status === 'close' ? 'bg-slate-100 text-slate-700' : '' }}
-                                        {{ $status === 'bast' ? 'bg-amber-50 text-amber-700' : '' }}
-                                        {{ $status === 'drop' ? 'bg-red-50 text-red-700' : '' }}">
-                                        {{ strtoupper($project->status_project ?? '-') }}
+                                    <span class="px-3 py-1.5 rounded-full text-xs font-black {{ $statusClass }}">
+                                        {{ $statusOptions[$status] ?? strtoupper(str_replace('_', ' ', $status)) }}
                                     </span>
                                 </td>
 
@@ -397,16 +400,14 @@
                             <tr>
                                 <th rowspan="2" class="px-5 py-3 text-left sticky left-0 bg-slate-100 z-10">Wilayah</th>
                                 @foreach($programs as $program)
-                                    <th colspan="5" class="px-3 py-2 text-center border-l border-slate-200">{{ $program }}</th>
+                                    <th colspan="{{ count($statusOptions) }}" class="px-3 py-2 text-center border-l border-slate-200">{{ $program }}</th>
                                 @endforeach
                             </tr>
                             <tr>
                                 @foreach($programs as $program)
-                                    <th class="px-2 py-2 text-blue-600">Init</th>
-                                    <th class="px-2 py-2 text-amber-600">Active</th>
-                                    <th class="px-2 py-2 text-indigo-600">Close</th>
-                                    <th class="px-2 py-2 text-emerald-600">BAST</th>
-                                    <th class="px-2 py-2 text-red-600">Drop</th>
+                                    @foreach($statusOptions as $label)
+                                        <th class="px-2 py-2 text-blue-600">{{ $label }}</th>
+                                    @endforeach
                                 @endforeach
                             </tr>
                         </thead>
@@ -416,7 +417,7 @@
                                     <td class="px-5 py-3 sticky left-0 bg-white z-10">{{ $region['region'] }}</td>
                                     @foreach($programs as $program)
                                         @php $stats = $region['programs'][$program]; @endphp
-                                        @foreach(['init','active','close','bast','drop'] as $statusKey)
+                                        @foreach(array_keys($statusOptions) as $statusKey)
                                             <td class="px-2 py-3 text-center">{{ $stats[$statusKey] ?: '-' }}</td>
                                         @endforeach
                                     @endforeach
@@ -427,7 +428,7 @@
                                         <td class="px-5 py-2 pl-9 sticky left-0 bg-slate-50 z-10">↳ {{ $branch['name'] }}</td>
                                         @foreach($programs as $program)
                                             @php $stats = $branch['programs'][$program]; @endphp
-                                            @foreach(['init','active','close','bast','drop'] as $statusKey)
+                                            @foreach(array_keys($statusOptions) as $statusKey)
                                                 <td class="px-2 py-2 text-center">{{ $stats[$statusKey] ?: '-' }}</td>
                                             @endforeach
                                         @endforeach
@@ -441,7 +442,7 @@
                                 <tr>
                                     <td class="px-5 py-4 sticky left-0 bg-slate-100 z-10">GRAND TOTAL</td>
                                     @foreach($programs as $program)
-                                        @foreach(['init','active','close','bast','drop'] as $statusKey)
+                                        @foreach(array_keys($statusOptions) as $statusKey)
                                             <td class="px-2 py-4 text-center">{{ $grandTotals[$program][$statusKey] ?: '-' }}</td>
                                         @endforeach
                                     @endforeach
@@ -491,7 +492,7 @@
                     { label: 'PID SAP', value: this.selected.pid_sap || '-' },
                     { label: 'Program', value: this.selected.program || '-' },
                     { label: 'Execution Type', value: this.selected.execution_type || '-' },
-                    { label: 'Status Project', value: this.selected.status_project || '-' },
+                    { label: 'Status Progress', value: this.selected.status_progress || '-' },
                 ];
             },
 

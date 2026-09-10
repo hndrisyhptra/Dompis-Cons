@@ -1,19 +1,19 @@
 @extends('layouts.waspang')
 
 @section('content')
-<div class="min-h-screen max-w-md mx-auto bg-[#f8fafc] pb-24 font-sans">
+<div class="min-h-screen max-w-md mx-auto bg-[#F8FAFC] pb-24 font-sans">
 
     {{-- HEADER --}}
-    <div class="bg-blue-700 text-white px-5 pt-6 pb-5 rounded-b-[1.7rem] shadow-md">
+    <div class="bg-[#1565D8] text-white px-5 pt-6 pb-5 rounded-b-[2rem] shadow-lg shadow-slate-900/10">
         <div class="flex items-center gap-3">
-            <a href="{{ route('waspang.dashboard') }}" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 inline-flex items-center justify-center text-2xl font-medium transition active:scale-95">
-                ‹
+            <a href="{{ route('waspang.dashboard') }}" class="w-10 h-10 shrink-0 rounded-2xl bg-white/15 hover:bg-white/25 inline-flex items-center justify-center transition active:scale-90">
+                <i class="fa-solid fa-chevron-left text-sm"></i>
             </a>
             <div>
                 <h1 class="text-xl font-black tracking-tight">List LOP Selesai</h1>
                 <p class="text-xs text-blue-100 mt-0.5">{{ $projects->count() }} LOP Ready UT</p>
             </div>
-        </div>      
+        </div>
     </div>
 
     {{-- SEARCH BAR --}}
@@ -24,9 +24,9 @@
                     name="search"
                     value="{{ request('search') }}"
                     placeholder="Cari LOP finish, STO, branch, mitra..."
-                    class="w-full h-11 rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-bold shadow-xs focus:ring-2 focus:ring-blue-100 focus:border-blue-700 outline-none transition">
+                    class="w-full h-11 rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-xs font-bold shadow-xs focus:ring-2 focus:ring-blue-100 focus:border-[#1565D8] outline-none transition">
                 <div class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">
-                    🔍
+                    <i class="fa-solid fa-magnifying-glass"></i>
                 </div>
             </div>
         </form>
@@ -41,7 +41,7 @@
                 $boqItems = $project->boqItems ?? collect();
 
                 // 1. PERSIAPAN DONE
-                $persiapanDone = $evidences->where('stage', 'persiapan')->where('evidence_type', 'barang_tiba')->where('status', 'approved')->count() > 0 
+                $persiapanDone = $evidences->where('stage', 'persiapan')->where('evidence_type', 'barang_tiba')->where('status', 'approved')->count() > 0
                     && $evidences->where('stage', 'persiapan')->where('evidence_type', 'perizinan')->where('status', 'approved')->count() > 0;
 
                 // 2. INSTALASI DONE
@@ -58,7 +58,7 @@
                 $hasOtdr = $evidences->where('stage', 'pengukuran')->where('evidence_type', 'otdr')->count() > 0;
                 $hasOpm = $evidences->where('stage', 'pengukuran')->where('evidence_type', 'opm')->count() > 0;
                 $hasDalam = $evidences->where('stage', 'pengukuran')->where('evidence_type', 'kedalaman')->count() > 0;
-                
+
                 $pengukuranApproved = $evidences->where('stage', 'pengukuran')->where('status', 'approved')->count() == $evidences->where('stage', 'pengukuran')->count();
                 $pengukuranDone = ($hasOtdr || $hasOpm || $hasDalam) ? $pengukuranApproved : true;
 
@@ -76,7 +76,7 @@
 
                 <div class="flex justify-between items-start gap-3">
                     <div class="min-w-0">
-                        <h2 class="text-base font-black text-slate-800 tracking-tight leading-tight">
+                        <h2 class="text-base font-black text-slate-900 tracking-tight leading-tight">
                             {{ $project->project_name }}
                         </h2>
                         <p class="text-[11px] text-slate-400 font-bold mt-1">
@@ -95,7 +95,7 @@
                         ✓ Persiapan
                     </span>
 
-                    <span class="px-2 py-0.5 rounded-md border bg-blue-50 border-blue-200 text-blue-600">
+                    <span class="px-2 py-0.5 rounded-md border bg-blue-50 border-blue-200 text-[#1565D8]">
                         ✓ Instalasi
                     </span>
 
@@ -108,15 +108,15 @@
                     </span>
                 </div>
 
-                {{-- PROGRESS BAR SOLID BIRU --}}
+                {{-- PROGRESS BAR SOLID INDIGO --}}
                 <div class="mt-4 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div class="h-full bg-blue-600 rounded-full transition-all duration-300" style="width: 100%"></div>
+                    <div class="h-full bg-[#1565D8] rounded-full transition-all duration-300" style="width: 100%"></div>
                 </div>
 
                 <div class="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-50">
                     <div>
                         <p class="text-[10px] text-slate-400 font-medium">Total Progress</p>
-                        <p class="text-sm font-black text-blue-700">100%</p>
+                        <p class="text-sm font-black text-[#1565D8]">100%</p>
                     </div>
 
                     <div class="text-right">

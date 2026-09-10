@@ -325,7 +325,6 @@
             </div>
         </div>
 
-
         {{-- IMPORT DATA --}}
         <div x-data="{ open: {{ $importDataOpen ? 'true' : 'false' }} }">
 

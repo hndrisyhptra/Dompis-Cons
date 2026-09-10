@@ -85,13 +85,13 @@
                         elseif ($stageLabel === 'Instalasi') { $stageBadge = 'bg-yellow-100 text-yellow-700'; $progressColor = 'bg-yellow-600'; }
                         else { $stageBadge = 'bg-red-100 text-red-700'; $progressColor = 'bg-red-600'; }
 
-                        $statusProject = $project->status_project ?? '-';
-                        $statusBadge = match ($statusProject) {
-                            'active' => 'bg-blue-100 text-blue-700',
-                            'close' => 'bg-emerald-100 text-emerald-700',
-                            'bast' => 'bg-purple-100 text-purple-700',
+                        $statusProgress = $summary['effectiveStageCode'] ?? $project->lop?->status_progress ?? '-';
+                        $statusBadge = match ($statusProgress) {
+                            'golive' => 'bg-emerald-100 text-emerald-700',
+                            'fi_ogp_golive' => 'bg-purple-100 text-purple-700',
                             'drop' => 'bg-red-100 text-red-700',
-                            'init' => 'bg-slate-100 text-slate-600',
+                            'hold' => 'bg-amber-100 text-amber-700',
+                            'inisiasi' => 'bg-slate-100 text-slate-600',
                             default => 'bg-gray-100 text-gray-500',
                         };
 
@@ -114,7 +114,7 @@
                             'lopName' => $project->lop?->lop_name ?? '-',
                             'mitra' => $project->mitra_name ?? '-',
                             'executionType' => $project->execution_type ?? '-',
-                            'statusLabel' => $statusOptions[$statusProject] ?? ucfirst($statusProject),
+                            'statusLabel' => $statusOptions[$statusProgress] ?? $stageLabel,
                             'statusBadgeClass' => $statusBadge,
                             'stageLabel' => $stageLabel,
                             'stageBadgeClass' => $stageBadge,
@@ -146,7 +146,7 @@
                             @endif
                         </td>
                         <td class="px-5 py-4">
-                            <span class="px-3 py-1 rounded-full {{ $statusBadge }} text-xs font-black">{{ $statusOptions[$statusProject] ?? ucfirst($statusProject) }}</span>
+                            <span class="px-3 py-1 rounded-full {{ $statusBadge }} text-xs font-black">{{ $statusOptions[$statusProgress] ?? $stageLabel }}</span>
                         </td>
                         <td class="px-5 py-4">
                             <span class="px-3 py-1 rounded-full {{ $stageBadge }} text-xs font-black">{{ $stageLabel }}</span>

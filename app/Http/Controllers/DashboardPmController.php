@@ -40,11 +40,18 @@ class DashboardPmController extends Controller
 
     private function buildIndexData(): array
     {
+        // FIX (2026-09-08): kode 'preparation' sudah tidak pernah ada lagi di
+        // lops.status_progress sejak migration 2026_09_08_090300 (alur
+        // 11-tahap) -- LOP lama yang dulunya 'preparation' sekarang jadi
+        // 'persiapan_instalasi', dan LOP baru mulai dari 'inisiasi'.
+        // total_prep sendiri saat ini tidak dipakai di bawah (hanya
+        // total_inst/total_finish), tapi tetap dibetulkan biar tidak
+        // menyesatkan kalau suatu saat dipakai.
         $projectStats = DB::table('lops')
             ->select(
-                DB::raw("COUNT(CASE WHEN status_progress = 'preparation' THEN 1 END) as total_prep"),
-                DB::raw("COUNT(CASE WHEN status_progress = 'instalasi' THEN 1 END) as total_inst"),
-                DB::raw("COUNT(CASE WHEN status_progress = 'finishing' THEN 1 END) as total_finish")
+                DB::raw("COUNT(CASE WHEN status_progress NOT IN ('instalasi', 'pengukuran', 'finishing', 'fi_ogp_golive', 'golive', 'hold', 'drop') THEN 1 END) as total_prep"),
+                DB::raw("COUNT(CASE WHEN status_progress IN ('instalasi', 'pengukuran') THEN 1 END) as total_inst"),
+                DB::raw("COUNT(CASE WHEN status_progress IN ('finishing', 'fi_ogp_golive', 'golive') OR is_golive = 1 THEN 1 END) as total_finish")
             )->first();
 
         $pendingEvidence = DB::table('evidences')->where('status', 'pending')->count();
@@ -108,8 +115,8 @@ class DashboardPmController extends Controller
 
         $matrixRows = DB::table('lops as l')
             ->join('projects as p', 'l.project_id', '=', 'p.id_project')
-            ->where('p.status_project', '!=', 'drop')
-            ->get(['l.branch', 'l.status_progress', 'p.program', 'p.is_golive']);
+            ->where('l.status_progress', '!=', 'drop')
+            ->get(['l.branch', 'l.status_progress', 'p.program', 'l.is_golive']);
 
         foreach ($matrixRows as $row) {
             $branch = strtoupper($row->branch ?? '');
@@ -123,15 +130,7 @@ class DashboardPmController extends Controller
                 continue;
             }
 
-            if ((int) $row->is_golive === 1) {
-                $statusKey = 'finishing';
-            } elseif ($row->status_progress === 'instalasi') {
-                $statusKey = 'instalasi';
-            } elseif ($row->status_progress === 'finishing') {
-                $statusKey = 'finishing';
-            } else {
-                $statusKey = 'preparation';
-            }
+            $statusKey = $this->regularStatusBucket($row->status_progress, (int) $row->is_golive === 1);
 
             $matrixAccumulator[$regionName]['programs'][$program][$statusKey]++;
 
@@ -177,14 +176,11 @@ class DashboardPmController extends Controller
 
         $pt2Rows = DB::table('pt2_lops as l')
             ->join('pt2_projects as p', 'l.pt2_project_id', '=', 'p.id_pt2_project')
-            ->where(function ($q) {
-                $q->whereNull('p.status_project')->orWhere('p.status_project', '!=', 'drop');
-            })
+            ->where('l.status_progress', '!=', 'drop')
             ->get([
                 DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch))) as branch"),
                 'l.status_progress',
                 DB::raw('COALESCE(l.is_golive, 0) as lop_is_golive'),
-                DB::raw('COALESCE(p.is_golive, 0) as project_is_golive'),
             ]);
 
         foreach ($pt2Rows as $row) {
@@ -194,16 +190,10 @@ class DashboardPmController extends Controller
                 continue;
             }
 
-            $isGoLive = (int) ($row->lop_is_golive ?? 0) === 1 || (int) ($row->project_is_golive ?? 0) === 1;
+            $isGoLive = (int) ($row->lop_is_golive ?? 0) === 1;
             $statusProgress = strtolower(trim($row->status_progress ?? ''));
 
-            if ($isGoLive || $statusProgress === 'finishing') {
-                $statusKey = 'finishing';
-            } elseif ($statusProgress === 'instalasi') {
-                $statusKey = 'instalasi';
-            } else {
-                $statusKey = 'preparation';
-            }
+            $statusKey = $this->pt2StatusBucket($statusProgress, $isGoLive);
 
             $pt2Accumulator[$regionName]['stats'][$statusKey]++;
             $pt2Accumulator[$regionName]['stats']['total']++;
@@ -243,9 +233,7 @@ class DashboardPmController extends Controller
                 'project.boqItems.designatorData',
                 'project.boqItems.designatorDataByCode',
             ])
-            ->whereHas('project', function ($q) {
-                $q->where('status_project', '!=', 'drop');
-            })
+            ->where('status_progress', '!=', 'drop')
             ->get();
 
         $statsAccumulator = [];
@@ -276,7 +264,7 @@ class DashboardPmController extends Controller
             $summary = $project->progressSummary();
             $progress = (int) ($summary['progress'] ?? 0);
             $isAssigned = (bool) $project->assignment;
-            $isGoLive = (int) $project->is_golive === 1;
+            $isGoLive = (int) $lop->is_golive === 1;
             $isCompleted = $isGoLive || $progress === 100;
             $isWaiting = !$isGoLive && $progress > 0 && $progress < 100;
             $hasBoq = (bool) $project->boqItems?->isNotEmpty();
@@ -395,7 +383,7 @@ class DashboardPmController extends Controller
             ->join('projects as p', 'l.project_id', '=', 'p.id_project')
             ->leftJoin('boq_items as b', 'l.id_lop', '=', 'b.lop_id')
             ->leftJoin('designators as d', 'b.designator_id', '=', 'd.id_designator')
-            ->where('p.status_project', '!=', 'drop')
+            ->where('l.status_progress', '!=', 'drop')
             ->whereIn(DB::raw('UPPER(TRIM(p.program))'), $programs)
             ->select([
                 DB::raw('UPPER(TRIM(p.program)) as program'),
@@ -422,7 +410,7 @@ class DashboardPmController extends Controller
             ->join('lops as l', 'bi.lop_id', '=', 'l.id_lop')
             ->join('projects as p', 'l.project_id', '=', 'p.id_project')
             ->join('designators as d', 'bi.designator_id', '=', 'd.id_designator')
-            ->where('p.status_project', '!=', 'drop')
+            ->where('l.status_progress', '!=', 'drop')
             ->whereIn(DB::raw('UPPER(TRIM(p.program))'), $programs)
             ->select([
                 'bi.lop_id',
@@ -542,19 +530,9 @@ class DashboardPmController extends Controller
             ]);
 
             if ($request->filled('f_status')) {
-                if ($request->f_status === 'drop') {
-                    $query->whereHas('project', function ($q) {
-                        $q->where('status_project', 'drop');
-                    });
-                } else {
-                    $query->whereHas('project', function ($q) {
-                        $q->where('status_project', '!=', 'drop');
-                    });
-                }
+                $query->where('status_progress', $request->f_status);
             } else {
-                $query->whereHas('project', function ($q) {
-                    $q->where('status_project', '!=', 'drop');
-                });
+                $query->where('status_progress', '!=', 'drop');
             }
 
             $query->whereIn(DB::raw('UPPER(branch)'), $branchList);
@@ -570,7 +548,7 @@ class DashboardPmController extends Controller
                 $summary = $project->progressSummary();
                 $progress = (int) ($summary['progress'] ?? 0);
                 $isAssigned = (bool) $project->assignment;
-                $isGoLive = (int) $project->is_golive === 1;
+                $isGoLive = (int) $lop->is_golive === 1;
                 $isCompleted = $isGoLive || $progress === 100;
                 $isWaiting = !$isGoLive && $progress > 0 && $progress < 100;
                 $hasBoq = (bool) $project->boqItems?->isNotEmpty();
@@ -630,21 +608,20 @@ class DashboardPmController extends Controller
 
             $lopRows = DB::table('lops as l')
                 ->join('projects as p', 'l.project_id', '=', 'p.id_project')
-                ->where('p.status_project', '!=', 'drop')
+                ->where('l.status_progress', '!=', 'drop')
                 ->whereRaw('UPPER(TRIM(p.program)) = ?', [$program])
                 ->whereIn(DB::raw('UPPER(TRIM(l.branch))'), $branchList)
                 ->select([
                     'l.id_lop', 'l.lop_name', 'l.branch', 'l.sto', 'l.status_progress',
-                    'p.id_project', 'p.pid', 'p.pid_sap', 'p.project_name', 'p.is_golive',
+                    'p.id_project', 'p.pid', 'p.pid_sap', 'p.project_name', 'l.is_golive',
                 ])
                 ->get();
 
             foreach ($lopRows as $row) {
-                $statusKey = ((int) $row->is_golive === 1)
-                    ? 'finishing'
-                    : ($row->status_progress === 'instalasi'
-                        ? 'instalasi'
-                        : ($row->status_progress === 'finishing' ? 'finishing' : 'preparation'));
+                $statusKey = $this->regularStatusBucket(
+                    $row->status_progress,
+                    (int) $row->is_golive === 1,
+                );
 
                 if ($statusKey !== $metric) {
                     continue;
@@ -674,9 +651,7 @@ class DashboardPmController extends Controller
             $pt2Query = DB::table('pt2_lops as l')
                 ->join('pt2_projects as p', 'l.pt2_project_id', '=', 'p.id_pt2_project');
 
-            $pt2Query->where(function ($q) {
-                $q->whereNull('p.status_project')->orWhere('p.status_project', '!=', 'drop');
-            });
+            $pt2Query->where('l.status_progress', '!=', 'drop');
 
             $pt2Query->whereIn(
                 DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch)))"),
@@ -688,23 +663,15 @@ class DashboardPmController extends Controller
                 DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch))) as branch"),
                 'l.status_progress',
                 DB::raw('COALESCE(l.is_golive, 0) as lop_is_golive'),
-                DB::raw('COALESCE(p.is_golive, 0) as project_is_golive'),
                 'p.pid', 'p.pid_sap', 'p.project_name',
             ])->get();
 
             foreach ($pt2Rows as $row) {
-                $isGoLive = (int) ($row->lop_is_golive ?? 0) === 1
-                    || (int) ($row->project_is_golive ?? 0) === 1;
+                $isGoLive = (int) ($row->lop_is_golive ?? 0) === 1;
 
                 $statusProgress = strtolower(trim((string) ($row->status_progress ?? '')));
 
-                if ($isGoLive || $statusProgress === 'finishing') {
-                    $statusKey = 'finishing';
-                } elseif ($statusProgress === 'instalasi') {
-                    $statusKey = 'instalasi';
-                } else {
-                    $statusKey = 'preparation';
-                }
+                $statusKey = $this->pt2StatusBucket($statusProgress, $isGoLive);
 
                 if ($metric !== 'total' && $statusKey !== $metric) {
                     continue;
@@ -824,7 +791,7 @@ class DashboardPmController extends Controller
             ->join('projects as p', 'l.project_id', '=', 'p.id_project')
             ->leftJoin('boq_items as b', 'l.id_lop', '=', 'b.lop_id')
             ->leftJoin('designators as d', 'b.designator_id', '=', 'd.id_designator')
-            ->where('p.status_project', '!=', 'drop')
+            ->where('l.status_progress', '!=', 'drop')
             ->whereRaw('UPPER(TRIM(p.program)) = ?', [$normalizedProgram]);
 
         // Jika PM memfilter branch dari dropdown di dalam halaman
@@ -1042,5 +1009,31 @@ class DashboardPmController extends Controller
         $totalAllEvidences = array_sum(array_column($performanceData, 'evidences'));
         
         return view('pm.waspang_performance', compact('performanceData', 'branches', 'totalWaspangActive', 'totalAllEvidences'));
+    }
+
+    private function regularStatusBucket(?string $statusProgress, bool $isGoLive): string
+    {
+        $status = strtolower(trim((string) $statusProgress));
+
+        if ($isGoLive || in_array($status, ['finishing', 'fi_ogp_golive', 'golive'], true)) {
+            return 'finishing';
+        }
+
+        return in_array($status, ['instalasi', 'pengukuran'], true)
+            ? 'instalasi'
+            : 'preparation';
+    }
+
+    private function pt2StatusBucket(?string $statusProgress, bool $isGoLive): string
+    {
+        $status = strtolower(trim((string) $statusProgress));
+
+        if ($isGoLive || in_array($status, ['finish', 'finishing', 'dismantle', 'mancore', 'complete', 'done', 'golive'], true)) {
+            return 'finishing';
+        }
+
+        return in_array($status, ['progress', 'instalasi'], true)
+            ? 'instalasi'
+            : 'preparation';
     }
 }

@@ -13,6 +13,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
+    {{-- Stage 4d: TomSelect -- dipakai picker designator "+ Tambah Item BOQ"
+         di sub-step Survey (resources/views/waspang/show.blade.php), versi &
+         sumber CDN SAMA dgn yg sudah dipakai admin/pm/sdi (lihat
+         layouts/admin.blade.php) supaya konsisten 1 keluarga. --}}
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+
     <style>
         body {
             font-family: 'Plus Jakarta Sans', sans-serif;
@@ -22,23 +29,24 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-[#f7f6f2] text-gray-900 min-h-full antialiased selection:bg-blue-500 selection:text-white">
+<body class="bg-[#F8FAFC] text-slate-900 min-h-full antialiased selection:bg-blue-500 selection:text-white">
 
-    {{-- Main Mobile Container Wrapper --}}
-    <main class="relative min-h-screen max-w-md mx-auto bg-[#f7f6f2] shadow-xl border-x border-gray-200/30">
-        
+    {{-- Main Mobile Container Wrapper (Stage 4b redesign: palet fresh
+         indigo/blue, tetap 1 keluarga desain dgn admin/PM) --}}
+    <main class="relative min-h-screen max-w-md mx-auto bg-[#F8FAFC] shadow-2xl shadow-slate-900/10 border-x border-slate-200/60">
+
         {{-- Flash Session Toast/Alert Bawaan (Jika Ada) --}}
         @if(session('success'))
-            <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3000)" 
-                 class="fixed top-4 inset-x-4 max-w-sm mx-auto z-50 bg-emerald-600 text-white p-3.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 animate-fade-in">
+            <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3000)"
+                 class="fixed top-4 inset-x-4 max-w-sm mx-auto z-50 bg-emerald-600 text-white p-3.5 rounded-2xl text-xs font-bold shadow-lg shadow-emerald-900/20 flex items-center gap-2 animate-fade-in">
                 <i class="fa-solid fa-circle-check text-base"></i>
                 <span>{{ session('success') }}</span>
             </div>
         @endif
 
         @if(session('error'))
-            <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3000)" 
-                 class="fixed top-4 inset-x-4 max-w-sm mx-auto z-50 bg-red-600 text-white p-3.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-2 animate-fade-in">
+            <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 3000)"
+                 class="fixed top-4 inset-x-4 max-w-sm mx-auto z-50 bg-red-600 text-white p-3.5 rounded-2xl text-xs font-bold shadow-lg shadow-red-900/20 flex items-center gap-2 animate-fade-in">
                 <i class="fa-solid fa-circle-xmark text-base"></i>
                 <span>{{ session('error') }}</span>
             </div>

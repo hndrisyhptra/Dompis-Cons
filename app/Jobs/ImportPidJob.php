@@ -174,14 +174,22 @@ class ImportPidJob implements ShouldQueue
                 $validRows++;
 
                 $executionType = $this->cleanValue($data['execution_type'] ?? 'kemitraan') ?: 'kemitraan';
-                $statusProject = $this->cleanValue($data['status_project'] ?? 'active') ?: 'active';
+                $rawStatus = strtolower((string) ($this->cleanValue(
+                    $data['status_progress'] ?? $data['status_project'] ?? 'inisiasi'
+                ) ?: 'inisiasi'));
+                $statusProgress = [
+                    'init' => 'inisiasi',
+                    'active' => 'inisiasi',
+                    'close' => 'finishing',
+                    'bast' => 'fi_ogp_golive',
+                ][$rawStatus] ?? $rawStatus;
 
                 if (!in_array($executionType, ['kemitraan', 'swakelola', 'turnkey'])) {
                     $executionType = 'kemitraan';
                 }
 
-                if (!in_array($statusProject, ['init', 'active', 'close', 'bast'])) {
-                    $statusProject = 'active';
+                if (!in_array($statusProgress, ['inisiasi', 'survey', 'perizinan', 'material_delivery', 'persiapan_instalasi', 'instalasi', 'pengukuran', 'finishing', 'fi_ogp_golive', 'golive', 'hold', 'drop'], true)) {
+                    $statusProgress = 'inisiasi';
                 }
 
                 $pidForProject = $pid ?: $pidSap;
@@ -192,7 +200,6 @@ class ImportPidJob implements ShouldQueue
                     'project_name' => $namaLop,
                     'program' => $this->cleanValue($data['program'] ?? null),
                     'execution_type' => $executionType,
-                    'status_project' => $statusProject,
                 ];
 
                 $project = Project::where('pid_sap', $pidSap)->first();
@@ -224,7 +231,7 @@ class ImportPidJob implements ShouldQueue
                     'tgl_toc' => $this->cleanDate($data['tgl_toc'] ?? null),
                     'mitra_name' => $this->cleanValue($data['mitra_name'] ?? null),
                     'mapping_status' => 'auto_matched',
-                    'status_progress' => 'preparation',
+                    'status_progress' => $statusProgress,
                 ];
 
                 $lop = null;

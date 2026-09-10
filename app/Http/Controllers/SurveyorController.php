@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\ProjectAssignment;
 use App\Models\SiteSurvey;
 use App\Models\SiteSurveyPoint;
 use App\Models\SiteSurveyRoute;
+use App\Models\User;
+use App\Services\ProjectActivityService;
 use App\Services\SiteSurveyKmlService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -19,13 +22,17 @@ class SurveyorController extends Controller
      * dipertahankan di sini agar akun lama yang masih memakai role tsb tidak
      * kehilangan akses.
      */
-    private const ALLOWED_ROLES = ['sdi_surveyor', 'admin', 'sdi', 'waspang', 'superadmin', 'super_tif'];
+    // FIX (2026-09-08): 'officer' ditambahkan -- sidebar officer sendiri
+    // sudah link ke admin.site-surveys.index (menu turunan yang sama dgn
+    // GisCadController), tapi constant ini belum pernah diupdate saat role
+    // officer ditambahkan.
+    private const ALLOWED_ROLES = ['sdi_surveyor', 'admin', 'sdi', 'waspang', 'superadmin', 'super_tif', 'officer'];
 
-    private function guardAccess(): \App\Models\User
+    private function guardAccess(): User
     {
         $user = auth()->user();
 
-        if (!$user || !in_array($user->role, self::ALLOWED_ROLES, true)) {
+        if (! $user || ! in_array($user->role, self::ALLOWED_ROLES, true)) {
             abort(403, 'Anda tidak memiliki akses ke fitur Survey Lapangan.');
         }
 
@@ -35,15 +42,27 @@ class SurveyorController extends Controller
     /**
      * Pastikan survey yang diakses memang milik surveyor tsb (kecuali admin).
      */
-    private function findSurveyOrFail($id, \App\Models\User $user): SiteSurvey
+    private function findSurveyOrFail($id, User $user): SiteSurvey
     {
         $query = SiteSurvey::query();
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true)) {
+        if ($user->role === 'waspang') {
+            $query->where(function ($surveyQuery) use ($user) {
+                $surveyQuery->where('surveyor_id', $user->id_user)
+                    ->orWhereHas('project.assignments', function ($assignmentQuery) use ($user) {
+                        $assignmentQuery->where('waspang_id', $user->id_user);
+                    });
+            });
+        } elseif (! in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true)) {
             $query->where('surveyor_id', $user->id_user);
         }
 
         return $query->findOrFail($id);
+    }
+
+    private function ensureSurveyIsEditable(SiteSurvey $survey): void
+    {
+        abort_if($survey->isCompleted(), 409, 'Survey yang sudah selesai dikunci sebagai histori dan tidak dapat diubah.');
     }
 
     /*
@@ -55,12 +74,12 @@ class SurveyorController extends Controller
     /**
      * Query dasar site survey, dibatasi ke milik sendiri kecuali admin/sdi.
      */
-    private function baseSurveyQuery(\App\Models\User $user)
+    private function baseSurveyQuery(User $user)
     {
         $query = SiteSurvey::with(['project', 'surveyor'])
             ->withCount(['points', 'routes']);
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true)) {
+        if (! in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true)) {
             $query->where('surveyor_id', $user->id_user);
         }
 
@@ -83,7 +102,7 @@ class SurveyorController extends Controller
                     ->orWhere('project_name', 'like', "%{$search}%")
                     ->orWhereHas('project', function ($p) use ($search) {
                         $p->where('project_name', 'like', "%{$search}%")
-                          ->orWhere('pid', 'like', "%{$search}%");
+                            ->orWhere('pid', 'like', "%{$search}%");
                     });
             });
         }
@@ -126,7 +145,7 @@ class SurveyorController extends Controller
                     })
                     ->orWhereHas('project', function ($p) use ($search) {
                         $p->where('project_name', 'like', "%{$search}%")
-                          ->orWhere('pid', 'like', "%{$search}%");
+                            ->orWhere('pid', 'like', "%{$search}%");
                     });
             });
         }
@@ -186,6 +205,15 @@ class SurveyorController extends Controller
             'notes' => 'nullable|string|max:2000',
         ]);
 
+        if ($user->role === 'waspang' && ! empty($validated['project_id'])) {
+            $isAssigned = ProjectAssignment::query()
+                ->where('project_id', $validated['project_id'])
+                ->where('waspang_id', $user->id_user)
+                ->exists();
+
+            abort_unless($isAssigned, 403, 'Project ini tidak ditugaskan kepada Anda.');
+        }
+
         $survey = SiteSurvey::create([
             'project_id' => $validated['project_id'] ?? null,
             'project_name' => $validated['project_name'] ?? null,
@@ -217,7 +245,21 @@ class SurveyorController extends Controller
             $q->orderBy('order_index')->orderBy('id_site_survey_routes');
         }, 'project', 'surveyor']);
 
-        return view('surveyor.show', compact('survey'));
+        $referenceSurvey = $survey->project_id
+            ? SiteSurvey::query()
+                ->where('project_id', $survey->project_id)
+                ->where('status', 'completed')
+                ->where('id_site_surveys', '!=', $survey->id)
+                ->latest('completed_at')
+                ->latest('id_site_surveys')
+                ->first()
+            : null;
+
+        $referenceMapUrl = $referenceSurvey
+            ? route('surveyor.kml', $referenceSurvey->id)
+            : ($survey->project?->kml_file ? Storage::url($survey->project->kml_file) : null);
+
+        return view('surveyor.show', compact('survey', 'referenceMapUrl'));
     }
 
     /*
@@ -230,6 +272,7 @@ class SurveyorController extends Controller
     {
         $user = $this->guardAccess();
         $survey = $this->findSurveyOrFail($id, $user);
+        $this->ensureSurveyIsEditable($survey);
 
         $validated = $request->validate([
             'type' => 'required|in:tiang_eksisting,catuan',
@@ -243,7 +286,7 @@ class SurveyorController extends Controller
 
         $photoPath = null;
         if ($request->hasFile('photo')) {
-            $photoPath = $request->file('photo')->store('site-surveys/' . $survey->id . '/points', 'public');
+            $photoPath = $request->file('photo')->store('site-surveys/'.$survey->id.'/points', 'public');
         }
 
         $nextOrder = (int) $survey->points()->max('order_index') + 1;
@@ -277,9 +320,10 @@ class SurveyorController extends Controller
         $user = $this->guardAccess();
         $point = SiteSurveyPoint::with('survey')->findOrFail($pointId);
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $point->survey->surveyor_id !== $user->id_user) {
+        if (! in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $point->survey->surveyor_id !== $user->id_user) {
             abort(404);
         }
+        $this->ensureSurveyIsEditable($point->survey);
 
         $validated = $request->validate([
             'name' => 'nullable|string|max:150',
@@ -298,9 +342,10 @@ class SurveyorController extends Controller
         $user = $this->guardAccess();
         $point = SiteSurveyPoint::with('survey')->findOrFail($pointId);
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $point->survey->surveyor_id !== $user->id_user) {
+        if (! in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $point->survey->surveyor_id !== $user->id_user) {
             abort(404);
         }
+        $this->ensureSurveyIsEditable($point->survey);
 
         if ($point->photo_path) {
             Storage::disk('public')->delete($point->photo_path);
@@ -325,6 +370,7 @@ class SurveyorController extends Controller
     {
         $user = $this->guardAccess();
         $survey = $this->findSurveyOrFail($id, $user);
+        $this->ensureSurveyIsEditable($survey);
 
         $validated = $request->validate([
             'name' => 'nullable|string|max:150',
@@ -338,7 +384,7 @@ class SurveyorController extends Controller
 
         $route = SiteSurveyRoute::create([
             'site_survey_id' => $survey->id,
-            'name' => $validated['name'] ?: ('Rute Kabel ' . $nextOrder),
+            'name' => $validated['name'] ?: ('Rute Kabel '.$nextOrder),
             'path' => $validated['path'],
             'distance_meters' => SiteSurveyRoute::calculateDistanceMeters($validated['path']),
             'order_index' => $nextOrder,
@@ -352,9 +398,10 @@ class SurveyorController extends Controller
         $user = $this->guardAccess();
         $route = SiteSurveyRoute::with('survey')->findOrFail($routeId);
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $route->survey->surveyor_id !== $user->id_user) {
+        if (! in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $route->survey->surveyor_id !== $user->id_user) {
             abort(404);
         }
+        $this->ensureSurveyIsEditable($route->survey);
 
         $validated = $request->validate([
             'name' => 'nullable|string|max:150',
@@ -378,9 +425,10 @@ class SurveyorController extends Controller
         $user = $this->guardAccess();
         $route = SiteSurveyRoute::with('survey')->findOrFail($routeId);
 
-        if (!in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $route->survey->surveyor_id !== $user->id_user) {
+        if (! in_array($user->role, ['admin', 'sdi', 'superadmin', 'super_tif'], true) && $route->survey->surveyor_id !== $user->id_user) {
             abort(404);
         }
+        $this->ensureSurveyIsEditable($route->survey);
 
         $route->delete();
 
@@ -397,6 +445,7 @@ class SurveyorController extends Controller
     {
         $user = $this->guardAccess();
         $survey = $this->findSurveyOrFail($id, $user);
+        $this->ensureSurveyIsEditable($survey);
 
         $validated = $request->validate([
             'ending_site_lat' => 'required|numeric|between:-90,90',
@@ -419,12 +468,25 @@ class SurveyorController extends Controller
     {
         $user = $this->guardAccess();
         $survey = $this->findSurveyOrFail($id, $user);
+        $this->ensureSurveyIsEditable($survey);
 
-        $survey->load(['points', 'routes', 'surveyor']);
+        $survey->load(['points', 'routes', 'surveyor', 'project']);
+
+        if ($survey->points->isEmpty() || $survey->routes->isEmpty()) {
+            return back()->with('error', 'Tag minimal satu titik dan buat minimal satu rute kabel sebelum menyelesaikan redesign.');
+        }
+
+        if ($user->role === 'waspang' && $survey->project_id) {
+            $isAssigned = ProjectAssignment::query()
+                ->where('project_id', $survey->project_id)
+                ->where('waspang_id', $user->id_user)
+                ->exists();
+            abort_unless($isAssigned, 403, 'Project ini tidak lagi ditugaskan kepada Anda.');
+        }
 
         $kmlContent = $kmlService->build($survey);
         $fileName = $kmlService->fileName($survey);
-        $path = 'site-surveys/' . $survey->id . '/' . $fileName;
+        $path = 'site-surveys/'.$survey->id.'/'.$fileName;
 
         Storage::disk('public')->put($path, $kmlContent);
 
@@ -434,6 +496,29 @@ class SurveyorController extends Controller
             'kml_path' => $path,
         ]);
 
+        if ($survey->project_id) {
+            $projectLops = $survey->project?->lops()->limit(2)->get() ?? collect();
+            $lopId = $projectLops->count() === 1 ? $projectLops->first()->id_lop : null;
+
+            ProjectActivityService::log([
+                'project_id' => $survey->project_id,
+                'lop_id' => $lopId,
+                'activity_type' => 'survey_redesign_completed',
+                'title' => 'Redesign Survey Disimpan',
+                'description' => 'Waspang menyelesaikan redesign peta. Versi sebelumnya tetap disimpan sebagai histori.',
+                'stage' => 'survey',
+                'meta' => [
+                    'site_survey_id' => $survey->id,
+                    'kml_path' => $path,
+                ],
+            ]);
+        }
+
+        if ($user->role === 'waspang' && $survey->project_id) {
+            return redirect()->route('waspang.projects.persiapan', $survey->project_id)
+                ->with('success', 'Redesign berhasil disimpan. Peta terbaru sudah aktif; konfirmasi dengan tombol Sesuai.');
+        }
+
         return back()->with('success', 'Survey berhasil diselesaikan! File KML sudah siap diunduh.');
     }
 
@@ -441,8 +526,9 @@ class SurveyorController extends Controller
     {
         $user = $this->guardAccess();
         $survey = $this->findSurveyOrFail($id, $user);
+        $this->ensureSurveyIsEditable($survey);
 
-        Storage::disk('public')->deleteDirectory('site-surveys/' . $survey->id);
+        Storage::disk('public')->deleteDirectory('site-surveys/'.$survey->id);
 
         $survey->delete();
 
@@ -467,7 +553,7 @@ class SurveyorController extends Controller
 
         return response($kmlContent, 200, [
             'Content-Type' => 'application/vnd.google-earth.kml+xml',
-            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Content-Disposition' => 'attachment; filename="'.$fileName.'"',
         ]);
     }
 }

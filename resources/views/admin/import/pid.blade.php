@@ -475,7 +475,7 @@
                 <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
                     <h2 class="text-sm font-black text-slate-900 dark:text-white">Format Header</h2>
                     <p class="text-xs text-slate-500 mt-3 leading-relaxed font-mono break-words">
-                        pid, pid_sap, project_name, nama_lop, program, execution_type, status_project, id_ihld, tematik, sto, branch, batch, no_sp, tgl_sp, tgl_toc, mitra_name
+                        pid, pid_sap, project_name, nama_lop, program, execution_type, status_progress, id_ihld, tematik, sto, branch, batch, no_sp, tgl_sp, tgl_toc, mitra_name
                     </p>
                     <p class="text-[10px] text-slate-400 mt-2">
                         project_name bersifat optional; untuk PT 2 digunakan sebagai nama parent project.

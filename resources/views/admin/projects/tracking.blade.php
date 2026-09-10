@@ -559,7 +559,7 @@
                     <div class="flex justify-between gap-3">
                         <span class="text-slate-500">Status</span>
                         <span class="font-black text-slate-900 dark:text-white text-right">
-                            {{ $project->status_project ?? '-' }}
+                            {{ $firstLop?->stage?->name ?? str($firstLop?->status_progress ?? '-')->replace('_', ' ')->title() }}
                         </span>
                     </div>
 
