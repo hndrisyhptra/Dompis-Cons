@@ -586,6 +586,55 @@ class ProjectController extends Controller
                     });
             });
 
+        // Section AI: definisi 3 tab diluruskan sesuai kondisi flow
+        // terbaru (permintaan user) --
+        // "Menunggu Review" = LOP yang BENAR-BENAR belum ada evidennya yang
+        // di-approve SAMA SEKALI (bukan sekadar "ada yang berstatus
+        // pending" seperti logika lama -- LOP yang sudah pernah di-approve
+        // tapi kebetulan ada foto baru yang masih pending itu SEHARUSNYA
+        // sudah dianggap "On Progress", karena admin sudah mulai
+        // mengerjakannya).
+        // "On Progress" = sudah ada MINIMAL 1 eviden approved, TAPI belum
+        // mencapai kriteria "Selesai" di bawah.
+        // "Selesai" = LOP sudah mencapai tahap FI-OGP Golive/Golive (baik
+        // langsung maupun via hold/drop SETELAH sempat mencapai tahap itu --
+        // hold/drop-safe, lihat Section AH) DAN tidak ada eviden yang masih
+        // nyangkut (pending/rejected).
+        $completedCodes = ['fi_ogp_golive', 'golive'];
+        $completedOrDropCodes = ['fi_ogp_golive', 'golive', 'drop'];
+
+        $applyPendingFilter = function ($q) {
+            $q->whereDoesntHave('evidences', function ($sub) {
+                $sub->where('status', 'approved');
+            });
+        };
+
+        $applyActiveFilter = function ($q) use ($completedOrDropCodes) {
+            $q->whereHas('evidences', function ($sub) {
+                $sub->where('status', 'approved');
+            })->whereHas('lops', function ($lopQuery) use ($completedOrDropCodes) {
+                $lopQuery->whereNotIn('status_progress', $completedOrDropCodes)
+                    ->where(function ($qq) use ($completedOrDropCodes) {
+                        $qq->whereNull('status_progress_before_hold')
+                            ->orWhereNotIn('status_progress_before_hold', $completedOrDropCodes);
+                    });
+            });
+        };
+
+        $applyCompleteFilter = function ($q) use ($completedCodes) {
+            $q->whereHas('lops', function ($lopQuery) use ($completedCodes) {
+                $lopQuery->where('status_progress', '!=', 'drop')
+                    ->where(function ($qq) use ($completedCodes) {
+                        $qq->whereIn('status_progress', $completedCodes)
+                            ->orWhereIn('status_progress_before_hold', $completedCodes);
+                    });
+            })->whereDoesntHave('evidences', function ($ev) {
+                $ev->whereIn('status', ['pending', 'rejected']);
+            });
+        };
+
+        $tabCounts = null;
+
         if ($search) {
             $query->where(function ($q) use ($search) {
                 // ... (Logika Search sama seperti sebelumnya) ...
@@ -602,39 +651,12 @@ class ProjectController extends Controller
                         $waspangQ->where('name', 'like', "%{$search}%");
                     });
             });
+            // Saat search aktif tab diabaikan (semua hasil ditampilkan
+            // terlepas dari tab) -- jadi badge angka per-tab tidak relevan.
         } else {
-            // ==========================================
-            // LOGIKA TAB FILTER YANG AKURAT
-            // ==========================================
-            if ($statusFilter === 'pending') {
-                // MENUNGGU REVIEW: Punya minimal 1 eviden berstatus 'pending'
-                $query->whereHas('evidences', function ($sub) {
-                    $sub->where('status', 'pending');
-                });
-
-            } elseif ($statusFilter === 'complete') {
-                // Selesai ketika status_progress LOP sudah Golive.
-                // DAN tidak ada satupun foto yang masih nyangkut (pending/rejected)
-                $query->whereHas('lops', function ($lopQuery) {
-                    $lopQuery->where('status_progress', 'golive');
-                })
-                    ->whereDoesntHave('evidences', function ($ev) {
-                        $ev->whereIn('status', ['pending', 'rejected']);
-                    });
-
-            } elseif ($statusFilter === 'active') {
-                // ON PROGRESS (Aktif):
-                // 1. Sudah ada foto (dari base query whereHas evidences)
-                // 2. TIDAK ada foto pending (Admin sudah beres me-review)
-                // 3. Project BELUM selesai / close
-                $query->whereDoesntHave('evidences', function ($ev) {
-                    $ev->where('status', 'pending');
-                })->whereHas('lops', function ($lopQuery) {
-                    $lopQuery->whereNotIn('status_progress', ['drop', 'golive']);
-                });
-            }
-
-            // ... (Filter Kawalanku, Program, Branch sama seperti sebelumnya) ...
+            // Filter Kawalanku, Program, Branch diterapkan DULU (independen
+            // dari tab) supaya angka counter di tiap tab (di bawah) ikut
+            // merefleksikan filter yang sedang aktif.
             $query->when($myKawal == '1', function ($q) {
                 $q->whereHas('assignment', function ($sub) {
                     $sub->where('assigned_by', auth()->user()->id_user);
@@ -655,6 +677,32 @@ class ProjectController extends Controller
                     $sub->where('branch', $branchFilter);
                 });
             });
+
+            // Hitung jumlah LOP di tiap tab (dgn filter Kawalanku/Program/
+            // Branch yang sama) utk badge angka di UI tab, supaya admin
+            // tahu beban kerja tiap tab tanpa harus klik satu-satu.
+            $pendingCountQuery = clone $query;
+            $applyPendingFilter($pendingCountQuery);
+
+            $activeCountQuery = clone $query;
+            $applyActiveFilter($activeCountQuery);
+
+            $completeCountQuery = clone $query;
+            $applyCompleteFilter($completeCountQuery);
+
+            $tabCounts = [
+                'pending' => $pendingCountQuery->count(),
+                'active' => $activeCountQuery->count(),
+                'complete' => $completeCountQuery->count(),
+            ];
+
+            if ($statusFilter === 'pending') {
+                $applyPendingFilter($query);
+            } elseif ($statusFilter === 'complete') {
+                $applyCompleteFilter($query);
+            } elseif ($statusFilter === 'active') {
+                $applyActiveFilter($query);
+            }
         }
 
         $projects = $query->latest('updated_at')->paginate(10)->withQueryString();
@@ -666,7 +714,8 @@ class ProjectController extends Controller
             'projects',
             'search',
             'availableBranches',
-            'availablePrograms'
+            'availablePrograms',
+            'tabCounts'
         ));
     }
 
@@ -1096,6 +1145,122 @@ class ProjectController extends Controller
         ])->where('id_project', $id)->firstOrFail();
 
         return view('admin.evidences.review-finishing', compact('project'));
+    }
+
+    // STEP 5 - REVIEW / UPLOAD DOKUMEN FI-OGP GOLIVE (Section AF)
+    public function reviewGolive($id)
+    {
+        $project = Project::with([
+            'lop.goliveSubmission',
+            'lop.goliveVerification',
+            'assignment.waspang',
+        ])->where('id_project', $id)->firstOrFail();
+
+        return view('admin.evidences.review-golive', compact('project'));
+    }
+
+    // Section AF: upload/perbarui 4 dokumen FI-OGP Golive (capture valins,
+    // PDF ABD & Valid4, KML, Mancore -- foto ATAU excel, lihat
+    // LopGoliveSubmission::mancore_input_type). Field dikirim satu-satu,
+    // upload parsial diperbolehkan (form bisa disubmit berkali-kali sampai
+    // lengkap) -- makanya validasi semuanya 'nullable', bukan 'required'.
+    public function submitGoliveDocuments(Request $request, $id)
+    {
+        $project = Project::with(['lop.stage'])->where('id_project', $id)->firstOrFail();
+        $lop = $project->lop;
+
+        if (! $lop) {
+            return back()->with('error', 'LOP untuk project ini belum ada.');
+        }
+
+        $request->validate([
+            'capture_valins' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'abd_valid4' => 'nullable|file|mimes:pdf|max:10240',
+            'kml' => 'nullable|file|mimes:kml,xml|max:5120',
+            'mancore_input_type' => 'nullable|in:photo,excel',
+            'mancore' => 'nullable|file|mimes:jpeg,png,jpg,webp,xls,xlsx|max:10240',
+        ]);
+
+        $submission = \App\Models\LopGoliveSubmission::firstOrNew(['lop_id' => $lop->id_lop]);
+        $submission->lop_id = $lop->id_lop;
+
+        $folder = 'evidences/golive/'.$lop->id_lop;
+
+        if ($request->hasFile('capture_valins')) {
+            $file = $request->file('capture_valins');
+            $submission->capture_valins_path = $file->storeAs($folder, 'capture_valins_'.time().'.'.$file->getClientOriginalExtension(), 'public');
+        }
+
+        if ($request->hasFile('abd_valid4')) {
+            $file = $request->file('abd_valid4');
+            $submission->abd_valid4_path = $file->storeAs($folder, 'abd_valid4_'.time().'.'.$file->getClientOriginalExtension(), 'public');
+        }
+
+        if ($request->hasFile('kml')) {
+            $file = $request->file('kml');
+            $submission->kml_path = $file->storeAs($folder, 'kml_'.time().'.'.$file->getClientOriginalExtension(), 'public');
+        }
+
+        if ($request->hasFile('mancore')) {
+            $file = $request->file('mancore');
+            $submission->mancore_path = $file->storeAs($folder, 'mancore_'.time().'.'.$file->getClientOriginalExtension(), 'public');
+            $submission->mancore_input_type = $request->input('mancore_input_type', $submission->mancore_input_type);
+        }
+
+        $submission->submitted_by = auth()->id();
+        $submission->submitted_at = now();
+        $submission->save();
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'golive_submission_upload',
+            'title' => 'Dokumen FI-OGP Golive Diunggah',
+            'description' => 'Admin mengunggah/memperbarui dokumen FI-OGP Golive untuk LOP: '.$lop->lop_name,
+            'status_after' => $submission->isComplete() ? 'complete' : 'partial',
+        ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | AUTO-ADVANCE status_progress: finishing (9) -> fi_ogp_golive (10)
+        |--------------------------------------------------------------------------
+        | Barier & gate PERSIS SAMA dgn approveEvidence()/toggleMeasurementCheck():
+        | bukan PT2, belum drop/golive, tidak sedang hold/drop, persis di
+        | sequence 9 (Finishing), DAN finishingDone (seluruh eviden wajib s.d.
+        | Finishing sudah disetujui). Baru maju kalau ke-4 dokumen submission
+        | ini JUGA lengkap.
+        */
+        $programSap = strtoupper($lop->program_sap ?? '');
+        $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
+        $isAlreadyClosed = in_array($lop->status_progress, ['drop', 'golive'], true) || (bool) $lop->is_golive;
+
+        $project = $project->fresh(['lop.stage']);
+        $summary = $project->progressSummary();
+        $currentStage = $project->lop?->stage;
+        $currentSequence = $currentStage?->sequence;
+        $isPausedOrDropped = (bool) ($currentStage?->is_pause_type || $currentStage?->is_terminal);
+
+        if (
+            ! $isPt2 && ! $isAlreadyClosed
+            && $project->lop && $currentSequence !== null && ! $isPausedOrDropped
+            && ($summary['finishingDone'] ?? false)
+            && $currentSequence === 9
+            && $submission->isComplete()
+        ) {
+            Lop::where('project_id', $project->id_project)->update(['status_progress' => 'fi_ogp_golive']);
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'lop_stage_advance',
+                'title' => 'LOP Maju ke FI-OGP Golive',
+                'description' => 'Seluruh dokumen FI-OGP Golive lengkap, LOP maju otomatis ke tahap FI-OGP Golive.',
+                'status_before' => 'finishing',
+                'status_after' => 'fi_ogp_golive',
+            ]);
+        }
+
+        return back()->with('success', 'Dokumen FI-OGP Golive berhasil disimpan.');
     }
 
     public function reviewBoq($id)

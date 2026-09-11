@@ -87,7 +87,7 @@
                     @php
                         $summary = $project->progressSummary();
                         $progress = $summary['progress'];
-                        $stageLabel = $summary['stageLabel'];
+                        $stageLabel = $summary['effectiveStageLabel'] ?? $summary['stageLabel'];
                         
                         $assignmentData = $project->assignment;
                         $assignedUser = null;
@@ -107,11 +107,14 @@
                         $isPT2 = (str_replace(' ', '', strtoupper($programName)) === 'PT2');
                         $labelRole = $isPT2 ? 'Teknisi' : 'Waspang';
 
-                        if ($progress == 100) { $stageBadge = 'bg-green-100 text-green-700'; $progressColor = 'bg-green-600'; } 
-                        elseif ($stageLabel === 'Finishing') { $stageBadge = 'bg-purple-100 text-purple-700'; $progressColor = 'bg-purple-600'; } 
-                        elseif ($stageLabel === 'Pengukuran') { $stageBadge = 'bg-blue-100 text-blue-700'; $progressColor = 'bg-blue-600'; } 
-                        elseif ($stageLabel === 'Instalasi') { $stageBadge = 'bg-yellow-100 text-yellow-700'; $progressColor = 'bg-yellow-600'; } 
-                        else { $stageBadge = 'bg-red-100 text-red-700'; $progressColor = 'bg-red-600'; }
+                        // Section AF: warna badge/progress bar sekarang dari
+                        // project_stages.color (via stageColorClasses()), bukan
+                        // if/elseif string-match label lagi -- yg lama TIDAK PUNYA
+                        // cabang utk FI-OGP Golive/Golive (jatuh ke "else" merah,
+                        // padahal itu 2 tahap paling akhir/paling positif).
+                        $stageColors = \App\Models\Project::stageColorClasses(($summary['isHold'] ?? false) ? 'orange' : (($summary['isDrop'] ?? false) ? 'red' : ($summary['effectiveStageColor'] ?? null)));
+                        $stageBadge = $stageColors['badge'];
+                        $progressColor = $stageColors['progress'];
                     @endphp
 
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">

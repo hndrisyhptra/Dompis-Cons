@@ -37,6 +37,19 @@
     $step5Done = $seq !== null ? $seq > 9 : ($summary['finishingDone'] ?? false);
     $step6Done = $seq !== null ? $seq > 9 : false; // Selesai = sudah lewat Finishing (FI-OGP Golive/Golive)
 
+    // Section AD (revisi): checklist stepper 2 warna. HIJAU ($stepNDone di
+    // atas) tetap murni posisi sequence/approval admin -- TIDAK diubah,
+    // supaya status_progress LOP & gate lanjut-step tetap seperti sekarang.
+    // KUNING ($stepNUploaded) = Waspang sudah selesai upload SEMUA foto
+    // wajib tahap itu (status eviden apapun -- pending atau approved),
+    // indikator visual "progres upload saya" independen dari approval.
+    $uploadFlags = $project->stepUploadFlags();
+    $step1Uploaded = ! $step1Done && ($uploadFlags['persiapanUploaded'] ?? false);
+    $step2Uploaded = ! $step2Done && ($uploadFlags['persiapanInstalasiUploaded'] ?? false);
+    $step3Uploaded = ! $step3Done && ($uploadFlags['instalasiUploaded'] ?? false);
+    $step4Uploaded = ! $step4Done && ($uploadFlags['pengukuranUploaded'] ?? false);
+    $step5Uploaded = ! $step5Done && ($uploadFlags['finishingUploaded'] ?? false);
+
     $route = Route::currentRouteName();
     // FIX (Stage 4d): 'waspang.projects.show' cuma dipakai utk redirect ke
     // 'waspang.projects.persiapan' (lihat WaspangController::show()) -- route
@@ -98,6 +111,7 @@
             'href' => route('waspang.projects.show', $project->id_project),
             'open' => true,
             'done' => $step1Done,
+            'uploaded' => $step1Uploaded,
             'active' => $isStep1,
             'rejected' => $step1Rejected,
         ],
@@ -107,6 +121,7 @@
             'href' => route('waspang.projects.persiapan-instalasi', $project->id_project),
             'open' => $step2Open,
             'done' => $step2Done,
+            'uploaded' => $step2Uploaded,
             'active' => $isStep2,
             'rejected' => $step2Rejected,
         ],
@@ -116,6 +131,7 @@
             'href' => route('waspang.projects.instalasi', $project->id_project),
             'open' => $step3Open,
             'done' => $step3Done,
+            'uploaded' => $step3Uploaded,
             'active' => $isStep3,
             'rejected' => $step3Rejected,
         ],
@@ -125,6 +141,7 @@
             'href' => route('waspang.projects.pengukuran', $project->id_project),
             'open' => $step4Open,
             'done' => $step4Done,
+            'uploaded' => $step4Uploaded,
             'active' => $isStep4,
             'rejected' => $step4Rejected,
         ],
@@ -134,6 +151,7 @@
             'href' => route('waspang.projects.finishing', $project->id_project),
             'open' => $step5Open,
             'done' => $step5Done,
+            'uploaded' => $step5Uploaded,
             'active' => $isStep5,
             'rejected' => $step5Rejected,
         ],
@@ -143,6 +161,7 @@
             'href' => null, // belum ada halaman waspang -- murni indikator status
             'open' => false,
             'done' => $step6Done,
+            'uploaded' => false,
             'active' => false,
             'rejected' => false,
         ],
@@ -198,11 +217,14 @@
                         $seg['rejected'] => 'bg-white text-red-600 ring-2 ring-red-500',
                         $seg['active'] => 'bg-white text-[#1565D8] ring-2 ring-[#1565D8]',
                         $seg['done'] => 'bg-white text-emerald-600 ring-2 ring-emerald-500',
+                        // KUNING: sudah upload lengkap, masih menunggu admin approve.
+                        $seg['uploaded'] ?? false => 'bg-white text-amber-500 ring-2 ring-amber-400',
                         default => 'bg-slate-100 text-slate-400',
                     };
                     $labelClass = match(true) {
                         $seg['rejected'] => 'text-red-100',
                         $seg['active'], $seg['done'] => 'text-white',
+                        ($seg['uploaded'] ?? false) => 'text-amber-100',
                         default => 'text-blue-200/70',
                     };
                 @endphp
@@ -212,7 +234,7 @@
                         <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-sm {{ $circleClass }}">
                             @if($seg['rejected'])
                                 <i class="fa-solid fa-exclamation"></i>
-                            @elseif($seg['done'])
+                            @elseif($seg['done'] || ($seg['uploaded'] ?? false))
                                 <i class="fa-solid fa-check"></i>
                             @else
                                 {{ $seg['number'] }}
@@ -223,7 +245,7 @@
                 @else
                     <div class="z-10 flex flex-col items-center gap-1 {{ $seg['open'] ? '' : 'opacity-90' }}">
                         <div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shadow-sm {{ $circleClass }}">
-                            @if($seg['done'])
+                            @if($seg['done'] || ($seg['uploaded'] ?? false))
                                 <i class="fa-solid fa-check"></i>
                             @else
                                 {{ $seg['number'] }}

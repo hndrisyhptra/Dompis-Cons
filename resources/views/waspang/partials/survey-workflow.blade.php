@@ -91,7 +91,33 @@
             </div>
         @endif
 
-        @if($step['survey']['active'] && $surveyMapConfirmed)
+        @if($step['survey']['active'] && $lop->survey_redesign_required)
+            <div class="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-3">
+                <div>
+                    <p class="text-xs font-black text-amber-800"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Approval Redesign Diperlukan</p>
+                    <p class="mt-1 text-[10px] leading-relaxed text-amber-700">
+                        Nilai BOQ Survey menyimpang <span class="font-black">{{ rtrim(rtrim(number_format($lop->survey_deviation_percent, 2, '.', ''), '0'), '.') }}%</span> dari BOQ Plan (di atas ambang 10%). Upload bukti foto/capture yang menyatakan sudah disetujui untuk melanjutkan ke Perizinan.
+                    </p>
+                </div>
+                <form id="surveyRedesignApprovalForm" method="POST" action="{{ route('waspang.survey.redesign-approval.store', $project->id_project) }}" enctype="multipart/form-data" class="space-y-2">
+                    @csrf
+                    <label class="flex flex-col items-center justify-center w-full min-h-[90px] border-2 border-dashed border-amber-300 rounded-2xl bg-white cursor-pointer hover:bg-amber-50/60 transition p-3">
+                        <div class="text-center">
+                            <i class="fa-solid fa-camera text-amber-500 text-lg"></i>
+                            <p class="text-xs font-black text-amber-700 mt-1">Ambil / Pilih Foto Bukti Persetujuan</p>
+                        </div>
+                        <input type="file" name="photos[]" id="surveyRedesignApprovalPhotoInput" accept="image/*" multiple class="hidden">
+                    </label>
+                    <div id="surveyRedesignApprovalPreview" class="grid grid-cols-4 gap-1.5"></div>
+                    @error('photos')
+                        <p class="text-[9px] font-bold text-red-600">{{ $message }}</p>
+                    @enderror
+                    <button type="submit" class="h-11 w-full rounded-xl bg-amber-600 text-xs font-black text-white shadow-sm">
+                        <i class="fa-solid fa-check mr-1"></i> Konfirmasi Disetujui & Lanjut ke Perizinan
+                    </button>
+                </form>
+            </div>
+        @elseif($step['survey']['active'] && $surveyMapConfirmed)
             <div class="border-t border-slate-100 pt-3">
                 <button type="button" @click="finalizeOpen = !finalizeOpen"
                         class="h-10 w-full rounded-xl bg-[#1565D8] text-[11px] font-black text-white">
@@ -116,7 +142,7 @@
                                 $draftValue = $surveyDraftVolumes->get($field);
                             }
                             if ($draftValue === null && $group['is_additional']) {
-                                $draftValue = $group['quantity_actual'];
+                                $draftValue = $group['quantity_survey'];
                             }
                         @endphp
                         <div class="rounded-xl border {{ $group['is_additional'] ? 'border-amber-200' : 'border-slate-200' }} bg-white p-3">
@@ -206,5 +232,109 @@
 
             @include('waspang.partials.step-action-buttons', ['stageCode' => 'survey', 'stepLabel' => 'Survey'])
         @endif
+
+        @if($surveyRounds->isNotEmpty())
+            <div class="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                    <p class="text-[11px] font-black text-slate-800">Riwayat BOQ Survey</p>
+                    <span class="text-[9px] font-bold text-slate-400">{{ $surveyRounds->count() }} ronde</span>
+                </div>
+                <div class="space-y-1.5">
+                    @foreach($surveyRounds as $round)
+                        <div class="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+                            <div class="min-w-0">
+                                <p class="text-[10.5px] font-black text-slate-700">Ronde {{ $round->round_number }}{{ $round->round_number === 1 ? ' (Survey Awal)' : '' }}</p>
+                                <p class="text-[9px] text-slate-400">
+                                    {{ $round->status === 'completed' ? 'Selesai · '.optional($round->finished_at)->format('d M Y H:i') : 'Sedang berjalan' }}
+                                </p>
+                            </div>
+                            @if($round->deviation_percent !== null)
+                                <span class="shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-black {{ $round->redesign_required ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700' }}">
+                                    {{ rtrim(rtrim(number_format($round->deviation_percent, 2, '.', ''), '0'), '.') }}%
+                                </span>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        @if($canStartReSurvey)
+            <form method="POST" action="{{ route('waspang.survey.re-survey.start', $project->id_project) }}"
+                  onsubmit="return confirm('Mulai Re Survey? Volume Survey akan diisi ulang dari awal untuk LOP ini, tetapi histori ronde sebelumnya tetap tersimpan.')">
+                @csrf
+                <button type="submit" class="h-11 w-full rounded-xl border border-[#1565D8] bg-white text-xs font-black text-[#1565D8]">
+                    <i class="fa-solid fa-rotate-left mr-1"></i> Re Survey
+                </button>
+            </form>
+        @endif
     </div>
 </div>
+
+<script>
+// Stage 4e: bukti persetujuan Redesign -- foto disimpan dulu di array JS
+// (bukan langsung di <input>) supaya waspang bisa BATALKAN/hapus satu-satu
+// SEBELUM submit. Begitu form berhasil terkirim ke server, evidence-nya
+// sudah tersimpan permanen -- SENGAJA tidak ada tombol hapus sesudahnya
+// (tidak ada endpoint utk itu), beda dgn tahap memilih foto yang masih
+// bisa diedit bebas.
+let surveyRedesignApprovalFiles = [];
+
+document.getElementById('surveyRedesignApprovalPhotoInput')?.addEventListener('change', async function (e) {
+    const input = e.target;
+    const files = Array.from(input.files).filter(f => f.type.startsWith('image/'));
+
+    for (const file of files) {
+        const compressed = (typeof compressImage === 'function') ? await compressImage(file) : file;
+        surveyRedesignApprovalFiles.push({ file: compressed, url: URL.createObjectURL(compressed) });
+    }
+
+    input.value = ''; // supaya pilih ulang file yang sama tetap trigger 'change'
+    renderSurveyRedesignApprovalPreview();
+});
+
+function removeSurveyRedesignApprovalPhoto(index) {
+    const item = surveyRedesignApprovalFiles[index];
+    if (item) URL.revokeObjectURL(item.url);
+    surveyRedesignApprovalFiles.splice(index, 1);
+    renderSurveyRedesignApprovalPreview();
+}
+
+function renderSurveyRedesignApprovalPreview() {
+    const preview = document.getElementById('surveyRedesignApprovalPreview');
+    preview.innerHTML = '';
+
+    surveyRedesignApprovalFiles.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = 'relative aspect-square rounded-lg overflow-hidden bg-slate-100 border border-slate-200';
+        div.innerHTML = `
+            <img src="${item.url}" class="w-full h-full object-cover">
+            <button type="button" onclick="removeSurveyRedesignApprovalPhoto(${index})"
+                    class="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/75 text-white text-xs font-black flex items-center justify-center">×</button>
+        `;
+        preview.appendChild(div);
+    });
+}
+
+document.getElementById('surveyRedesignApprovalForm')?.addEventListener('submit', function (e) {
+    if (surveyRedesignApprovalFiles.length === 0) {
+        e.preventDefault();
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({ title: 'Pilih Foto!', text: 'Mohon lampirkan minimal 1 foto/capture bukti persetujuan.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
+        } else {
+            alert('Mohon lampirkan minimal 1 foto/capture bukti persetujuan.');
+        }
+        return;
+    }
+
+    // Susun ulang FileList input tepat sebelum submit, dari array yang
+    // sudah difilter waspang (hasil hapus manual sudah tidak ikut).
+    const dt = new DataTransfer();
+    surveyRedesignApprovalFiles.forEach(item => dt.items.add(item.file));
+    document.getElementById('surveyRedesignApprovalPhotoInput').files = dt.files;
+
+    const btn = this.querySelector('button[type="submit"]');
+    if (btn) { btn.disabled = true; btn.innerText = 'Mengirim...'; }
+    // Native submit tetap lanjut (tidak di-preventDefault di jalur ini).
+});
+</script>

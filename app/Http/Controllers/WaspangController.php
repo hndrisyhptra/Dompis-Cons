@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\BoqItem;
+use App\Models\BoqSurveyRound;
+use App\Models\BoqSurveyRoundItem;
 use App\Models\Designator;
 use App\Models\Evidence;
 use App\Models\EvidenceRevisionHistory;
@@ -90,9 +92,13 @@ class WaspangController extends Controller
             // yang tidak pakai prefix M-/J-, mis. Konstruksi Eksternal) --
             // kalau cuma cek prefix, item material tanpa prefix "M-" akan
             // hilang total dari progress instalasi meski BOQ-nya valid.
+            // quantity_plan !== null WAJIB: item tambahan hasil BOQ Survey
+            // (addSurveyBoqItem(), tidak punya Plan) bukan bagian checklist
+            // progress Instalasi -- lihat ANALISA_REFACTOR_PERSIAPAN.md bag. AC.
             $materialBoqItems = $boqItems->filter(function ($boq) {
-                return str_starts_with($boq->designator, 'M-')
-                    || optional($boq->designatorData)->type === 'material';
+                return ($boq->quantity_plan !== null)
+                    && (str_starts_with($boq->designator, 'M-')
+                        || optional($boq->designatorData)->type === 'material');
             });
 
             $boqTotal = $materialBoqItems->count();
@@ -233,9 +239,12 @@ class WaspangController extends Controller
 
         // HANYA MATERIAL -- lihat catatan di dashboard() soal kenapa dicek
         // dua-duanya (prefix "M-" ATAU type master designator = 'material').
+        // quantity_plan !== null WAJIB (lihat bag. AC): item tambahan BOQ
+        // Survey bukan bagian checklist progress Instalasi.
         $materialBoqItems = $boqItems->filter(function ($boq) {
-            return str_starts_with($boq->designator, 'M-')
-                || optional($boq->designatorData)->type === 'material';
+            return ($boq->quantity_plan !== null)
+                && (str_starts_with($boq->designator, 'M-')
+                    || optional($boq->designatorData)->type === 'material');
         });
 
         $boqTotal = $materialBoqItems->count();
@@ -376,6 +385,18 @@ class WaspangController extends Controller
         $permitCategories = PermitCategory::active()->get();
         $kendalaCategories = KendalaCategory::active()->get();
 
+        // Re Survey (lihat startReSurvey()): tombol tampil begitu ada
+        // minimal 1 ronde selesai & tidak ada ronde lain yg masih berjalan
+        // / menunggu Approval Redesign -- berlaku dari tahap manapun
+        // setelah Survey pertama tuntas, tidak dibatasi hanya saat aktif.
+        // ensureBaselineSurveyRound() backfill round 1 utk LOP lama yg
+        // sudah lewat Survey SEBELUM fitur ini ada (lihat catatan di sana).
+        $this->ensureBaselineSurveyRound($lop);
+        $surveyRounds = $lop->surveyRounds()->with('items')->get();
+        $canStartReSurvey = $surveyRounds->where('status', 'completed')->isNotEmpty()
+            && $surveyRounds->where('status', 'in_progress')->isEmpty()
+            && ! $lop->survey_redesign_required;
+
         return view('waspang.show', compact(
             'project',
             'lop',
@@ -396,7 +417,9 @@ class WaspangController extends Controller
             'additionalDesignatorOptions',
             'kronologis',
             'permitCategories',
-            'kendalaCategories'
+            'kendalaCategories',
+            'surveyRounds',
+            'canStartReSurvey'
         ));
     }
 
@@ -477,15 +500,17 @@ class WaspangController extends Controller
     {
         $project = $this->getAssignedProject($id);
 
-        // Prefix "M-" ATAU type master designator = 'material' -- lihat
-        // catatan di dashboard(). Tanpa OR ini, BOQ item material yang
-        // designatornya tidak berawalan "M-" (mis. project Konstruksi
-        // Eksternal) tidak akan pernah muncul di Step 2 Instalasi walau
-        // BOQ-nya sudah ke-upload & terlihat di halaman lain.
-        $materialBoqItems = $project->boqItems->filter(function ($boq) {
-            return str_starts_with($boq->designator, 'M-')
-                || optional($boq->designatorData)->type === 'material';
-        })->values();
+        // Section AD: sumber item Material = ronde BOQ Survey TERBARU yang
+        // sudah selesai (kalau ada) -- else fallback BOQ Plan murni
+        // (quantity_plan !== null, bag. AC). Lihat Project::
+        // materialProgressItems() utk alasan lengkap. Prefix "M-" ATAU type
+        // master designator = 'material' tetap dipakai sbg filter Material
+        // (lihat catatan lama di dashboard()) supaya item non-"M-" (mis.
+        // project Konstruksi Eksternal) tetap muncul.
+        $materialSource = $project->materialProgressItems();
+        $materialBoqItems = $materialSource['items'];
+        $materialSourceType = $materialSource['source'];
+        $materialSourceRound = $materialSource['round'];
 
         $persiapanComplete = $this->isPersiapanUploaded($id);
 
@@ -526,7 +551,8 @@ class WaspangController extends Controller
 
         return view('waspang.steps.instalasi', compact(
             'project', 'boqTotal', 'boqUploaded', 'persiapanComplete',
-            'instalasiComplete', 'pengukuranComplete', 'finishingComplete', 'revisionHistories'
+            'instalasiComplete', 'pengukuranComplete', 'finishingComplete', 'revisionHistories',
+            'materialSourceType', 'materialSourceRound'
         ));
     }
 
@@ -643,6 +669,33 @@ class WaspangController extends Controller
         $check->note = $wantsNotApplicable ? $request->note : null;
         $check->checked_by = auth()->user()->id_user;
         $check->save();
+
+        // Section AE: sebelumnya status_progress LOP CUMA bisa maju dari
+        // 'pengukuran' -> 'finishing' lewat 1 jalur: admin approve eviden
+        // stage='pengukuran' (lihat ProjectController, blok auto-transisi).
+        // Kalau SEMUA 5 item Pengukuran ditandai "Tidak Ada" (N/A) -- tanpa
+        // upload eviden APAPUN -- tidak pernah ada evidence utk di-approve,
+        // jadi transisi itu TIDAK PERNAH kepicu walau pengukuranDone sudah
+        // true (LopMeasurementCheck::isDone() -- lihat Project::
+        // progressSummary()). Stepper jadi tidak pernah checklist utk Step 4
+        // meski Waspang sudah "selesai" (semua item N/A). Replikasi gate yg
+        // SAMA PERSIS dgn ProjectController supaya konsisten (PT2/hold/drop
+        // tidak disentuh, urutan sequence tidak boleh dilompati).
+        $summaryAfterToggle = $project->progressSummary();
+        $programSap = strtoupper($lop->program_sap ?? '');
+        $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
+        $isAlreadyClosed = in_array($lop->status_progress, ['drop', 'golive'], true) || (bool) $lop->is_golive;
+        $currentStage = $lop->stage;
+        $currentSequence = $currentStage?->sequence;
+        $isPausedOrDropped = (bool) ($currentStage?->is_pause_type || $currentStage?->is_terminal);
+
+        if (
+            ! $isPt2 && ! $isAlreadyClosed && ! $isPausedOrDropped
+            && $currentSequence === 8 // persis di tahap Pengukuran
+            && ($summaryAfterToggle['pengukuranDone'] ?? false)
+        ) {
+            Lop::where('project_id', $project->id_project)->update(['status_progress' => 'finishing']);
+        }
 
         ProjectActivityService::log([
             'project_id' => $project->id_project,
@@ -1018,7 +1071,10 @@ class WaspangController extends Controller
                     'item_name' => $designator->item_name,
                     'unit' => $designator->unit,
                     'quantity_plan' => null,
-                    'quantity_actual' => $validated['volume_survey'],
+                    // Volume BOQ Survey -- KOLOM TERPISAH dari quantity_actual
+                    // (lihat bag. AB): quantity_actual murni utk progress
+                    // Instalasi Step 3, baru diisi nanti di sana, BUKAN di sini.
+                    'quantity_survey' => $validated['volume_survey'],
                 ]);
             }
 
@@ -1140,8 +1196,17 @@ class WaspangController extends Controller
     }
 
     /**
-     * Finalisasi Survey: seluruh volume wajib diisi, lalu status berpindah
-     * langsung ke Perizinan. BOQ Plan tidak pernah diubah; hanya
+     * Ambang deviasi nominal BOQ Survey vs BOQ Plan yg memicu Approval
+     * Redesign (Stage 4e). Lihat ANALISA_REFACTOR_PERSIAPAN.md bag. U.
+     */
+    private const SURVEY_DEVIATION_THRESHOLD = 0.10;
+
+    /**
+     * Finalisasi Survey: seluruh volume wajib diisi. Kalau deviasi nominal
+     * (vs BOQ Plan, dihitung dari designator_package_prices) di ambang
+     * batas, status TETAP di 'survey' dan menunggu Approval Redesign
+     * (lihat uploadSurveyRedesignApproval()) -- selain itu langsung
+     * berpindah ke Perizinan. BOQ Plan tidak pernah diubah; hanya
      * quantity_actual yang disimpan.
      */
     public function finishSurvey(Request $request, $project, SurveyPreparationService $surveyPreparation)
@@ -1167,28 +1232,421 @@ class WaspangController extends Controller
             return back()->with('error', 'BOQ Plan belum tersedia untuk LOP ini.');
         }
 
-        DB::transaction(function () use ($project, $lop, $groups, $validated): void {
+        // Stage 4e: hitung deviasi nominal SEBELUM commit apapun -- kalau
+        // package/harga belum lengkap, Selesai Survey diblokir total (sesuai
+        // keputusan user), waspang dipersilakan pakai "Simpan Draf" dulu.
+        $boqItems = BoqItem::where('lop_id', $lop->id_lop)->get(['id_boq', 'designator_id', 'designator']);
+        $nominal = $surveyPreparation->evaluateNominalDeviation($groups, $validated['volumes'], $boqItems, $lop->package_id);
+
+        if (in_array('__no_package__', $nominal['missing'], true)) {
+            return back()->with('error', 'Package LOP ini belum diisi Admin -- dibutuhkan untuk menghitung nilai nominal BOQ (Survey vs Plan). Hubungi Admin untuk melengkapi Package sebelum Selesai Survey.')
+                ->withInput();
+        }
+
+        if ($nominal['missing'] !== []) {
+            $preview = implode(', ', array_slice($nominal['missing'], 0, 5)).(count($nominal['missing']) > 5 ? ', ...' : '');
+
+            return back()->with('error', "Harga sebagian designator belum tersedia untuk Package LOP ini ({$preview}). Hubungi Admin untuk melengkapi harga sebelum Selesai Survey.")
+                ->withInput();
+        }
+
+        $planTotal = $nominal['plan_total'];
+        $surveyTotal = $nominal['survey_total'];
+        $deviation = $planTotal > 0.0
+            ? abs($surveyTotal - $planTotal) / $planTotal
+            : ($surveyTotal > 0.0 ? 1.0 : 0.0);
+        $deviationPercent = round($deviation * 100, 2);
+        $needsRedesignApproval = $deviation > self::SURVEY_DEVIATION_THRESHOLD;
+
+        DB::transaction(function () use ($project, $lop, $groups, $validated, $planTotal, $surveyTotal, $deviationPercent, $needsRedesignApproval): void {
             $volumes = $this->persistSurveyVolumes($groups, $validated['volumes'], true);
-            $lop->update(['status_progress' => 'perizinan']);
+
+            // Re Survey (lihat startReSurvey()): ronde berjalan sudah dibuat
+            // saat tombol "Re Survey" ditekan (atau round 1 dibuat otomatis
+            // di sini utk LOP lama yg belum pernah punya ronde). Simpan
+            // total nominal & deviasi ronde ini SEBELUM ditutup.
+            $round = $this->currentSurveyRound($lop);
+            $round->plan_total = $planTotal;
+            $round->survey_total = $surveyTotal;
+            $round->deviation_percent = $deviationPercent;
+            $round->redesign_required = $needsRedesignApproval;
+            $round->save();
+
+            $lop->survey_deviation_percent = $deviationPercent;
+            $lop->survey_redesign_required = $needsRedesignApproval;
+
+            if (! $needsRedesignApproval) {
+                $lop->status_progress = 'perizinan';
+                $this->completeSurveyRound($round, $lop);
+            }
+
+            $lop->save();
 
             ProjectActivityService::log([
                 'project_id' => $project->id_project,
                 'lop_id' => $lop->id_lop,
-                'activity_type' => 'survey_finalized',
-                'title' => 'Survey Selesai',
-                'description' => 'Waspang memfinalisasi '.$groups->count().' baris BOQ Survey dan melanjutkan ke Perizinan.',
+                'activity_type' => $needsRedesignApproval ? 'survey_deviation_detected' : 'survey_finalized',
+                'title' => $needsRedesignApproval ? 'Deviasi BOQ Survey Terdeteksi' : 'Survey Selesai',
+                'description' => $needsRedesignApproval
+                    ? "Waspang memfinalisasi {$groups->count()} baris BOQ Survey (ronde {$round->round_number}) -- nilai nominal menyimpang {$deviationPercent}% dari Plan (>10%), menunggu upload bukti persetujuan Redesign."
+                    : "Waspang memfinalisasi {$groups->count()} baris BOQ Survey (ronde {$round->round_number}) dan melanjutkan ke Perizinan.",
                 'status_before' => 'survey',
-                'status_after' => 'perizinan',
+                'status_after' => $needsRedesignApproval ? 'survey' : 'perizinan',
                 'stage' => 'survey',
-                'meta' => ['volumes' => $volumes],
+                'meta' => ['volumes' => $volumes, 'deviation_percent' => $deviationPercent, 'round_number' => $round->round_number],
             ]);
         });
+
+        if ($needsRedesignApproval) {
+            return back()->with('warning', "Volume Survey tersimpan, namun nilai BOQ Survey menyimpang {$deviationPercent}% dari Plan (di atas ambang 10%). Upload bukti persetujuan Redesign untuk melanjutkan ke Perizinan.");
+        }
 
         return back()->with('success', 'Survey selesai. Lanjut ke Perizinan.');
     }
 
     /**
-     * Pilih kategori perizinan (master `permit_categories`) utk LOP ini.
+     * Stage 4e -- waspang mengunggah bukti foto/capture persetujuan Redesign
+     * (self-declare, tidak ada langkah approve terpisah oleh role lain).
+     * Begitu tersimpan, langsung melanjutkan status_progress ke Perizinan.
+     */
+    public function uploadSurveyRedesignApproval(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $this->getSingleSurveyLop($project);
+
+        if ($lop->status_progress !== 'survey') {
+            return back()->with('error', 'LOP sudah tidak berada di tahap Survey.');
+        }
+
+        if (! $lop->survey_redesign_required) {
+            return back()->with('error', 'Tidak ada deviasi Survey yang perlu disetujui saat ini.');
+        }
+
+        $request->validate([
+            'photos' => 'required|array|min:1',
+            'photos.*' => 'image|max:10240',
+        ]);
+
+        $projectFolder = $this->evidenceLopFolder($project->id_project);
+        $deviationPercent = $lop->survey_deviation_percent;
+
+        DB::transaction(function () use ($request, $project, $lop, $projectFolder, $deviationPercent): void {
+            foreach ($request->file('photos') as $photo) {
+                $path = $photo->storeAs(
+                    "evidences/{$projectFolder}/survey/redesign_approval",
+                    now()->format('Ymd_His').'_'.uniqid().'.jpg',
+                    'public'
+                );
+
+                Evidence::create([
+                    'project_id' => $project->id_project,
+                    'uploaded_by' => auth()->user()->id_user,
+                    'stage' => 'survey',
+                    'evidence_type' => 'redesign_approval',
+                    'file_path' => $path,
+                    // Self-declare waspang -- tidak ada langkah approve role
+                    // lain utk bukti ini, jadi langsung ditandai approved
+                    // supaya tidak nyangkut di antrean Approval Eviden admin.
+                    'status' => 'approved',
+                ]);
+            }
+
+            $lop->survey_redesign_required = false;
+            $lop->status_progress = 'perizinan';
+            $lop->save();
+
+            // Ronde ini baru benar-benar tuntas setelah bukti Approval
+            // Redesign diupload -- baru sekarang snapshot histori dibuat.
+            $round = $this->currentSurveyRound($lop);
+            $this->completeSurveyRound($round, $lop);
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'survey_redesign_approved',
+                'title' => 'Redesign Survey Disetujui',
+                'description' => "Waspang mengunggah bukti persetujuan deviasi BOQ Survey ({$deviationPercent}%, ronde {$round->round_number}) dan melanjutkan ke Perizinan.",
+                'status_before' => 'survey',
+                'status_after' => 'perizinan',
+                'stage' => 'survey',
+                'meta' => ['round_number' => $round->round_number],
+            ]);
+        });
+
+        return back()->with('success', 'Bukti persetujuan tersimpan. Lanjut ke Perizinan.');
+    }
+
+    /**
+     * Re Survey -- bisa dipicu dari tahap manapun SETELAH Survey pertama
+     * kali selesai (tidak dibatasi hanya saat LOP masih di 'survey'),
+     * sesuai keputusan user. Klik tombol ini:
+     * 1. Membuka ronde BOQ Survey baru (boq_survey_rounds, round_number
+     *    bertambah) -- ronde SEBELUMNYA tetap tersimpan utuh, tidak
+     *    dihapus/ditimpa.
+     * 2. Mengembalikan status_progress LOP ke 'survey' supaya UI Survey
+     *    (termasuk daftar item BOQ) tampil seperti kondisi awal lagi utk
+     *    diisi ulang -- boq_items TIDAK diduplikasi, quantity_actual-nya
+     *    hanya akan ditimpa nanti saat ronde baru ini di-Selesai-kan
+     *    (lihat finishSurvey()).
+     */
+    public function startReSurvey($project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $this->getSingleSurveyLop($project);
+
+        $this->ensureBaselineSurveyRound($lop);
+
+        $hasCompletedRound = BoqSurveyRound::where('lop_id', $lop->id_lop)
+            ->where('status', 'completed')
+            ->exists();
+
+        if (! $hasCompletedRound) {
+            return back()->with('error', 'Re Survey hanya dapat dilakukan setelah Survey pertama selesai.');
+        }
+
+        $hasInProgressRound = BoqSurveyRound::where('lop_id', $lop->id_lop)
+            ->where('status', 'in_progress')
+            ->exists();
+
+        if ($hasInProgressRound || $lop->survey_redesign_required) {
+            return back()->with('error', 'Masih ada ronde Survey yang berjalan/menunggu Approval Redesign. Selesaikan ronde tersebut terlebih dahulu.');
+        }
+
+        $statusBefore = $lop->status_progress;
+
+        DB::transaction(function () use ($project, $lop, $statusBefore): void {
+            $lastRoundNumber = (int) (BoqSurveyRound::where('lop_id', $lop->id_lop)->max('round_number') ?? 0);
+
+            $round = BoqSurveyRound::create([
+                'lop_id' => $lop->id_lop,
+                'round_number' => $lastRoundNumber + 1,
+                'status' => 'in_progress',
+                'started_by' => auth()->user()->id_user,
+                'started_at' => now(),
+            ]);
+
+            $lop->status_progress = 'survey';
+            $lop->survey_redesign_required = false;
+            $lop->survey_deviation_percent = null;
+            $lop->save();
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 're_survey_started',
+                'title' => 'Re Survey Dimulai',
+                'description' => "Waspang memulai Re Survey (ronde {$round->round_number}) untuk LOP {$lop->lop_name}. Status dikembalikan ke Survey dari '{$statusBefore}'.",
+                'status_before' => $statusBefore,
+                'status_after' => 'survey',
+                'stage' => 'survey',
+                'meta' => ['round_number' => $round->round_number],
+            ]);
+        });
+
+        return back()->with('success', 'Re Survey dimulai. Silakan isi ulang volume Survey.');
+    }
+
+    /**
+     * LOP yang sudah menyelesaikan Survey SEBELUM fitur Re Survey ini ada
+     * tidak pernah tercatat di boq_survey_rounds sama sekali -- tanpa
+     * backfill ini, tombol Re Survey tidak akan pernah muncul utk LOP
+     * lama walau Survey-nya sudah lama tuntas. Dipanggil dari persiapan()
+     * (supaya kepakai lewat GET biasa) & startReSurvey() (jaga-jaga kalau
+     * halaman belum sempat di-refresh). Idempotent -- no-op kalau LOP ini
+     * sudah pernah punya baris ronde apapun.
+     */
+    private function ensureBaselineSurveyRound(Lop $lop): void
+    {
+        if (BoqSurveyRound::where('lop_id', $lop->id_lop)->exists()) {
+            return;
+        }
+
+        // Masih di Inisiasi/Survey berarti belum pernah Selesai Survey sama
+        // sekali -- bukan kandidat backfill, tombol Re Survey memang belum
+        // seharusnya muncul.
+        if (in_array($lop->status_progress, ['inisiasi', 'survey'], true)) {
+            return;
+        }
+
+        $round = BoqSurveyRound::create([
+            'lop_id' => $lop->id_lop,
+            'round_number' => 1,
+            'status' => 'completed',
+            'deviation_percent' => $lop->survey_deviation_percent,
+            'redesign_required' => false,
+            'finished_at' => $lop->perizinan_completed_at ?? $lop->updated_at ?? now(),
+            'note' => 'Dibuat otomatis (backfill) -- LOP ini menyelesaikan Survey sebelum fitur Re Survey tersedia.',
+        ]);
+
+        // quantity_survey SEHARUSNYA sudah dipisah migration 160000, tapi kalau
+        // LOP ini belum pernah punya baris ronde SAAT migration jalan, migration
+        // itu tidak sempat memprosesnya -- fallback ke quantity_actual (satu2nya
+        // sisa data lama) DI SINI, sekaligus pindahkan permanen spy tidak
+        // tertinggal lagi ke depannya.
+        foreach (BoqItem::where('lop_id', $lop->id_lop)->get() as $item) {
+            $surveyValue = $item->quantity_survey ?? $item->quantity_actual;
+
+            BoqSurveyRoundItem::create([
+                'boq_survey_round_id' => $round->id,
+                'boq_item_id' => $item->id_boq,
+                'designator_id' => $item->designator_id,
+                'designator' => $item->designator,
+                'item_name' => $item->item_name,
+                'unit' => $item->unit,
+                'quantity_plan' => $item->quantity_plan,
+                'quantity_survey' => $surveyValue,
+            ]);
+
+            if ($item->quantity_survey === null && $item->quantity_actual !== null) {
+                $hasRealInstalasiProgress = ProjectActivityLog::where('activity_type', 'update_quantity_actual')
+                    ->where('meta->boq_item_id', $item->id_boq)
+                    ->exists();
+
+                $item->quantity_survey = $surveyValue;
+
+                if (! $hasRealInstalasiProgress) {
+                    $item->quantity_actual = null;
+                }
+
+                $item->save();
+            }
+        }
+    }
+
+    /** Ronde in_progress LOP saat ini; auto-buat round 1 utk LOP lama yg belum pernah punya ronde (backward compatibility). */
+    private function currentSurveyRound(Lop $lop): BoqSurveyRound
+    {
+        $round = BoqSurveyRound::where('lop_id', $lop->id_lop)
+            ->where('status', 'in_progress')
+            ->latest('round_number')
+            ->first();
+
+        if ($round) {
+            return $round;
+        }
+
+        $lastRoundNumber = (int) (BoqSurveyRound::where('lop_id', $lop->id_lop)->max('round_number') ?? 0);
+
+        return BoqSurveyRound::create([
+            'lop_id' => $lop->id_lop,
+            'round_number' => $lastRoundNumber + 1,
+            'status' => 'in_progress',
+            'started_by' => auth()->user()->id_user,
+            'started_at' => now(),
+        ]);
+    }
+
+    /** Tutup ronde + snapshot seluruh boq_items LOP ini sebagai histori ronde tsb. */
+    private function completeSurveyRound(BoqSurveyRound $round, Lop $lop): void
+    {
+        $round->status = 'completed';
+        $round->finished_by = auth()->user()->id_user;
+        $round->finished_at = now();
+        $round->save();
+
+        $items = BoqItem::where('lop_id', $lop->id_lop)->get();
+
+        foreach ($items as $item) {
+            BoqSurveyRoundItem::create([
+                'boq_survey_round_id' => $round->id,
+                'boq_item_id' => $item->id_boq,
+                'designator_id' => $item->designator_id,
+                'designator' => $item->designator,
+                'item_name' => $item->item_name,
+                'unit' => $item->unit,
+                'quantity_plan' => $item->quantity_plan,
+                'quantity_survey' => $item->quantity_survey,
+            ]);
+        }
+    }
+
+    /**
+     * Redesign accordion Perizinan (Stage 4f) -- "Add Perizinan": 1
+     * submission = pilih kategori perizinan + catatan kronologi (wajib) +
+     * eviden foto/PDF (opsional, boleh campur & lebih dari 1 file
+     * sekaligus). Bisa dipanggil berkali-kali selama LOP di tahap
+     * Perizinan -- tiap submission jadi 1 baris baru `lop_kronologis`
+     * (stage_code='perizinan'), TIDAK menimpa entri sebelumnya.
+     * `lops.permit_category_id` SELALU ikut kategori TERBARU yang dipilih,
+     * sementara kategori tiap entri sendiri tetap tercatat utuh di
+     * `lop_kronologis.permit_category_id` sbg histori.
+     */
+    public function addPerizinan(Request $request, $project)
+    {
+        $project = $this->getAssignedProject($project);
+        $lop = $project->lop;
+
+        abort_if(! $lop, 404, 'LOP belum tersedia untuk project ini.');
+
+        if (! in_array($lop->status_progress, ['drm', 'perizinan'], true)) {
+            return back()->with('error', 'LOP sudah tidak berada di tahap Perizinan.');
+        }
+
+        $validated = $request->validate([
+            'permit_category_id' => 'required|exists:permit_categories,id',
+            'event_date' => 'required|date',
+            'note' => 'required|string|max:2000',
+            'files' => 'nullable|array',
+            'files.*' => 'file|mimes:jpg,jpeg,png,pdf|max:10240',
+        ]);
+
+        $projectFolder = $this->evidenceLopFolder($project->id_project);
+
+        DB::transaction(function () use ($request, $project, $lop, $validated, $projectFolder): void {
+            $kronologi = LopKronologi::create([
+                'lop_id' => $lop->id_lop,
+                'project_id' => $project->id_project,
+                'stage_code' => 'perizinan',
+                'permit_category_id' => $validated['permit_category_id'],
+                'event_date' => $validated['event_date'],
+                'note' => $validated['note'],
+                'created_by' => auth()->user()->id_user,
+            ]);
+
+            $lop->update(['permit_category_id' => $validated['permit_category_id']]);
+
+            foreach ($request->file('files') ?? [] as $file) {
+                $isPdf = strtolower($file->getClientOriginalExtension()) === 'pdf';
+                $path = $file->storeAs(
+                    "evidences/{$projectFolder}/perizinan/add_perizinan",
+                    now()->format('Ymd_His').'_'.uniqid().($isPdf ? '.pdf' : '.jpg'),
+                    'public'
+                );
+
+                Evidence::create([
+                    'project_id' => $project->id_project,
+                    'lop_kronologi_id' => $kronologi->id,
+                    'uploaded_by' => auth()->user()->id_user,
+                    'stage' => 'perizinan',
+                    'evidence_type' => $isPdf ? 'ba_kp' : 'eviden_perizinan',
+                    'file_path' => $path,
+                    'status' => 'pending',
+                ]);
+            }
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'add_perizinan',
+                'title' => 'Add Perizinan',
+                'description' => 'Waspang menambahkan aktivitas Perizinan ('.optional(PermitCategory::find($validated['permit_category_id']))->name.'): '.Str::limit($validated['note'], 150),
+                'stage' => 'perizinan',
+                'meta' => [
+                    'kronologi_id' => $kronologi->id,
+                    'permit_category_id' => $validated['permit_category_id'],
+                    'event_date' => $validated['event_date'],
+                ],
+            ]);
+        });
+
+        return back()->with('success', 'Perizinan berhasil ditambahkan.');
+    }
+
+    /**
+     * DIPERTAHANKAN utk kompatibilitas route lama -- sejak Stage 4f, kategori
+     * perizinan dipilih langsung dari form "Add Perizinan" (lihat
+     * addPerizinan() di atas), method & route ini sudah tidak dipanggil dari
+     * UI manapun.
      */
     public function updatePerizinanCategory(Request $request, $project)
     {
@@ -1216,13 +1674,15 @@ class WaspangController extends Controller
     }
 
     /**
-     * Radio "Perizinan Selesai" -- syarat: minimal 1 kronologi perizinan
-     * sudah pernah diinput (setiap aktivitas perizinan wajib kronologi, sesuai
-     * spec user), lalu wajib upload BA KP (pdf) + minimal 1 eviden foto.
-     * Menandai lops.perizinan_completed_at & transisi status_progress:
-     * perizinan -> material_delivery.
+     * Tombol "Perizinan Selesai" (Stage 4f -- revisi: sebelumnya checkbox +
+     * form upload BA KP wajib, SEKARANG langsung tombol aksi tanpa upload
+     * tambahan lagi, krn eviden BA KP/foto sudah bisa dilampirkan per entri
+     * lewat "Add Perizinan"). Syarat: minimal 1x Add Perizinan (baris
+     * lop_kronologis stage_code='perizinan') sudah pernah disimpan. Klik
+     * langsung menandai lops.perizinan_completed_at & transisi
+     * status_progress: perizinan -> material_delivery.
      */
-    public function togglePerizinanSelesai(Request $request, $project)
+    public function togglePerizinanSelesai($project)
     {
         $project = $this->getAssignedProject($project);
         $lop = $project->lop;
@@ -1240,48 +1700,7 @@ class WaspangController extends Controller
             ->exists();
 
         if (! $hasKronologi) {
-            return back()->with('error', 'Input minimal 1 kronologi perizinan sebelum menandai Perizinan Selesai.');
-        }
-
-        $request->validate([
-            'ba_kp_file' => 'required|file|mimes:pdf|max:10240',
-            'photos' => 'required|array|min:1',
-            'photos.*' => 'image|max:10240',
-        ]);
-
-        $projectFolder = $this->evidenceLopFolder($project->id_project);
-
-        $baKpFile = $request->file('ba_kp_file');
-        $baKpPath = $baKpFile->storeAs(
-            "evidences/{$projectFolder}/perizinan/ba_kp",
-            now()->format('Ymd_His').'_'.uniqid().'.pdf',
-            'public'
-        );
-
-        Evidence::create([
-            'project_id' => $project->id_project,
-            'uploaded_by' => auth()->user()->id_user,
-            'stage' => 'perizinan',
-            'evidence_type' => 'ba_kp',
-            'file_path' => $baKpPath,
-            'status' => 'pending',
-        ]);
-
-        foreach ($request->file('photos') as $photo) {
-            $path = $photo->storeAs(
-                "evidences/{$projectFolder}/perizinan/eviden_perizinan",
-                now()->format('Ymd_His').'_'.uniqid().'.jpg',
-                'public'
-            );
-
-            Evidence::create([
-                'project_id' => $project->id_project,
-                'uploaded_by' => auth()->user()->id_user,
-                'stage' => 'perizinan',
-                'evidence_type' => 'eviden_perizinan',
-                'file_path' => $path,
-                'status' => 'pending',
-            ]);
+            return back()->with('error', 'Tambahkan minimal 1x Add Perizinan sebelum menandai Perizinan Selesai.');
         }
 
         $lop->update([
@@ -1294,7 +1713,7 @@ class WaspangController extends Controller
             'lop_id' => $lop->id_lop,
             'activity_type' => 'stage_transition',
             'title' => 'Perizinan Selesai',
-            'description' => 'Waspang menandai Perizinan selesai & mengunggah BA KP, lanjut ke Material Delivery.',
+            'description' => 'Waspang menandai Perizinan selesai, lanjut ke Material Delivery.',
             'status_before' => $statusBefore,
             'status_after' => 'material_delivery',
             'stage' => 'perizinan',
@@ -1475,9 +1894,12 @@ class WaspangController extends Controller
         $boqItems = $project->boqItems ?? collect();
 
         // Anda bisa memilah item material saja atau semua item sesuai kebutuhan cetak UT
+        // quantity_plan !== null WAJIB (bag. AC): item tambahan BOQ Survey
+        // tidak punya Plan, jadi tidak relevan dibandingkan Plan vs Aktual di sini.
         $materialBoqItems = $boqItems->filter(function ($boq) {
-            return str_starts_with($boq->designator, 'M-')
-                || optional($boq->designatorData)->type === 'material';
+            return $boq->quantity_plan !== null
+                && (str_starts_with($boq->designator, 'M-')
+                    || optional($boq->designatorData)->type === 'material');
         })->values();
 
         // 4. Hitung ringkasan akumulasi total untuk widget pencapaian di atas halaman
@@ -1645,7 +2067,7 @@ class WaspangController extends Controller
             $value = (float) $submittedVolumes[$field];
             BoqItem::query()
                 ->whereIn('id_boq', $group['item_ids'])
-                ->update(['quantity_actual' => $value]);
+                ->update(['quantity_survey' => $value]);
             $saved[$field] = $value;
         }
 
@@ -1784,12 +2206,11 @@ class WaspangController extends Controller
     private function isInstalasiApproved($project)
     {
         $evidences = $project->evidences ?? collect();
-        $boqItems = $project->boqItems ?? collect();
 
-        // PERBAIKAN BUG: Filter M- material agar variabel terdefinisi
-        $materialBoqItems = $boqItems->filter(function ($boq) {
-            return str_starts_with($boq->designator, 'M-');
-        });
+        // Section AD: item acuan approval Instalasi DISAMAKAN dgn item yang
+        // ditampilkan di Step 3 (ronde BOQ Survey terbaru kalau ada, else
+        // BOQ Plan) -- lihat Project::materialProgressItems().
+        $materialBoqItems = $project->materialProgressItems()['items'];
 
         $boqTotal = $materialBoqItems->count();
 
@@ -2045,8 +2466,11 @@ class WaspangController extends Controller
      */
     private function instalasiSubmittedComplete($project): bool
     {
+        // quantity_plan !== null WAJIB (bag. AC): item tambahan BOQ Survey
+        // bukan bagian checklist progress Instalasi.
         $materialIds = BoqItem::where('project_id', $project->id_project)
             ->where('designator', 'like', 'M-%')
+            ->whereNotNull('quantity_plan')
             ->pluck('id_boq');
 
         if ($materialIds->isEmpty()) {

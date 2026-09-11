@@ -897,6 +897,7 @@ class DashboardController extends Controller
             'assignments.waspang',
             'evidences',
             'lop.stage',
+            'lop.surveyRounds.items',
         ])->findOrFail($id);
 
         return view('admin.project-detail', compact('project'));

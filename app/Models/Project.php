@@ -123,6 +123,180 @@ class Project extends Model
      * stepper 11-tahap penuh (Stage 3-4 refactor), key baru di bagian bawah
      * (stageCode/stageSequence/phaseGroup/isHold/isDrop) sudah disiapkan.
      */
+    /**
+     * Section AD: sumber item Material (checklist Step 3 Instalasi & Step 5
+     * Finishing). Dulu SELALU BOQ Plan (`quantity_plan !== null`, bag. AC).
+     * Sekarang, kalau LOP sudah punya minimal 1 ronde BOQ Survey yang
+     * SELESAI (`boq_survey_rounds.status = 'completed'`), item & angka
+     * acuannya dipindah ke snapshot RONDE TERBARU
+     * (`boq_survey_round_items`) -- karena itu revisi resmi hasil Survey
+     * lapangan (termasuk kemungkinan re-design dari fitur Re Survey).
+     * Kalau LOP belum pernah punya ronde Survey selesai sama sekali,
+     * fallback ke BOQ Plan murni seperti sebelumnya.
+     *
+     * PENTING: setiap baris hasil TETAP objek BoqItem yang mengacu ke
+     * id_boq ASLI (boq_items.id_boq) -- evidence upload (evidences.
+     * boq_item_id) & seluruh gate approval TIDAK BERUBAH. Yang berubah
+     * HANYA (a) daftar item mana yang dianggap "berlaku" hari ini, dan
+     * (b) `quantity_plan` di objek clone-nya ditimpa pakai
+     * `quantity_survey` ronde terbaru (dikonfirmasi user) supaya label
+     * "Plan" yang dibaca semua view Instalasi/Finishing otomatis ikut
+     * angka Survey tanpa perlu ubah blade satu-satu.
+     *
+     * @return array{items: \Illuminate\Support\Collection<int, BoqItem>, source: 'survey_round'|'plan', round: ?BoqSurveyRound}
+     */
+    public function materialProgressItems(): array
+    {
+        $this->loadMissing([
+            'boqItems.designatorData',
+            'boqItems.designatorDataByCode',
+            'lop',
+        ]);
+
+        $lop = $this->lop;
+
+        $latestRound = $lop
+            ? BoqSurveyRound::where('lop_id', $lop->id_lop)
+                ->where('status', 'completed')
+                ->orderByDesc('round_number')
+                ->first()
+            : null;
+
+        if ($latestRound) {
+            $items = BoqSurveyRoundItem::where('boq_survey_round_id', $latestRound->id)
+                ->whereNotNull('boq_item_id')
+                ->with(['boqItem.designatorData', 'boqItem.designatorDataByCode'])
+                ->get()
+                ->filter(function (BoqSurveyRoundItem $roundItem) {
+                    $boq = $roundItem->boqItem;
+
+                    if (! $boq) {
+                        // Item asli sudah dihapus sejak ronde ini -- skip
+                        // drpd nunjukin baris yatim yang tidak bisa di-upload.
+                        return false;
+                    }
+
+                    return str_starts_with((string) $roundItem->designator, 'M-')
+                        || optional($boq->designatorData)->type === 'material'
+                        || optional($boq->designatorDataByCode)->type === 'material';
+                })
+                ->map(function (BoqSurveyRoundItem $roundItem) {
+                    /** @var BoqItem $boq */
+                    $boq = clone $roundItem->boqItem;
+                    // Angka acuan "Plan" yang dibaca view = quantity_survey
+                    // ronde terbaru (keputusan user, lihat ANALISA_REFACTOR_
+                    // PERSIAPAN.md bag. AD). Ini cuma objek clone in-memory,
+                    // TIDAK disimpan ke DB.
+                    $boq->quantity_plan = $roundItem->quantity_survey;
+
+                    return $boq;
+                })
+                ->values();
+
+            return [
+                'items' => $items,
+                'source' => 'survey_round',
+                'round' => $latestRound,
+            ];
+        }
+
+        $items = ($this->boqItems ?? collect())->filter(function (BoqItem $boq) {
+            return $boq->quantity_plan !== null
+                && (str_starts_with((string) $boq->designator, 'M-')
+                    || optional($boq->designatorData)->type === 'material');
+        })->values();
+
+        return [
+            'items' => $items,
+            'source' => 'plan',
+            'round' => null,
+        ];
+    }
+
+    /**
+     * Section AD: versi "sudah di-upload" (status apapun -- pending maupun
+     * approved) dari flag persiapanDone/instalasiDone/pengukuranDone/
+     * finishingDone di atas, yang SEMUANYA baru true setelah admin approve
+     * semua eviden. Dipakai stepper (stepper.blade.php) utk checklist
+     * KUNING ("sudah upload, menunggu admin approve") vs HIJAU (existing
+     * $stepNDone -- approved/posisi sequence sudah lewat). Approval TETAP
+     * jadi syarat utk status_progress LOP maju ke step berikutnya --
+     * flag ini murni indikator visual progres upload Waspang sendiri.
+     */
+    public function stepUploadFlags(): array
+    {
+        $this->loadMissing(['evidences', 'lop']);
+        $evidences = $this->evidences ?? collect();
+        $lop = $this->lop;
+
+        $barangTibaUploaded = $evidences->where('stage', 'persiapan')->where('evidence_type', 'barang_tiba')->isNotEmpty();
+        $perizinanUploaded = $evidences->where('stage', 'persiapan')->where('evidence_type', 'perizinan')->isNotEmpty();
+        // Step 1 & Step 2 (Persiapan Instalasi) sama2 baca eviden stage=
+        // 'persiapan' yg sama (lihat WaspangController::persiapanInstalasi()),
+        // jadi flag upload-nya memang identik -- bukan bug baru di sini.
+        $persiapanUploaded = $barangTibaUploaded && $perizinanUploaded;
+
+        $material = $this->materialProgressItems();
+        $materialItems = $material['items'];
+
+        $instalasiTotal = $materialItems->count();
+        $instalasiUploaded = $materialItems->filter(function (BoqItem $boq) use ($evidences) {
+            return $evidences->where('stage', 'instalasi')
+                ->where('evidence_type', 'progress_boq')
+                ->where('boq_item_id', $boq->id_boq)
+                ->isNotEmpty();
+        })->count();
+        $instalasiUploadedComplete = $instalasiTotal > 0 && $instalasiUploaded >= $instalasiTotal;
+
+        // Section AE: samakan dgn LopMeasurementCheck::ITEMS (5 item -- otdr,
+        // file_sor, opm, kedalaman, eviden_lainnya), BUKAN cuma 3 evidence_
+        // type lama. Item "sudah diisi Waspang" (kuning) = ada eviden APAPUN
+        // statusnya (upload belum tentu di-approve admin) ATAU sudah
+        // ditandai "Tidak Ada" (N/A) -- lihat WaspangController::
+        // toggleMeasurementCheck(). Alias nama lama (otdr_sor/lainnya)
+        // disamakan dgn pengukuran()/toggleMeasurementCheck().
+        $legacyAliases = [
+            'file_sor' => ['file_sor', 'otdr_sor'],
+            'eviden_lainnya' => ['eviden_lainnya', 'lainnya'],
+        ];
+        $measurementChecks = $lop
+            ? LopMeasurementCheck::where('lop_id', $lop->id_lop)->get()->keyBy('item_key')
+            : collect();
+        $pengukuranUploadedComplete = collect(LopMeasurementCheck::ITEMS)->every(function (string $itemKey) use ($measurementChecks, $evidences, $legacyAliases) {
+            if ($measurementChecks->get($itemKey)?->is_not_applicable) {
+                return true;
+            }
+
+            $typesToCheck = $legacyAliases[$itemKey] ?? [$itemKey];
+
+            return $evidences->where('stage', 'pengukuran')
+                ->whereIn('evidence_type', $typesToCheck)
+                ->isNotEmpty();
+        });
+
+        $finishingRequired = $materialItems->filter(function (BoqItem $boq) {
+            return (int) optional($boq->designatorData)->requires_finishing_evidence === 1
+                || (int) optional($boq->designatorDataByCode)->requires_finishing_evidence === 1;
+        });
+        $finishingTotal = $finishingRequired->count();
+        $finishingUploaded = $finishingRequired->filter(function (BoqItem $boq) use ($evidences) {
+            return $evidences->where('stage', 'finishing')
+                ->where('boq_item_id', $boq->id_boq)
+                ->isNotEmpty();
+        })->count();
+        $finishingUploadedComplete = $finishingTotal === 0
+            ? $evidences->where('stage', 'finishing')->isNotEmpty()
+            : $finishingUploaded >= $finishingTotal;
+
+        return [
+            'persiapanUploaded' => $persiapanUploaded,
+            'persiapanInstalasiUploaded' => $persiapanUploaded,
+            'instalasiUploaded' => $instalasiUploadedComplete,
+            'pengukuranUploaded' => $pengukuranUploadedComplete,
+            'finishingUploaded' => $finishingUploadedComplete,
+        ];
+    }
+
     public function progressSummary(): array
     {
         // Jangan hitung ulang project yang sama dalam request yang sama
@@ -221,15 +395,22 @@ class Project extends Model
         |--------------------------------------------------------------------------
         */
 
+        // Section AD: sumber "item Material yang berlaku" DISAMAKAN dgn yang
+        // ditampilkan ke Waspang di Step 3 Instalasi/Step 5 Finishing --
+        // ronde BOQ Survey terbaru kalau ada, else BOQ Plan (quantity_plan
+        // !== null). Sebelumnya loop ini scan $boqItems MENTAH (cuma filter
+        // prefix M-, tanpa quantity_plan !== null) -- item tambahan hasil
+        // BOQ Survey ikut kehitung di materialTotal walau tidak pernah
+        // tampil/diupload di Step 3, jadi instalasiApproved tidak akan
+        // pernah capai materialTotal & LOP macet permanen di status_progress
+        // 'instalasi' (checklist stepper tidak pernah hijau walau semua
+        // item yang BENAR-BENAR tampil sudah di-approve semua).
+        $materialItems = $this->materialProgressItems()['items'];
+
         $materialIds = [];
         $finishingRequiredIds = [];
 
-        foreach ($boqItems as $boq) {
-
-            // Hanya material M-
-            if (! str_starts_with((string) ($boq->designator ?? ''), 'M-')) {
-                continue;
-            }
+        foreach ($materialItems as $boq) {
 
             $boqKey = (string) $boq->id_boq;
 
@@ -462,5 +643,38 @@ class Project extends Model
     public function siteSurveys()
     {
         return $this->hasMany(SiteSurvey::class, 'project_id', 'id_project');
+    }
+
+    /**
+     * Section AF: 1 sumber warna Tailwind utk badge/aksen "tahapan LOP" di
+     * SEMUA halaman admin (index, project-card, tracking, dsb), dipetakan
+     * dari `project_stages.color` (dibaca via progressSummary()
+     * ['effectiveStageColor']) -- BUKAN lagi if/elseif per-file yang
+     * hardcode string label ('Finishing'/'Pengukuran'/'Instalasi', fallback
+     * "else" ke merah) seperti sebelumnya. Fallback if/elseif lama itu tidak
+     * ada cabang utk 'FI-OGP Golive'/'Golive' sama sekali -- keduanya
+     * kejebak di cabang "else" (merah, warna utk LOP bermasalah), padahal
+     * itu 2 tahap PALING AKHIR & justru paling positif.
+     *
+     * Daftar kelas di bawah SENGAJA ditulis statis per-warna (bukan
+     * interpolasi "bg-{$color}-600") supaya tetap ke-scan Tailwind JIT --
+     * samakan kalau ada warna baru ditambah ke tabel project_stages.
+     *
+     * @return array{accent: string, border: string, progress: string, badge: string, dot: string}
+     */
+    public static function stageColorClasses(?string $color): array
+    {
+        return match ($color) {
+            'slate' => ['accent' => 'bg-slate-500', 'border' => 'border-l-slate-500', 'progress' => 'bg-slate-500', 'badge' => 'bg-slate-100 text-slate-700', 'dot' => 'bg-slate-300'],
+            'amber' => ['accent' => 'bg-amber-500', 'border' => 'border-l-amber-500', 'progress' => 'bg-amber-500', 'badge' => 'bg-amber-100 text-amber-700', 'dot' => 'bg-amber-300'],
+            'blue' => ['accent' => 'bg-blue-600', 'border' => 'border-l-blue-600', 'progress' => 'bg-blue-600', 'badge' => 'bg-blue-100 text-blue-700', 'dot' => 'bg-blue-300'],
+            'indigo' => ['accent' => 'bg-indigo-600', 'border' => 'border-l-indigo-600', 'progress' => 'bg-indigo-600', 'badge' => 'bg-indigo-100 text-indigo-700', 'dot' => 'bg-indigo-300'],
+            'emerald' => ['accent' => 'bg-emerald-600', 'border' => 'border-l-emerald-600', 'progress' => 'bg-emerald-600', 'badge' => 'bg-emerald-100 text-emerald-700', 'dot' => 'bg-emerald-300'],
+            'purple' => ['accent' => 'bg-purple-600', 'border' => 'border-l-purple-600', 'progress' => 'bg-purple-600', 'badge' => 'bg-purple-100 text-purple-700', 'dot' => 'bg-purple-300'],
+            'green' => ['accent' => 'bg-green-600', 'border' => 'border-l-green-600', 'progress' => 'bg-green-600', 'badge' => 'bg-green-100 text-green-700', 'dot' => 'bg-green-300'],
+            'orange' => ['accent' => 'bg-orange-500', 'border' => 'border-l-orange-500', 'progress' => 'bg-orange-500', 'badge' => 'bg-orange-100 text-orange-700', 'dot' => 'bg-orange-300'],
+            'red' => ['accent' => 'bg-red-500', 'border' => 'border-l-red-500', 'progress' => 'bg-red-500', 'badge' => 'bg-red-100 text-red-700', 'dot' => 'bg-red-300'],
+            default => ['accent' => 'bg-gray-400', 'border' => 'border-l-gray-400', 'progress' => 'bg-gray-400', 'badge' => 'bg-gray-100 text-gray-700', 'dot' => 'bg-gray-300'],
+        };
     }
 }

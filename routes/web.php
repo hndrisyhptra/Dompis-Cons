@@ -262,6 +262,17 @@ Route::middleware(['auth', 'role:admin,superadmin,super_tif'])->group(function (
     Route::get('/admin/evidences/review/{project}/finishing', [ProjectController::class, 'reviewFinishing'])
     ->name('admin.evidences.review.finishing');
 
+    // Section AF: Stage 5 (dulu "belum dikerjakan", lihat catatan di
+    // approveEvidence()) -- Admin upload 4 dokumen FI-OGP Golive
+    // (capture valins, PDF ABD & Valid4, KML, Mancore) di sini. Begitu
+    // lengkap DAN finishingDone DAN persis di sequence 9, LOP otomatis
+    // maju ke status_progress 'fi_ogp_golive' (lihat submitGoliveDocuments()).
+    Route::get('/admin/evidences/review/{project}/golive', [ProjectController::class, 'reviewGolive'])
+    ->name('admin.evidences.review.golive');
+
+    Route::post('/admin/evidences/review/{project}/golive/submit', [ProjectController::class, 'submitGoliveDocuments'])
+    ->name('admin.evidences.golive.submit');
+
     Route::post('/admin/evidences/bulk-approve', [\App\Http\Controllers\ProjectController::class, 'bulkApprove'])
     ->name('admin.evidences.bulk-approve');
 });
@@ -381,9 +392,21 @@ Route::middleware(['auth', 'role:waspang'])->group(function () {
     Route::post('/waspang/projects/{project}/survey/finish', [WaspangController::class, 'finishSurvey'])
         ->name('waspang.survey.finish');
 
+    // Stage 4e: upload bukti persetujuan Redesign (deviasi nominal >10%)
+    Route::post('/waspang/projects/{project}/survey/redesign-approval', [WaspangController::class, 'uploadSurveyRedesignApproval'])
+        ->name('waspang.survey.redesign-approval.store');
+
+    // Re Survey: buka ronde BOQ Survey baru, histori ronde lama tetap tersimpan
+    Route::post('/waspang/projects/{project}/survey/re-survey', [WaspangController::class, 'startReSurvey'])
+        ->name('waspang.survey.re-survey.start');
+
     // Perizinan
     Route::post('/waspang/projects/{project}/perizinan/category', [WaspangController::class, 'updatePerizinanCategory'])
         ->name('waspang.perizinan.category');
+
+    // Stage 4f: "Add Perizinan" -- kategori + kronologi + eviden opsional, bisa berkali-kali
+    Route::post('/waspang/projects/{project}/perizinan/add', [WaspangController::class, 'addPerizinan'])
+        ->name('waspang.perizinan.add');
 
     Route::post('/waspang/projects/{project}/perizinan/selesai', [WaspangController::class, 'togglePerizinanSelesai'])
         ->name('waspang.perizinan.selesai');
@@ -815,6 +838,14 @@ Route::middleware(['auth', 'role:sdi'])->prefix('sdi')->name('sdi.')->group(func
 
     // Jika menggunakan parameter {id}
     Route::post('/admin/pt2/{id}/send-to-sdi', [AdminPt2Controller::class, 'sendToSdi'])->name('admin.pt2.sendToSdi');
+
+    // Section AF: verifikasi Golive utk LOP REGULER (model Lop, BUKAN
+    // Pt2Lop) -- terpisah dari alur PT2 di atas. SdiGoliveController baru,
+    // list LOP yg sudah 'fi_ogp_golive' (submission Admin lengkap),
+    // lalu SDI upload capture UIM di sini utk resmi jadi 'golive'.
+    Route::get('/golive', [\App\Http\Controllers\SdiGoliveController::class, 'index'])->name('golive.index');
+    Route::get('/golive/{id}', [\App\Http\Controllers\SdiGoliveController::class, 'show'])->name('golive.show');
+    Route::post('/golive/{id}/verify', [\App\Http\Controllers\SdiGoliveController::class, 'verify'])->name('golive.verify');
 });
 
 // FIX (2026-09-08): route ini sebelumnya TIDAK berada di dalam group manapun

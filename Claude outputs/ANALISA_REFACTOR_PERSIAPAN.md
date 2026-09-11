@@ -1,6 +1,227 @@
 # Analisa & Audit — Refactor Upload LOP + Sub-Step Persiapan (PT3/Reguler)
 
-Belum ada kode yang saya jalankan/ubah — ini murni hasil audit kesesuaian spesifikasi kamu terhadap kode yang ada sekarang, sesuai instruksi untuk menunggu detail lanjutan dulu.
+> **HANDOFF UNTUK CLAUDE — WAJIB BACA BAGIAN INI TERLEBIH DAHULU**
+>
+> Dokumen ini bersifat kronologis. Bagian A–R berisi audit, keputusan, implementasi, dan rencana pada saat masing-masing bagian ditulis. Beberapa rencana lama sudah diselesaikan atau dibatalkan. **Kondisi aplikasi yang berlaku saat ini adalah bagian “Ringkasan Kondisi Terkini” di bawah serta bagian S–T.** Jika ada pertentangan, kondisi terkini mengalahkan catatan historis.
+
+Dokumen terakhir diperbarui **10 September 2026 (Asia/Jakarta)** setelah migration freeze dibuka, data direkonsiliasi, sumber status dipindahkan ke LOP, kolom status project induk dihapus, dashboard/filter/import diperbarui, dan smoke test aplikasi dijalankan.
+
+---
+
+## 0. Ringkasan Kondisi Terkini — Sumber Kebenaran untuk Handoff
+
+### 0.1 Keputusan produk dan alur final
+
+Alur Persiapan reguler/PT3 yang berlaku sekarang:
+
+1. **Inisiasi** — PID dan BOQ diinput/import admin.
+2. **Survey** — aktif setelah LOP di-assign ke Waspang.
+3. **Perizinan** — Survey yang selesai langsung menuju Perizinan.
+4. **Material Delivery**.
+5. **Persiapan Instalasi**.
+6. **Instalasi**.
+7. **Pengukuran**.
+8. **Finishing**.
+9. **FI-OGP Golive**.
+10. **Golive**.
+
+Status khusus **Hold** dan **Drop** tetap tersedia. Nilai kode yang benar untuk Material Delivery adalah `material_delivery`.
+
+**Proses DRM sudah dihapus dari alur aktif.** Jangan membuat kembali tombol, route, upload, atau transisi DRM. Master row `project_stages.code=drm` masih dipertahankan secara fisik untuk keamanan histori/foreign key, tetapi:
+
+- dikecualikan oleh scope `ProjectStage::active()` dan `ProjectStage::sequential()`;
+- disembunyikan dan dilindungi dari pengelolaan tahap aktif;
+- nilai DRM historis dibaca sebagai Perizinan;
+- finalisasi Survey langsung menulis `lops.status_progress = 'perizinan'`;
+- evidence/kronologi DRM lama tidak dihapus karena merupakan histori.
+
+Desain UI Waspang yang berlaku adalah desain **flat** dengan primary `#1565D8`, background `#F8FAFC`, card putih, tanpa gradient. Pertahankan desain ini kecuali user meminta perubahan baru.
+
+### 0.2 Fitur Survey yang sudah dibangun
+
+Pada accordion Survey:
+
+- map menampilkan hasil KML/desain awal yang diunggah admin setelah input PID dan BOQ;
+- tersedia aksi **Sesuai** dan **Redesign**;
+- Redesign membuka halaman Site Survey untuk tagging tiang, membuat rute kabel, dan aktivitas desain lapangan;
+- nama LOP pada survey otomatis mengikuti LOP yang sedang dikerjakan dan tidak boleh diubah manual;
+- hasil desain terbaru menjadi map aktif, sedangkan desain/map lama tetap dipertahankan sebagai histori;
+- setelah desain sesuai, user dapat masuk ke **Finalisasi Survey**;
+- tombol **Update Kronologi** yang sempat duplikat sebelum Finalisasi Survey sudah dihapus; tombol universal kronologi tetap tersedia pada aktivitas yang relevan.
+
+Finalisasi Survey:
+
+- memakai BOQ plan sebagai referensi;
+- hanya kategori designator `M` dan `J` yang dipakai;
+- material/jasa dengan `pair_code` sama ditampilkan sebagai satu baris;
+- menampilkan designator dan volume plan yang terkunci;
+- volume survey wajib diisi;
+- designator tambahan dapat ditambahkan dengan volume plan kosong;
+- item tambahan dapat dihapus bila tidak sesuai;
+- **Simpan Draf** menyimpan isian sementara;
+- **Selesai Survey** menyimpan finalisasi dan memindahkan status ke Perizinan;
+- project yang mempunyai lebih dari satu LOP ditolak oleh mutation Survey lama agar data tidak salah diarahkan ke LOP pertama.
+
+Implementasi utama berada di:
+
+- `app/Services/SurveyPreparationService.php`
+- `app/Http/Controllers/WaspangController.php`
+- `app/Http/Controllers/SurveyorController.php`
+- `resources/views/waspang/partials/survey-workflow.blade.php`
+- `resources/views/surveyor/show.blade.php`
+- `tests/Feature/WaspangSurveyWorkflowTest.php`
+
+### 0.3 Sumber status kanonik setelah refactor
+
+Semua status pekerjaan sekarang berada di level LOP:
+
+| Domain | Sumber kebenaran |
+|---|---|
+| Posisi proses reguler/PT3 | `lops.status_progress` |
+| Persetujuan SDI reguler/PT3 | `lops.sdi_approval_status` |
+| Golive reguler/PT3 | `lops.is_golive` |
+| Bukti dan waktu Golive reguler | `lops.golive_evidence_path`, `lops.golive_at` |
+| Posisi proses PT2 | `pt2_lops.status_progress` |
+| Persetujuan SDI PT2 | `pt2_lops.sdi_approval_status` |
+| Golive PT2 | `pt2_lops.is_golive` |
+
+Kolom berikut **sudah dihapus secara fisik** dan tidak boleh diperkenalkan kembali sebagai sumber status:
+
+- `projects.status`
+- `projects.status_project`
+- `projects.sdi_approval_status`
+- `projects.is_golive`
+- `projects.golive_evidence_path`
+- `projects.golive_at`
+- `pt2_projects.status`
+- `pt2_projects.status_project`
+- `pt2_projects.sdi_approval_status`
+- `pt2_projects.is_golive`
+
+`status_project` masih muncul pada beberapa controller/service hanya sebagai **alias input kompatibilitas** untuk URL/template lama. Alias tersebut dinormalisasi lalu ditulis ke `status_progress` LOP; tidak ada lagi penulisan ke project parent.
+
+Status domain lain tidak ikut dihapus karena berbeda fungsi, antara lain:
+
+- `lops.status_progress_before_hold` untuk kembali dari Hold/Drop;
+- `lops.mapping_status` untuk hasil pemetaan import;
+- status evidence, approval, survey, kendala, import process, GIS/CAD, BAUT, dan LACT;
+- status user aktif/nonaktif.
+
+### 0.4 Migrasi dan keadaan database live
+
+Migration freeze sudah **dibuka**. Konfigurasi `config/migrations.php` memakai default `false`, dan `.env.example` berisi `MIGRATIONS_FROZEN=false`. Freeze sekarang hanya emergency switch.
+
+Mekanisme pengaman freeze tetap tersedia melalui `app/Console/PreventFrozenMigrations.php` dan wiring di `app/Providers/AppServiceProvider.php`. Saat diaktifkan kembali, perintah schema-changing seperti migrate/rollback/fresh/refresh/reset/db:wipe/schema:dump diblokir, sedangkan pemeriksaan status tetap diperbolehkan. Rekonsiliasi ledger historis tersedia melalui `database:reconcile-migration-ledger`, tetapi command itu memang hanya boleh dipakai saat freeze aktif.
+
+Migrasi status yang sudah dijalankan:
+
+1. `2026_09_10_120000_consolidate_regular_lop_statuses` — batch 32.
+2. `2026_09_10_121000_drop_legacy_project_status_columns` — batch 33.
+
+Migrasi pertama menambah dan melakukan backfill status SDI/Golive ke LOP. Migrasi kedua melakukan rekonsiliasi terakhir, membatalkan proses bila ada project tanpa LOP, kemudian menghapus kolom parent legacy. `down()` tersedia untuk merekonstruksi kolom parent dari agregasi LOP bila rollback darurat diperlukan.
+
+Hasil verifikasi database setelah migrasi:
+
+| Pemeriksaan | Hasil |
+|---|---:|
+| Project reguler | 1.308 |
+| LOP reguler | 1.360 |
+| Project reguler tanpa LOP | 0 |
+| Project PT2 | 7 |
+| LOP PT2 | 297 |
+| Project PT2 tanpa LOP | 0 |
+| LOP reguler Golive / SDI approved | 2 / 2 |
+| LOP PT2 Golive / SDI approved | 2 / 2 |
+
+Sebaran `lops.status_progress` saat verifikasi:
+
+- `persiapan_instalasi`: 1.344
+- `finishing`: 6
+- `instalasi`: 5
+- `golive`: 2
+- `inisiasi`: 1
+- `survey`: 1
+- `drop`: 1
+
+Baseline `database/schema/mysql-schema.sql` sudah diperbarui dan memuat ledger kedua migrasi tersebut.
+
+**Dua migrasi lama masih sengaja pending dan tidak boleh dijalankan otomatis tanpa audit terpisah:**
+
+- `2026_08_31_120000_add_performance_indexes_for_pm_dashboard`
+- `2026_09_07_090000_drop_role_enum_from_users_table`
+
+### 0.5 Dashboard, filter, program, dan import yang sudah diselaraskan
+
+- Dashboard Admin, Super TIF, dan PM membaca status/flag dari LOP.
+- Filter status Dashboard Admin/Super TIF mengambil seluruh tahap aktif dari `project_stages`; DRM tidak muncul.
+- Matriks ringkas tetap memakai tiga bucket visual agar desain tidak berubah:
+  - Prepare: tahap awal sampai Persiapan Instalasi;
+  - Progress: Instalasi dan Pengukuran;
+  - Finish: Finishing, FI-OGP Golive, dan Golive.
+- Bucket PT2 juga membaca tahap LOP: Preparation/Survey → Prepare; Progress/Instalasi → Progress; Finish/Dismantle/Mancore/Complete/Golive → Finish.
+- Detail matriks dan filter aktif menggunakan `status_progress`, bukan status parent.
+- Program OSP, NODE B, HEM, OLO, dan Konstruksi Eksternal sudah menggunakan filter status LOP.
+- Data PID dan Data BOQ, modal edit, ekspor Excel, template CSV, `PidImportService`, serta job import lama sudah memakai `status_progress`.
+- Template PID sekarang menggunakan header `status_progress` dengan contoh awal `inisiasi`.
+- Import PID reguler mewajibkan `pid_sap` dan `nama_lop`; `id_ihld` hanya wajib untuk PT2 karena satu PID PT2 dapat mempunyai banyak LOP. Kolom lain tetap opsional dan nilai kosong tidak menimpa data existing.
+- Import PID lama dan import CSV Project tidak lagi menulis `status_project`. Jalur CSV Project yang sebelumnya memiliki variabel validasi tidak aktif juga sudah diperbaiki agar membuat Project dan LOP secara transaksional, lalu menyimpan status ke LOP.
+- Filter/daftar PT2 memakai `pt2_lops.status_progress`.
+- Reminder project stale berhenti berdasarkan status LOP Golive/Drop.
+- Bug pada bulk review evidence yang sebelumnya menyiapkan `$status` tetapi mencoba menulis variabel `$statusProject` yang tidak ada sudah diperbaiki; bulk review sekarang hanya mengubah status evidence sesuai domainnya.
+
+File inti perubahan status:
+
+- `app/Http/Controllers/DashboardController.php`
+- `app/Http/Controllers/DashboardPmController.php`
+- `app/Http/Controllers/ProgramController.php`
+- `app/Http/Controllers/ImportController.php`
+- `app/Http/Controllers/ProjectController.php`
+- `app/Http/Controllers/AdminPt2Controller.php`
+- `app/Http/Controllers/SdiController.php`
+- `app/Services/Imports/PidImportService.php`
+- `app/Jobs/ImportPidJob.php`
+- `app/Console/Commands/PublishStaleProjectReminders.php`
+- `app/Models/Lop.php`
+- `app/Models/Project.php`
+
+### 0.6 Verifikasi yang sudah dilakukan
+
+- Lint seluruh file PHP yang berubah: **lulus**.
+- Kompilasi seluruh Blade (`artisan view:cache`): **lulus**.
+- Test fokus: **24 test / 94 assertion lulus**.
+- Test mencakup baseline schema, rekonsiliasi ledger, migration freeze guard, service Finalisasi Survey, serta workflow Survey.
+- Smoke test render penuh berhasil untuk:
+  - Dashboard Admin dengan filter Survey;
+  - Dashboard PM;
+  - Data PID PT2 dengan filter Preparation;
+  - Program OSP dengan filter Survey.
+
+Suite bawaan penuh masih memiliki kegagalan lama yang tidak berasal dari refactor ini:
+
+- test auth/profile memakai SQLite memory dan migration lama langsung mengubah tabel `evidences` yang belum dibuat;
+- test contoh root mengharapkan HTTP 200, sedangkan aplikasi memang redirect ke login/dashboard (HTTP 302).
+
+Jangan menganggap kegagalan tersebut sebagai regresi status tanpa memperbaiki fixture/baseline test SQLite terlebih dahulu.
+
+### 0.7 Pekerjaan yang masih pending / tindakan Claude berikutnya
+
+1. Jangan jalankan seluruh migration pending sekaligus. Audit dua migrasi lama yang disebut di 0.4 satu per satu.
+2. Lakukan pengujian manual browser untuk Survey → Redesign → simpan desain → Sesuai → Simpan Draf → Selesai Survey → Perizinan menggunakan akun role nyata.
+3. Setelah deploy perubahan import/job, restart queue worker agar worker lama tidak memakai kode yang masih menulis status parent.
+4. Jika akan membersihkan master DRM secara fisik, audit dulu seluruh foreign key dan histori; kondisi saat ini sengaja mempertahankan row DRM.
+5. Perbaikan suite SQLite/auth dapat dibuat sebagai pekerjaan terpisah; jangan mengubah alur produksi hanya untuk membuat test contoh bawaan lolos.
+6. Working tree berisi rangkaian perubahan refactor ini dan belum boleh dibersihkan/reset secara destruktif. Periksa `git diff` sebelum mengedit area yang sama.
+
+### 0.8 Aturan lanjutan agar tidak terjadi regresi
+
+- Jangan membaca/menulis status pekerjaan dari tabel `projects` atau `pt2_projects`.
+- Jangan menambah kembali `status_project` ke form, filter, export, atau model sebagai field penyimpanan.
+- Setiap LOP pada project multi-LOP harus diperlakukan independen.
+- Gunakan `ProjectStage::active()`/`sequential()` untuk opsi tahap reguler agar DRM tetap tersembunyi.
+- Pertahankan alias input `status_project` hanya selama kompatibilitas template lama masih diperlukan; alias boleh dihapus setelah seluruh klien memakai `status_progress`.
+- Jangan menghapus `status_progress_before_hold`, `mapping_status`, atau status milik domain lain.
+- Pertahankan histori map/desain Survey; perubahan desain terbaru tidak boleh menghapus versi sebelumnya.
+- Gunakan migration path spesifik untuk perubahan schema sensitif dan lakukan verifikasi jumlah data/orphan sebelum drop kolom.
 
 ---
 
@@ -646,15 +867,15 @@ Riset: dikonfirmasi TomSelect (v2.3.1, CDN jsdelivr, sudah dipakai admin/pm/sdi 
 
 **BUG DITEMUKAN SAAT TESTING** (via baca `storage/logs/laravel.log` langsung, krn device_bash tidak bisa jalankan PHP/artisan -- lihat poin di bawah): `evidences.stage` ternyata kolom **ENUM legacy** (tabel `evidences` tidak py migration Schema::create(), diimport manual dari SQL lama, cuma izinkan 4 nilai lama) -- insert eviden stage BARU (`drm` dkk) gagal dgn "Data truncated for column 'stage'" walau validasi Laravel sudah dilebarkan sebelumnya (DB-nya sendiri belum ikut). **Fix**: migration baru `2026_09_08_091200_widen_evidences_stage_column.php` -- ganti kolom dari ENUM sempit jadi `VARCHAR(50)` bebas (supaya tidak perlu migration lagi tiap ada stage baru di masa depan).
 
-**BELUM/PERLU TINDAK LANJUT USER:**
-- **Jalankan `php artisan migrate`** di server (3 migration baru sekarang: `lop_kronologis`, kolom `perizinan_completed_at`/`stage_code`, + widen `evidences.stage`) -- sesi ini TIDAK bisa menjalankannya sendiri krn device_bash (VM Linux jembatan) tidak punya akses ke binary PHP XAMPP di macOS host, murni tool file-sync & baca log teks.
+**CATATAN HISTORIS — tindak lanjut migration ini sudah diselesaikan:**
+- Migration `lop_kronologis`, kolom `perizinan_completed_at`/`stage_code`, dan pelebaran `evidences.stage` sudah tercatat sebagai **Ran** pada ledger live. Jangan mengikuti instruksi lama untuk menjalankan semua migration tanpa melihat daftar pending terkini di bagian 0.4.
 - Reference screenshot desain yg dikirim user belum bisa saya lihat ulang secara visual dlm sesi ini (hilang dari konteks setelah compaction) -- tampilan dibangun murni dari spec tertulis; kemungkinan perlu penyesuaian detail visual setelah user lihat hasil nyata.
 - FAB "Survey" bottom-nav (`route('surveyor.index')`, modul Site Survey/GIS milik SDI) sesuai instruksi user TETAP terpisah/tidak diubah.
 - Kolom `unit_price`/`total_price` `BoqItem` tetap tidak fillable (bug lama, di luar scope) -- item BOQ hasil Survey baru (manual/import) otomatis TIDAK mengisi harga, sama seperti BOQ item lain di aplikasi.
 
 ---
 
-## S. Revisi 2026-09-10 -- DRM dihapus dari alur aktif dan audit sumber status
+## S. Revisi 2026-09-10 -- DRM dihapus dari alur aktif dan audit sumber status (STATUS ANTARA/HISTORIS)
 
 Keputusan alur terbaru: Persiapan sekarang terdiri dari **Inisiasi → Survey → Perizinan → Material Delivery**. Finalisasi Survey langsung menulis `lops.status_progress = 'perizinan'`; route, controller action, accordion, upload baru, dan tombol selesai DRM sudah dihapus. Tombol **Update Kronologi** yang duplikat sebelum Finalisasi Survey juga dihapus karena tombol universal sudah tersedia.
 
@@ -667,7 +888,7 @@ Audit sumber status menghasilkan batas kanonik berikut:
 3. Penanda Golive reguler saat ini: `projects.is_golive`.
 4. Pada PT2, ketiganya memang sudah berada di `pt2_lops`: `status_progress`, `sdi_approval_status`, dan `is_golive`.
 
-Kolom lain **belum aman dihapus** sekarang:
+Pada titik audit ini kolom berikut **belum aman dihapus**; seluruh blocker ini kemudian diselesaikan pada bagian T:
 
 - `projects.status_project` masih dipakai luas oleh dashboard, filter program, impor PID/BOQ, reminder, serta penanda drop/close/bast.
 - `projects.status` masih dibaca oleh alur penutupan/Ready UT dan ekspor/impor.
@@ -676,7 +897,7 @@ Kolom lain **belum aman dihapus** sekarang:
 - Kolom `status` pada evidence, survey, kendala, approval, import, GIS/CAD, BAUT, dan LACT adalah state milik domain masing-masing dan tidak boleh diganti dengan `status_progress`.
 - `status_progress_before_hold` tetap diperlukan agar HOLD/DROP dapat kembali ke tahap sebelumnya.
 
-Karena eksekusi migration sedang dibekukan, pemindahan `sdi_approval_status` dan `is_golive` dari proyek reguler ke tiap LOP serta drop kolom legacy harus menunggu tahap rekonsiliasi database. Urutan aman setelah freeze dibuka: tambah/backfill kolom LOP reguler → pindahkan semua pembaca/penulis → verifikasi dashboard dan impor → normalisasi nilai DRM lama → baru drop kolom proyek yang benar-benar tidak lagi direferensikan.
+**Status akhir catatan ini:** seluruh urutan aman tersebut sudah dijalankan pada bagian T — freeze dibuka, kolom LOP ditambah/backfill, pembaca/penulis dipindahkan, dashboard/import diverifikasi, DRM aktif dinormalisasi, dan kolom project legacy dihapus.
 
 ---
 
@@ -730,3 +951,432 @@ Hasil pascamigrasi:
 ---
 
 Audit dan implementasi akan terus diperbarui pada dokumen ini selama refactor berlangsung.
+
+## U. Stage 4e -- Deviasi nominal BOQ Survey vs BOQ Plan + Approval Redesign (SELESAI, sesi Claude ini)
+
+Spesifikasi dari user: pada accordion Survey, tombol Finalisasi Survey menampilkan List BOQ Plan + volume (Material/Jasa dengan `pair_code` sama TETAP satu baris/satu volume, tidak dijumlahkan -- ini sebenarnya sudah jadi perilaku `SurveyPreparationService::groupBoqItems()` sejak Stage 4d, dikonfirmasi ulang saat audit sesi ini, tidak perlu diubah). Setelah volume BOQ Survey diinput, nilai nominalnya dibandingkan dengan BOQ Plan: deviasi >10% memunculkan accordion **Approval Redesign** (upload eviden foto/capture bukti persetujuan); deviasi <=10% langsung lanjut ke Perizinan seperti sebelumnya.
+
+4 keputusan yang dikonfirmasi user sebelum eksekusi:
+1. **Basis nominal**: nilai Rupiah (`quantity x harga designator per package`), bukan cuma volume.
+2. **Granularitas**: dihitung agregat total 1 LOP (bukan per-item).
+3. **Data harga tidak lengkap** (LOP belum punya `package_id`, atau ada designator tanpa baris `designator_package_prices` untuk package itu): **Selesai Survey diblokir total** dengan pesan error, waspang diarahkan pakai "Simpan Draf" sambil menunggu Admin melengkapi data.
+4. **Approval Redesign bersifat self-declare** oleh Waspang sendiri (upload bukti foto/capture), TIDAK ada langkah approve terpisah oleh Admin/PM/role lain di sistem.
+
+### U.1 Migration baru
+
+`2026_09_10_130000_add_survey_deviation_fields_to_lops_table.php` (raw ALTER + guard `Schema::hasColumn`, gaya sama migration 090300/091100) -- tambah 2 kolom ke `lops`:
+- `survey_deviation_percent` DECIMAL(8,2) NULL -- histori hasil hitung terakhir, murni catatan.
+- `survey_redesign_required` TINYINT(1) NOT NULL DEFAULT 0 -- gate SEBENARNYA. Selama `true`, LOP tetap di `status_progress='survey'` walau volume Survey sudah final, sampai Waspang upload bukti persetujuan.
+
+**BELUM DIJALANKAN** -- migration freeze sudah terbuka (`MIGRATIONS_FROZEN=false`), tapi eksekusi `php artisan migrate` tetap perlu dilakukan manual oleh user (device bridge sesi ini tidak punya akses ke binary PHP/artisan, sama seperti sesi-sesi sebelumnya).
+
+### U.2 Logika penghitungan nominal
+
+Method baru `SurveyPreparationService::evaluateNominalDeviation(Collection $groups, array $submittedVolumes, Collection $boqItems, ?int $packageId)`. Poin desain penting: 1 group (1 `pair_code`) tetap cuma pakai SATU volume (konsisten dgn `groupBoqItems()`), tapi nominalnya SENGAJA menjumlahkan harga Material DAN Jasa dalam pasangan itu (dua komponen biaya berbeda -- harga satuan material != harga satuan jasa pasang -- walau volumenya sama). Harga diambil dari `designator_package_prices` per `(designator_id, lop.package_id)` -- BUKAN dari `boq_items` (kolom `unit_price`/`total_price` di sana memang tidak fillable/tidak pernah diisi, bug lama yang sudah dicatat di bagian R).
+
+Kalau `lop.package_id` null -> `missing` berisi penanda `__no_package__`. Kalau designator tertentu tidak punya baris harga utk package itu -> masuk daftar `missing` (kode designator). Kedua kasus ini memblokir `finishSurvey()` total (keputusan #3), pesan errornya beda (arahkan ke "lengkapi Package" vs "lengkapi harga designator X, Y, Z").
+
+### U.3 `WaspangController::finishSurvey()` -- dirombak
+
+Urutan baru: validasi volume -> hitung nominal (blokir kalau data harga tidak lengkap) -> hitung deviasi `|survey_total - plan_total| / plan_total` (kalau `plan_total=0`, deviasi dianggap 100% kalau survey_total>0, atau 0% kalau survey_total juga 0) -> baru masuk transaksi simpan volume. Kalau deviasi >10%: `survey_redesign_required=true`, `status_progress` TETAP `'survey'`, activity log `survey_deviation_detected`, flash `warning` (bukan `success`) menjelaskan angka deviasinya. Kalau <=10%: perilaku lama (status -> `'perizinan'`, log `survey_finalized`). Method ini aman dipanggil ulang -- kalau Waspang mengubah volume & submit lagi sebelum upload approval, deviasi dihitung ulang dari nol (bisa lolos otomatis kalau ternyata sekarang di bawah 10%).
+
+### U.4 Method baru `WaspangController::uploadSurveyRedesignApproval()`
+
+Endpoint terpisah (`POST /waspang/projects/{project}/survey/redesign-approval`, route `waspang.survey.redesign-approval.store`) -- guard: `status_progress` harus masih `'survey'` DAN `survey_redesign_required` harus `true`. Terima `photos[]` (wajib >=1, image, max 10MB/file, pola sama modal kendala), simpan ke `evidences/{lop-folder}/survey/redesign_approval/`, buat baris `Evidence` (`stage='survey'`, `evidence_type='redesign_approval'`) dengan **`status` langsung `'approved'`** (bukan `'pending'`) -- karena self-declare (keputusan #4), sengaja tidak dibuat masuk antrean Approval Eviden Admin. Setelah tersimpan: `survey_redesign_required=false`, `status_progress='perizinan'`, log `survey_redesign_approved`.
+
+### U.5 View & UI
+
+`resources/views/waspang/partials/survey-workflow.blade.php`: blok "Finalisasi Survey" lama (`@if($step['survey']['active'] && $surveyMapConfirmed)`) diubah jadi `@if(...&& $lop->survey_redesign_required) ... @elseif(...&& $surveyMapConfirmed) ... @endif` -- kalau sedang menunggu approval, accordion Finalisasi Survey (input volume) DIGANTI accordion baru "Approval Redesign Diperlukan" (kartu amber, tampilkan angka deviasi, form upload foto dengan kompresi client-side pola sama `kendala-modal.blade.php`/`compressImage()` global di `show.blade.php`). Begitu approval terkirim, `survey_redesign_required` balik `false` dan halaman otomatis pindah render ke accordion Perizinan (karena `status_progress` sudah berubah) di request berikutnya.
+
+`resources/views/layouts/waspang.blade.php`: ditambah 1 blok flash message baru `@if(session('warning'))` (amber, sebelumnya layout cuma punya `success`/`error`) -- dipakai `finishSurvey()` saat deviasi >10% supaya pesannya benar-benar tampil ke Waspang (sebelum ini ditambah, `session('warning')` akan silently tidak muncul apa-apa).
+
+### U.6 File yang diubah/dibuat (belum di-commit, menunggu review user)
+
+- `database/migrations/2026_09_10_130000_add_survey_deviation_fields_to_lops_table.php` (baru)
+- `app/Models/Lop.php` (+fillable `survey_deviation_percent`/`survey_redesign_required`, +cast)
+- `app/Services/SurveyPreparationService.php` (+method `evaluateNominalDeviation()`, +import `DesignatorPackagePrice`)
+- `app/Http/Controllers/WaspangController.php` (`finishSurvey()` dirombak, +method `uploadSurveyRedesignApproval()`, +const `SURVEY_DEVIATION_THRESHOLD`)
+- `routes/web.php` (+1 route `waspang.survey.redesign-approval.store`)
+- `resources/views/waspang/partials/survey-workflow.blade.php` (+accordion Approval Redesign, +JS kompresi foto)
+- `resources/views/layouts/waspang.blade.php` (+flash `warning`)
+
+### U.7 BELUM/PERLU TINDAK LANJUT USER
+
+1. **Jalankan `php artisan migrate`** (1 migration baru: `2026_09_10_130000_...`) -- sesi ini tidak bisa menjalankannya sendiri (device bridge tidak punya akses ke binary PHP/artisan XAMPP).
+2. Tidak bisa live-test dari sisi saya (browser/PHP tidak terjangkau) -- mohon testing manual: (a) LOP dengan `package_id` kosong -> pastikan Selesai Survey diblokir dgn pesan jelas; (b) LOP dengan package lengkap & deviasi <=10% -> pastikan langsung lanjut Perizinan seperti biasa (regresi check); (c) LOP dengan deviasi >10% -> pastikan accordion Approval Redesign muncul, angka deviasi masuk akal, upload foto berhasil & lanjut ke Perizinan; (d) ubah volume lagi sebelum upload approval (submit ulang Finalisasi Survey) -> pastikan deviasi dihitung ulang, bukan numpuk dari hitungan sebelumnya.
+3. Arah deviasi saat ini dihitung **dua arah** (`abs()` -- survey lebih besar ATAU lebih kecil dari plan sama-sama bisa memicu Approval Redesign). User cuma menyebutkan "lebih dari 10% dari BOQ Plan" yang bisa dibaca 1 arah (survey > plan) -- kalau maksudnya cuma searah, tinggal hapus `abs()` di `WaspangController::finishSurvey()`, beri tahu saya.
+4. Belum ada indikator visual "harga tidak lengkap" di UI Survey SEBELUM waspang klik Selesai Survey (baru ketahuan setelah submit & kena blokir) -- kalau mau preventif (badge peringatan dari awal accordion dibuka), ini pekerjaan tambahan terpisah.
+
+---
+
+## V. Insiden 10 Sept -- error `Unknown column 'status_project'` saat upload PID (BUKAN bug kode, worker belum di-restart)
+
+User melaporkan upload PID gagal dgn `SQLSTATE[42S22]: Column not found: 1054 Unknown column 'status_project' in 'field list'` saat insert ke `projects`, dan minta ditambahkan fallback "kalau status_project kosong, otomatis jadi inisiasi".
+
+**Diagnosa**: dicek langsung `PidImportService::newRegularProjectPayload()` (baris 863) -- payload project baru SUDAH TIDAK menyertakan `status_project` sama sekali (konsisten dgn drop kolom di bagian T). Fallback yang diminta user JUGA SUDAH ADA di kode saat ini (baris ~657-685): `status_project` dibaca sbg alias input kalau `status_progress` kosong, lalu kalau hasilnya tetap tidak valid/kosong, otomatis jatuh ke `'inisiasi'` (via cek `in_array($statusProgress, $allowedStatuses)`). Jadi source code sesi ini sudah benar & sudah sesuai permintaan user -- **tidak ada perubahan kode yang dilakukan**.
+
+Kesimpulan: error ini adalah **kelas masalah operasional yang sama persis dgn catatan di bagian M** -- upload PID diproses lewat queue (`ProcessPidImportJob`, `QUEUE_CONNECTION=database`), dan proses `php artisan queue:work` yg sedang berjalan kemungkinan besar masih meng-cache versi kode SEBELUM Stage T (saat `projects.status_project` masih ada & masih ditulis). Perubahan file tidak otomatis kepakai worker yang sudah berjalan sampai di-restart.
+
+**Tindakan yang disarankan ke user**: jalankan `php artisan queue:restart` (atau matikan & jalankan ulang `php artisan queue:work` manual), lalu coba upload PID lagi. Kalau errornya masih persis sama setelah restart worker, baru perlu diaudit lebih lanjut (kemungkinan ada jalur import lain yang belum ditemukan).
+
+---
+
+## W. Revisi U -- Approval Redesign: foto bisa dihapus SEBELUM submit, terkunci SESUDAH submit
+
+Permintaan user: pada form upload bukti Approval Redesign (bagian U.5), foto yang sudah dipilih harus bisa dihapus satu-satu sebelum diklik "Konfirmasi Disetujui & Lanjut ke Perizinan", tapi begitu sudah diklik (submit berhasil), foto itu tidak boleh bisa dihapus lagi.
+
+**Sebelumnya**: file langsung ditaruh di `<input type="file">` via `DataTransfer` begitu dipilih -- tidak ada cara hapus 1 foto saja tanpa membuka ulang file picker dan memilih ulang semuanya.
+
+**Sekarang**: `resources/views/waspang/partials/survey-workflow.blade.php` -- foto yang dipilih ditampung dulu di array JS (`surveyRedesignApprovalFiles`, pola sama dgn `selectedFiles` di `waspang/show.blade.php`), tiap thumbnail di preview dapat tombol × (`removeSurveyRedesignApprovalPhoto(index)`) yg cuma memanipulasi array + render ulang preview -- BELUM menyentuh `<input>` sama sekali. Input file yang sesungguhnya (dipakai form native submit, bukan AJAX) baru disusun dari isi array PERSIS sebelum submit (di listener `submit`, sebelum form benar-benar terkirim). Submit juga divalidasi client-side: kalau array kosong, submit dibatalkan (SweetAlert2, fallback native `alert()` kalau `Swal` belum ke-load).
+
+Bagian "terkunci sesudah submit" tidak butuh perubahan tambahan -- itu otomatis terpenuhi karena tidak ada (dan tidak dibuat) endpoint hapus utk evidence `stage=survey, evidence_type=redesign_approval` sesudah tersimpan; begitu form ini submit, satu-satunya jalan mengubahnya adalah lewat DB langsung.
+
+File yang diubah: `resources/views/waspang/partials/survey-workflow.blade.php` saja (fungsi JS di bagian U.5 diganti total, tidak ada perubahan controller/route/migration).
+
+---
+
+## X. Fitur "Re Survey" -- boq_survey_rounds/boq_survey_round_items, ronde histori tanpa duplikasi boq_items
+
+Permintaan user: sebelum lanjut ke spec sub-step Perizinan, sub-step Survey butuh tombol **"Re Survey"** yang muncul setelah Survey selesai. Klik tombol ini membuka lagi UI Survey (termasuk daftar item BOQ) seperti kondisi awal, TAPI data BOQ Survey ronde SEBELUMNYA tidak boleh hilang/tertimpa -- tetap tersimpan di database dgn LOP yang sama, dibedakan per ronde (`boq_survey_1`, `boq_survey_2`, dst). Saat search LOP, hasilnya menampilkan BOQ Plan + tiap ronde BOQ Survey.
+
+**4 keputusan user (ditanya via AskUserQuestion sebelum implementasi):**
+1. Re Survey bisa dipicu **dari tahap manapun setelah Survey** (tidak dibatasi hanya saat LOP masih berada di stage 'survey') -- klik tombol MENGEMBALIKAN `status_progress` LOP ke `'survey'` lagi, apapun tahap LOP saat ini (Perizinan, Instalasi, dst).
+2. Histori tiap ronde disimpan di **tabel baru** (`boq_survey_rounds` + `boq_survey_round_items`), BUKAN dgn menduplikasi baris `boq_items` -- supaya tidak mengganggu Dashboard PM, BAUT/LACT, evidence (`boq_item_id`), dan kalkulasi harga yang sudah bergantung pada `boq_items` sbg satu baris per designator per LOP (lihat riset di bawah).
+3. Pengecekan deviasi nominal >10% (bag. U) **berlaku di SETIAP ronde**, termasuk ronde Re Survey ke-2, 3, dst -- bukan hanya round 1.
+4. Tampilan "BOQ Plan + Survey round 1, 2, dst" ditaruh di **halaman Admin** (`admin.projects.show` / `resources/views/admin/project-detail.blade.php`), sbg riwayat read-only.
+
+**Riset sebelum desain**: `boq_items.quantity_actual`/`quantity_plan` dipakai luas di luar Waspang -- `BautController`/`LactController` (generate dokumen BAUT/LACT baca `quantity_plan`), `DashboardController` (kalkulasi "Nilai Total" = harga × `quantity_plan`), `DashboardPmController` (banyak agregasi SQL grouped by `progress_category`, dgn komentar eksplisit soal risiko double-count kalau Material+Jasa `pair_code` sama), `ImportController`, `ProjectController`, `TeknisiPt2Controller`. Karena itu `boq_items` TETAP satu baris per designator per LOP seperti sekarang (tidak diduplikasi per ronde) -- histori ronde disimpan terpisah.
+
+**Desain data (migration `2026_09_10_140000_create_boq_survey_rounds_tables.php`):**
+- `boq_survey_rounds` -- 1 baris per ronde per LOP: `lop_id`, `round_number` (unique bareng lop_id), `status` (`in_progress`/`completed`), `plan_total`, `survey_total`, `deviation_percent`, `redesign_required`, `started_by`/`started_at`, `finished_by`/`finished_at`, `note`.
+- `boq_survey_round_items` -- snapshot SELURUH baris `boq_items` LOP tsb pada saat ronde selesai (`boq_item_id`, `designator_id`, `designator`, `item_name`, `unit`, `quantity_plan`, `quantity_survey`) -- `boq_item_id` sengaja TANPA foreign key krn baris `boq_items` (khususnya item tambahan Survey) bisa saja dihapus tapi histori harus tetap utuh.
+- Model baru: `App\Models\BoqSurveyRound` (relasi `items()`, `lop()`, scope `inProgress()`), `App\Models\BoqSurveyRoundItem`. `Lop::surveyRounds()` -- `hasMany` order by `round_number`.
+
+**Alur (`app/Http/Controllers/WaspangController.php`):**
+- `finishSurvey()` -- sebelum commit, ambil/buat ronde `in_progress` via `currentSurveyRound()` (auto-buat round 1 kalau LOP lama belum pernah punya ronde sama sekali -- backward compatibility). Simpan `plan_total`/`survey_total`/`deviation_percent`/`redesign_required` ke ronde ini. Kalau deviasi ≤10% -> `status_progress` langsung `'perizinan'` DAN ronde langsung `completeSurveyRound()` (snapshot semua `boq_items` LOP ke `boq_survey_round_items`, tandai `status='completed'`). Kalau >10% -> ronde TETAP `in_progress` (menunggu upload Approval Redesign), snapshot BELUM dibuat.
+- `uploadSurveyRedesignApproval()` -- setelah evidence tersimpan & `status_progress` maju ke `'perizinan'`, baru panggil `completeSurveyRound()` utk ronde yg sama (snapshot dibuat di sini, bukan di `finishSurvey()`, supaya snapshot mencerminkan kondisi FINAL ronde tsb).
+- `startReSurvey($project)` (route POST `waspang.survey.re-survey.start`) -- guard: minimal 1 ronde `completed` harus sudah ada (kalau belum pernah Survey sama sekali, ditolak), dan TIDAK BOLEH ada ronde `in_progress`/`survey_redesign_required` yg masih menggantung (harus diselesaikan dulu). Kalau lolos: buat `BoqSurveyRound` baru (`round_number` = max+1, `status='in_progress'`), lalu **reset** `lop->status_progress = 'survey'`, `survey_redesign_required = false`, `survey_deviation_percent = null`. `boq_items` TIDAK disentuh sama sekali (quantity_actual lama tetap ada sbg nilai awal form sampai waspang timpa via Selesai Survey ronde baru). Log activity `re_survey_started` (mencatat `status_before` sebelum direset).
+- Helper privat baru: `currentSurveyRound(Lop $lop)`, `completeSurveyRound(BoqSurveyRound $round, Lop $lop)`.
+
+**UI Waspang** (`resources/views/waspang/partials/survey-workflow.blade.php`): 2 blok baru ditambahkan di dalam accordion Survey, di LUAR gate `$step['survey']['active']` (supaya tetap tampil walau LOP sudah lanjut ke tahap lain, sesuai keputusan #1):
+- "Riwayat BOQ Survey" -- daftar seluruh `$surveyRounds` (round number, status, tanggal selesai, badge % deviasi kalau ada).
+- Tombol "Re Survey" -- muncul kalau `$canStartReSurvey` true (dihitung di `WaspangController::persiapan()`: ada ronde `completed`, tidak ada ronde `in_progress`, & `survey_redesign_required` false). Konfirmasi JS sebelum submit.
+
+**UI Admin** (`resources/views/admin/project-detail.blade.php` + `DashboardController::show()` eager-load `lop.surveyRounds.items`): section baru "Riwayat BOQ Survey" di bawah BOQ Item -- 1 kartu per ronde (label "Round N — Survey Awal"/"Round N — Re Survey", status, badge deviasi) + tabel snapshot item (Designator/Item/Plan/Survey ronde tsb).
+
+**Migration BELUM dijalankan** (sama seperti bag. U) -- user perlu `php artisan migrate` utk `2026_09_10_130000_...` dan `2026_09_10_140000_create_boq_survey_rounds_tables.php` sekaligus.
+
+**Catatan lanjutan**: setelah fitur Survey (termasuk Re Survey) ini dianggap tuntas, user akan menjelaskan detail spec sub-step Perizinan berikutnya.
+
+## Y. Fix bag. X -- tombol "Re Survey" tidak muncul utk LOP yang sudah lebih dulu selesai Survey sebelum fitur ini ada
+
+User melaporkan: sudah migrate (`2026_09_10_130000_...` & `2026_09_10_140000_create_boq_survey_rounds_tables.php`), tapi tombol Re Survey tetap tidak muncul.
+
+**Penyebab**: `$canStartReSurvey` (dihitung di `WaspangController::persiapan()`) & guard di `startReSurvey()` sama-sama mensyaratkan minimal 1 baris `boq_survey_rounds` berstatus `completed` utk LOP tsb. Baris itu HANYA dibuat oleh `finishSurvey()`/`uploadSurveyRedesignApproval()` -- keduanya cuma jalan saat LOP MASIH di tahap Survey. LOP yang Survey-nya sudah selesai SEBELUM kode bag. X ini dideploy (yaitu hampir semua LOP yang sedang berjalan saat ini) tidak akan pernah memicu kedua fungsi itu lagi, jadi tidak akan pernah punya baris ronde sama sekali -- `$surveyRounds` selalu kosong, tombol Re Survey tidak pernah muncul, permanen.
+
+**Fix**: helper baru `WaspangController::ensureBaselineSurveyRound(Lop $lop)` -- idempotent (no-op kalau LOP sudah punya baris ronde apapun), dipanggil di awal `persiapan()` (supaya "sembuh sendiri" cukup lewat refresh halaman biasa) & juga di awal `startReSurvey()` (jaga-jaga). Kalau LOP belum punya baris ronde SAMA SEKALI tapi `status_progress`-nya sudah bukan `inisiasi`/`survey` lagi (artinya pernah Selesai Survey di masa lalu), backfill 1 baris `boq_survey_rounds` round 1 berstatus `completed` (`finished_at` diambil dari `perizinan_completed_at` kalau ada, fallback `updated_at`) + snapshot `boq_survey_round_items` dari `boq_items` SAAT INI (satu-satunya data yang tersedia -- volume Survey asli sebelum fitur ini sudah menimpa `quantity_actual`, tidak ada jalan mengambil nilai yang lebih lama).
+
+File yang diubah: `app/Http/Controllers/WaspangController.php` saja (method baru + 2 titik pemanggilan). Tidak ada migration/route/blade tambahan.
+
+## Z. Redesign accordion Perizinan -- "Add Perizinan" (kategori + kronologi + eviden opsional, bisa berkali-kali), tombol "Perizinan Selesai" langsung aksi
+
+Permintaan user: sub-step Perizinan diubah desainnya -- ada tombol **"Add Perizinan"** yang tiap diklik menampilkan form: pilih kategori perizinan, teks kronologi, upload eviden foto/file BA KP (opsional). Bisa Add Perizinan berkali-kali. Tombol "Update Kronologi" yang lama DIGANTI oleh tombol **"Perizinan Selesai"** yang langsung mengubah status LOP ke Material Delivery (tanpa upload BA KP wajib terpisah lagi seperti sebelumnya).
+
+**3 keputusan user (ditanya via AskUserQuestion sebelum implementasi):**
+1. Tombol "Perizinan Selesai" **tetap wajib minimal 1x Add Perizinan** sudah tersimpan (menjaga aturan lama: setiap aktivitas perizinan wajib kronologi) -- BUKAN bebas tanpa syarat.
+2. `lops.permit_category_id` **selalu ikut kategori TERBARU** yang dipilih di Add Perizinan manapun, tapi kategori tiap entri tetap tercatat utuh sbg histori di baris kronologinya masing-masing (tidak hilang/tertimpa).
+3. Upload eviden di form Add Perizinan **boleh campur foto & PDF sekaligus** dalam 1 input file (tidak dipisah 2 form).
+
+**Desain data (migration `2026_09_10_150000_add_perizinan_entry_columns.php`):**
+- `lop_kronologis.permit_category_id` (baru, FK nullable ke `permit_categories`, `nullOnDelete`) -- kategori yang dipilih SAAT entri Add Perizinan itu dibuat, terpisah dari `lops.permit_category_id` yang mencerminkan kategori TERBARU.
+- `evidences.lop_kronologi_id` (baru, FK nullable ke `lop_kronologis`, `nullOnDelete`, TANPA constraint arah sebaliknya) -- menautkan eviden opsional yg diupload bersamaan Add Perizinan ke baris kronologi tsb, supaya bisa ditampilkan menyatu per entri (bukan grid eviden terpisah seperti sebelumnya).
+- Model: `LopKronologi` -- tambah relasi `permitCategory()` & `evidences()` (`hasMany(Evidence::class, 'lop_kronologi_id')`). `Evidence` -- tambah `lop_kronologi_id` ke `$fillable` + relasi `kronologi()`.
+
+**Alur (`app/Http/Controllers/WaspangController.php`):**
+- `addPerizinan(Request $request, $project)` (route POST `waspang.perizinan.add`, BARU) -- guard status LOP harus `perizinan`/`drm` (alias lama). Validasi: `permit_category_id` (required, exists), `event_date` (required, date), `note` (required, string max 2000), `files` (nullable array, tiap file `mimes:jpg,jpeg,png,pdf|max:10240`). Dalam transaksi: buat 1 baris `LopKronologi` (`stage_code='perizinan'`, simpan `permit_category_id` di baris itu), update `lop->permit_category_id` ke kategori TERBARU, lalu utk tiap file upload buat `Evidence` (`evidence_type` otomatis `ba_kp` kalau ekstensi pdf, else `eviden_perizinan`; `status='pending'`, `lop_kronologi_id` diisi id kronologi tsb) di folder `evidences/{lop}/perizinan/add_perizinan/`. Log activity `add_perizinan`.
+- `togglePerizinanSelesai($project)` (route POST `waspang.perizinan.selesai`, DISEDERHANAKAN) -- request body TIDAK lagi divalidasi (tidak ada file wajib lagi, `Request $request` type-hint DIHAPUS dari signature krn tidak dipakai). Guard tetap sama: status LOP `perizinan`/`drm`, DAN minimal 1 baris `lop_kronologis` `stage_code='perizinan'` harus sudah ada (persis cek lama, otomatis terpenuhi begitu Add Perizinan pertama tersimpan). Kalau lolos: langsung `lop->update(['perizinan_completed_at' => now(), 'status_progress' => 'material_delivery'])`, log `stage_transition`.
+- `updatePerizinanCategory()` (route lama `waspang.perizinan.category`) -- method & route DIBIARKAN ada (tidak dihapus, low-risk) tapi SUDAH TIDAK DIPANGGIL dari UI manapun lagi (sudah digantikan pilihan kategori di dalam form Add Perizinan).
+
+**UI Waspang** (`resources/views/waspang/show.blade.php` + partial baru `resources/views/waspang/partials/perizinan-modal.blade.php`):
+- Accordion Perizinan: dropdown kategori standalone + grid "Eviden Proses Perizinan" terpisah + list "Kronologi Perizinan" terpisah -- SEMUA DIGABUNG jadi 1 seksi "Riwayat Perizinan": 1 kartu per entri `lop_kronologis` (badge kategori, tanggal, catatan, nama pencatat) + `@include('waspang.partials.evidence-photo-grid', ['photos' => $k->evidences])` kalau entri itu punya eviden (reuse partial yang sudah ada, otomatis dapat fitur hapus/upload-ulang per foto tanpa kerja tambahan).
+- Tombol "+ Add Perizinan" di header seksi membuka modal baru (`perizinanModal`, fungsi `openAddPerizinanModal()`/`closePerizinanModal()`) -- form: select kategori, input tanggal, textarea kronologi, 1 input file (`files[]`, `accept="image/*,application/pdf"`, multiple).
+- JS baru `compressMixedFileInput(input)` di `perizinan-modal.blade.php` -- kompres tiap file BERTIPE GAMBAR di input (pakai `compressImage()` global yg sudah ada), file PDF dilewati apa adanya (BEDA dgn `compressFileInputPhotos()` lama yg langsung MEMBUANG file non-gambar dari FileList -- tidak bisa dipakai di sini krn input ini sengaja campur foto+PDF).
+- Blok "Radio Perizinan Selesai" (checkbox + form upload BA KP wajib) DIHAPUS TOTAL, diganti kartu simpel: 1 tombol "Perizinan Selesai" yang disabled (abu-abu) selama `$perizinanKronologis` masih kosong, aktif (biru, klik langsung submit dgn `confirm()`) begitu minimal 1 Add Perizinan sudah ada -- tidak ada modal/upload tambahan lagi di titik ini.
+
+**Migration BELUM dijalankan** -- user perlu `php artisan migrate` utk `2026_09_10_150000_add_perizinan_entry_columns.php` (sekaligus 2 migration sebelumnya di bag. U/X kalau belum, walau sudah dikonfirmasi user sudah migrate utk 130000 & 140000).
+
+## AA. Fix penomoran & CTA "Lanjut Step" -- Step 1 Persiapan salah loncat langsung finish Persiapan Instalasi, penomoran Instalasi/Pengukuran/Finishing tidak sinkron dgn stepper
+
+User melapor: setelah menyelesaikan Step 1 Persiapan (4 sub-step: Inisiasi/Survey/Perizinan/Material Delivery), tombol CTA paling bawah salah -- minta disesuaikan supaya lanjut ke "Step 2 Persiapan Instalasi" dgn benar, dan supaya penomoran step konsisten di SEMUA halaman.
+
+**Sumber kebenaran penomoran** ternyata SUDAH ADA & SUDAH BENAR di `resources/views/waspang/partials/stepper.blade.php` (komponen global, di-include di atas setiap halaman step Waspang): **1 Persiapan -> 2 Persiapan Instalasi -> 3 Instalasi -> 4 Pengukuran -> 5 Finishing -> 6 Selesai**. Masalahnya, beberapa teks INLINE di halaman lain tidak ikut diupdate saat Persiapan Instalasi dipecah jadi halaman sendiri (Step 2) -- jadi tidak sinkron dgn stepper di atasnya:
+
+1. **`resources/views/waspang/show.blade.php`** (Step 1 Persiapan) -- CTA final paling bawah, saat `lop->status_progress === 'persiapan_instalasi'` (artinya Step 1 baru selesai), SEBELUMNYA langsung **POST** ke `WaspangController::finishPersiapanInstalasi()` (route `waspang.persiapan-instalasi.finish`) dgn label salah **"Lanjut Step 2 - Instalasi"**. Padahal `finishPersiapanInstalasi()` itu SENDIRI mensyaratkan eviden Barang Tiba & Perizinan SUDAH terupload (upload-nya ada di halaman Step 2, yg belum pernah dibuka) -- jadi tombol ini kalau diklik cuma akan gagal dgn error "Upload Eviden Barang Tiba dan Eviden Perizinan terlebih dahulu" tanpa mengarahkan waspang kemanapun. **Fix**: diganti jadi LINK biasa (GET) ke halaman Step 2 (`route('waspang.projects.persiapan-instalasi', ...)`), label dibetulkan jadi **"Lanjut Step 2 - Persiapan Instalasi"**. Cabang `$seq > 6` (LOP sudah lewat Persiapan Instalasi) labelnya juga dibetulkan dari "Lihat Step 2 Instalasi" -> **"Lihat Step 3 Instalasi"**.
+2. **`resources/views/waspang/steps/instalasi.blade.php`** -- header inline "Step 2 Instalasi" -> **"Step 3 Instalasi"**; CTA bawah "Next Step 3 - Pengukuran" -> **"Next Step 4 - Pengukuran"**.
+3. **`resources/views/waspang/steps/pengukuran.blade.php`** -- header inline "Step 3 Pengukuran" -> **"Step 4 Pengukuran"**; CTA bawah "Next Step 4 - Finishing" -> **"Next Step 5 - Finishing"**.
+4. **`resources/views/waspang/steps/finishing.blade.php`** -- header inline "Step 4 Finishing" -> **"Step 5 Finishing"** (CTA-nya sendiri, link ke `waspang.projects.review_final`, tidak menyebut nomor step jadi tidak perlu diubah).
+
+`resources/views/waspang/steps/persiapan-instalasi.blade.php` TIDAK diubah -- labelnya ("Step 2 Persiapan Instalasi" di komentar, CTA "Lanjut Step 3 - Instalasi") sudah benar dari awal & sudah konsisten dgn stepper; halaman ini juga TIDAK pakai header inline `<h2>Step N ...</h2>` (murni mengandalkan `@include('waspang.partials.stepper')`). `resources/views/waspang/steps/persiapan.blade.php` (file lama, header masih bilang "Step 1 - Persiapan") dicek TIDAK dipanggil controller manapun (`persiapan()` render ke `waspang.show`, bukan `waspang.steps.persiapan`) -- dead file, dibiarkan apa adanya.
+
+Semua perubahan murni teks/link blade (tidak ada migration/controller/route baru).
+
+## AB. Fix bug nyata -- boq_items.quantity_actual dipakai dobel (Volume BOQ Survey vs qty aktual Instalasi Step 3), kolom baru `quantity_survey`
+
+User melapor: di Step 3 Instalasi, kolom "Qty Aktual" sudah terisi seperti Volume BOQ Survey -- padahal Volume Survey beda dgn qty aktual, dan qty aktual seharusnya BARU diisi saat Waspang input progress di Step 3 (item yang ditampilkan di Step 3 adalah BOQ Plan).
+
+**Akar masalah**: sejak fitur Survey nominal-deviation (bag. U) & Re Survey (bag. X) dibuat, `WaspangController::persistSurveyVolumes()` (Selesai/Simpan Draf Survey) dan `addSurveyBoqItem()` (tambah designator hasil Survey) SAMA-SAMA menulis Volume BOQ Survey ke kolom `boq_items.quantity_actual` -- kolom yang SAMA dipakai `uploadEvidence()` utk menyimpan qty aktual Instalasi Step 3 (blok "UPDATE QUANTITY ACTUAL & REASON"). Akibatnya begitu Survey selesai, `quantity_actual` sudah terisi Volume Survey walau Waspang belum pernah menyentuh Step 3 sama sekali -- Step 3 pun menampilkannya seolah2 progress sudah ada.
+
+**Fix (migration `2026_09_10_160000_split_quantity_survey_from_quantity_actual.php`)**: kolom BARU `boq_items.quantity_survey` (INT NULL) jadi rumah KHUSUS Volume BOQ Survey. `quantity_actual` mulai sekarang MURNI dipakai Instalasi Step 3 saja.
+
+**Perbaikan data lama** (dikonfirmasi user sebelum dijalankan, lihat AskUserQuestion): migration yg sama otomatis:
+1. Isi `quantity_survey` dari snapshot RONDE TERAKHIR tiap item di `boq_survey_round_items` (bag. X) -- akurat krn snapshot itu diambil PERSIS saat Survey/Re Survey selesai, tidak peduli `quantity_actual` sudah/belum sempat ditimpa Instalasi.
+2. Kosongkan (`NULL`) `quantity_actual` **HANYA** utk item yang `quantity_survey`-nya barusan terisi (pernah lewat Survey) **DAN** TIDAK PERNAH punya histori aktivitas `update_quantity_actual` di `project_activity_logs` (dicek via `JSON_EXTRACT(meta, '$.boq_item_id')`) -- artinya item yang SUDAH PERNAH diinput progress Instalasi asli (walau kebetulan sama dgn Volume Survey) **TIDAK DISENTUH SAMA SEKALI**, supaya data progres asli tidak pernah berisiko hilang.
+
+**Perubahan kode:**
+- `app/Models/BoqItem.php` -- tambah `quantity_survey` ke `$fillable`.
+- `app/Services/SurveyPreparationService.php::groupBoqItems()` -- key hasil grouping diganti dari `'quantity_actual' => $actualItem->quantity_actual` jadi `'quantity_survey' => $actualItem->quantity_survey`.
+- `resources/views/waspang/partials/survey-workflow.blade.php` -- draft-value fallback utk item tambahan (`is_additional`) baca `$group['quantity_survey']` (sebelumnya `$group['quantity_actual']`).
+- `app/Http/Controllers/WaspangController.php`:
+  - `addSurveyBoqItem()` -- designator tambahan hasil Survey disimpan ke `quantity_survey` (BUKAN lagi `quantity_actual`).
+  - `persistSurveyVolumes()` (dipakai `saveSurveyBoqDraft()` & `finishSurvey()`) -- update `quantity_survey`.
+  - `completeSurveyRound()` -- snapshot `boq_survey_round_items.quantity_survey` sekarang baca dari `$item->quantity_survey` (sudah fresh dari `persistSurveyVolumes()` di transaksi yg sama).
+  - `ensureBaselineSurveyRound()` (backfill Re Survey utk LOP lama, bag. Y) -- fallback `$item->quantity_survey ?? $item->quantity_actual` (jaga2 utk LOP yg migration 160000 lewatkan krn saat itu belum py baris ronde), SEKALIGUS memindahkan nilainya permanen ke `quantity_survey` + kosongkan `quantity_actual` dgn pengecekan histori `update_quantity_actual` yg SAMA PERSIS dgn migration.
+
+Tidak ada perubahan di `uploadEvidence()` (blok update qty aktual Instalasi) -- itu SUDAH BENAR dari awal, memang seharusnya murni utk Step 3.
+
+**Migration BELUM dijalankan** -- user perlu `php artisan migrate` utk `2026_09_10_160000_split_quantity_survey_from_quantity_actual.php` (bergantung pada tabel `boq_survey_rounds`/`boq_survey_round_items` dari migration 140000 sudah ada -- SUDAH dikonfirmasi user migrate sebelumnya).
+
+## AC. Fix -- item tambahan BOQ Survey ikut nongol/dihitung di checklist Step 3 Instalasi (harusnya cuma item BOQ Plan)
+
+User menegaskan: yang ditampilkan di Step 3 Instalasi seharusnya item dari **BOQ PLAN** saja -- item hasil "Tambah Designator" di sub-step Survey (`WaspangController::addSurveyBoqItem()`, dibuat dgn `quantity_plan = null` krn memang tidak berasal dari Plan Admin) **TIDAK PERLU** ikut ditampilkan di Step 3.
+
+**Penyebab**: seluruh filter "item material utk progress Instalasi" di codebase (`$materialBoqItems = $boqItems->filter(...)`) SELAMA INI hanya menyaring berdasarkan designator (`M-` prefix ATAU `type === 'material'`), TANPA mengecualikan item yang `quantity_plan`-nya `null`. Karena item tambahan Survey SERING berupa Material (prefix `M-`), item2 itu ikut lolos filter & muncul sbg baris checklist Instalasi -- padahal mereka bukan bagian BOQ Plan sama sekali.
+
+**Fix**: tambahkan syarat `quantity_plan !== null` di SEMUA titik yang menghitung `$materialBoqItems` utk keperluan progress/checklist Instalasi (`app/Http/Controllers/WaspangController.php`):
+1. `dashboard()` -- kartu ringkasan progress Instalasi per project.
+2. Helper progress kedua (dipakai alur `isProjectReadyUt`).
+3. `instalasi()` -- **halaman Step 3 Instalasi itu sendiri** (yang dilaporkan user).
+4. `reviewFinal()` -- Step "Validasi Akhir" (perbandingan Plan vs Aktual, item tanpa Plan memang tidak relevan dibandingkan).
+5. `isInstalasiApproved()` -- helper gate approval Instalasi.
+6. `instalasiSubmittedComplete()` -- versi query DB (`BoqItem::where(...)`), ditambah `->whereNotNull('quantity_plan')`.
+
+Kalau tidak seluruhnya dibetulkan sekaligus, `$boqTotal`/`$boqApproved` di berbagai tempat (dashboard, gate "Instalasi selesai") akan tetap terhitung dari angka yang salah (memasukkan item tanpa Plan) walau tampilan Step 3-nya sendiri sudah benar -- makanya semua titik dibetulkan bersamaan, bukan cuma `instalasi()`.
+
+Tidak ada migration baru -- murni perubahan logic filter (tambah 1 syarat `quantity_plan !== null`) di 6 titik tsb.
+
+
+## AD. Fix + Revisi -- Stepper checklist 2 warna (upload vs approved), sumber item BOQ Instalasi/Finishing ikut ronde Survey terbaru, & bug lanjutan filter Material di `Project::progressSummary()`/`finishing.blade.php`
+
+User melaporkan Step 3 Instalasi di stepper global (`stepper.blade.php`) tidak pernah berubah jadi checklist (icon check) walau Waspang sudah selesai upload semua foto progress. Sekaligus minta revisi: item BOQ yang dipakai di Step 3 Instalasi & Step 5 Finishing seharusnya dari **ronde BOQ Survey TERBARU** (`boq_survey_rounds`/`boq_survey_round_items`, fitur Re Survey bag. X) kalau LOP itu punya ronde yang SELESAI, dan HANYA fallback ke BOQ Plan (`quantity_plan !== null`, bag. AC) kalau LOP belum pernah punya ronde Survey selesai sama sekali. Diminta juga: SETIAP step di stepper berubah jadi checklist begitu Waspang selesai upload (bukan cuma stelah admin approve).
+
+**Root cause #1 (kenapa checklist tidak pernah muncul)**: checklist hijau di `stepper.blade.php` (`$stepNDone`) dihitung dari `$seq > N` (posisi `lops.status_progress` di 11-tahap `project_stages`) -- dan `status_progress` HANYA maju dari `instalasi` -> `pengukuran` (lalu `pengukuran` -> `finishing`) lewat 1 tempat: blok auto-transisi di `ProjectController` (bagian approve eviden, ~baris 787-825), yang di-gate `$summary['instalasiDone']`/`$summary['pengukuranDone']` dari `Project::progressSummary()` -- dan KEDUANYA itu mensyaratkan SEMUA eviden material **status approved**, bukan cuma ter-upload. Jadi sebagian ini MEMANG BY DESIGN (approval tetap syarat lanjut step, dikonfirmasi user) -- bukan murni bug.
+
+**Root cause #2 (bug nyata, kelas sama dgn bag. AC tapi di lokasi ke-7 & ke-8 yang kelewat)**: 2 titik filter "item Material" TERNYATA belum kena fix bag. AC:
+1. `Project::progressSummary()` -- loop pembentuk `$materialIds`/`$finishingRequiredIds` (dasar hitung `instalasiApproved`/`finishingApproved`, JUGA dipakai auto-transisi `status_progress` di atas) cuma filter prefix `M-`, TANPA `quantity_plan !== null`. Akibatnya: kalau LOP punya item tambahan Survey (Material, `quantity_plan = null`) yang TIDAK PERNAH tampil/diupload di Step 3 (sejak bag. AC), item itu tetap ikut kehitung di `materialTotal` -- `instalasiApproved` TIDAK PERNAH bisa capai `materialTotal` -- `instalasiDone` SELALU `false` -- `status_progress` macet permanen di `instalasi` walau semua item yang BENAR2 tampil ke Waspang sudah full di-approve admin. Ini kemungkinan besar akar masalah utama yang dilaporkan user.
+2. `resources/views/waspang/steps/finishing.blade.php` -- filter `$materialBoqItems`-nya cuma cek `type === 'material'`, TANPA `quantity_plan !== null` SAMA SEKALI (beda dgn 6 titik lain yg sudah dibenahi bag. AC) -- item tambahan Survey ikut nyasar ke checklist Finishing.
+
+**Keputusan user** (dikonfirmasi via pertanyaan klarifikasi sebelum implementasi):
+1. Checklist stepper JADI 2 WARNA: **KUNING** = Waspang sudah selesai upload SEMUA foto wajib tahap itu (status eviden apapun -- pending/approved), murni indikator visual progres upload sendiri. **HIJAU** = sudah di-approve admin SEMUA (persis definisi lama, `$stepNDone`/`$seq`). Approval TETAP jadi syarat lanjut ke step berikutnya (status_progress LOP) -- TIDAK diubah/dilonggarkan.
+2. Item BOQ Instalasi & Finishing: ronde BOQ Survey TERBARU yang SELESAI kalau ada (else BOQ Plan) -- DAN label "Plan" yang ditampilkan ke Waspang ikut brubah jadi `quantity_survey` ronde itu (bukan `quantity_plan` asli Admin lagi), karena itu revisi resmi hasil Survey lapangan.
+
+**Implementasi**:
+- `app/Models/Project.php`:
+  - Method baru `materialProgressItems(): array` -- sumber tunggal (single source of truth) utk "item Material yang berlaku hari ini". Cari `BoqSurveyRound` `status=completed` ber-`round_number` terbesar milik LOP; kalau ada, ambil snapshot `boq_survey_round_items`-nya (filter M-/type material via `BoqSurveyRoundItem::boqItem` relation), lalu **clone** tiap `BoqItem` asli & timpa `quantity_plan`-nya dgn `quantity_survey` ronde itu (in-memory saja, TIDAK disimpan ke DB) -- `id_boq` & semua relasi eviden TETAP ke row asli. Kalau tidak ada ronde selesai, fallback filter lama bag. AC (`quantity_plan !== null` + M-/material). Return `['items' => Collection, 'source' => 'survey_round'|'plan', 'round' => ?BoqSurveyRound]`.
+  - Method baru `stepUploadFlags(): array` -- versi "sudah upload" (bukan approved) dari `persiapanDone`/`instalasiDone`/`pengukuranDone`/`finishingDone`, dipakai stepper utk warna KUNING. `instalasiUploaded`/`finishingUploaded` dihitung dari `materialProgressItems()` (jadi otomatis ikut sumber ronde/plan yang sama).
+  - `progressSummary()`: loop `$materialIds`/`$finishingRequiredIds` (dulu scan `$boqItems` mentah, cuma filter prefix `M-`) sekarang sumbernya `$this->materialProgressItems()['items']` -- **fix root cause #2.1** sekaligus menyamakan item acuan approval Instalasi/Finishing dgn item yang BENAR2 ditampilkan (ronde terbaru/plan), bukan lagi himpunan yang bisa beda sendiri.
+- `app/Http/Controllers/WaspangController.php`:
+  - `instalasi()` -- `$materialBoqItems` sekarang dari `$project->materialProgressItems()` (bukan filter manual lagi); tambah `$materialSourceType`/`$materialSourceRound` yg dilempar ke view utk badge sumber.
+  - `isInstalasiApproved()` -- item acuan disamakan, pakai `$project->materialProgressItems()['items']` (dulu filter manual `quantity_plan !== null && M-` sendiri, bisa beda dgn `instalasi()` kalau ronde Survey ada).
+- `resources/views/waspang/steps/finishing.blade.php` -- filter manual diganti panggil `$project->materialProgressItems()` juga (**fix root cause #2.2**, sekalian ikut revisi ronde terbaru); tambah badge sumber ("BOQ Survey Ronde N" / "BOQ Plan") di header list, sejajar dgn badge yg sama di `instalasi.blade.php`.
+- `resources/views/waspang/steps/instalasi.blade.php` -- tambah badge sumber yang sama (variabel `$materialSourceType`/`$materialSourceRound` sudah dilempar dari controller). Loop item (`$project->boqItems`, hasil `setRelation()`) & hitung `$boqTotal`/`$boqUploaded`/`$instalasiUploadedComplete` di file ini SENDIRI TIDAK perlu diubah -- otomatis ikut karena sumbernya (`$project->boqItems`) sudah dari `materialProgressItems()`.
+- `resources/views/waspang/partials/stepper.blade.php` -- tambah `$uploadFlags = $project->stepUploadFlags()` & `$stepNUploaded` (= `!$stepNDone && flag`) per step 1-5; tiap `$segments[N]` dapat key baru `'uploaded'`; `$circleClass`/`$labelClass`/icon check di 2 tempat (versi `<a>` & `<div>`) tambah 1 match-arm baru utk state kuning (`ring-2 ring-amber-400`, teks amber) sebelum fallback abu2 -- HIJAU (`done`) tetap dicek LEBIH DULU jadi kalau sudah approved ya langsung hijau, bukan kuning dulu.
+
+**TIDAK diubah** (di luar scope eksplisit user, supaya blast radius kecil): `reviewFinal()` (Step "Validasi Akhir"/cetak UT) & `instalasiSubmittedComplete()` TETAP pakai BOQ Plan murni (bag. AC) apa adanya -- 2 halaman itu memang laporan/perbandingan Plan vs Aktual, bukan checklist upload, dan user tidak minta itu ikut berubah. Auto-transisi `status_progress` di `ProjectController` TIDAK disentuh -- otomatis ikut benar krn sumber `instalasiDone`/`finishingDone`-nya (`progressSummary()`) sudah dibetulkan di atas.
+
+Tidak ada migration baru -- murni perubahan logic (model + controller + 3 view blade).
+
+
+## AE. Fix -- Step 4 Pengukuran tidak pernah checklist kalau SEMUA item ditandai "Tidak Ada" (N/A)
+
+User melaporkan: kalau Step 4 Pengukuran sudah "complete" (semua item sudah ditangani), stepper harus tetap checklist WALAU semua item ditandai "Tidak Ada" (N/A) -- bukan cuma via upload foto.
+
+**Root cause**: `status_progress` LOP CUMA bisa maju dari `pengukuran` -> `finishing` lewat 1 jalur di `ProjectController` (blok auto-transisi saat admin approve eviden, ~baris 787-820), yang di-gate `$summary['pengukuranDone']`. Kalau Waspang menandai SEMUA 5 item Pengukuran (`LopMeasurementCheck::ITEMS` -- otdr, file_sor, opm, kedalaman, eviden_lainnya) sebagai N/A TANPA upload eviden apapun, tidak pernah ada eviden utk di-approve admin -- transisi itu TIDAK PERNAH kepicu, walau `pengukuranDone` (`LopMeasurementCheck::isDone()`, bag. sebelumnya "Opsi B") SUDAH `true`. Stepper (hijau, `$step4Done`) jadi macet permanen krn `status_progress` tidak pernah lewat sequence 8, meski secara definisi Pengukuran sudah tuntas.
+
+Sekaligus dibenahi: flag KUNING (`stepUploadFlags()['pengukuranUploaded']`, bag. AD) sebelumnya cuma cek 3 dari 5 evidence_type (otdr/opm/kedalaman) & TIDAK menghitung penanda N/A sama sekali -- jadi kalau ada item ditandai N/A, kuning juga tidak pernah nyala.
+
+**Fix**:
+- `app/Http/Controllers/WaspangController.php::toggleMeasurementCheck()` -- setelah `$check->save()`, replikasi gate auto-transisi yang SAMA PERSIS dengan `ProjectController` (PT2 barrier, LOP hold/drop tidak disentuh, `currentSequence === 8`) lalu cek `$project->progressSummary()['pengukuranDone']` -- kalau true, `status_progress` LOP di-update ke `finishing`. Jadi walau tidak ada satupun eviden yang di-approve (semua item N/A), LOP tetap bisa maju begitu item terakhir ditandai N/A.
+- `app/Models/Project.php::stepUploadFlags()` -- bagian Pengukuran ditulis ulang: loop semua `LopMeasurementCheck::ITEMS` (5 item, bukan 3), per item "sudah diisi" (kuning) = ada eviden APAPUN statusnya (dengan alias nama lama `file_sor`/`otdr_sor` & `eviden_lainnya`/`lainnya`, sama seperti `pengukuran()`/`toggleMeasurementCheck()`) ATAU baris `lop_measurement_checks`-nya `is_not_applicable = true`. Method jadi butuh `$lop` juga (`loadMissing(['evidences', 'lop'])`).
+
+Tidak ada migration baru. Tidak menyentuh `progressSummary()`'s `pengukuranDone` (definisi hijau) -- itu sudah benar dari awal (`LopMeasurementCheck::isDone()`); yang kurang cuma PEMICU transisi `status_progress`-nya saat jalur "semua N/A, nol eviden" dan definisi flag kuning yang belum lengkap.
+
+
+## AF. UI Approval Admin disesuaikan dgn refactor "flow 11-tahap" + dibangun alur FI-OGP Golive/Golive lengkap
+
+User: "sekarang lanjut sesuaikan untuk UI approval pada admin sesuai dengan refactor yang kita sedang jalankan termasuk stepper nya sesuaikan dengan waspang termasuk FI-OGP Golive dan Golive sesuai status progress yang terbaru". 2 keputusan eksplisit lewat AskUserQuestion: (1) bangun ALUR LENGKAP FI-OGP Golive/Golive (bukan cuma kosmetik/tombol manual sementara), (2) benahi SEMUA tempat di Admin yang menampilkan warna/label stage (bukan cuma stepper evidence-approval).
+
+**Root cause #1 (warna/label stage tidak konsisten & tidak lengkap)**: 3 file (`admin/projects/index.blade.php`, `admin/projects/partials/project-card.blade.php`, `admin/project-detail.blade.php`) masing-masing punya if/elseif SENDIRI yang string-match `$stageLabel` ('Finishing'/'Pengukuran'/'Instalasi') utk nentuin warna badge -- TIDAK PUNYA cabang utk 'FI-OGP Golive'/'Golive' sama sekali, jadi 2 tahap paling akhir (& paling positif) itu jatuh ke cabang "else" yang berarti merah (warna utk LOP bermasalah). `admin/projects/tracking.blade.php` juga scan BOQ Material-nya sendiri (`type==='material'` doang, tanpa `quantity_plan !== null`) -- beda dari `Project::materialProgressItems()` (bag. AC/AD) -- dan `$stageLabels`/`$stageProgress`-nya cuma sampai Finishing (seq 9), berhenti di situ.
+
+**Root cause #2 (FI-OGP Golive/Golive "belum dikerjakan")**: `ProjectController::approveEvidence()` punya komentar eksplisit "Stage 5, belum dikerjakan" -- `status_progress` LOP tidak pernah maju otomatis lewat `finishing` (seq 9). Model `LopGoliveSubmission`/`LopGoliveVerification` + relasi `Lop::goliveSubmission()`/`goliveVerification()` SUDAH ADA (migration sudah jalan) tapi NOL controller/route/view yang memakainya -- benar2 dead code sampai sekarang.
+
+**Implementasi**:
+
+1. **`app/Models/Project.php`** -- method statis baru `stageColorClasses(?string $color): array`, 1 sumber warna Tailwind (accent/border/progress/badge/dot) per `project_stages.color` (slate/amber/blue/indigo/emerald/purple/green/orange/red + default abu2), dipetakan MANUAL per-warna (bukan interpolasi string) supaya tetap ke-scan Tailwind JIT. Dipanggil dari `progressSummary()['effectiveStageColor']` (hold->orange, drop->red di-override di pemanggil).
+
+2. **Warna/label stage disamakan** di 4 tempat, semua baca `$summary['effectiveStageLabel']`/`stageColorClasses($summary['effectiveStageColor'])` (hold/drop-safe, konsisten dgn `progressSummary()`):
+   - `admin/projects/index.blade.php` & `admin/projects/partials/project-card.blade.php` -- if/elseif lama diganti panggil `stageColorClasses()`.
+   - `admin/project-detail.blade.php` -- "Status Progress" yang tadinya baca `$lop->stage?->name` mentah (bukan hold/drop-safe, tanpa warna) sekarang jadi badge berwarna dari `stageColorClasses()`.
+   - `admin/projects/tracking.blade.php` -- 3 perubahan: (a) sumber item Material disamakan dgn Waspang via `$project->materialProgressItems()['items']`; (b) `$stageLabels`/`$stageRoutes`/`$stageProgress` ditambah 2 entry (`fi_ogp_golive` "FI-OGP Golive"/Step 5, `golive` "Golive"/Step 6), progress 2 tahap ini dari `effectiveStageSequence` (bukan ambang persentase kayak 4 tahap lama); (c) `$stageEvidenceStats` loop ditambah cabang baca `LopGoliveSubmission`/`LopGoliveVerification` (bukan tabel `evidences`) utk 2 tahap baru itu.
+
+3. **Alur FI-OGP Golive/Golive dibangun lengkap** (bukan stopgap):
+   - `app/Http/Controllers/ProjectController.php` -- 2 method baru: `reviewGolive($id)` (GET, tampilkan halaman submission) & `submitGoliveDocuments(Request, $id)` (POST, terima 4 file satu2/parsial, `updateOrCreate` ke `LopGoliveSubmission`, simpan ke `storage/app/public/evidences/golive/{lop_id}/...`; begitu ke-4 lengkap DAN `finishingDone` DAN persis `currentSequence===9` DAN bukan PT2/hold/drop/closed -> `status_progress` LOP di-set `'fi_ogp_golive'`, log via `ProjectActivityService`). Gate PERSIS sama pola dgn `approveEvidence()`/`toggleMeasurementCheck()` (bag. AE).
+   - `app/Http/Controllers/SdiGoliveController.php` (BARU, terpisah dari `SdiController` yg cuma utk `Pt2Lop`) -- `index()` (list LOP reguler `status_progress='fi_ogp_golive'`), `show($id)` (lihat submission + form upload UIM), `verify(Request, $id)` (upload `capture_uim`, `updateOrCreate` `LopGoliveVerification`; begitu tersimpan DAN persis `currentSequence===10` DAN bukan PT2/hold/drop/closed -> `status_progress` LOP di-set `'golive'` + `lops.is_golive=true` + `golive_at=now()`, log via `ProjectActivityService`).
+   - `routes/web.php` -- route baru `admin.evidences.review.golive` (GET) & `admin.evidences.golive.submit` (POST) di group `role:admin,superadmin,super_tif`; route baru `sdi.golive.index`/`sdi.golive.show`/`sdi.golive.verify` di group `role:sdi` (terpisah dari `sdi.golive.store` lama yg PT2-only).
+   - View baru: `admin/evidences/review-golive.blade.php` (Step 5 = form upload 4 dokumen dgn preview link file tersimpan + toggle jenis input Mancore foto/excel; Step 6 = status verifikasi SDI read-only), `sdi/golive/index.blade.php` (daftar LOP nunggu verifikasi, extends `layouts.sdi` spt `sdi/index.blade.php`), `sdi/golive/show.blade.php` (detail submission + form upload capture UIM, tombol verify disabled/hidden kalau submission belum lengkap).
+
+4. **`resources/views/admin/evidences/partials/stepper.blade.php`** -- REWRITE TOTAL: dari 4 segmen jadi 6 (Persiapan/Instalasi/Pengukuran/Finishing/FI-OGP Golive/Golive). Sebelumnya method ini recompute SENDIRI semua status "done" dari filter BOQ M-prefix mentah (beda dari `materialProgressItems()`) -- sekarang semua baca dari `$project->progressSummary()` (hijau=approved) & `$project->stepUploadFlags()` (kuning=uploaded blm approved, step 1-4) plus `LopGoliveSubmission`/`LopGoliveVerification` (step 5-6), 2-tone yang SAMA PERSIS dgn stepper Waspang (bag. AD) supaya kedua sisi selalu konsisten. Step 5 "done" = `effectiveStageSequence >= 11`; Step 6 "done" = `lops.is_golive` OR sequence >= 11.
+
+**TIDAK diubah** (di luar scope eksplisit): `resources/views/admin/evidences/review-finishing.blade.php`'s `$stepSummary` (mini review card Persiapan/Instalasi/Pengukuran internal di halaman itu) & `$materialBoqItems` filter lokalnya sendiri -- keduanya duplikasi terpisah dari stepper utama, sengaja tidak disentuh supaya blast radius kecil (dicatat di summary sblmnya juga).
+
+Tidak ada migration baru (tabel `lop_golive_submissions`/`lop_golive_verifications` sudah ada dari sebelumnya, cuma belum dipakai sama sekali). Semua validasi file baru (`kml`, `pdf`, `xls/xlsx`, `image/*`) memakai mimes list yg sudah ada presedennya di codebase (pola KML dari fitur lain, pola image dari `SdiController::submitGolive`).
+
+---
+
+## Section AG — Stepper Admin 2 Warna (Hijau/Kuning) + Fix "N/A" pada Step Ukur
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "untuk stepper pada admin jika sudah di approve maka checklist dan warna hijau jika belum warna kuning, kemudian untuk step ukur jika waspang memilih button tidak ada maka munculkan saja N/A atau tidak ada jangan pending"
+
+### Root cause #1 — Stepper punya 3 warna (emerald/amber/blue), harusnya cuma 2
+
+`resources/views/admin/evidences/partials/stepper.blade.php` versi sebelumnya (Section AF) memberi warna biru (blue) pada step yang sedang dibuka/dilihat admin (`$isCurrent`) meskipun step itu BELUM di-approve — jadi step yang belum disetujui tidak selalu tampil kuning, tergantung apakah admin sedang membukanya atau tidak. User minta aturan sederhana: **hijau + centang HANYA kalau sudah di-approve admin**, selain itu **selalu kuning**, apapun state-nya (belum upload / sudah upload tapi belum di-review / sedang dibuka).
+
+**Fix**: Rewrite total logika warna di `stepper.blade.php` jadi 2 closure PHP:
+- `$stepCircleClass(bool $done, bool $isCurrent)` → base color HANYA `bg-emerald-500` (done) atau `bg-amber-400` (belum), lalu highlight "sedang dibuka" diubah dari warna isian jadi RING (border) saja — supaya tetap ada indikasi visual "sedang di step ini" tanpa melanggar aturan 2-warna.
+- `$stepLabelClass(bool $done)` → text emerald atau amber, dipakai konsisten di label bawah tiap step.
+
+Diterapkan ke seluruh 6 step (Persiapan/Instalasi/Ukur/Finish/FI-OGP/Golive), sumber `$stepNDone` tetap dari `progressSummary()` (`persiapanDone`/`instalasiDone`/`pengukuranDone`/`finishingDone` — semua approval-gated) dan `effectiveStageSequence` untuk step 5 & 6 (FI-OGP Golive & Golive), tidak berubah dari Section AF. Variabel `$stepNUploaded` dan pemanggilan `stepUploadFlags()` dihapus dari file ini karena sudah tidak dipakai (state "sudah upload tapi belum approve" sekarang sama-sama kuning seperti "belum upload sama sekali").
+
+Verifikasi balance: div 15/15, @php/@endphp 1/1, brace 75/75, paren 43/43.
+
+### Root cause #2 — Step Ukur (Pengukuran) tampilkan "Pending" utk item yang ditandai "Tidak Ada" oleh Waspang
+
+Waspang punya opsi menandai sebuah item pengukuran (OTDR / File SOR / OPM / Kedalaman / Eviden Lainnya) sebagai **"Tidak Ada"** (N/A) via kolom `is_not_applicable` di tabel `lop_measurement_checks` (model `LopMeasurementCheck`) — artinya item tsb memang tidak berlaku untuk LOP tersebut, BUKAN "belum sempat diisi". Namun UI review admin (`review-item.blade.php`, partial yang dipakai bersama oleh semua step review) tidak tahu apa-apa soal kolom ini — begitu `$items` (evidence untuk requirement itu) kosong, itu otomatis jatuh ke cabang default `'pending'`, jadi tampil badge "Pending" + pesan "Belum ada file/eviden diunggah" — padahal Waspang sudah eksplisit menandai item itu tidak berlaku.
+
+**Fix — 2 file:**
+
+1. **`resources/views/admin/evidences/review-pengukuran.blade.php`**: tambah query `$measurementChecksByKey` (dari `LopMeasurementCheck::where('lop_id', $project->lop->id_lop)->get()->keyBy('item_key')`) dan `$itemKeyMap` (memetakan 5 nilai `type` di `$requirements` — `otdr`, `otdr_sor`, `opm`, `kedalaman`, `lainnya` — ke key `LopMeasurementCheck::ITEMS` — `otdr`, `file_sor`, `opm`, `kedalaman`, `eviden_lainnya`; dikonfirmasi cocok persis dengan definisi `ITEMS` di model). Di loop `@foreach($requirements as $req)`, dihitung `$isNotApplicable` per item lalu dilempar ke partial via prop baru `'isNotApplicable' => $isNotApplicable`.
+
+2. **`resources/views/admin/evidences/partials/review-item.blade.php`** (shared partial): tambah handling `$isNotApplicable` (default `false` kalau prop tidak dikirim — jadi step lain seperti Persiapan/Instalasi/Finishing yang tidak kirim prop ini tetap berjalan seperti biasa, tidak terdampak):
+   - `$groupStatus` dapat cabang baru `'na'` (kalau `$total === 0 && $isNotApplicable`).
+   - `$statusClass` dapat warna slate/abu utk status `'na'`.
+   - `$statusLabel` baru (`'na' => 'Tidak Ada'`, selain itu tetap `ucfirst($groupStatus)`) — badge sekarang render `{{ $statusLabel }}` bukan `{{ ucfirst($groupStatus) }}` langsung.
+   - `$iconText` dapat `'na' => '—'`.
+   - Blok `@empty` (saat `$items` kosong) sekarang bercabang: kalau `$isNotApplicable` tampilkan ikon "—" + pesan `Ditandai "Tidak Ada" oleh Waspang -- item ini tidak berlaku untuk LOP ini.`; kalau tidak, tetap pesan lama "Belum ada file/eviden diunggah."
+
+Verifikasi balance: `review-item.blade.php` → div 31/31, @if/@endif 8/8, @php/@endphp 3/3, brace 84/84, paren 55/55, @forelse/@endforelse 1/1. `review-pengukuran.blade.php` → div 8/8, @foreach/@endforeach 1/1, @php/@endphp 2/2, brace 22/22, paren 30/30.
+
+### Scope — TIDAK diubah
+
+- Step Persiapan/Instalasi/Finishing/FI-OGP tidak mengirim prop `isNotApplicable` ke `review-item.blade.php` — otomatis default `false`, behavior badge/pesan mereka identik dengan sebelumnya.
+- Logika auto-advance status_progress, `progressSummary()`, `stepUploadFlags()`, dan seluruh alur FI-OGP Golive/Golive dari Section AF tidak disentuh.
+- Warna/label stage di halaman lain (index, project-card, project-detail, tracking) dari Section AF tidak disentuh — perubahan Section AG ini murni di stepper approval partial dan review Step 3 Pengukuran.
+
+### File yang diubah
+- `resources/views/admin/evidences/partials/stepper.blade.php` (full rewrite v2)
+- `resources/views/admin/evidences/partials/review-item.blade.php` (3 patch)
+- `resources/views/admin/evidences/review-pengukuran.blade.php` (2 patch)
+
+---
+
+## Section AH — UI Menu "Approval Eviden" (Approval Konstruksi) Disesuaikan dengan Flow Terbaru
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "sesuaikan juga untuk UI di menu approval konstruksi sesuai dengan kondisi flow terbaru"
+
+### Konteks
+
+Menu ini adalah halaman inbox utama admin (`resources/views/admin/evidences/approval.blade.php`, route `admin.evidences.approval`, controller `ProjectController::approvalIndex()`) tempat admin melihat daftar LOP yang perlu di-review eviden-nya, dengan 3 tab: "Menunggu Review", "On Progress", "Selesai / Ready UT". Halaman ini TIDAK ikut disentuh saat Section AF membangun alur FI-OGP Golive/Golive dan menyamakan warna/label stage di 4 lokasi admin lain (index, project-card, project-detail, tracking) -- jadi halaman ini masih pakai logika lama yang tidak sadar akan 2 tahap baru tsb. Root cause & fix:
+
+### Root cause #1 — Badge status per-baris salah baca "selesai review" setelah `progress` jadi berbasis 11-tahap
+
+`Project::progressSummary()['progress']` (dari pekerjaan sebelumnya) dihitung dari `effectiveStageSequence` 1-11, jadi HANYA 100% persis di Golive (tahap 11). Sebelumnya badge "✓ READY UT" di kolom Status ditentukan oleh `$progressPercent >= 100` -- ini valid selama progress dihitung dari 4-step lama (Persiapan/Instalasi/Pengukuran/Finishing), tapi begitu progress ikut menghitung sampai ke FI-OGP Golive/Golive, LOP yang eviden-nya SUDAH TUNTAS (finishingDone) tapi baru sampai fi_ogp_golive (menunggu dokumen/verifikasi SDI, bukan eviden foto) progress-nya < 100% -- jadi badge salah tetap nampilkan "IN REVIEW" padahal kerjaan admin di menu approval eviden ini sudah beres.
+
+**Fix**: badge status per-baris diganti dari biner "READY UT / IN REVIEW" jadi badge STAGE (label + warna) yang dibaca dari `progressSummary()['effectiveStageLabel']`/`['effectiveStageColor']` via `Project::stageColorClasses()` -- SAMA PERSIS dengan yang dipakai di stepper/tracking/index (Section AF/AG), supaya konsisten di semua lokasi. Ditambah indikator kecil terpisah "Perlu Review" (amber) yang HANYA muncul kalau `$pendingCount > 0` -- supaya sinyal "butuh aksi admin" (fokus utama halaman inbox ini) tidak hilang setelah badge utama diganti jadi penanda stage. Badge juga menangani state Hold ("HOLD · <label tahap sebelum hold>") dan Drop ("DROP").
+
+Progress bar (angka %) juga diganti warnanya dari hardcode biru ke `$stageColors['progress']` (ikut warna stage saat ini) untuk konsistensi visual.
+
+### Root cause #2 — Tab "Selesai / Ready UT" & "On Progress" tidak sadar hold/drop maupun FI-OGP Golive
+
+Query lama:
+- Tab "Selesai": `status_progress === 'golive'` PERSIS.
+- Tab "On Progress": `status_progress NOT IN ('drop', 'golive')`.
+
+Dua masalah: (1) LOP yang eviden-nya sudah tuntas tapi baru sampai `fi_ogp_golive` tidak pernah dianggap "Selesai" dari sisi approval eviden, padahal tidak ada lagi kerjaan review foto di situ untuk admin -- LOP ini malah nyangkut selamanya di tab "On Progress"; (2) LOP yang `status_progress`-nya berubah jadi `hold`/`drop` SETELAH sempat mencapai `fi_ogp_golive`/`golive` jadi HILANG dari SEMUA tab sekaligus (bukan match tab manapun), karena tab "On Progress" juga mengecualikan `drop`/`golive` secara string mentah tanpa melihat `status_progress_before_hold`.
+
+**Fix** (`ProjectController::approvalIndex()`):
+- Tab "Selesai": sekarang match kalau `status_progress` ATAU `status_progress_before_hold` (kolom yang menyimpan tahap sebelum LOP di-hold/drop) ada di `['fi_ogp_golive', 'golive']`, selama `status_progress` bukan `'drop'` murni -- plus syarat lama (tidak ada eviden pending/rejected) tetap dipertahankan.
+- Tab "On Progress": mengecualikan LOP yang match kriteria "Selesai" di atas (baik langsung maupun via hold/drop dari tahap itu) dan bukan `'drop'` murni.
+
+### Perubahan lain
+
+- Tombol "Review" tiap baris sekarang diarahkan ke STEP yang sedang berjalan (dibaca dari `effectiveStageSequence`, hold/drop-safe: sequence 7→Instalasi, 8→Pengukuran, 9→Finishing, ≥10→Golive, default→Persiapan) -- bukan selalu balik ke Step 1 (Persiapan) seperti sebelumnya. Admin langsung mendarat di halaman review yang relevan.
+- Mini badge progress per-step ditambah 1 (jadi 5): "FI-OGP: x/4" menghitung berapa dari 4 dokumen (capture valins, ABD, valid4/KML, mancore) yang sudah diupload lewat `$project->lop?->goliveSubmission`, supaya admin bisa lihat progres FI-OGP Golive tanpa buka halaman Review.
+
+Verifikasi balance: `approval.blade.php` -> div 27/27, @if/@endif 4/4, @foreach/@endforeach 2/2, @forelse/@endforelse 1/1, @php/@endphp 2/2, brace 170/170, paren 148/148. `ProjectController.php` -> brace 161/161, paren 737/737 (utuh, hanya bertambah dari penyisipan blok baru).
+
+### Scope — TIDAK diubah
+- Perhitungan mini badge Persiapan/Instalasi/Pengukuran/Finishing (kolom "Progress Approval") tidak disentuh.
+- Tab "Menunggu Review" (pending) tidak diubah -- sudah akurat (berbasis ada/tidaknya eviden `status=pending`).
+- Method `approveEvidence`, `reviewGolive`, `submitGoliveDocuments`, dan seluruh alur FI-OGP Golive/Golive dari Section AF tidak disentuh.
+
+### File yang diubah
+- `app/Http/Controllers/ProjectController.php` (`approvalIndex()` -- tab "complete" & "active")
+- `resources/views/admin/evidences/approval.blade.php` (badge status, progress bar color, mini badge FI-OGP, tombol Review)
+
+
+---
+
+## Section AI — Redesign Kolom Progress & Tab Filter Menu "Approval Eviden" (Simplifikasi + Semantik Tab Baru)
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "Progress approval tidak perlu angka 1/2 dll hanya tampilkan persentase dan status progress approval sudah sampai mana. buatkan tampilan filter yang modern, clean dan user friendly untuk Menunggu Review, On progress, Selesai menunggu review adalah LOP yang benar benar belum di lakukan approve, kemudian On progress LOP yang sudah ada approve, Selesai adalah untuk LOP yang sudah menyelesaikan sampai tahap FI - OGP Golive"
+
+### Konteks
+
+Lanjutan langsung dari Section AH (halaman `admin.evidences.approval`, `resources/views/admin/evidences/approval.blade.php` + `ProjectController::approvalIndex()`). Section AH sudah memperbaiki badge stage & query "Selesai"/"On Progress" agar sadar FI-OGP Golive dan hold/drop, tapi user merasa kolom "Progress Approval" masih terlalu ramai (5 mini badge angka per-step: Persiapan x/2, Instalasi x/2, Pengukuran x/3, Finishing x/2, FI-OGP x/4) dan tab filter masih polos (link teks biasa, tanpa indikator jumlah). User juga memberi definisi PERSIS untuk 3 tab yang berbeda dari implementasi Section AH:
+- **Menunggu Review**: LOP yang **benar-benar belum pernah** di-approve (bukan sekadar "ada eviden pending").
+- **On Progress**: LOP yang **sudah ada minimal 1 eviden approved**, tapi belum "Selesai".
+- **Selesai**: LOP yang sudah mencapai tahap **FI-OGP Golive** (atau lebih, yaitu Golive) -- sama seperti definisi Section AH, dipertahankan.
+
+### Perubahan 1 — Kolom "Progress Approval" disederhanakan (Controller: tidak berubah; View: simplifikasi @php + markup)
+
+Dihapus semua 5 mini badge angka per-step (Persiapan/Instalasi/Pengukuran/Finishing/FI-OGP) beserta variabel `@php` pendukungnya yang sudah tidak dipakai (`$persiapanTotal`, `$persiapanApproved`, `$materialBoqItems`, `$instalasiTotal`, `$instalasiApproved`, `$hasOtdr`, `$hasOpm`, `$hasDalam`, `$pengukuranApprovedCount`, `$pengukuranTotal`, `$pengukuranApproved`, `$finishingRequiredItems`, `$finishingTotal`, `$finishingApproved`, `$goliveSubmission`, `$goliveDocsCount`). Kolom sekarang hanya menampilkan: label stage saat ini (dot berwarna + `effectiveStageLabel`, hold/drop-safe, sama sumber dengan badge status di kolom kanan) dan progress bar + angka persentase (`progressSummary()['progress']`, basis sequence 11-tahap sama seperti Section AH/AF). Jauh lebih ringkas dan tidak membingungkan admin yang sebelumnya harus menafsirkan banyak angka x/y sekaligus.
+
+### Perubahan 2 — Tab filter didesain ulang jadi pill-switcher modern
+
+Tab lama berupa 3 link teks polos dengan garis bawah aktif. Diganti jadi pill-switcher segmented control: 1 container rounded-2xl abu-abu (`bg-slate-100`/`bg-slate-800` dark) berisi 3 pill (`<a>`) yang masing-masing punya dot warna (amber/blue/emerald sesuai makna tab), label, dan badge count bulat kecil yang menampilkan jumlah LOP di tab tsb (`$tabCounts['pending'|'active'|'complete']`) -- badge count disembunyikan otomatis saat sedang search (`$tabCounts === null`, karena count per-tab tidak relevan/tidak dihitung saat search aktif, sesuai desain Section AI controller). Pill yang aktif mendapat background putih + shadow + warna teks sesuai tema tab; pill nonaktif abu-abu netral dengan hover state. Responsive: pill melebar penuh (flex-1) di layar sempit (mobile), auto-width di layar ≥sm.
+
+### Perubahan 3 — Semantik 3 tab didefinisikan ulang sesuai instruksi eksplisit user (Controller: `ProjectController::approvalIndex()`)
+
+Query lama Section AH untuk tab "Menunggu Review" (pending) hanya mensyaratkan LOP punya eviden dengan `status=pending` -- ini SALAH menurut definisi baru user (LOP yang sudah pernah di-approve sebagian tapi masih ada 1 pending eviden baru akan tetap masuk "Menunggu Review" secara keliru, padahal seharusnya "On Progress"). Diperbaiki total jadi 3 filter closure yang **saling eksklusif** dan konsisten dipakai baik untuk query utama maupun untuk hitung count tiap tab:
+
+- **Pending** (`Menunggu Review`): `whereDoesntHave('evidences', status=approved)` -- LOP yang **belum pernah sama sekali** punya eviden approved (nol approval, apa pun status eviden lain: pending/rejected/belum ada eviden).
+- **Active** (`On Progress`): `whereHas('evidences', status=approved)` **DAN** LOP terkait belum mencapai tahap "Selesai" (lihat definisi complete di bawah) -- yaitu `status_progress` (atau, kalau LOP sedang hold/drop, `status_progress_before_hold`) TIDAK termasuk `['fi_ogp_golive', 'golive', 'drop']`.
+- **Complete** (`Selesai`): LOP terkait mencapai `fi_ogp_golive`/`golive` (baik langsung di `status_progress`, atau via `status_progress_before_hold` kalau sedang hold/drop dari tahap itu), `status_progress` bukan `'drop'` murni, DAN tidak ada eviden `pending`/`rejected` tersisa -- definisi ini identik dengan Section AH, hanya diformalkan ulang sebagai closure `$applyCompleteFilter` yang dipakai bersama oleh query utama & count.
+
+Ketiga closure (`$applyPendingFilter`, `$applyActiveFilter`, `$applyCompleteFilter`) dipakai 2x: sekali di query ter-clone untuk menghitung `$tabCounts` (dengan filter Kawalanku/Program/Branch yang SAMA seperti query utama, supaya count akurat sesuai konteks filter admin saat ini), dan sekali lagi di query utama sesuai `status_filter` yang aktif. Saat mode search aktif, tab count tidak dihitung (`$tabCounts = null`, view otomatis sembunyikan badge count) karena hasil search lintas-tab tidak relevan dengan pembagian 3 tab ini.
+
+Filter Kawalanku (`myKawal`), Program, dan Branch dipindah agar diterapkan SEBELUM filtering tab (baik untuk count maupun query utama), supaya angka count di tiap pill selalu konsisten dengan project yang sedang di-filter admin, bukan total keseluruhan sistem.
+
+Verifikasi balance: `ProjectController.php` -> brace 164/164, paren 748/748. `approval.blade.php` -> div 26/26, @if/@endif 7/7, @foreach/@endforeach 2/2, @forelse/@endforelse 1/1, @php/@endphp 2/2, brace 148/148, paren 86/86, td 6/6. Tidak ada sisa referensi ke variabel yang sudah dihapus (`$persiapanTotal`, `$goliveDocsCount`, dst) di seluruh file.
+
+### Scope — TIDAK diubah
+- Badge status stage per-baris (kolom "Status & Aksi") dan tombol "Review" (routing per-step) dari Section AH tidak disentuh strukturnya, hanya ikut memakai `$effectiveLabel`/`$stageColors` yang sama seperti sebelumnya.
+- Kolom "Eviden" (hitung Pending/Approved/Rejected mentah) tidak diubah.
+- Logika `progressSummary()`, alur FI-OGP Golive/Golive, dan halaman lain (index, tracking, project-detail, stepper) dari Section AF/AG/AH tidak disentuh.
+- Definisi tab "Selesai" (harus sudah capai fi_ogp_golive/golive, hold/drop-safe, tanpa eviden pending/rejected tersisa) TIDAK berubah dari Section AH -- hanya diformalkan ulang sebagai closure yang reusable untuk count.
+
+### File yang diubah
+- `app/Http/Controllers/ProjectController.php` (`approvalIndex()` -- restrukturisasi penuh: 3 closure filter, tab counts, filter Kawalanku/Program/Branch dipindah lebih awal)
+- `resources/views/admin/evidences/approval.blade.php` (tab filter redesign pill-switcher + count badge, simplifikasi kolom Progress jadi label stage + persentase saja, pembersihan variabel `@php` yang tidak terpakai)

@@ -48,15 +48,24 @@
 
     {{-- STEP 2 LIST --}}
     <div class="px-4 mt-6">
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-1.5 gap-2">
             <div>
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Step 2 Instalasi</h2>
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Step 3 Instalasi</h2>
                 <p class="text-[11px] text-slate-500">Tap item untuk melihat foto/riwayat & upload</p>
             </div>
             @if($instalasiUploadedComplete ?? false)
                 <span class="px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-bold">Complete</span>
             @else
                 <span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">{{ $boqUploaded ?? 0 }}/{{ $boqTotal ?? 0 }} Item</span>
+            @endif
+        </div>
+        <div class="flex justify-end mb-3">
+            @if(($materialSourceType ?? 'plan') === 'survey_round')
+                <span class="shrink-0 px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">
+                    BOQ Survey Ronde {{ $materialSourceRound->round_number ?? '-' }}
+                </span>
+            @else
+                <span class="shrink-0 px-2 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold">BOQ Plan</span>
             @endif
         </div>
 
@@ -236,7 +245,7 @@
     <div class="px-4 mt-6">
         @if($instalasiUploadedComplete ?? false)
             <a href="{{ route('waspang.projects.pengukuran', $project->id_project) }}" class="h-11 w-full rounded-xl bg-[#1565D8] text-white inline-flex items-center justify-center text-sm font-bold shadow-sm hover:bg-[#0F4FAF] transition">
-                Next Step 3 - Pengukuran <i class="fa-solid fa-chevron-right ml-2 text-xs"></i>
+                Next Step 4 - Pengukuran <i class="fa-solid fa-chevron-right ml-2 text-xs"></i>
             </a>
         @else
             <button disabled class="h-11 w-full rounded-xl bg-slate-200 text-slate-400 inline-flex items-center justify-center text-sm font-bold cursor-not-allowed">

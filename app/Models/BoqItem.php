@@ -20,6 +20,7 @@ class BoqItem extends Model
         'item_name',
         'unit',
         'quantity_plan',
+        'quantity_survey',
         'quantity_actual',
     ];
 

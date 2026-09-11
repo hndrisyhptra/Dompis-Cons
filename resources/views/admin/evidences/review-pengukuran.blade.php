@@ -38,6 +38,24 @@
 
     $approvedCount = 0;
 
+    // Section AG: baca tanda "Tidak Ada" (N/A) per item dari
+    // lop_measurement_checks -- item_key di tabel itu BEDA nama dgn
+    // evidence_type di $requirements utk 2 item (file_sor/otdr_sor,
+    // eviden_lainnya/lainnya), jadi dipetakan manual di sini. Dipakai
+    // supaya review-item.blade.php bisa tampilkan "Tidak Ada" alih-alih
+    // "Pending" utk item yang memang sudah ditandai N/A oleh Waspang.
+    $measurementChecksByKey = $project->lop
+        ? \App\Models\LopMeasurementCheck::where('lop_id', $project->lop->id_lop)->get()->keyBy('item_key')
+        : collect();
+
+    $itemKeyMap = [
+        'otdr' => 'otdr',
+        'otdr_sor' => 'file_sor',
+        'opm' => 'opm',
+        'kedalaman' => 'kedalaman',
+        'lainnya' => 'eviden_lainnya',
+    ];
+
     foreach ($requirements as $req) {
         $items = $project->evidences
             ->where('stage', 'pengukuran')
@@ -97,6 +115,9 @@
                     ->where('stage', 'pengukuran')
                     ->where('evidence_type', $req['type'])
                     ->sortByDesc('created_at');
+
+                $checkKey = $itemKeyMap[$req['type']] ?? $req['type'];
+                $isNotApplicable = (bool) ($measurementChecksByKey[$checkKey]->is_not_applicable ?? false);
             @endphp
 
             @include('admin.evidences.partials.review-item', [
@@ -105,6 +126,7 @@
                 'description' => $req['description'],
                 'items' => $items,
                 'type' => $req['type'],
+                'isNotApplicable' => $isNotApplicable,
             ])
         @endforeach
     </div>

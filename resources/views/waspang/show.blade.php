@@ -123,40 +123,13 @@
 
             <div x-show="open" x-transition x-cloak class="border-t border-slate-50 bg-slate-50/30 p-4 space-y-3">
 
-                @if($step['perizinan']['active'])
-                    {{-- KATEGORI PERIZINAN (master) --}}
-                    <form method="POST" action="{{ route('waspang.perizinan.category', $project->id_project) }}" onchange="this.submit()">
-                        @csrf
-                        <label class="text-[11px] font-black text-slate-600">Kategori Perizinan</label>
-                        <select name="permit_category_id" required class="mt-1.5 w-full h-10 rounded-xl border border-slate-300 px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-100 focus:border-[#1565D8] transition">
-                            <option value="">Pilih kategori perizinan...</option>
-                            @foreach($permitCategories as $cat)
-                                <option value="{{ $cat->id }}" @selected($lop->permit_category_id == $cat->id)>{{ $cat->name }}</option>
-                            @endforeach
-                        </select>
-                    </form>
-                @endif
-
-                {{-- EVIDEN PROSES PERIZINAN --}}
-                <div>
-                    <p class="text-[11px] font-black text-slate-600 mb-1.5">Eviden Proses Perizinan</p>
-                    @include('waspang.partials.evidence-photo-grid', ['photos' => $perizinanEvidences])
-
-                    @if($step['perizinan']['active'])
-                        <button type="button" onclick="openUploadModal('perizinan', 'proses_perizinan', 'Eviden Proses Perizinan', false)"
-                                class="mt-2 h-9 w-full rounded-xl bg-[#1565D8] hover:bg-[#0F4FAF] text-white text-xs font-bold transition shadow-xs">
-                            <i class="fa-solid fa-camera mr-1"></i> Upload Eviden Perizinan
-                        </button>
-                    @endif
-                </div>
-
-                {{-- KRONOLOGI PERIZINAN (wajib per aktivitas) --}}
+                {{-- RIWAYAT PERIZINAN (Stage 4f -- "Add Perizinan": kategori + kronologi + eviden opsional dalam 1 submission, bisa berkali-kali) --}}
                 <div>
                     <div class="flex items-center justify-between mb-1.5">
-                        <p class="text-[11px] font-black text-slate-600">Kronologi Perizinan</p>
+                        <p class="text-[11px] font-black text-slate-600">Riwayat Perizinan</p>
                         @if($step['perizinan']['active'])
-                            <button type="button" onclick="openKronologiModal('perizinan', 'Perizinan')" class="text-[11px] font-black text-[#1565D8]">
-                                <i class="fa-solid fa-plus mr-0.5"></i> Tambah
+                            <button type="button" onclick="openAddPerizinanModal()" class="text-[11px] font-black text-[#1565D8]">
+                                <i class="fa-solid fa-plus mr-0.5"></i> Add Perizinan
                             </button>
                         @endif
                     </div>
@@ -164,14 +137,25 @@
                     @php $perizinanKronologis = $kronologis->where('stage_code', 'perizinan'); @endphp
 
                     @if($perizinanKronologis->isEmpty())
-                        <p class="text-xs text-slate-400 italic">Belum ada kronologi. Setiap aktivitas perizinan wajib dicatat kronologinya.</p>
+                        <p class="text-xs text-slate-400 italic">Belum ada aktivitas Perizinan. Klik "Add Perizinan" untuk menambahkan.</p>
                     @else
-                        <div class="space-y-2">
+                        <div class="space-y-2.5">
                             @foreach($perizinanKronologis as $k)
-                                <div class="bg-white rounded-xl border border-slate-200 p-2.5">
-                                    <p class="text-[10px] font-black text-[#1565D8]">{{ optional($k->event_date)->format('d M Y') }}</p>
-                                    <p class="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{{ $k->note }}</p>
+                                <div class="bg-white rounded-xl border border-slate-200 p-3">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-[9px] font-black uppercase tracking-wide text-[#1565D8] bg-blue-50 px-1.5 py-0.5 rounded">
+                                            {{ $k->permitCategory?->name ?? 'Kategori tidak diketahui' }}
+                                        </span>
+                                        <p class="text-[10px] font-black text-slate-400 shrink-0">{{ optional($k->event_date)->format('d M Y') }}</p>
+                                    </div>
+                                    <p class="text-[11px] text-slate-600 mt-1.5 leading-relaxed">{{ $k->note }}</p>
                                     <p class="text-[9.5px] text-slate-400 mt-1">{{ $k->creator?->name ?? '-' }}</p>
+
+                                    @if($k->evidences->isNotEmpty())
+                                        <div class="mt-2">
+                                            @include('waspang.partials.evidence-photo-grid', ['photos' => $k->evidences])
+                                        </div>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>
@@ -179,32 +163,21 @@
                 </div>
 
                 @if($step['perizinan']['active'])
-                    {{-- RADIO PERIZINAN SELESAI --}}
+                    {{-- PERIZINAN SELESAI -- langsung aksi, tanpa upload tambahan lagi (eviden sudah dilampirkan per entri lewat Add Perizinan) --}}
                     <div class="rounded-xl border border-slate-200 bg-white p-3">
-                        <label class="flex items-center gap-2 text-xs font-bold text-slate-700">
-                            <input type="checkbox" x-model="selesai" class="w-4 h-4 rounded accent-[#1565D8]">
-                            Perizinan Selesai
-                        </label>
-
-                        <div x-show="selesai" x-transition x-cloak class="mt-3">
-                            <form method="POST" action="{{ route('waspang.perizinan.selesai', $project->id_project) }}" enctype="multipart/form-data" class="space-y-2.5" onsubmit="return confirm('Tandai Perizinan selesai & lanjut ke Material Delivery?')">
-                                @csrf
-                                <div>
-                                    <label class="text-[11px] font-black text-slate-600">Upload Hasil BA KP (PDF)</label>
-                                    <input type="file" name="ba_kp_file" required accept="application/pdf" class="mt-1.5 w-full text-xs">
-                                </div>
-                                <div>
-                                    <label class="text-[11px] font-black text-slate-600">Eviden Foto BA KP</label>
-                                    <input type="file" name="photos[]" id="baKpPhotoInput" required multiple accept="image/*" class="mt-1.5 w-full text-xs" onchange="compressFileInputPhotos(this)">
-                                </div>
-                                <button type="submit" class="h-11 w-full rounded-xl bg-[#1565D8] hover:bg-[#0F4FAF] text-white text-sm font-black transition shadow-sm">
-                                    Simpan &amp; Lanjut Material Delivery
-                                </button>
-                            </form>
-                        </div>
+                        <form method="POST" action="{{ route('waspang.perizinan.selesai', $project->id_project) }}" onsubmit="return confirm('Tandai Perizinan selesai & lanjut ke Material Delivery?')">
+                            @csrf
+                            <button type="submit" @if($perizinanKronologis->isEmpty()) disabled @endif
+                                    class="h-11 w-full rounded-xl text-sm font-black transition shadow-sm {{ $perizinanKronologis->isEmpty() ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-[#1565D8] hover:bg-[#0F4FAF] text-white' }}">
+                                Perizinan Selesai <i class="fa-solid fa-chevron-right ml-1 text-xs"></i>
+                            </button>
+                        </form>
+                        @if($perizinanKronologis->isEmpty())
+                            <p class="text-[10px] text-slate-400 mt-2 text-center">Tambahkan minimal 1x Add Perizinan terlebih dahulu.</p>
+                        @endif
                     </div>
 
-                    @include('waspang.partials.step-action-buttons', ['stageCode' => 'perizinan', 'stepLabel' => 'Perizinan'])
+                    @include('waspang.partials.step-action-buttons', ['stageCode' => 'perizinan', 'stepLabel' => 'Perizinan', 'showKronologiButton' => false])
                 @endif
             </div>
         </div>
@@ -257,23 +230,24 @@
         </div>
     </div>
 
-    {{-- CTA FINAL: lanjut ke Step 2 - Instalasi -- meniru tombol "Next Step
-         2 - Instalasi" pada halaman Persiapan LAMA (2 kartu Barang Tiba/
-         Perizinan), sekarang digerbangi oleh 4 sub-step BARU: hanya bisa
-         diklik kalau seluruhnya (Inisiasi s.d. Material Delivery) sudah
-         beres. --}}
+    {{-- CTA FINAL Step 1 -- FIX: sebelumnya tombol ini langsung POST ke
+         finishPersiapanInstalasi() (butuh eviden Barang Tiba & Perizinan yg
+         BELUM tentu sudah diupload krn halamannya sendiri belum pernah
+         dibuka) dgn label salah "Instalasi" -- padahal Persiapan Instalasi
+         adalah STEP 2 TERSENDIRI (lihat waspang/steps/persiapan-instalasi.
+         blade.php), Instalasi sebenarnya Step 3. Sekarang jadi LINK biasa
+         ke halaman Step 2 tsb (evidence & tombol finish-nya ada DI SANA),
+         label & penomoran disamakan ke seluruh step (1 Persiapan -> 2
+         Persiapan Instalasi -> 3 Instalasi -> 4 Pengukuran -> 5 Finishing). --}}
     <div class="px-4 mt-4">
         @if($lop->status_progress === 'persiapan_instalasi')
-            <form method="POST" action="{{ route('waspang.persiapan-instalasi.finish', $project->id_project) }}" onsubmit="return confirm('Lanjut ke Step 2 - Instalasi?')">
-                @csrf
-                <button type="submit" class="h-11 w-full rounded-xl bg-[#1565D8] text-white inline-flex items-center justify-center text-sm font-bold shadow-sm hover:bg-[#0F4FAF] transition">
-                    Lanjut Step 2 - Instalasi <i class="fa-solid fa-chevron-right ml-2 text-xs"></i>
-                </button>
-            </form>
+            <a href="{{ route('waspang.projects.persiapan-instalasi', $project->id_project) }}" class="h-11 w-full rounded-xl bg-[#1565D8] text-white inline-flex items-center justify-center text-sm font-bold shadow-sm hover:bg-[#0F4FAF] transition">
+                Lanjut Step 2 - Persiapan Instalasi <i class="fa-solid fa-chevron-right ml-2 text-xs"></i>
+            </a>
         @elseif($seq !== null && $seq > 6)
             {{-- Sudah pernah lanjut sebelumnya (mis. waspang balik lagi ke halaman ini) --}}
             <a href="{{ route('waspang.projects.instalasi', $project->id_project) }}" class="h-11 w-full rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 inline-flex items-center justify-center text-sm font-bold transition">
-                <i class="fa-solid fa-circle-check mr-2"></i> Persiapan Selesai -- Lihat Step 2 Instalasi
+                <i class="fa-solid fa-circle-check mr-2"></i> Persiapan Selesai -- Lihat Step 3 Instalasi
             </a>
         @else
             <button disabled class="h-11 w-full rounded-xl bg-slate-200 text-slate-400 inline-flex items-center justify-center text-sm font-bold cursor-not-allowed">
@@ -341,6 +315,7 @@
     {{-- MODAL KENDALA & KRONOLOGI (universal, dipakai semua sub-step) --}}
     @include('waspang.partials.kendala-modal')
     @include('waspang.partials.kronologi-modal')
+    @include('waspang.partials.perizinan-modal')
 
     @include('waspang.partials.bottom-nav', ['active' => 'inbox'])
 </div>

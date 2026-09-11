@@ -15,6 +15,7 @@ class Evidence extends Model
     protected $fillable = [
         'project_id',
         'boq_item_id',
+        'lop_kronologi_id',
         'uploaded_by',
         'stage',
         'evidence_type',
@@ -34,6 +35,12 @@ class Evidence extends Model
     public function boqItem()
     {
         return $this->belongsTo(BoqItem::class, 'boq_item_id', 'id_boq');
+    }
+
+    /** Entri "Add Perizinan" (lop_kronologis) yang menyertakan eviden ini, kalau ada. */
+    public function kronologi()
+    {
+        return $this->belongsTo(LopKronologi::class, 'lop_kronologi_id');
     }
 
     public function uploader()

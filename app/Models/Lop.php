@@ -58,12 +58,16 @@ class Lop extends Model
         'golive_at',
         'permit_category_id',
         'perizinan_completed_at',
+        'survey_deviation_percent',
+        'survey_redesign_required',
     ];
 
     protected $casts = [
         'perizinan_completed_at' => 'datetime',
         'is_golive' => 'boolean',
         'golive_at' => 'datetime',
+        'survey_redesign_required' => 'boolean',
+        'survey_deviation_percent' => 'float',
     ];
 
     public function project()
@@ -115,5 +119,11 @@ class Lop extends Model
     public function goliveVerification()
     {
         return $this->hasOne(LopGoliveVerification::class, 'lop_id', 'id_lop');
+    }
+
+    /** Riwayat ronde BOQ Survey (round 1, 2, dst) -- lihat BoqSurveyRound. */
+    public function surveyRounds()
+    {
+        return $this->hasMany(BoqSurveyRound::class, 'lop_id', 'id_lop')->orderBy('round_number');
     }
 }

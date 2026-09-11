@@ -15,7 +15,7 @@
     $finishingApproved = $summary['finishingApproved'];
 
     $progress = $summary['progress'];
-    $stageLabel = $summary['stageLabel'];
+    $stageLabel = $summary['effectiveStageLabel'] ?? $summary['stageLabel'];
 
     $evidences = $project->evidences ?? collect();
     $waspang = optional($project->assignment)->waspang;
@@ -24,32 +24,15 @@
     $approvedCount = $evidences->where('status', 'approved')->count();
     $rejectedCount = $evidences->where('status', 'rejected')->count();
 
-    if ($progress == 100) {
-        $accentColor = 'bg-green-600';
-        $borderColor = 'border-l-green-600';
-        $progressColor = 'bg-green-600';
-        $badgeClass = 'bg-green-100 text-green-700';
-    } elseif ($stageLabel === 'Finishing') {
-        $accentColor = 'bg-purple-600';
-        $borderColor = 'border-l-purple-600';
-        $progressColor = 'bg-purple-600';
-        $badgeClass = 'bg-purple-100 text-purple-700';
-    } elseif ($stageLabel === 'Pengukuran') {
-        $accentColor = 'bg-blue-500';
-        $borderColor = 'border-l-blue-500';
-        $progressColor = 'bg-blue-500';
-        $badgeClass = 'bg-blue-100 text-blue-700';
-    } elseif ($stageLabel === 'Instalasi') {
-        $accentColor = 'bg-yellow-600';
-        $borderColor = 'border-l-yellow-600';
-        $progressColor = 'bg-yellow-600';
-        $badgeClass = 'bg-yellow-100 text-yellow-700';
-    } else {
-        $accentColor = 'bg-red-500';
-        $borderColor = 'border-l-red-500';
-        $progressColor = 'bg-red-500';
-        $badgeClass = 'bg-red-100 text-red-700';
-    }
+    // Section AF: warna aksen/badge kartu project sekarang dari
+    // project_stages.color (via stageColorClasses()), bukan if/elseif
+    // string-match label lagi -- yg lama TIDAK PUNYA cabang utk FI-OGP
+    // Golive/Golive (jatuh ke "else" merah, padahal 2 tahap paling akhir).
+    $stageColors = \App\Models\Project::stageColorClasses(($summary['isHold'] ?? false) ? 'orange' : (($summary['isDrop'] ?? false) ? 'red' : ($summary['effectiveStageColor'] ?? null)));
+    $accentColor = $stageColors['accent'];
+    $borderColor = $stageColors['border'];
+    $progressColor = $stageColors['progress'];
+    $badgeClass = $stageColors['badge'];
 @endphp
 
     <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 border-l-4 {{ $borderColor }} rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition">

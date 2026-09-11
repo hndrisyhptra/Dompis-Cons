@@ -15,6 +15,7 @@ class LopKronologi extends Model
         'lop_id',
         'project_id',
         'stage_code',
+        'permit_category_id',
         'event_date',
         'note',
         'created_by',
@@ -37,5 +38,17 @@ class LopKronologi extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by', 'id_user');
+    }
+
+    /** Kategori perizinan yang dipilih SAAT entri ini dibuat (histori -- lihat Stage 4f). */
+    public function permitCategory()
+    {
+        return $this->belongsTo(PermitCategory::class, 'permit_category_id', 'id');
+    }
+
+    /** Eviden foto/PDF opsional yang diupload bersamaan lewat "Add Perizinan". */
+    public function evidences()
+    {
+        return $this->hasMany(Evidence::class, 'lop_kronologi_id');
     }
 }

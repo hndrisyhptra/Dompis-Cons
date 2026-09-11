@@ -22,11 +22,24 @@
     // Memastikan hasil bulat ke bawah
     $durationDays = $startDate ? floor($startDate->diffInDays(now())) : 0;
 
+    // Section AF: tambah 2 tahap baru (FI-OGP Golive/Golive, sequence 10-11
+    // di project_stages) supaya timeline & "Progress Tahap" konsisten dgn
+    // status_progress terbaru -- sebelumnya berhenti di Finishing (seq 9),
+    // padahal 2 tahap ini sekarang PUNYA alur sendiri (lihat
+    // ProjectController::reviewGolive()/submitGoliveDocuments(),
+    // SdiGoliveController). $stageProgress utk 2 tahap ini TIDAK pakai
+    // ambang persentase lagi (posisinya bukan proporsional dari 0-100%
+    // yang sama dgn 4 tahap eviden lama) -- langsung baca
+    // effectiveStageSequence via progressSummary().
+    $seq = $progressSummary['effectiveStageSequence'] ?? null;
+
     $stageLabels = [
         'persiapan' => 'Persiapan',
         'instalasi' => 'Instalasi',
         'pengukuran' => 'Pengukuran',
         'finishing' => 'Finishing',
+        'fi_ogp_golive' => 'FI-OGP Golive',
+        'golive' => 'Golive',
     ];
 
     $stageRoutes = [
@@ -34,6 +47,8 @@
         'instalasi' => 'Step 2',
         'pengukuran' => 'Step 3',
         'finishing' => 'Step 4',
+        'fi_ogp_golive' => 'Step 5',
+        'golive' => 'Step 6',
     ];
 
     $stageProgress = [
@@ -41,6 +56,8 @@
         'instalasi' => $progress >= 50,
         'pengukuran' => $progress >= 75,
         'finishing' => $progress >= 100,
+        'fi_ogp_golive' => $seq !== null && $seq > 10,
+        'golive' => $seq !== null && $seq > 11,
     ];
 
     /*
@@ -78,17 +95,14 @@
         $timelineGroups[$key]['items']->push($log);
     }
 
-    $boqItemsRaw = $project->boqItems ?? collect();
-
-        $boqItems = $boqItemsRaw->filter(function ($item) {
-
-            $type = strtolower(trim(
-                $item->designatorData?->type
-                ?? ''
-            ));
-
-            return $type === 'material';
-        })->values();
+    // Section AF: sumber item Material disamakan dgn Step 3 Instalasi/Step 5
+    // Finishing Waspang (ronde BOQ Survey terbaru kalau ada, else BOQ Plan
+    // quantity_plan !== null) -- lihat Project::materialProgressItems().
+    // Sebelumnya filter di sini cuma cek type==='material' TANPA
+    // quantity_plan !== null (beda sendiri dari 8 lokasi lain yg sudah
+    // dibenahi bag. AC/AD), jadi angka "Progress Tahap" Instalasi di
+    // halaman ini bisa beda dgn yang Waspang/Admin lihat di halaman lain.
+    $boqItems = $project->materialProgressItems()['items'];
 
     $totalBoqItem = $boqItems->count();
 
@@ -100,10 +114,25 @@
         : 0;
 
     $stageEvidenceStats = [];
+    $goliveSubmission = $project->lop?->goliveSubmission;
+    $goliveVerification = $project->lop?->goliveVerification;
 
     foreach ($stageLabels as $stageKey => $stageName) {
 
-        if ($stageKey === 'instalasi') {
+        if ($stageKey === 'fi_ogp_golive') {
+            $stageTotal = 4; // capture valins, PDF ABD & Valid4, KML, Mancore
+            $stageApproved = collect([
+                $goliveSubmission?->capture_valins_path,
+                $goliveSubmission?->abd_valid4_path,
+                $goliveSubmission?->kml_path,
+                $goliveSubmission?->mancore_path,
+            ])->filter()->count();
+            $percent = round(($stageApproved / $stageTotal) * 100);
+        } elseif ($stageKey === 'golive') {
+            $stageTotal = 1; // capture UIM (verifikasi SDI)
+            $stageApproved = $goliveVerification?->capture_uim_path ? 1 : 0;
+            $percent = $stageApproved ? 100 : 0;
+        } elseif ($stageKey === 'instalasi') {
             $stageTotal = $totalBoqItem;
 
             $stageApproved = $boqItems->filter(function ($item) use ($evidences) {

@@ -109,13 +109,13 @@
             </div>
         </div>
 
-        {{-- KRONOLOGI PERSIAPAN INSTALASI --}}
+        {{-- KRONOLOGI PERSIAPAN INSTALASI -- tombol tambah cukup 1x lewat
+             "Update Kronologi" universal di bawah (step-action-buttons),
+             supaya tidak ada 2 tombol tambah kronologi yg redundan di
+             halaman yang sama. --}}
         <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
-            <div class="flex items-center justify-between mb-1.5">
+            <div class="mb-1.5">
                 <p class="text-[11px] font-black text-slate-600">Kronologi Persiapan Instalasi</p>
-                <button type="button" onclick="openKronologiModal('persiapan_instalasi', 'Persiapan Instalasi')" class="text-[11px] font-black text-[#1565D8]">
-                    <i class="fa-solid fa-plus mr-0.5"></i> Tambah
-                </button>
             </div>
 
             @php $piKronologis = $kronologis->where('stage_code', 'persiapan_instalasi'); @endphp

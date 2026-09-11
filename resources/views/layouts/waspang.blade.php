@@ -52,6 +52,14 @@
             </div>
         @endif
 
+        @if(session('warning'))
+            <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)"
+                 class="fixed top-4 inset-x-4 max-w-sm mx-auto z-50 bg-amber-500 text-white p-3.5 rounded-2xl text-xs font-bold shadow-lg shadow-amber-900/20 flex items-center gap-2 animate-fade-in">
+                <i class="fa-solid fa-triangle-exclamation text-base"></i>
+                <span>{{ session('warning') }}</span>
+            </div>
+        @endif
+
         {{-- Konten Utama Halaman Step Lapangan --}}
         @yield('content')
 

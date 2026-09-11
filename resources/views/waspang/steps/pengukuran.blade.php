@@ -106,7 +106,7 @@
 
         <div class="flex items-center justify-between mb-3">
             <div>
-                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Step 3 Pengukuran</h2>
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Step 4 Pengukuran</h2>
                 <p class="text-[11px] text-slate-500">Tap item untuk Upload eviden OTDR, OPM & Kedalaman Galian</p>
             </div>
 
@@ -371,7 +371,7 @@
     <div class="px-4 mt-5">
         <a href="{{ route('waspang.projects.finishing', $project->id_project) }}"
            class="h-11 w-full rounded-2xl bg-[#1565D8] text-white inline-flex items-center justify-center text-sm font-bold shadow-sm hover:bg-[#0F4FAF] transition">
-            Next Step 4 - Finishing <i class="fa-solid fa-chevron-right ml-2 text-xs"></i>
+            Next Step 5 - Finishing <i class="fa-solid fa-chevron-right ml-2 text-xs"></i>
         </a>
     </div>
 

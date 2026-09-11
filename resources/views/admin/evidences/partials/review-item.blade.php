@@ -4,23 +4,40 @@
     $rejectedCount = $items->where('status', 'rejected')->count();
     $pendingCount = $items->where('status', 'pending')->count();
 
+    // Section AG: item yang ditandai "Tidak Ada" (N/A) oleh Waspang --
+    // dilempar dari review-pengukuran.blade.php via LopMeasurementCheck.
+    // Sebelumnya item begini TIDAK PUNYA cabang sendiri, jadi nyasar ke
+    // 'pending' (badge "Pending", pesan "Belum ada file/eviden diunggah")
+    // padahal Waspang MEMANG SUDAH menandai item ini tidak berlaku sama
+    // sekali -- beda kondisi dgn "belum sempat diisi".
+    $isNotApplicable = $isNotApplicable ?? false;
+
     // Logika Status Group
     $groupStatus = 'pending';
     if ($rejectedCount > 0) {
         $groupStatus = 'rejected';
     } elseif ($approvedCount === $total && $total > 0) {
         $groupStatus = 'approved';
+    } elseif ($total === 0 && $isNotApplicable) {
+        $groupStatus = 'na';
     }
 
     $statusClass = match ($groupStatus) {
         'approved' => 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900',
         'rejected' => 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:border-red-900',
+        'na' => 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800/40 dark:border-slate-700',
         default => 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:border-amber-900',
+    };
+
+    $statusLabel = match ($groupStatus) {
+        'na' => 'Tidak Ada',
+        default => ucfirst($groupStatus),
     };
 
     $iconText = match ($groupStatus) {
         'approved' => '✓',
         'rejected' => '×',
+        'na' => '—',
         default => $number ?? 1,
     };
 
@@ -60,7 +77,7 @@
 
         <div class="flex items-center gap-3 shrink-0">
             <span class="px-3 py-1.5 rounded-xl border text-xs font-black uppercase tracking-wider {{ $statusClass }}">
-                {{ ucfirst($groupStatus) }}
+                {{ $statusLabel }}
             </span>
             <div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-500 transition-transform duration-300" :class="open ? 'rotate-180' : ''">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
@@ -224,8 +241,13 @@
                     </div>
                 @empty
                     <div class="col-span-full py-10 text-center">
-                        <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-2xl text-slate-400">📊</div>
-                        <p class="text-sm font-bold text-gray-500">Belum ada file/eviden diunggah.</p>
+                        @if($isNotApplicable)
+                            <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-2xl text-slate-400">—</div>
+                            <p class="text-sm font-bold text-gray-500">Ditandai "Tidak Ada" oleh Waspang -- item ini tidak berlaku untuk LOP ini.</p>
+                        @else
+                            <div class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3 text-2xl text-slate-400">📊</div>
+                            <p class="text-sm font-bold text-gray-500">Belum ada file/eviden diunggah.</p>
+                        @endif
                     </div>
                 @endforelse
             </div>

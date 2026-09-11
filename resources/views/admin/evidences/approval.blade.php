@@ -79,23 +79,40 @@
     </form>
 
     {{-- SYSTEM TABS FILTER STATUS --}}
-    <div class="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-px overflow-x-auto">
+    <div class="inline-flex flex-wrap items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/60 w-full sm:w-auto">
         @php $currentFilter = request('status_filter', 'pending'); @endphp
-        
-        <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'pending']) }}" 
-           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'pending' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
+
+        <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'pending']) }}"
+           class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold tracking-wide transition-all whitespace-nowrap {{ $currentFilter === 'pending' ? 'bg-white dark:bg-slate-900 text-amber-600 dark:text-amber-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200' }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
             Menunggu Review
+            @if($tabCounts !== null)
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-black {{ $currentFilter === 'pending' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">
+                    {{ $tabCounts['pending'] }}
+                </span>
+            @endif
         </a>
-        
-        {{-- MENGGANTI "Semua Penugasan" MENJADI "On Progress" --}}
-        <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'active']) }}" 
-           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'active' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
+
+        <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'active']) }}"
+           class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold tracking-wide transition-all whitespace-nowrap {{ $currentFilter === 'active' ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200' }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
             On Progress
+            @if($tabCounts !== null)
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-black {{ $currentFilter === 'active' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">
+                    {{ $tabCounts['active'] }}
+                </span>
+            @endif
         </a>
-        
-        <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'complete']) }}" 
-           class="px-4 py-2.5 border-b-2 text-xs font-extrabold tracking-wide transition whitespace-nowrap {{ $currentFilter === 'complete' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600' }}">
-            Selesai / Ready UT
+
+        <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'complete']) }}"
+           class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold tracking-wide transition-all whitespace-nowrap {{ $currentFilter === 'complete' ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200' }}">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            Selesai
+            @if($tabCounts !== null)
+                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-black {{ $currentFilter === 'complete' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300' }}">
+                    {{ $tabCounts['complete'] }}
+                </span>
+            @endif
         </a>
     </div>
 
@@ -119,49 +136,48 @@
                             $projectId = $project->id_project;
                             $waspang = optional($project->assignment)->waspang;
 
-                            // LOGIKA PERHITUNGAN (Sama persis dengan sebelumnya)
-                            $persiapanTotal = 2;
-                            $persiapanApproved = $items->where('stage', 'persiapan')->where('status', 'approved')->pluck('evidence_type')->unique()->count();
-
-                            $materialBoqItems = ($project->boqItems ?? collect())->filter(function ($boq) {
-                                return str_starts_with($boq->designator, 'M-') || optional($boq->designatorData)->type === 'material';
-                            });
-                            $instalasiTotal = $materialBoqItems->count();
-                            $instalasiApproved = $materialBoqItems->filter(function ($boq) use ($items) {
-                                $boqEvidences = $items->where('stage', 'instalasi')->where('evidence_type', 'progress_boq')->where('boq_item_id', $boq->id_boq);
-                                return $boqEvidences->count() > 0 && $boqEvidences->where('status', 'pending')->count() == 0 && $boqEvidences->where('status', 'rejected')->count() == 0;
-                            })->count();
-
-                            $hasOtdr = $items->where('stage', 'pengukuran')->where('evidence_type', 'otdr')->count() > 0;
-                            $hasOpm = $items->where('stage', 'pengukuran')->where('evidence_type', 'opm')->count() > 0;
-                            $hasDalam = $items->where('stage', 'pengukuran')->where('evidence_type', 'kedalaman')->count() > 0;
-                            $pengukuranApprovedCount = $items->where('stage', 'pengukuran')->where('status', 'approved')->count();
-                            
-                            $pengukuranTotal = ($hasOtdr ? 1 : 0) + ($hasOpm ? 1 : 0) + ($hasDalam ? 1 : 0);
-                            $pengukuranApproved = $pengukuranApprovedCount;
-
-                            $finishingRequiredItems = $materialBoqItems->filter(function ($boq) {
-                                return optional($boq->designatorData)->requires_finishing_evidence == 1;
-                            });
-                            $finishingTotal = $finishingRequiredItems->count();
-                            $finishingApproved = $finishingRequiredItems->filter(function ($boq) use ($items) {
-                                $finalEvidences = $items->where('stage', 'finishing')->where('boq_item_id', $boq->id_boq);
-                                return $finalEvidences->count() > 0 && $finalEvidences->where('status', 'pending')->count() == 0 && $finalEvidences->where('status', 'rejected')->count() == 0;
-                            })->count();
-
                             $pendingCount = $items->where('status', 'pending')->count();
                             $approvedCount = $items->where('status', 'approved')->count();
                             $rejectedCount = $items->where('status', 'rejected')->count();
 
-                            // PROGRESS KESELURUHAN: dihitung PER STEP (4 step: Persiapan,
-                            // Instalasi, Pengukuran, Finishing = masing-masing 25%), sama
-                            // persis dengan Project::progressSummary() yang dipakai saat
-                            // approve eviden. Ini FIX untuk bug progress lompat ke 100%
-                            // hanya karena 1 step (mis. Persiapan) selesai duluan, padahal
-                            // step lain (Instalasi/Pengukuran/Finishing) belum diupload.
+                            // PROGRESS KESELURUHAN: dihitung dari sequence 11-tahap LOP
+                            // (persis 100% di Golive), sama persis dengan
+                            // Project::progressSummary() yang dipakai di admin lain.
                             $summary = $project->progressSummary();
                             $progressPercent = $summary['progress'] ?? 0;
-                            $isComplete = ($progressPercent >= 100);
+
+                            // Section AH/AJ: kolom "Progress Approval" TIDAK lagi
+                            // menampilkan rincian angka per-step (Persiapan: 1/2, dst) --
+                            // user minta cukup persentase + tahap sekarang, supaya lebih
+                            // ringkas & tidak membingungkan. Label & warna tahap dibaca
+                            // dari effectiveStageLabel/effectiveStageColor (hold/drop-safe,
+                            // sama persis dgn stepper/tracking, Section AF/AG) via
+                            // Project::stageColorClasses() -- dipakai baik utk badge
+                            // status (kolom kanan) maupun label singkat di kolom Progress.
+                            $effectiveLabel = $summary['effectiveStageLabel'] ?? ($project->lop?->stage?->label ?? '-');
+                            $effectiveColor = $summary['effectiveStageColor'] ?? null;
+                            $stageColors = \App\Models\Project::stageColorClasses($effectiveColor);
+                            $isHold = $summary['isHold'] ?? false;
+                            $isDrop = $summary['isDrop'] ?? false;
+                            $hasPendingEvidence = $pendingCount > 0;
+
+                            // Tombol "Review" diarahkan ke step yang SEDANG berjalan
+                            // (dibaca dari effectiveStageSequence, hold/drop-safe) supaya
+                            // admin langsung mendarat di step yang relevan, bukan selalu
+                            // balik ke Step 1 (Persiapan).
+                            $seq = $summary['effectiveStageSequence'] ?? null;
+                            $reviewRoute = 'admin.evidences.review.project';
+                            if ($seq !== null) {
+                                if ($seq >= 10) {
+                                    $reviewRoute = 'admin.evidences.review.golive';
+                                } elseif ($seq == 9) {
+                                    $reviewRoute = 'admin.evidences.review.finishing';
+                                } elseif ($seq == 8) {
+                                    $reviewRoute = 'admin.evidences.review.pengukuran';
+                                } elseif ($seq == 7) {
+                                    $reviewRoute = 'admin.evidences.review.instalasi';
+                                }
+                            }
                         @endphp
 
                         <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors group">
@@ -214,29 +230,16 @@
 
                             {{-- KOLOM 3: Progress --}}
                             <td class="p-4 align-top">
-                                <div class="space-y-2.5">
-                                    {{-- Progress Bar --}}
-                                    <div class="flex items-center gap-3">
-                                        <div class="flex-1 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                            <div class="h-full bg-blue-600 rounded-full transition-all duration-300" style="width: {{ $progressPercent }}%"></div>
-                                        </div>
-                                        <span class="text-xs font-black text-slate-700 dark:text-slate-200 w-9 text-right">{{ round($progressPercent) }}%</span>
+                                <div class="space-y-2 min-w-[140px]">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 truncate">
+                                            <span class="w-1.5 h-1.5 rounded-full shrink-0 {{ $stageColors['dot'] }}"></span>
+                                            {{ $effectiveLabel }}
+                                        </span>
+                                        <span class="text-xs font-black text-slate-700 dark:text-slate-200 shrink-0">{{ round($progressPercent) }}%</span>
                                     </div>
-                                    
-                                    {{-- Detail Angka Progress (Mini Badges) --}}
-                                    <div class="flex items-center gap-1.5 text-[9px] font-bold">
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500" title="1. Persiapan">
-                                            Persiapan: <span class="{{ $persiapanApproved == $persiapanTotal ? 'text-blue-600' : 'text-slate-700 dark:text-slate-300' }}">{{ $persiapanApproved }}/{{ $persiapanTotal }}</span>
-                                        </span>
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500" title="2. Instalasi">
-                                           Instalasi: <span class="{{ $instalasiApproved == $instalasiTotal && $instalasiTotal > 0 ? 'text-blue-600' : 'text-slate-700 dark:text-slate-300' }}">{{ $instalasiApproved }}/{{ $instalasiTotal }}</span>
-                                        </span>
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500" title="3. Pengukuran (Opsional)">
-                                            Pengukuran: <span class="{{ $pengukuranApproved == $pengukuranTotal && $pengukuranTotal > 0 ? 'text-amber-600' : 'text-slate-700 dark:text-slate-300' }}">{{ $pengukuranApproved }}/{{ $pengukuranTotal }}</span>
-                                        </span>
-                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500" title="4. Finishing">
-                                            Finishing: <span class="{{ $finishingApproved == $finishingTotal && $finishingTotal > 0 ? 'text-blue-600' : 'text-slate-700 dark:text-slate-300' }}">{{ $finishingApproved }}/{{ $finishingTotal }}</span>
-                                        </span>
+                                    <div class="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                        <div class="h-full {{ $stageColors['progress'] }} rounded-full transition-all duration-300" style="width: {{ $progressPercent }}%"></div>
                                     </div>
                                 </div>
                             </td>
@@ -258,14 +261,24 @@
 
                             {{-- KOLOM 5: Status & Aksi --}}
                             <td class="p-4 align-top text-right">
-                                <div class="flex flex-col items-end gap-2.5">
-                                    <span class="inline-flex px-2.5 py-1 rounded-md text-[9px] font-extrabold tracking-widest uppercase
-                                        {{ $isComplete ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400' }}">
-                                        {{ $isComplete ? '✓ READY UT' : 'IN REVIEW' }}
+                                <div class="flex flex-col items-end gap-1.5">
+                                    <span class="inline-flex px-2.5 py-1 rounded-md text-[9px] font-extrabold tracking-widest uppercase {{ $stageColors['badge'] }}">
+                                        @if($isDrop)
+                                            DROP
+                                        @elseif($isHold)
+                                            HOLD &middot; {{ $effectiveLabel }}
+                                        @else
+                                            {{ $effectiveLabel }}
+                                        @endif
                                     </span>
+                                    @if($hasPendingEvidence)
+                                        <span class="inline-flex px-2 py-0.5 rounded-md text-[8px] font-extrabold tracking-widest uppercase bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400">
+                                            Perlu Review
+                                        </span>
+                                    @endif
                                     
-                                    <a href="{{ route('admin.evidences.review.project', $projectId) }}"
-                                       class="h-8 px-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-900 hover:text-white dark:hover:bg-slate-100 dark:hover:text-slate-900 text-slate-700 dark:text-slate-200 inline-flex items-center justify-center gap-1.5 text-xs font-black transition-all shadow-sm group">
+                                    <a href="{{ route($reviewRoute, $projectId) }}"
+                                       class="h-8 px-4 mt-1 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-900 hover:text-white dark:hover:bg-slate-100 dark:hover:text-slate-900 text-slate-700 dark:text-slate-200 inline-flex items-center justify-center gap-1.5 text-xs font-black transition-all shadow-sm group">
                                         Review
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
                                     </a>

@@ -6,12 +6,18 @@
 
 @php
     $evidences = $project->evidences ?? collect();
-    $finishingBoqItems = $project->boqItems ?? collect();
-
-    $materialBoqItems = ($project->boqItems ?? collect())->filter(function ($boq) {
-        return optional($boq->designatorData)->type === 'material'
-            || optional($boq->designatorDataByCode)->type === 'material';
-    });
+    // Section AD: item BOQ Finishing DISAMAKAN dgn Step 3 Instalasi -- ronde
+    // BOQ Survey TERBARU yang sudah selesai kalau ada, else fallback BOQ
+    // Plan murni (quantity_plan !== null, bag. AC). Sebelumnya filter di
+    // sini TIDAK ikut quantity_plan !== null sama sekali (beda dgn 6 lokasi
+    // lain yg sudah dibenahi bag. AC) -- item tambahan hasil BOQ Survey
+    // (quantity_plan selalu null) jadi ikut nyasar ke checklist Finishing.
+    // Lihat Project::materialProgressItems().
+    $materialSource = $project->materialProgressItems();
+    $materialBoqItems = $materialSource['items'];
+    $materialSourceType = $materialSource['source'];
+    $materialSourceRound = $materialSource['round'];
+    $finishingBoqItems = $materialBoqItems;
 
     $totalEvidence = $evidences->count();
     $approvedEvidence = $evidences->where('status', 'approved')->count();
@@ -108,9 +114,18 @@
 
 {{-- FINAL EVIDENCE PER MATERIAL ITEM --}}
 <div class="px-4 mt-5">
-    <div>
-        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Step 4 Finishing</h2>
-        <p class="text-[11px] text-slate-500">Tap item untuk Upload Eviden Final</p>
+    <div class="flex items-center justify-between gap-2">
+        <div>
+            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Step 5 Finishing</h2>
+            <p class="text-[11px] text-slate-500">Tap item untuk Upload Eviden Final</p>
+        </div>
+        @if(($materialSourceType ?? 'plan') === 'survey_round')
+            <span class="shrink-0 px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">
+                BOQ Survey Ronde {{ $materialSourceRound->round_number ?? '-' }}
+            </span>
+        @else
+            <span class="shrink-0 px-2 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold">BOQ Plan</span>
+        @endif
     </div>
 
     <div class="space-y-3 mt-3">
