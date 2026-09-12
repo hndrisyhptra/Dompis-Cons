@@ -125,62 +125,144 @@
         </div>
     </div>
 
-    {{-- REKAP PROGRESS PER PROGRAM + TOTAL NILAI PER PROGRAM --}}
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
-        <div class="mb-4">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white">Rekap Progress per Program</h2>
-            <p class="text-xs text-gray-400 mt-1">Kabel (FO) &amp; Tiang Plan vs Actual, serta Total Nilai real-time per program regular.</p>
+    {{-- REPORTING DEPLOYMENT (DROP/HOLD/PREPARING/PERIZINAN/MATDEL/INSTALASI/
+         FI-OGP GOLIVE/GOLIVE + GRAND TOTAL) PER REGION & BRANCH, FILTER
+         REGION/BRANCH/PROGRAM --}}
+    {{--
+        Revisi (permintaan user): judul diganti dari "Rekap Status Progress
+        LOP" jadi "Reporting Deployment". Ditambahkan filter Region/Branch/
+        Program (client-side, Alpine -- data mentahnya "cube" pre-agregat
+        per kombinasi region+branch+program, `stageCube`, dikirim dari
+        DashboardPmController::buildIndexData(), dijumlahkan ulang di
+        browser tiap filter berubah, TANPA round-trip ke server). Ditambah
+        kolom "Grand Total" (jumlah semua kolom status) setelah kolom Golive
+        di tiap baris, dan 1 baris footer "Grand Total" yang menjumlahkan
+        seluruh baris yang lagi ditampilkan (mengikuti filter aktif).
+        Semua angka (termasuk Grand Total) tetap bisa diklik -> modal
+        matrixDetailModal() (type 'stage_breakdown', ikut kirim
+        program_filter kalau filter Program lagi aktif -- lihat
+        DashboardPmController::matrixDetail()).
+    --}}
+    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
+        <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/50">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                    <h2 class="text-sm font-black uppercase tracking-wider text-gray-800 dark:text-gray-200">Reporting Deployment</h2>
+                    <p class="text-xs text-gray-400 mt-1">Klik nama Region untuk detail per Branch. Klik angka untuk melihat daftar LOP.</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <select x-model="stageFilterRegion"
+                            @change="if (!stageBranchOptions().includes(stageFilterBranch)) stageFilterBranch = ''"
+                            class="text-xs font-semibold rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Semua Region</option>
+                        <template x-for="r in stageRegions()" :key="'region-'+r">
+                            <option :value="r" x-text="r"></option>
+                        </template>
+                    </select>
+
+                    <select x-model="stageFilterBranch"
+                            class="text-xs font-semibold rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Semua Branch</option>
+                        <template x-for="b in stageBranchOptions()" :key="'branch-'+b">
+                            <option :value="b" x-text="b"></option>
+                        </template>
+                    </select>
+
+                    <select x-model="stageFilterProgram"
+                            class="text-xs font-semibold rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Semua Program</option>
+                        <template x-for="p in stagePrograms()" :key="'program-'+p">
+                            <option :value="p" x-text="p === 'EKSBIS' ? 'Eksbis' : p"></option>
+                        </template>
+                    </select>
+
+                    <button type="button" @click="stageResetFilters()"
+                            x-show="stageFilterRegion || stageFilterBranch || stageFilterProgram"
+                            class="text-xs font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-2 py-2">
+                        Reset
+                    </button>
+                </div>
+            </div>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="border-b border-gray-200 dark:border-gray-800 text-xs font-bold uppercase text-gray-400 tracking-wider">
-                        <th class="pb-3 font-semibold">Program</th>
-                        <th class="pb-3 text-center font-semibold">Total LOP</th>
-                        <th class="pb-3 text-center font-semibold text-blue-500 dark:text-blue-400">Kabel Plan</th>
-                        <th class="pb-3 text-center font-semibold text-blue-600 dark:text-blue-400">Kabel Actual</th>
-                        <th class="pb-3 text-center font-semibold text-blue-700 dark:text-blue-400">% Kabel</th>
-                        <th class="pb-3 text-center font-semibold text-amber-500 dark:text-amber-400">Tiang Plan</th>
-                        <th class="pb-3 text-center font-semibold text-amber-600 dark:text-amber-400">Tiang Actual</th>
-                        <th class="pb-3 text-center font-semibold text-amber-700 dark:text-amber-400">% Tiang</th>
-                        <th class="pb-3 text-right font-semibold">Total Nilai</th>
+            <table class="w-full text-xs border-collapse">
+                <thead class="bg-gray-100/60 dark:bg-gray-950/60 text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+                    <tr>
+                        <th class="px-6 py-3 text-left whitespace-nowrap">Breakdown (Region / Branch)</th>
+                        <th class="px-3 py-3 text-center text-rose-600 dark:text-rose-400 whitespace-nowrap">Drop</th>
+                        <th class="px-3 py-3 text-center text-orange-600 dark:text-orange-400 whitespace-nowrap">Hold</th>
+                        <th class="px-3 py-3 text-center text-slate-500 dark:text-slate-400 whitespace-nowrap">Preparing</th>
+                        <th class="px-3 py-3 text-center text-amber-600 dark:text-amber-400 whitespace-nowrap">Perizinan</th>
+                        <th class="px-3 py-3 text-center text-indigo-600 dark:text-indigo-400 whitespace-nowrap">Matdel</th>
+                        <th class="px-3 py-3 text-center text-blue-600 dark:text-blue-400 whitespace-nowrap">Instalasi</th>
+                        <th class="px-3 py-3 text-center text-purple-600 dark:text-purple-400 whitespace-nowrap">FI-OGP Golive</th>
+                        <th class="px-3 py-3 text-center text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Golive</th>
+                        <th class="px-6 py-3 text-center text-gray-700 dark:text-gray-300 whitespace-nowrap">Grand Total</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800 text-sm">
-                    @forelse($programRekap ?? [] as $prog)
-                        <tr>
-                            <td class="py-3.5 font-bold text-gray-800 dark:text-gray-200">{{ $prog['program'] === 'EKSBIS' ? 'Eksbis' : $prog['program'] }}</td>
-                            <td class="py-3.5 text-center font-medium text-gray-600 dark:text-gray-400">{{ $prog['total_lop'] }}</td>
-                            <td class="py-3.5 text-center text-gray-600 dark:text-gray-400">{{ number_format($prog['kabel_plan'], 0, ',', '.') }}</td>
-                            <td class="py-3.5 text-center text-gray-600 dark:text-gray-400">{{ number_format($prog['kabel_actual'], 0, ',', '.') }}</td>
-                            <td class="py-3.5 text-center font-bold text-blue-600 dark:text-blue-400">{{ $prog['kabel_persen'] }}%</td>
-                            <td class="py-3.5 text-center text-gray-600 dark:text-gray-400">{{ number_format($prog['tiang_plan'], 0, ',', '.') }}</td>
-                            <td class="py-3.5 text-center text-gray-600 dark:text-gray-400">{{ number_format($prog['tiang_actual'], 0, ',', '.') }}</td>
-                            <td class="py-3.5 text-center font-bold text-amber-600 dark:text-amber-400">{{ $prog['tiang_persen'] }}%</td>
-                            <td class="py-3.5 text-right font-bold text-emerald-700 dark:text-emerald-400">Rp {{ number_format($prog['nilai_total'], 0, ',', '.') }}</td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="9" class="py-8 text-center text-gray-400">Belum ada data program tersedia</td>
-                        </tr>
-                    @endforelse
+                <template x-for="reg in stageGroupedRows()" :key="reg.region">
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                            <tr class="cursor-pointer bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition" @click="stageToggle(reg.region)">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-5 h-5 flex items-center justify-center rounded bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200" :class="stageExpanded[reg.region] ? 'rotate-90' : ''"><path d="m9 18 6-6-6-6"/></svg>
+                                        </div>
+                                        <span class="font-black text-gray-800 dark:text-gray-200 text-sm whitespace-nowrap" x-text="reg.region"></span>
+                                    </div>
+                                </td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 font-black hover:bg-rose-100" @click.stop="stageShow(reg.region, '', 'drop')" x-text="reg.drop"></span></td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-orange-50 dark:bg-orange-950/50 text-orange-700 dark:text-orange-400 font-black hover:bg-orange-100" @click.stop="stageShow(reg.region, '', 'hold')" x-text="reg.hold"></span></td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 font-black hover:bg-slate-100" @click.stop="stageShow(reg.region, '', 'preparing')" x-text="reg.preparing"></span></td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 font-black hover:bg-amber-100" @click.stop="stageShow(reg.region, '', 'perizinan')" x-text="reg.perizinan"></span></td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400 font-black hover:bg-indigo-100" @click.stop="stageShow(reg.region, '', 'matdel')" x-text="reg.matdel"></span></td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 font-black hover:bg-blue-100" @click.stop="stageShow(reg.region, '', 'instalasi')" x-text="reg.instalasi"></span></td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-400 font-black hover:bg-purple-100" @click.stop="stageShow(reg.region, '', 'fi_ogp_golive')" x-text="reg.fi_ogp_golive"></span></td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-black hover:bg-emerald-100" @click.stop="stageShow(reg.region, '', 'golive')" x-text="reg.golive"></span></td>
+                                <td class="px-6 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-black hover:bg-gray-200" @click.stop="stageShow(reg.region, '', 'total')" x-text="reg.total"></span></td>
+                            </tr>
+
+                            <template x-for="br in reg.branches" :key="reg.region + '-' + br.name">
+                                <tr class="bg-gray-50/50 dark:bg-gray-950/50 hover:bg-gray-100/50 transition" x-show="stageExpanded[reg.region]">
+                                    <td class="px-6 py-3 pl-[3.25rem]">
+                                        <span class="font-bold text-gray-600 dark:text-gray-400 whitespace-nowrap" x-text="'• ' + br.name"></span>
+                                    </td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-rose-600 dark:text-rose-400 font-bold hover:underline" @click.stop="stageShow(reg.region, br.name, 'drop')" x-text="br.drop"></span></td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-orange-600 dark:text-orange-400 font-bold hover:underline" @click.stop="stageShow(reg.region, br.name, 'hold')" x-text="br.hold"></span></td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-slate-600 dark:text-slate-400 font-bold hover:underline" @click.stop="stageShow(reg.region, br.name, 'preparing')" x-text="br.preparing"></span></td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-amber-600 dark:text-amber-400 font-bold hover:underline" @click.stop="stageShow(reg.region, br.name, 'perizinan')" x-text="br.perizinan"></span></td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-indigo-600 dark:text-indigo-400 font-bold hover:underline" @click.stop="stageShow(reg.region, br.name, 'matdel')" x-text="br.matdel"></span></td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-blue-600 dark:text-blue-400 font-bold hover:underline" @click.stop="stageShow(reg.region, br.name, 'instalasi')" x-text="br.instalasi"></span></td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-purple-600 dark:text-purple-400 font-bold hover:underline" @click.stop="stageShow(reg.region, br.name, 'fi_ogp_golive')" x-text="br.fi_ogp_golive"></span></td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-emerald-600 dark:text-emerald-400 font-bold hover:underline" @click.stop="stageShow(reg.region, br.name, 'golive')" x-text="br.golive"></span></td>
+                                    <td class="px-6 py-3 text-center"><span class="cursor-pointer text-gray-700 dark:text-gray-300 font-bold hover:underline" @click.stop="stageShow(reg.region, br.name, 'total')" x-text="br.total"></span></td>
+                                </tr>
+                            </template>
+                    </tbody>
+                </template>
+
+                <tbody x-show="stageGroupedRows().length === 0">
+                    <tr>
+                        <td colspan="10" class="px-6 py-10 text-center text-gray-400 font-medium">Tidak ada data statistik tersedia.</td>
+                    </tr>
                 </tbody>
+                <tfoot x-show="stageGroupedRows().length > 0">
+                    <tr class="bg-gray-100/80 dark:bg-gray-950/80 border-t-2 border-gray-300 dark:border-gray-700">
+                        <td class="px-6 py-4 font-black text-gray-900 dark:text-white uppercase text-xs tracking-wide">Grand Total</td>
+                        <td class="px-3 py-4 text-center font-black text-rose-700 dark:text-rose-400" x-text="stageGrandTotal().drop"></td>
+                        <td class="px-3 py-4 text-center font-black text-orange-700 dark:text-orange-400" x-text="stageGrandTotal().hold"></td>
+                        <td class="px-3 py-4 text-center font-black text-slate-700 dark:text-slate-300" x-text="stageGrandTotal().preparing"></td>
+                        <td class="px-3 py-4 text-center font-black text-amber-700 dark:text-amber-400" x-text="stageGrandTotal().perizinan"></td>
+                        <td class="px-3 py-4 text-center font-black text-indigo-700 dark:text-indigo-400" x-text="stageGrandTotal().matdel"></td>
+                        <td class="px-3 py-4 text-center font-black text-blue-700 dark:text-blue-400" x-text="stageGrandTotal().instalasi"></td>
+                        <td class="px-3 py-4 text-center font-black text-purple-700 dark:text-purple-400" x-text="stageGrandTotal().fi_ogp_golive"></td>
+                        <td class="px-3 py-4 text-center font-black text-emerald-700 dark:text-emerald-400" x-text="stageGrandTotal().golive"></td>
+                        <td class="px-6 py-4 text-center font-black text-gray-900 dark:text-white" x-text="stageGrandTotal().total"></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
-    </div>
-
-    {{-- TOTAL NILAI PER PROGRAM (CARD) --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        @forelse($programRekap ?? [] as $prog)
-            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 shadow-sm">
-                <p class="text-[10px] font-black uppercase tracking-wider text-gray-400">{{ $prog['program'] === 'EKSBIS' ? 'Eksbis' : $prog['program'] }}</p>
-                <p class="text-xs text-gray-400 mt-0.5">Total Nilai</p>
-                <p class="text-lg font-extrabold text-emerald-700 dark:text-emerald-400 mt-1.5 leading-tight">Rp {{ number_format($prog['nilai_total'], 0, ',', '.') }}</p>
-                <p class="text-[11px] text-gray-400 mt-1">{{ $prog['total_lop'] }} LOP</p>
-            </div>
-        @empty
-            <div class="col-span-full text-center text-sm text-gray-400 py-4">Belum ada data nilai program.</div>
-        @endforelse
     </div>
 
     {{-- TABEL REKAP ASSIGNMENT & STATUS PROJECT REGULAR (KLIK ANGKA UNTUK DETAIL) --}}
@@ -196,6 +278,7 @@
                         <th class="px-6 py-3 text-left">Breakdown (Region / Branch)</th>
                         <th class="px-3 py-3 text-center">Total LOP</th>
                         <th class="px-3 py-3 text-center">Assign</th>
+                        <th class="px-3 py-3 text-center">Blm Assign</th>
                         <th class="px-3 py-3 text-center">In Review</th>
                         <th class="px-3 py-3 text-center">Complete (Done)</th>
                         <th class="px-6 py-3 text-right">Progress Rate</th>
@@ -216,6 +299,7 @@
                                 <span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'total'})">{{ $reg['total'] }}</span>
                             </td>
                             <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 font-black hover:bg-blue-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'assigned'})">{{ $reg['assigned'] }}</span></td>
+                            <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400 font-black hover:bg-rose-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'unassigned'})">{{ $reg['total'] - $reg['assigned'] }}</span></td>
                             <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 font-black hover:bg-amber-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'waiting'})">{{ $reg['waiting'] }}</span></td>
                             <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 font-black hover:bg-emerald-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'completed'})">{{ $reg['completed'] }}</span></td>
                             <td class="px-6 py-4 text-right">
@@ -237,6 +321,7 @@
                                     <span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'total'})">{{ $br['total'] }}</span>
                                 </td>
                                 <td class="px-3 py-3 text-center"><span class="cursor-pointer text-blue-600 dark:text-blue-400 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'assigned'})">{{ $br['assigned'] }}</span></td>
+                                <td class="px-3 py-3 text-center"><span class="cursor-pointer text-rose-600 dark:text-rose-400 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'unassigned'})">{{ $br['total'] - $br['assigned'] }}</span></td>
                                 <td class="px-3 py-3 text-center"><span class="cursor-pointer text-amber-600 dark:text-amber-400 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'waiting'})">{{ $br['waiting'] }}</span></td>
                                 <td class="px-3 py-3 text-center"><span class="cursor-pointer text-emerald-600 dark:text-emerald-400 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'completed'})">{{ $br['completed'] }}</span></td>
                                 <td class="px-6 py-3 text-right font-black text-gray-500 dark:text-gray-400">{{ $br['percent'] }}%</td>
@@ -244,7 +329,7 @@
                         @endforeach
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-10 text-center text-gray-400 font-medium">Tidak ada data statistik tersedia.</td>
+                            <td colspan="7" class="px-6 py-10 text-center text-gray-400 font-medium">Tidak ada data statistik tersedia.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -505,6 +590,104 @@
             rows: [],
             count: 0,
 
+            // Revisi (permintaan user): tabel "Reporting Deployment" (dulu
+            // "Rekap Status Progress LOP") -- data mentah "cube" pre-agregat
+            // per kombinasi (region, branch, program) dari
+            // DashboardPmController::buildIndexData() ($stageCube), filter
+            // Region/Branch/Program dihitung ulang di sini (client-side,
+            // tanpa round-trip server) tiap kali filter berubah.
+            stageCube: @json($stageCube ?? []),
+            stageFilterRegion: '',
+            stageFilterBranch: '',
+            stageFilterProgram: '',
+            stageExpanded: {},
+
+            stageRegions() {
+                return [...new Set(this.stageCube.map((r) => r.region))].sort();
+            },
+
+            stageBranchOptions() {
+                return [...new Set(
+                    this.stageCube
+                        .filter((r) => !this.stageFilterRegion || r.region === this.stageFilterRegion)
+                        .map((r) => r.branch)
+                )].sort();
+            },
+
+            stagePrograms() {
+                return [...new Set(this.stageCube.map((r) => r.program))].sort();
+            },
+
+            stageResetFilters() {
+                this.stageFilterRegion = '';
+                this.stageFilterBranch = '';
+                this.stageFilterProgram = '';
+            },
+
+            stageFilteredCube() {
+                return this.stageCube.filter((r) =>
+                    (!this.stageFilterRegion || r.region === this.stageFilterRegion) &&
+                    (!this.stageFilterBranch || r.branch === this.stageFilterBranch) &&
+                    (!this.stageFilterProgram || r.program === this.stageFilterProgram)
+                );
+            },
+
+            stageGroupedRows() {
+                const keys = ['drop', 'hold', 'preparing', 'perizinan', 'matdel', 'instalasi', 'fi_ogp_golive', 'golive'];
+                const regionsMap = {};
+
+                for (const row of this.stageFilteredCube()) {
+                    if (!regionsMap[row.region]) {
+                        const base = { region: row.region, total: 0, branches: {} };
+                        keys.forEach((k) => { base[k] = 0; });
+                        regionsMap[row.region] = base;
+                    }
+                    const rg = regionsMap[row.region];
+                    keys.forEach((k) => { rg[k] += row[k]; });
+                    rg.total += row.total;
+
+                    if (!rg.branches[row.branch]) {
+                        const b = { name: row.branch, total: 0 };
+                        keys.forEach((k) => { b[k] = 0; });
+                        rg.branches[row.branch] = b;
+                    }
+                    const br = rg.branches[row.branch];
+                    keys.forEach((k) => { br[k] += row[k]; });
+                    br.total += row.total;
+                }
+
+                return Object.values(regionsMap)
+                    .map((rg) => ({ ...rg, branches: Object.values(rg.branches).sort((a, b) => a.name.localeCompare(b.name)) }))
+                    .sort((a, b) => a.region.localeCompare(b.region));
+            },
+
+            stageGrandTotal() {
+                const keys = ['drop', 'hold', 'preparing', 'perizinan', 'matdel', 'instalasi', 'fi_ogp_golive', 'golive'];
+                const gt = { total: 0 };
+                keys.forEach((k) => { gt[k] = 0; });
+
+                for (const row of this.stageFilteredCube()) {
+                    keys.forEach((k) => { gt[k] += row[k]; });
+                    gt.total += row.total;
+                }
+
+                return gt;
+            },
+
+            stageToggle(region) {
+                this.stageExpanded[region] = !this.stageExpanded[region];
+            },
+
+            stageShow(region, branch, metric) {
+                this.show({
+                    type: 'stage_breakdown',
+                    region: region || '',
+                    branch: branch || '',
+                    metric: metric,
+                    program_filter: this.stageFilterProgram || '',
+                });
+            },
+
             async show(params) {
                 this.open = true;
                 this.loading = true;
@@ -518,6 +701,7 @@
                     region: params.region || '',
                     branch: params.branch || '',
                     program: params.program || '',
+                    program_filter: params.program_filter || '',
                     metric: params.metric || '',
                 }).toString();
 

@@ -1380,3 +1380,1038 @@ Verifikasi balance: `ProjectController.php` -> brace 164/164, paren 748/748. `ap
 ### File yang diubah
 - `app/Http/Controllers/ProjectController.php` (`approvalIndex()` -- restrukturisasi penuh: 3 closure filter, tab counts, filter Kawalanku/Program/Branch dipindah lebih awal)
 - `resources/views/admin/evidences/approval.blade.php` (tab filter redesign pill-switcher + count badge, simplifikasi kolom Progress jadi label stage + persentase saja, pembersihan variabel `@php` yang tidak terpakai)
+
+
+---
+
+## Section AJ — Fix Status LOP Nyangkut di "Pengukuran" Walau Semua Item Sudah Ditandai "Tidak Ada" (Self-Heal Auto-Advance)
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "di tampilan waspang kenapa posisi status masih pengukuran padahal di step pengukuran sudah di tandai Tidak Ada semua, bantu sesuaikan dengan flow terbaru"
+
+### Konteks & Root cause
+
+Halaman waspang (`resources/views/waspang/partials/stepper.blade.php`, chip "Posisi: ...", dipakai di semua halaman step waspang) membaca posisi LOP murni dari `lops.status_progress` lewat `Project::progressSummary()['effectiveStageLabel']`. Sudah ada mekanisme auto-advance `status_progress` dari `'pengukuran'` ke `'finishing'` di `WaspangController::toggleMeasurementCheck()` (dipicu tiap kali waspang menandai/batal-menandai 1 item "Tidak Ada"): begitu ke-5 item `lop_measurement_checks` (OTDR/File SOR/OPM/Kedalaman Galian/Eviden Lainnya) sudah "beres" (ada eviden ATAU ditandai N/A), method ini men-set `status_progress = 'finishing'`.
+
+**Masalahnya**: transisi ini HANYA kepicu PADA SAAT toggle terakhir dijalankan. Kalau ke-5 item sudah pernah ditandai "Tidak Ada" SEBELUM gate ini pernah berhasil jalan untuk LOP tsb (mis. toggle terakhir terjadi sebelum baris gate ini pernah dieksekusi dgn benar, urutan toggle yg tidak pas, atau race/kasus tepi lain), `status_progress` LOP itu PERMANEN nyangkut di `'pengukuran'` -- tidak ada aksi apapun di UI waspang yang bisa memicu ulang transisi itu (menandai ulang item yg sudah N/A tidak melakukan apa-apa, request tidak terkirim), jadi LOP tsb nyangkut selamanya walau pekerjaan Waspang di Step 4 sudah benar-benar tuntas.
+
+### Fix — Self-heal setiap kali halaman Pengukuran dibuka
+
+Ditambahkan `WaspangController::maybeAdvancePengukuranStage(Project $project): void` -- gate TUNGGAL "boleh maju `status_progress` pengukuran → finishing?" (syarat SAMA PERSIS dgn yg lama: bukan LOP program PT2, belum drop/golive, tidak sedang hold/drop, persis di sequence 8/Pengukuran, dan `pengukuranDone` true dari `progressSummary()`). Dipakai di 2 tempat:
+
+1. **`toggleMeasurementCheck()`** -- blok gate inline lama (duplikat logic) diganti jadi 1 baris `$this->maybeAdvancePengukuranStage($project)`, supaya aturannya 1 sumber kebenaran.
+2. **`pengukuran($id)`** (method GET yg merender halaman Step 4) -- dipanggil DI AWAL, SEBELUM `$project` yg dipakai utk view di-fetch, memakai instance `Project` TERPISAH (supaya cache `progressSummary()` milik `$project` yg dipakai view tidak ikut basi kalau `status_progress` berubah di tengah request). Efeknya: begitu Waspang membuka (atau me-refresh) halaman Pengukuran untuk LOP manapun yang secara nyata sudah `pengukuranDone` tapi `status_progress`-nya masih tertinggal di `'pengukuran'`, sistem otomatis membetulkan ke `'finishing'` SEBELUM halaman dirender -- jadi ini juga langsung memperbaiki LOP-LOP LAMA yang sudah kadung nyangkut, tanpa perlu migration/perbaikan data manual. Idempotent & aman dipanggil berkali-kali (tidak ada efek kalau LOP sudah bukan di sequence 8 atau belum `pengukuranDone`).
+
+Karena `toggleMeasurementCheck()` selalu redirect `back()` ke halaman Pengukuran (`resources/views/waspang/steps/pengukuran.blade.php`), toggle terakhir yg menyelesaikan item ke-5 pun otomatis melewati self-heal ini juga saat halaman reload -- jadi kasus toggle-langsung maupun kasus LOP-lama-yg-sudah-kadung-nyangkut sama-sama tertangani lewat 1 titik masuk yang sama.
+
+Verifikasi balance: `WaspangController.php` -> brace 260/260, paren 1448/1448. Fungsi `pengukuran()`, `toggleMeasurementCheck()`, `maybeAdvancePengukuranStage()` masing-masing muncul tepat 1x (tidak ada duplikasi akibat proses edit).
+
+### Scope — TIDAK diubah
+- Syarat gate (PT2/hold/drop/golive/sequence/`pengukuranDone`) tidak berubah nilainya sama sekali -- murni dipindah jadi 1 method reusable, bukan logic baru.
+- Alur admin approve eviden (`ProjectController::approveEvidence()`), submission FI-OGP Golive, dan gate-gate auto-advance lain (persiapan→instalasi, finishing→fi_ogp_golive) tidak disentuh.
+- Tidak ada perubahan skema/migration DB -- perbaikan LOP lama yg nyangkut terjadi otomatis lewat request GET halaman Pengukuran (bukan lewat script/query manual), sehingga aman dijalankan kapan saja tanpa downtime.
+
+### File yang diubah
+- `app/Http/Controllers/WaspangController.php` (tambah `maybeAdvancePengukuranStage()`, panggil dari `pengukuran()` [self-heal saat halaman dibuka] dan `toggleMeasurementCheck()` [refactor dari inline jadi reusable])
+
+
+---
+
+## Section AK — Fix Tombol "Uji Terima" di Step 5 Finishing Nyangkut Disabled Walau Admin Sudah Approve Semua Eviden
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "status sudah finishing benar karena sudah di step finishing, tapi kenapa button menunggu approval masih disable padahal sudah di approve semua eviden nya oleh admin"
+
+### Konteks & Root cause
+
+Halaman Step 5 Finishing (`resources/views/waspang/steps/finishing.blade.php`) punya tombol aksi akhir "Review BOQ Final" yang HANYA aktif kalau variabel `$readyForUt` bernilai true; kalau tidak, yg tampil tombol disabled "Menunggu Semua Eviden Approved". Variabel ini dihitung LANGSUNG di view (bukan lewat `Project::progressSummary()` yg jadi sumber kebenaran di tempat lain):
+
+```php
+$totalEvidence = $evidences->count();          // SELURUH eviden project
+$rejectedEvidence = $evidences->where('status', 'rejected')->count();
+$pendingEvidence = $evidences->where('status', 'pending')->count();
+
+$readyForUt = $totalEvidence > 0 && $pendingEvidence == 0 && $rejectedEvidence == 0 && $approvedEvidence == $totalEvidence;
+```
+
+`$evidences = $project->evidences` mengambil **SELURUH baris eviden milik project, LINTAS SEMUA STAGE** (persiapan/instalasi/pengukuran/finishing sekaligus), bukan cuma eviden Step 5 Finishing. Upload ulang eviden (`WaspangController::uploadEvidence()`) SELALU membuat baris `Evidence` BARU (INSERT), bukan meng-update baris lama -- jadi begitu 1 eviden DI TAHAP MANAPUN (termasuk Instalasi/Pengukuran yg jauh lebih awal) pernah di-reject lalu diganti dgn upload baru, baris LAMA yang berstatus `rejected` itu TETAP ada di database selamanya (tidak otomatis terhapus, hanya terhapus kalau Waspang secara manual menekan tombol hapus foto). Akibatnya `$rejectedEvidence` (dihitung dari SELURUH riwayat project) nyaris tidak pernah bisa balik ke 0, dan tombol Uji Terima nyangkut disabled PERMANEN walau eviden yg BENAR-BENAR relevan/wajib sekarang sudah 100% di-approve admin -- persis kasus yg dilaporkan user.
+
+### Fix
+
+`$readyForUt` diganti supaya memakai `Project::progressSummary()['finishingDone']` -- gate yang SAMA PERSIS dipakai di 2 tempat lain yg sudah lebih dulu benar:
+1. Checklist hijau Step 5 di `resources/views/waspang/partials/stepper.blade.php` (`$step5Done`).
+2. Auto-advance `status_progress` dari `finishing` ke `fi_ogp_golive` di `ProjectController::submitGoliveDocuments()`.
+
+`finishingDone` dihitung PER ITEM BOQ yang BENAR-BENAR wajib finishing evidence SAAT INI (`designatorData->requires_finishing_evidence`, via `materialProgressItems()`) -- bukan hitungan mentah lintas semua stage/semua riwayat -- sekaligus mensyaratkan `persiapanDone && instalasiDone && pengukuranDone` juga sudah true. Jadi baris eviden lama yg sudah tidak relevan (mis. rejected di Instalasi 2 bulan lalu yg sudah diganti & di-approve) tidak lagi ikut menyandera tombol ini, dan definisi "siap Uji Terima" sekarang konsisten 1:1 dengan definisi "Selesai" yg dipakai di seluruh flow (stepper, halaman admin Approval Eviden Section AH/AI, auto-advance ke FI-OGP Golive).
+
+Verifikasi balance: `finishing.blade.php` -> div 61/61, @if/@endif 10/10, @foreach/@endforeach 2/2, @forelse/@endforelse 1/1, @php/@endphp 2/2, brace 184/184, paren 251/251.
+
+### Scope — TIDAK diubah
+- Variabel `$totalEvidence`/`$approvedEvidence`/`$pendingEvidence`/`$rejectedEvidence` TETAP dihitung dari seluruh eviden project seperti sebelumnya -- tetap dipakai murni sebagai angka informatif di kartu "Ringkasan Approval Eviden" (bukan lagi jadi gate tombol). Tidak diubah agar scope perbaikan tetap minimal & fokus ke bug yg dilaporkan.
+- Definisi `finishingDone` sendiri di `Project::progressSummary()` tidak diubah nilainya sama sekali -- murni dipakai ulang (reuse), bukan logic baru.
+- Halaman/step lain (Persiapan, Persiapan Instalasi, Instalasi, Pengukuran) tidak disentuh.
+
+### File yang diubah
+- `resources/views/waspang/steps/finishing.blade.php` (`$readyForUt` -- dari hitungan mentah SELURUH eviden project jadi `progressSummary()['finishingDone']`)
+
+
+---
+
+## Section AL — Audit "Semua Menu yang Berhubungan dengan Status Progress" + Hapus Step 6 "Selesai" di Waspang + Fix Gap Matrix Dashboard
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "untuk waspang cukup berhenti sampai step finishing saja jadi tidak perlu step selesai kemudian nanti saat pull ke server bagaimana penyesuaian terhadap LOP yang sebelumnya sudah berjalan dan perhitungan matrix nanti di sesuaikan desain nya dengan kondisi yang sekarang bantu sesuaikan juga semua menu yang berhubungan dengan status progress , analisa terlebih dahulu dan lakukan audit sebelum eksekusi"
+
+### Metodologi audit
+
+Sebelum eksekusi, dilakukan pemetaan SEMUA konsumen `Project::progressSummary()` / `Project::stageColorClasses()` / `effectiveStageLabel` / `effectiveStageSequence` di seluruh codebase (grep lintas `app` & `resources`), didapat 23 file. Dari situ ditemukan 3 gap konkret di luar scope yg sudah dibereskan Section AF-AK, lalu didiskusikan ke user (3 pertanyaan konfirmasi) sebelum eksekusi:
+
+1. **Matrix Dashboard Admin** (`DashboardController::regularStatusBucket()`) -- LOP yang sedang HOLD selalu dihitung ke bucket "Preparation", tidak pernah melihat tahap sebenarnya sebelum di-hold. -> **User pilih: perbaiki (samakan dgn halaman lain yg sudah hold-safe).**
+2. **Dashboard PM** (`DashboardPmController`, definisi "Completed" = literally Golive/progress 100%) -- beda dgn definisi "Selesai" di Approval Eviden (Section AH/AI: FI-OGP Golive ATAU Golive). -> **User pilih: BIARKAN seperti sekarang** (Completed tetap ketat, hanya Golive murni) -- TIDAK diubah.
+3. **3 menu dgn badge warna tahap manual** (PM Program table, Admin Program table, Admin Project detail modal) -- if/elseif cuma kenal label 'Finishing'/'Pengukuran'/'Instalasi', tahap lain (Persiapan Instalasi, FI-OGP Golive) selalu jatuh ke else -> badge MERAH. -> **User pilih: selaraskan ke `Project::stageColorClasses()`.**
+
+### Perubahan 1 — Waspang: hapus Step 6 "Selesai" dari stepper
+
+`resources/views/waspang/partials/stepper.blade.php` sebelumnya punya 6 segmen (grid-cols-6): Persiapan/Persiapan Instalasi/Instalasi/Pengukuran/Finishing/**Selesai**. Segmen ke-6 ini dari awal HANYA indikator visual (href `null`, `open` selalu `false`, tidak pernah jadi halaman waspang sendiri) yang menandakan LOP sudah lewat Finishing (FI-OGP Golive/Golive, sequence >9) -- murni informatif, TIDAK ADA aksi/route/controller yang bergantung padanya.
+
+Dihapus: elemen array segmen nomor 6 beserta variabel `$step6Done` yang jadi tidak terpakai, dan grid diubah dari `grid-cols-6` ke `grid-cols-5`. Perjalanan Waspang di mobile sekarang resmi berhenti di Step 5 Finishing + halaman "Review BOQ Final" (`reviewFinal()`, ringkasan Plan vs Aktual read-only) -- sesuai instruksi user, karena FI-OGP Golive/Golive memang murni pekerjaan Admin (upload 4 dokumen SDI: capture valins/ABD/valid4-KML/mancore), tidak ada aksi Waspang di tahap itu.
+
+### Perubahan 2 — Penyesuaian terhadap LOP yang sudah berjalan (backward compatibility)
+
+**Tidak perlu migration/perbaikan data apapun.** Dianalisa: untuk LOP manapun yang statusnya SUDAH `fi_ogp_golive`/`golive` saat perubahan ini di-deploy, stepper mobile Waspang tetap menampilkan Step 5 Finishing dengan checklist HIJAU (`$step5Done = $seq > 9` sudah true untuk sequence 10/11 sejak awal dibangun), dan tombol "Review BOQ Final" tetap aktif (via `progressSummary()['finishingDone']`, Section AK). LOP tsb hanya tidak lagi melihat segmen "Selesai" ke-6 yang memang tidak pernah mereka klik/pakai -- tidak ada perilaku fungsional yang hilang.
+
+### Perubahan 3 — Fix gap Matrix Dashboard Admin (hold-aware)
+
+`DashboardController::regularStatusBucket()` (dipakai di 2 tempat: build Matrix Regular utama & drill-down detail saat klik 1 sel Matrix) sebelumnya cuma menerima `$statusProgress` mentah + flag `$isGoLive` -- LOP yang sedang HOLD (raw `status_progress = 'hold'`) TIDAK PERNAH resolve ke tahap sebenarnya sebelum di-hold, selalu jatuh ke bucket "Preparation" walau LOP itu di-hold saat sudah di Instalasi/Finishing/dst.
+
+**Fix**: method sekarang menerima parameter ke-3 `?string $statusBeforeHold` (dari kolom `lops.status_progress_before_hold`, ditambahkan ke 2 query select yang memanggilnya). Kalau raw status = `'hold'` dan ada `$statusBeforeHold`, bucket dihitung dari tahap SEBELUM hold itu -- persis pola hold/drop-safe yang sudah dipakai stepper mobile Waspang, tracking, dan Approval Eviden (Section AH/AI). LOP `drop` tetap dikeluarkan dari Matrix seperti sebelumnya (tidak diubah -- default filter `status_progress != 'drop'`, kecuali user memang memfilter status='drop' secara eksplisit).
+
+Catatan: `pt2StatusBucket()` (Matrix PT 2, query terpisah dari `pt2_lops`) SENGAJA TIDAK disentuh -- di luar scope "menu status_progress" LOP reguler yang dibahas sesi ini, dan PT 2 sudah konsisten memakai jalur/gate terpisah (`$isPt2` exclusion) di seluruh refactor sebelumnya.
+
+### Perubahan 4 — Selaraskan badge warna tahap di 3 menu
+
+`resources/views/pm/program/partials/table.blade.php`, `resources/views/admin/program/partials/table.blade.php`, dan `resources/views/admin/projects/partials/modals.blade.php` sebelumnya punya logic manual:
+
+```php
+if ($progress == 100) { ... hijau ... }
+elseif ($stageLabel === 'Finishing') { ... ungu ... }
+elseif ($stageLabel === 'Pengukuran') { ... biru ... }
+elseif ($stageLabel === 'Instalasi') { ... kuning ... }
+else { ... MERAH ... }
+```
+
+Cabang `else` ini menangkap SEMUA label tahap lain -- termasuk "Persiapan Instalasi" dan "FI-OGP Golive" yang notabene progress-nya sudah tinggi (masing-masing ~50% dan ~90%) -- sehingga tampil dengan badge merah seolah bermasalah/macet, padahal sebaliknya. Diganti dengan `Project::stageColorClasses($summary['effectiveStageColor'] ?? null)`, skema warna standar yang SAMA PERSIS dipakai di `admin/projects/index`, `project-card`, `project-detail`, dan `evidences/approval` (Section AF-AI) -- tiap tahap (termasuk yg baru: Persiapan Instalasi=biru, FI-OGP Golive=ungu, Golive=hijau) sekarang dapat warna yang konsisten & akurat di seluruh aplikasi, bukan cuma di segelintir halaman.
+
+Verifikasi balance: `DashboardController.php` -> brace 160/160, paren 889/889. `stepper.blade.php` -> div 10/10, @if/@endif 4/4, @php/@endphp 2/2, @foreach/@endforeach 1/1, brace 47/47, paren 87/87 (segmen sekarang tepat 5). `pm/program/partials/table.blade.php` -> brace 47/47, paren 39/39. `admin/program/partials/table.blade.php` -> brace 64/64, paren 36/36. `admin/projects/partials/modals.blade.php` -> brace 77/77, paren 49/49, div 56/56.
+
+### Scope — TIDAK diubah
+- **Dashboard PM "Completed" definition** (`DashboardPmController`) -- SESUAI pilihan user, TETAP ketat: hanya literally Golive (progress 100%) yang dihitung Completed, FI-OGP Golive tetap dihitung "Waiting/On Progress".
+- Matrix PT 2 (`pt2StatusBucket()`, `admin/pt2/*`) -- tidak disentuh, di luar scope, PT 2 selalu punya jalur terpisah.
+- Formula `progress` (0-100% berbasis sequence 11-tahap) di `Project::progressSummary()` tidak diubah -- Waspang berhenti di Finishing hanya soal TAMPILAN stepper mobile (segmen ke-6 dihapus), bukan perhitungan progress% itu sendiri (yang tetap dipakai admin utk lacak posisi LOP sampai Golive).
+- Halaman/menu lain yang sudah benar sejak Section AF-AK (index, project-card, project-detail, tracking, evidences/approval + partial stepper) tidak disentuh ulang.
+
+### File yang diubah
+- `resources/views/waspang/partials/stepper.blade.php` (hapus segmen 6 "Selesai", grid-cols-6 -> grid-cols-5)
+- `app/Http/Controllers/DashboardController.php` (`regularStatusBucket()` -- hold-aware via `status_progress_before_hold`, 2 query select + 2 call site diupdate)
+- `resources/views/pm/program/partials/table.blade.php` (badge warna tahap -> `Project::stageColorClasses()`)
+- `resources/views/admin/program/partials/table.blade.php` (badge warna tahap -> `Project::stageColorClasses()`)
+- `resources/views/admin/projects/partials/modals.blade.php` (badge warna tahap -> `Project::stageColorClasses()`)
+
+
+---
+
+## Section AM — Penyesuaian `status_progress` LOP Lama (Belum Di-assign → Inisiasi, Sudah Ada Eviden → Tahap Sesuai)
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "bantu sesuaikan lagi untuk semua LOP yang belum di assign maka statusnya berubah menjadi inisiasi, untuk LOP yang sudah ada eviden nya maka di sesuaikan status nya berada dalam tahap apa, karena memang data yang sudah masuk sebelum refactor banyak yang sedang on progress atau di step persiapan"
+
+### Latar belakang masalah
+
+Migration `2026_09_08_090300_convert_lops_status_progress_to_project_stages.php` (saat refactor 11-tahap pertama kali dijalankan) menyamaratakan SEMUA LOP lama yang berstatus enum `preparation` langsung jadi `persiapan_instalasi` -- asumsi paling aman waktu itu (LOP lama dianggap selalu lewat alur lama barang_tiba+perizinan). Tapi ini tidak akurat untuk 2 kelompok data:
+1. LOP yang **belum pernah di-assign waspang sama sekali** -- harusnya masih di `inisiasi`, bukan langsung dianggap sudah di step Persiapan Instalasi.
+2. LOP yang **sebenarnya sudah lebih jauh** dari `persiapan_instalasi` (sudah ada eviden Instalasi/Pengukuran/Finishing yang disetujui sebelum refactor jalan) -- tapi migration pertama tidak pernah mengecek eviden, jadi status-nya "mundur" secara visual walau pekerjaan sebenarnya sudah jauh lebih maju.
+
+### Tidak bisa dieksekusi langsung dari sesi ini
+
+Sesi Claude ini HANYA punya akses file (`device_bash`, mount `$HOME/mnt/dompis-cons`) -- TIDAK ADA `mysql`/`php artisan` yang bisa dijalankan langsung ke database produksi (sudah diverifikasi berkali-kali sepanjang sesi). Jadi hasil kerja Section ini adalah **kode Artisan command baru** yang harus dijalankan sendiri oleh user di server sebenarnya, bukan perubahan data langsung.
+
+### Audit sebelum eksekusi (3 pertanyaan konfirmasi ke user)
+
+1. **LOP sudah di-assign tapi belum ada eviden sama sekali** -> **User pilih: status = `survey`** (konsisten dengan `ProjectController::assignWaspang()` yang sudah memajukan LOP baru dari `inisiasi` ke `survey` begitu di-assign).
+2. **LOP berstatus HOLD/DROP/FI-OGP Golive/Golive** -> **User pilih: SKIP semuanya**, tidak ikut disesuaikan/dihitung ulang -- posisi yang tersimpan (termasuk `status_progress_before_hold`) dianggap sudah final/benar.
+3. **Cara eksekusi** -> **User pilih: Artisan command dengan wajib `--dry-run` dulu** (preview sebelum apply), bukan migration otomatis saat deploy.
+4. **LOP PT2** -> **User pilih: tetap dikecualikan seperti biasa** (di luar scope, `Pt2Lop` punya jalur/tabel terpisah).
+
+### Command baru: `php artisan lops:sync-legacy-status`
+
+File baru: `app/Console/Commands/SyncLegacyLopStatusProgress.php`.
+
+**Algoritma per LOP** (LOP HOLD/DROP/FI-OGP Golive/Golive dan LOP PT2 dilewati total, tidak disentuh sama sekali):
+
+1. **Belum di-assign** (tidak ada baris `pro_assign` dengan `waspang_id` terisi untuk project ini) -> dipaksa ke `inisiasi`, apa pun status_progress sekarang.
+2. **Sudah di-assign, tanpa eviden sama sekali** -> `survey`.
+3. **Sudah di-assign DAN punya eviden** -> dihitung ulang dari eviden LAMA (`stage` = `persiapan`/`instalasi`/`pengukuran`/`finishing`, format & query PERSIS sama dengan `WaspangController::isProjectReadyUt()` supaya konsisten dengan logic "Ready UT" yang sudah berjalan -- SENGAJA tidak memakai `Project::progressSummary()` karena sebagian shortcut method itu bergantung pada `$sequence`/status_progress saat ini, yang justru sedang mau dikoreksi):
+   - Eviden Finishing (`stage=finishing`) disetujui -> `finishing`.
+   - Semua item material Instalasi disetujui DAN eviden Pengukuran (OTDR+OPM+Kedalaman) lengkap disetujui, tapi belum ada eviden Finishing -> `finishing` (siap lanjut, sama seperti pola auto-advance pengukuran->finishing di Section AJ).
+   - Semua item material Instalasi disetujui, eviden Pengukuran belum lengkap -> `pengukuran`.
+   - Eviden Barang Tiba & Perizinan (`stage=persiapan`) disetujui, eviden Instalasi (progress_boq) belum lengkap -> `instalasi`.
+   - Ada eviden Barang Tiba/Perizinan diupload tapi belum lengkap disetujui -> `persiapan_instalasi`.
+   - Tidak ada eviden legacy sama sekali -> `survey`.
+
+   **Pengaman penting**: hasil hitungan di atas HANYA dipakai untuk MEMAJUKAN status_progress (dibandingkan `sequence` di `project_stages` -- kode `drm` dianggap alias `perizinan`/sequence 4, sama seperti `Project::progressSummary()`). Kalau hasil hitungan <= posisi yang tersimpan sekarang, LOP TIDAK disentuh sama sekali -- supaya LOP yang statusnya sudah benar lewat flow BARU (Survey/Perizinan/Material Delivery dengan `BoqSurveyRound`, dll -- yang eviden-nya TIDAK memakai `stage='persiapan'` legacy) tidak ikut termundurkan oleh perhitungan berbasis eviden lama ini.
+
+**Mode kerja**:
+- Default = **dry-run**: `php artisan lops:sync-legacy-status` hanya menampilkan tabel preview (id_lop, project, status lama -> baru, alasan) dan jumlah total, TIDAK menulis apa pun.
+- `--project=<id_project>` untuk uji coba di 1 project dulu sebelum jalan ke semua data.
+- `--apply` untuk benar-benar menyimpan -- masih ada 1 lapis konfirmasi interaktif (`$this->confirm(...)`) sebelum commit, dijalankan dalam `DB::transaction()` (all-or-nothing), dan tiap perubahan dicatat ke `ProjectActivityService::log()` (activity_type `sync_legacy_status_progress`) supaya ada jejak audit per LOP di riwayat aktivitas project.
+
+**Cara pakai di server** (setelah deploy kode ini):
+```
+php artisan lops:sync-legacy-status                 # lihat dulu preview lengkap
+php artisan lops:sync-legacy-status --project=123    # opsional: coba 1 project dulu
+php artisan lops:sync-legacy-status --apply          # baru benar-benar simpan (ada konfirmasi y/n)
+```
+
+Verifikasi: `php -l` (lint) lolos tanpa error di sandbox lokal, file ditransfer ke device dan diverifikasi checksum MD5 identik byte-per-byte (`dfe075d0211edec2d5cbb504a70306be`) sebelum ditulis ke `app/Console/Commands/SyncLegacyLopStatusProgress.php`. Tidak ada file lain yang diubah di Section ini -- command baru berdiri sendiri, tidak dipanggil otomatis oleh scheduler/route mana pun (harus dijalankan manual oleh user).
+
+### Scope — TIDAK diubah
+- LOP HOLD/DROP/FI-OGP Golive/Golive -- tidak disentuh sama sekali oleh command ini.
+- LOP PT2 (`Pt2Lop`/`pt2_lops`) -- tidak disentuh, di luar scope seperti biasa.
+- Tidak ada migration baru, tidak ada perubahan skema tabel apa pun.
+- Tidak ada perubahan ke `Project::progressSummary()`, controller, atau view manapun -- murni backfill data one-off lewat command terpisah yang dijalankan manual.
+
+### File yang diubah
+- `app/Console/Commands/SyncLegacyLopStatusProgress.php` (baru)
+
+
+---
+
+## Section AN — Perbaikan Matrix Dashboard "Rekap Assignment & Status Project PT 3" (Semua Role: Admin, PM, Super TIF)
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "lanjut perbaikan matrix pada semua role menu dashboard Rekap Assignment & Status Project PT 3 tambahkan kolom BLM ASSIGN dan bisa di klik angka nya, kemudian diatas tabel matrix tersebut tambahkan tabel matrix berdasarkan status progress lengkap dengan Breakdown (Region / Branch) dan angka juga bisa di klik muncul modal list nya"
+
+### Temuan audit
+
+Tabel "Rekap Assignment & Status Project PT 3" dan tabel "Matriks Progress Project PT 3" (breakdown Region/Branch berdasarkan status progress -- Prepare/Progress/Finish/%Done per program OSP/OLO/HEM/NODE B/EKSBIS) TERNYATA sudah ada di ketiga dashboard role (`resources/views/admin/dashboard.blade.php`, `resources/views/pm/dashboard.blade.php`, `resources/views/super_tif/dashboard.blade.php`), dan angka pada tabel "Matriks Progress" itu SUDAH bisa diklik (memanggil `show({type:'regular', ...})` -> modal list via endpoint `matrixDetail()` di `DashboardController`/`DashboardPmController`). Yang belum sesuai permintaan user:
+
+1. Urutan tampil: "Rekap Assignment" tampil DI ATAS "Matriks Progress" di ketiga dashboard -- padahal user minta tabel status-progress (Matriks Progress) tampil DI ATAS tabel Assignment.
+2. Kolom "BLM ASSIGN" (LOP yang belum di-assign waspang) belum ada di tabel Rekap Assignment -- hanya ada Total LOP/Assign/In Review/Complete/Progress Rate.
+3. Backend `matrixDetail()` di KEDUA controller (`DashboardController` utk admin/super_tif, `DashboardPmController` utk PM) TERNYATA sudah lengkap mendukung `metric:'unassigned'` (baris `'unassigned' => !$isAssigned` sudah ada dari refactor sebelumnya) -- jadi drill-down modal utk BLM ASSIGN tidak perlu perubahan backend sama sekali, cukup tambahkan kolom + tombol klik di Blade.
+
+### Perubahan
+
+**1. Reorder section** -- di ketiga file, block `{{-- MATRIX PROJECT REGULAR --}}` / `{{-- MATRIX PROGRESS PROJECT REGULAR --}}` (Matriks Progress Project PT 3, breakdown Region/Branch per program, sudah clickable) dipindah ke ATAS block `{{-- TABEL REKAP COLLAPSIBLE PER REGION --}}` / `{{-- TABEL REKAP ASSIGNMENT ... --}}` (Rekap Assignment). Tidak ada perubahan isi/logic di kedua block, murni pindah posisi tampil.
+
+**2. Kolom "Blm Assign"** ditambahkan di tabel Rekap Assignment (antara kolom "Assign" dan "In Review") di ketiga dashboard, level Region maupun Branch:
+- Header baru: `<th>Blm Assign</th>`.
+- Nilai dihitung langsung di Blade dari data yang SUDAH tersedia di `$statsByRegion`/`$reg['branches']` (tidak perlu query/controller baru): `{{ $reg['total'] - $reg['assigned'] }}` (level region) dan `{{ $br['total'] - $br['assigned'] }}` (level branch).
+- Warna badge: rose (merah muda), konsisten dengan warna "Belum Assign" di widget lain (`stageSummary` pakai warna `red` utk label yang sama).
+- Angka bisa diklik: `@click.stop="show({type:'assignment', region:..., branch:..., metric:'unassigned'})"` -- membuka modal list LOP yang belum di-assign, memakai endpoint `matrixDetail()` yang SUDAH ADA (tidak perlu endpoint baru, metric `unassigned` sudah didukung sejak refactor sebelumnya).
+- Fallback state "Tidak ada data" (`colspan`) disesuaikan dari 6 -> 7 kolom.
+
+**3. Perbaikan kosmetik**: swap block memindahkan 1 baris comment divider dekoratif (`{{-- ===...=== --}}`) yang tadinya mengapit judul "Matrix Project PT 2" -- diperbaiki manual supaya divider tetap di posisi semula (murni comment Blade, tidak memengaruhi output HTML, tapi dirapikan untuk kebersihan kode).
+
+### Tidak ada perubahan controller/backend
+
+Semua perubahan Section ini murni di file Blade (`admin/dashboard.blade.php`, `pm/dashboard.blade.php`, `super_tif/dashboard.blade.php`). `DashboardController::matrixDetail()` dan `DashboardPmController::matrixDetail()` TIDAK disentuh -- keduanya sudah lengkap mendukung metric `unassigned` dari sebelumnya.
+
+Verifikasi: balance div/table/tr/td/th/thead/@foreach/@forelse/@empty/@php cocok di ketiga file setelah perubahan (dihitung dengan regex `<th[ >]` supaya tidak tertukar dengan `<thead`). Heading order dicek ulang (`Matriks Progress Project PT 3` tampil sebelum `Rekap Assignment & Status Project PT 3` di ketiga file). Komponen modal Alpine (`function show`, `x-data="matrixDetailModal..."`) dipastikan masih utuh (jumlah kemunculan tidak berubah) setelah reorder block.
+
+### File yang diubah
+- `resources/views/admin/dashboard.blade.php`
+- `resources/views/super_tif/dashboard.blade.php`
+- `resources/views/pm/dashboard.blade.php`
+
+
+---
+
+## Section AO — Revisi Pengelompokan Kolom Matriks Progress Project PT 3 + Kembalikan Urutan Tabel
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "ada revisi pada matrix Matriks Progress Project PT 3 Program PT 3: OSP, OLO, HEM, NODE B, EKSBIS. revisi untuk tampilan nya di bagi step persiapan dan persiapan instalasi masuk kolom Prepare, step instalasi, pengukuran, finishing masuk kolom Progress, step FI - OGP Golive dan Golive mask kolom finish dan tabel tersebut di bawah dari tabel rekap assignment"
+
+### Revisi 1 — Urutan tabel dikembalikan
+
+Section AN sebelumnya memindahkan "Matriks Progress Project PT 3" ke ATAS "Rekap Assignment & Status Project PT 3" di ketiga dashboard (admin, PM, Super TIF). User sekarang eksplisit minta urutan SEBALIKNYA: Rekap Assignment di ATAS, Matriks Progress di BAWAH -- yaitu urutan ASLI sebelum Section AN. Ketiga file dikembalikan (swap block sekali lagi), termasuk comment divider dekoratif di sekitar judul "Matrix Project PT 2" yang ikut dirapikan lagi supaya tetap presisi mengapit judulnya. Kolom "Blm Assign" yang ditambahkan di Section AN TETAP ada (tidak ikut di-revert) -- `git diff` akhir terhadap kondisi sebelum Section AN cuma menyisakan penambahan kolom itu, urutan tabel sudah identik dengan semula.
+
+### Revisi 2 — Pengelompokan kolom Prepare/Progress/Finish
+
+`regularStatusBucket()` (dipakai utk membangun tabel Matrix & drill-down modalnya, di KEDUA controller -- `DashboardController` utk admin/Super TIF, `DashboardPmController` utk PM) sebelumnya mengelompokkan:
+- Prepare = semua tahap SEBELUM Instalasi (inisiasi/survey/drm/perizinan/material_delivery/persiapan_instalasi)
+- Progress = Instalasi, Pengukuran
+- Finish = Finishing, FI-OGP Golive, Golive
+
+Direvisi sesuai instruksi user jadi:
+- **Prepare** = seluruh fase Persiapan (inisiasi/survey/drm/perizinan/material_delivery) **DAN** Persiapan Instalasi -- TIDAK BERUBAH dari sebelumnya, tetap semua tahap sebelum Instalasi.
+- **Progress** = Instalasi, Pengukuran, **DAN Finishing** (finishing PINDAH dari kolom Finish ke kolom Progress).
+- **Finish** = **HANYA** FI-OGP Golive dan Golive (sebelumnya termasuk Finishing, sekarang tidak lagi).
+
+Implementasi: hanya baris kondisi di dalam `regularStatusBucket()` yang diubah (`in_array($status, ['fi_ogp_golive', 'golive'])` utk Finish, `in_array($status, ['instalasi', 'pengukuran', 'finishing'])` utk Progress) -- key array yang dikembalikan (`'preparation'`/`'instalasi'`/`'finishing'`) TIDAK diubah namanya supaya tidak perlu menyentuh Blade (label kolom Prepare/Progress/Finish di tabel tetap membaca key yang sama, cuma isinya yang berbeda sekarang). Drill-down modal (klik angka di kolom manapun) otomatis ikut konsisten karena memakai method yang sama.
+
+**Temuan tambahan saat audit**: `DashboardPmController::regularStatusBucket()` ternyata masih versi LAMA yang belum hold-aware (tidak menerima `$statusBeforeHold`, beda dengan `DashboardController` punya admin/Super TIF yang sudah diperbaiki di Section AL) -- LOP PM yang sedang HOLD akan salah taruh ke kolom Prepare walau di-hold saat sudah jauh (mis. Finishing). Sekalian diperbaiki di Section ini supaya PM konsisten dengan admin/Super TIF: parameter `?string $statusBeforeHold = null` ditambahkan, 2 query (`matrixRows` build & drill-down modal) ditambah select `l.status_progress_before_hold`, dan 2 call site method diupdate mengirim parameter itu.
+
+Verifikasi: `app/Http/Controllers/DashboardController.php` brace 160/160, paren 892/892. `app/Http/Controllers/DashboardPmController.php` brace 85/85, paren 669/669. Ketiga file Blade diverifikasi ulang: urutan heading (`Rekap Assignment` sebelum `Matriks Progress`), balance `<div>`/`<th>`, dan jumlah comment divider (`{{-- ===...=== --}}`) tepat 2 di admin/Super TIF (mengapit judul PT 2) dan 0 di PM (memang tidak pernah pakai pola divider itu).
+
+### Scope — TIDAK diubah
+- `pt2StatusBucket()` (Matrix PT 2) -- tidak disentuh, PT 2 selalu punya jalur terpisah.
+- `matrixDetail()` di kedua controller -- tidak perlu perubahan struktur, hanya otomatis ikut konsisten karena memanggil `regularStatusBucket()` yang sudah direvisi.
+- Kolom "Blm Assign" (Section AN) -- tetap ada, tidak ikut direvisi/dihapus.
+
+### File yang diubah
+- `app/Http/Controllers/DashboardController.php` (`regularStatusBucket()` -- bucket Prepare/Progress/Finish direvisi)
+- `app/Http/Controllers/DashboardPmController.php` (`regularStatusBucket()` -- bucket direvisi + hold-aware, 2 query select + 2 call site diupdate)
+- `resources/views/admin/dashboard.blade.php` (urutan tabel dikembalikan ke semula)
+- `resources/views/super_tif/dashboard.blade.php` (urutan tabel dikembalikan ke semula)
+- `resources/views/pm/dashboard.blade.php` (urutan tabel dikembalikan ke semula)
+
+
+---
+
+## Section AP — Stepper "Approval Konstruksi" Admin Disamakan dengan Stepper Waspang Terbaru
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "untuk approval konstruksi di stepper masih belum sesuai seperti stepper waspang bantu sesuaikan dengan stepper terbaru mulai dari persiapan, persiapan instalasi, instalasi, pengukuran, finishing untuk FI OGP dan Golive sudah sesuai"
+
+### Temuan audit
+
+Stepper "Approval Konstruksi" admin (`resources/views/admin/evidences/partials/stepper.blade.php`, dipakai di semua halaman `admin/evidences/review-*.blade.php`) sebelumnya cuma punya 6 step: **Persiapan** (route `admin.evidences.review.project`) → Instalasi → Ukur → Finish → FI-OGP → Golive. Setelah dibandingkan dengan stepper Waspang terbaru (`resources/views/waspang/partials/stepper.blade.php`, 5 step visible: Persiapan / **Persiapan Instalasi** / Instalasi / Pengukuran / Finishing), ketahuan step admin "Persiapan" itu SEBENARNYA berisi eviden Barang Tiba & Perizinan (`stage='persiapan'`) -- yaitu konten yang di sisi Waspang disebut **Persiapan Instalasi** (sequence 6), BUKAN Persiapan asli (sequence 1-5: inisiasi/survey/perizinan/material_delivery). Jadi labelnya salah & 1 step (Persiapan asli) belum ada sama sekali di sisi admin.
+
+Ditanyakan ke user cara menampilkan step "Persiapan" yang hilang itu -- user memilih: **tambahkan step Persiapan sebagai indikator status beserta sub-step-nya, dan kalau ada eviden foto tetap perlu approval Admin** (bukan cuma indikator kosong).
+
+### Perubahan
+
+**1. Stepper direvisi jadi 7 step** (`resources/views/admin/evidences/partials/stepper.blade.php`):
+1. **Persiapan** (BARU) → route `admin.evidences.review.persiapan` (baru)
+2. **Persiapan Instalasi** (relabel dari "Persiapan" lama, konten TIDAK berubah) → route `admin.evidences.review.project` (tetap)
+3. Instalasi → `admin.evidences.review.instalasi`
+4. Ukur (Pengukuran) → `admin.evidences.review.pengukuran`
+5. Finish (Finishing) → `admin.evidences.review.finishing`
+6. FI-OGP → `admin.evidences.review.golive`
+7. Golive → `admin.evidences.review.golive`
+
+Step 1 "Done" (hijau) dibaca dari posisi sequence LOP (`effectiveStageSequence > 5`), sama pola dengan step FI-OGP/Golive (bukan approval-gated per-eviden).
+
+**2. Halaman baru "Step 1 — Persiapan"** (`admin.evidences.review.persiapan` → `ProjectController::reviewPersiapan()` → view `admin/evidences/review-persiapan.blade.php`):
+- Breakdown 4 sub-step (Inisiasi/Survey/Perizinan/Material Delivery) ditampilkan sebagai kartu status (Selesai/Aktif/Menunggu), sumbernya posisi sequence LOP -- persis pola `WaspangController::persiapan()`.
+- Inisiasi & Survey TIDAK punya eviden foto (murni indikator posisi, tidak ada UI approve di sini -- keduanya dikerjakan lewat menu lain: Survey/BOQ, bukan upload eviden foto).
+- Perizinan & Material Delivery PUNYA eviden foto (`stage='perizinan'` evidence_type `eviden_perizinan`/`ba_kp`, dan `stage='material_delivery'`) -- ditampilkan & bisa di-approve/reject/reset per foto memakai partial `admin.evidences.partials.review-item` yang SAMA dipakai step lain. Route generik `admin.evidences.approve/reject/reset/bulk-approve` TIDAK dibatasi per-stage, jadi otomatis berfungsi tanpa perubahan backend approve/reject apapun.
+- Route baru: `GET /admin/evidences/review/{project}/persiapan` → `admin.evidences.review.persiapan`.
+
+**3. Relabel & renumber di halaman lain** (konten/logic evidence TIDAK berubah, murni teks & navigasi):
+- `review-project.blade.php`: judul "Step 1 — Persiapan" → "Step 2 — Persiapan Instalasi"; footer ditambah tombol "← Step 1 Persiapan" ke halaman baru (sebelumnya tidak ada tombol Prev karena ini dulu step pertama); "Step 1 dari 4" dihapus (footer sekarang cuma 2 tombol nav, konsisten dgn halaman lain).
+- `review-instalasi.blade.php`: tombol prev "← Step 1 Persiapan" → "← Step 2 Persiapan Instalasi" (route tetap `admin.evidences.review.project`).
+- `review-pengukuran.blade.php`: tombol prev "← Step 2 Instalasi" → "← Step 3 Instalasi".
+- `review-finishing.blade.php`: `$stepSummary` (kartu ringkasan mini-nav) ditambah 1 entri baru "Persiapan" (stage gabungan `['perizinan','material_delivery']`, route `review.persiapan`) di depan entri "Persiapan Instalasi" (relabel dari "Persiapan" lama); grid kartu `grid-cols-1 sm:grid-cols-3` → `grid-cols-2 sm:grid-cols-4` supaya muat 4 kartu; perhitungan `$stepItems` disesuaikan mendukung `stage` berupa array (`whereIn`) selain string tunggal; judul "Step 4 — Finishing" → "Step 5 — Finishing"; tombol prev "← Step 3 (Pengukuran)" → "← Step 4 (Pengukuran)".
+- `review-golive.blade.php`: "Step 5 · FI-OGP Golive" → "Step 6 · FI-OGP Golive"; "Step 6 · Golive (Verifikasi SDI)" → "Step 7 · Golive (Verifikasi SDI)".
+
+**4. `approval.blade.php`** (halaman inbox list "Approval Konstruksi"): tombol "Review" per-project diarahkan ke step yang sedang berjalan berdasarkan `effectiveStageSequence` -- default sebelumnya selalu `admin.evidences.review.project` untuk `seq` 1-6, sekarang: `seq` 1-5 (atau null) → `admin.evidences.review.persiapan` (step baru), `seq==6` → `admin.evidences.review.project` (Persiapan Instalasi, tetap), `seq==7/8/9/>=10` tidak berubah.
+
+### Tidak ada perubahan
+- `approveEvidence()`/`rejectEvidence()`/`resetEvidence()`/`bulkApprove()` di `ProjectController.php` -- generik, tidak dibatasi per-stage, sudah otomatis berfungsi untuk eviden Perizinan/BA KP/Material Delivery tanpa perubahan apapun.
+- Logic auto-advance `status_progress` saat approve eviden (di `approveEvidence()`, barier PT2/Golive) -- TIDAK ditambah cabang baru untuk `stage='perizinan'`/`'material_delivery'`, sesuai kondisi existing codebase ("5 sub-step Persiapan belum punya UI upload sendiri... Stage 4, belum dikerjakan" -- transisi status_progress untuk sub-step ini tetap manual lewat aksi Waspang: `togglePerizinanSelesai()`/`finishMaterialDelivery()`, BUKAN gated oleh approval Admin, sama seperti sebelumnya).
+- Stepper Waspang (`resources/views/waspang/partials/stepper.blade.php`) -- tidak disentuh, ini yang jadi acuan/referensi.
+
+### Verifikasi
+`php -l` (dijalankan di sandbox cloud terhadap salinan hasil staging dari device) lolos tanpa error untuk: `routes/web.php`, `app/Http/Controllers/ProjectController.php`, dan ke-8 file Blade yang diubah/ditambah (`partials/stepper.blade.php`, `review-persiapan.blade.php` [baru], `review-project.blade.php`, `review-instalasi.blade.php`, `review-pengukuran.blade.php`, `review-finishing.blade.php`, `review-golive.blade.php`, `approval.blade.php`). Balance `<div>`/`@php`/`@foreach` dicek di semua file Blade yang disentuh -- semuanya seimbang. Route baru `admin.evidences.review.persiapan` dikonfirmasi terdaftar via grep di `routes/web.php`, method `reviewPersiapan()` dikonfirmasi ada di `ProjectController.php`.
+
+### File yang diubah/ditambah
+- `app/Http/Controllers/ProjectController.php` (+method `reviewPersiapan()`)
+- `routes/web.php` (+route `admin.evidences.review.persiapan`)
+- `resources/views/admin/evidences/partials/stepper.blade.php` (7 step)
+- `resources/views/admin/evidences/review-persiapan.blade.php` (BARU)
+- `resources/views/admin/evidences/review-project.blade.php`
+- `resources/views/admin/evidences/review-instalasi.blade.php`
+- `resources/views/admin/evidences/review-pengukuran.blade.php`
+- `resources/views/admin/evidences/review-finishing.blade.php`
+- `resources/views/admin/evidences/review-golive.blade.php`
+- `resources/views/admin/evidences/approval.blade.php`
+
+
+---
+
+## Section AQ — Waspang: Progress 100% Setelah Finishing Disetujui + Halaman "Review BOQ Final" Jadi Read-Only + Pembanding BOQ Survey
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "untuk waspang step hanya sampai finishing, ketika eviden finishing sudah di approve maka pada tampilan waspang 100% kemudian button review BOQ hanya untuk Review BOQ Final di header hanya tampil tulisan Validasi Akhir Review BOQ Final tidak perlu button kunci & kirim berkas UT. Untuk review BOQ Final sebagai pembanding adalah BOQ Survey terbaru dengan actual apabila tidak ada BOQ Survey maka di bandingkan dengan BOQ Plan"
+
+### 1. Progress 100% begitu eviden Finishing disetujui
+
+Step Waspang memang cuma sampai Finishing (FI-OGP Golive & Golive murni tahap Admin/SDI, di luar jangkauan Waspang -- lihat Section AP). Tapi formula progress standar (`Project::progressSummary()['progress']`, sequence-based 11 tahap: `round(((sequence-1)/10)*100)`) masih mentok di **80%** begitu LOP mencapai Finishing (sequence 9), karena LOP memang SENGAJA tidak auto-advance lagi sampai Admin menuntaskan FI-OGP Golive & Golive (lihat catatan existing di `ProjectController` soal "Barier Pelindung"). Dari sudut pandang Waspang ini membingungkan -- pekerjaan mereka sudah 100% tuntas begitu eviden Finishing disetujui.
+
+**Fix**: `resources/views/waspang/show.blade.php` -- `$progressPercent` sekarang override jadi 100% kalau `$summary['finishingDone']` true, baru fallback ke angka sequence-based kalau belum:
+```php
+$progressPercent = ($summary['finishingDone'] ?? false) ? 100 : ($summary['progress'] ?? 0);
+```
+Cuma di halaman ini yang perlu diubah -- `resources/views/waspang/inbox.blade.php` TERNYATA sudah pakai formula terpisah (`($persiapanDone && $instalasiDone && $finishingDone) ? 100 : ...`) yang sudah otomatis 100% begitu finishingDone, jadi tidak disentuh. Formula global `progressSummary()['progress']` sendiri TIDAK diubah (dipakai luas di dashboard admin/PM/Super TIF utk progress bar per-LOP yg memang harus tetap merefleksikan posisi sequence asli 0-100% sampai Golive).
+
+### 2. Halaman "Review BOQ Final" (`waspang.projects.review_final`) jadi murni read-only
+
+Sebelumnya halaman ini (`resources/views/waspang/steps/review-final.blade.php`) berjudul "Step 4: Validasi Akhir" + "Review BOQ Final" (2 baris) dan punya tombol aksi mengambang di bawah "Kunci & Kirim Berkas UT" (`confirmSubmitUt()`, SweetAlert konfirmasi) -- diaudit ternyata tombol ini **TIDAK PERNAH terhubung ke backend apapun** (comment di JS: "Logika kelanjutan AJAX submit anda disematkan di sini", tidak ada implementasi). Karena step Waspang memang berhenti di Finishing (bukan step aksi ke-4 yang butuh dikunci manual), sesuai instruksi:
+- Header disederhanakan jadi 1 baris teks: **"Validasi Akhir Review BOQ Final"**, tanpa tombol.
+- Tombol mengambang "Kunci & Kirim Berkas UT" beserta script SweetAlert-nya **dihapus total**.
+- Label tombol yang mengarah ke halaman ini di `waspang/inbox.blade.php` & `waspang/ready-ut.blade.php` direlabel dari "Review BOQ Final & UT" -> **"Review BOQ Final"** (route tetap sama, `waspang.projects.review_final`).
+
+### 3. Pembanding Review BOQ Final: BOQ Survey terbaru, fallback BOQ Plan
+
+`WaspangController::reviewFinal()` sebelumnya SELALU membandingkan `quantity_actual` terhadap `quantity_plan` (BOQ Plan awal). Direvisi jadi: pembanding = `quantity_survey` (BOQ Survey TERBARU -- kolom ini SELALU tersinkron ke ronde survey terakhir, lihat `ensureBaselineSurveyRound()`/update survey BOQ di `WaspangController`), **fallback** ke `quantity_plan` HANYA kalau item itu tidak punya data Survey sama sekali (`quantity_survey === null`).
+
+Implementasi: tiap item di `$materialBoqItems` dilampiri 2 atribut transient (tidak disimpan ke DB) via `->each()`:
+- `compare_qty` = `quantity_survey ?? quantity_plan`
+- `compare_source` = `'survey'` kalau `quantity_survey` ada, `'plan'` kalau fallback
+
+`$summary['total_plan']` & `$summary['matched']` (dan filter awal `$materialBoqItems`) diupdate memakai `compare_qty` alih-alih `quantity_plan` langsung. View (`review-final.blade.php`) ikut diupdate: widget ringkasan Kabel/Tiang ("Total Plan" -> **"Total Pembanding"**) & kartu per-item ("Target Plan" -> **"Target Survey"**/**"Target Plan"** dinamis sesuai `compare_source`) semua memakai `compare_qty`, bukan `quantity_plan` langsung lagi. Judul section list item juga direlabel "Item BOQ Plan vs BOQ Actual" -> "Item BOQ Pembanding vs BOQ Actual".
+
+### Tidak ada perubahan
+- Formula global `Project::progressSummary()['progress']` (dipakai luas di admin/PM/Super TIF) -- tetap sequence-based 0-100%, TIDAK ikut dipaksa 100% di finishing (itu spesifik utk sudut pandang Waspang saja).
+- `admin.projects.review_boq` (halaman "Review BOQ" milik Admin, `ProjectController::reviewBoq()`) -- ini fitur BERBEDA (perbandingan harga material/jasa Plan vs Aktual utk Admin), tidak disentuh sama sekali, tidak tertukar dengan "Review BOQ Final" milik Waspang.
+- `resources/views/waspang/inbox.blade.php`'s formula progress 100% -- sudah benar sebelumnya, tidak diubah.
+
+### Verifikasi
+`php -l` lolos tanpa error untuk `WaspangController.php`, `waspang/show.blade.php`, `waspang/steps/review-final.blade.php`, `waspang/inbox.blade.php`, `waspang/ready-ut.blade.php` (dijalankan di sandbox cloud terhadap salinan hasil staging dari device). Balance `<div>`/`@php`/`@forelse`/`@if` dicek di `review-final.blade.php` setelah rewrite penuh -- semuanya seimbang. Dikonfirmasi via grep: tombol & script "Kunci & Kirim Berkas UT"/`confirmSubmitUt`/SweetAlert sudah tidak ada lagi di file (cuma tersisa di komentar penjelasan kenapa dihapus), label "Review BOQ Final" (tanpa "& UT") sudah konsisten di `inbox.blade.php` & `ready-ut.blade.php`, dan atribut `compare_qty`/`compare_source` terpasang di controller.
+
+### File yang diubah
+- `app/Http/Controllers/WaspangController.php` (`reviewFinal()` -- pembanding Survey/Plan)
+- `resources/views/waspang/show.blade.php` (progress 100% saat finishingDone)
+- `resources/views/waspang/steps/review-final.blade.php` (header disederhanakan, tombol Kunci & Kirim dihapus, pembanding Survey/Plan)
+- `resources/views/waspang/inbox.blade.php` (relabel tombol)
+- `resources/views/waspang/ready-ut.blade.php` (relabel tombol)
+
+
+---
+
+## Section AR — Admin "Review BOQ" Disamakan dgn Waspang (Survey vs Actual) + Bulk Download Ikut 7-Step Terbaru + Preview/Hapus File Sebelum Upload di FI-OGP Golive
+
+**Tanggal**: 2026-09-11
+**Diminta oleh user**: "untuk button review boq di approval admin sesuaikan seperti waspang karena yang di bandingkan BOQ Survey terbaru dan BOQ actual. Sesuaikan juga untuk bulk download dengan step yang terbaru. Dan untuk upload eviden pada step FI Golive buatkan upload eviden bisa review dan hapus sebelum upload"
+
+### 1. Halaman "Review BOQ" Admin (`admin.projects.review_boq`) -- pembanding disamakan dgn Waspang
+
+Halaman ini (`ProjectController::reviewBoq()` -> `admin/evidences/review-boq.blade.php`, diakses dari tombol "Review BOQ →" di halaman Review Finishing setelah `finishingApproved`) sebelumnya SELALU membandingkan `quantity_actual` terhadap `quantity_plan` (BOQ Plan awal) -- baik di widget ringkasan Kabel/Tiang, tabel item, maupun badge status "Kelebihan Volume/Terpenuhi/Selisih Kurang". Ini beda dgn Review BOQ Final milik Waspang (Section AQ) yg SUDAH diubah pakai BOQ Survey terbaru sbg pembanding utama.
+
+**Fix**: disamakan persis dgn pola Section AQ. Ditambahkan `$materialBoqItems->each(...)` yg melampirkan 2 atribut transient per item (tidak disimpan ke DB): `compare_qty` = `quantity_survey ?? quantity_plan`, `compare_source` = `'survey'`/`'plan'`. Semua pemakaian `quantity_plan` utk KOMPARASI (bukan tampilan Plan asli, karena kolom Plan asli sudah tidak lagi jadi rujukan) diganti ke `compare_qty`:
+- `$planKabel`/`$planTiang` (widget ringkasan) -> `sum('compare_qty')`, label "Total Plan" -> **"Total Pembanding"**.
+- Kolom tabel "Volume Plan" -> **"Volume Pembanding"**, nilainya `compare_qty` + badge kecil "Survey"/"Plan" di bawah angka (menunjukkan sumber pembanding tiap baris, karena dalam 1 tabel bisa campur -- sebagian item punya data Survey, sebagian fallback ke Plan).
+- `$isMatch` & badge status pemenuhan ("Kelebihan Volume"/"Terpenuhi"/"Selisih Kurang") -- semua pembanding `quantity_plan` diganti `compare_qty`.
+- Judul halaman "Rekapitulasi Quantity BOQ (Plan vs Actual)" -> **"(BOQ Survey vs Actual)"**.
+
+Tidak ada perubahan pada `ProjectController::reviewBoq()` (controller) -- filtering & atribut transient dikerjakan langsung di `@php` block Blade (sama seperti struktur asalnya, yg juga menghitung `$materialBoqItems` di view, bukan controller). Perhitungan Nilai Material/Nilai Jasa (harga designator x qty actual) TIDAK berubah -- itu murni berdasar `quantity_actual`, tidak melibatkan pembanding Plan/Survey sama sekali.
+
+### 2. Bulk Download Eviden (`admin.projects.download_zip` / `download-preview.blade.php`) -- disamakan dgn 7-step Approval Konstruksi terbaru
+
+Halaman "Bulk Download Eviden" sebelumnya masih pakai daftar 4-step LAMA (`persiapan`/`instalasi`/`pengukuran`/`finishing`, dgn "Step 1 - Persiapan" merujuk stage `persiapan` yg sebenarnya Persiapan Instalasi -- mismatch yg sama seperti temuan Section AP). Disamakan jadi 5 step (FI-OGP Golive & Golive TIDAK ikut, lihat alasan di bawah):
+
+1. **Persiapan** (BARU) -- gabungan stage `perizinan` + `material_delivery` (1 tombol download utk keduanya sekaligus)
+2. **Persiapan Instalasi** (relabel dari "Step 1 - Persiapan" lama, stage `persiapan`, isi TIDAK berubah)
+3. Instalasi (stage `instalasi`)
+4. Pengukuran (stage `pengukuran`)
+5. Finishing (stage `finishing`)
+
+`ProjectController::downloadZip()` diupdate supaya parameter `only_stage` boleh berupa **daftar dipisah koma** (mis. `?only_stage=perizinan,material_delivery`) -- pakai `whereIn('stage', $onlyStages)` alih-alih `where('stage', $onlyStage)` tunggal. Backward-compatible: 1 nilai tunggal (semua tombol lama) tetap jalan identik seperti sebelumnya (whereIn 1 elemen = where biasa). Nama file ZIP juga disesuaikan (`str_replace(',', '-', $onlyStage)`) supaya tidak error saat >1 stage dipilih.
+
+**Kenapa FI-OGP Golive & Golive TIDAK ikut ditambahkan**: dokumennya (capture Valins, PDF ABD & Valid4, KML, Mancore, capture UIM) BUKAN model `Evidence` -- itu `LopGoliveSubmission`/`LopGoliveVerification` terpisah (lihat Section AF), masing-masing sudah punya link download sendiri-sendiri langsung di halaman `review-golive.blade.php` ("Lihat file tersimpan ↗"). Menambahkannya ke bulk-ZIP generik butuh perubahan struktur `downloadZip()` yg lebih besar (join ke tabel berbeda, bukan sekadar `whereIn stage`) -- di luar scope permintaan user ("eviden" secara spesifik merujuk ke flow `Evidence` yg sudah ada).
+
+### 3. Upload dokumen FI-OGP Golive -- bisa preview & hapus sebelum submit
+
+`review-golive.blade.php` (4 input file: Capture Valins, PDF ABD & Valid4, KML, Mancore) sebelumnya cuma `<input type="file">` polos -- begitu pilih file, tidak ada cara melihat/membatalkan pilihan selain membuka file-picker lagi & memilih file lain (tidak ada cara "kosongkan" tanpa refresh halaman).
+
+**Fix** (murni client-side JS, TIDAK ada perubahan backend/route): tiap input file sekarang punya:
+- `id="file-{key}"` + `onchange="golivePreviewFile(key, this)"` -- begitu user memilih file, muncul kotak preview di bawah input: thumbnail (kalau file gambar, dibaca via `FileReader`/`readAsDataURL`) atau nama file saja (kalau bukan gambar, mis. PDF/KML/Excel), plus tombol **"✕ Hapus"**.
+- Tombol Hapus (`goliveClearFile(key)`) me-reset `input.value = ''` & menyembunyikan kotak preview -- user bisa pilih ulang file lain tanpa reload halaman, SEBELUM klik "Simpan Dokumen FI-OGP Golive" (submit form yg sesungguhnya).
+- File yg SUDAH tersimpan di server (link "Lihat file tersimpan ↗") sama sekali tidak terpengaruh oleh preview/hapus ini -- keduanya independen, cuma reset pilihan file BARU yg belum di-submit.
+
+### Tidak ada perubahan
+- `WaspangController::reviewFinal()` (Section AQ) -- sudah benar, jadi acuan/referensi utk Section AR poin 1.
+- `admin.evidences.review-item` partial (kartu approve/reject per foto di step lain) -- tidak disentuh, request ini spesifik utk form upload dokumen FI-OGP Golive yg strukturnya beda (bukan partial evidence per-item).
+- Rute `admin.evidences.golive.submit`/`ProjectController::submitGoliveDocuments()` -- tidak disentuh, upload tetap jalan sama seperti sebelumnya begitu form di-submit.
+
+### Verifikasi
+`php -l` (sandbox cloud, salinan staging dari device) lolos tanpa error utk `ProjectController.php`, `review-boq.blade.php`, `download-preview.blade.php`, `review-golive.blade.php`. Balance `<div>`/`@php`/`@foreach` dicek di ketiga file Blade -- semuanya seimbang. Dikonfirmasi via grep: atribut `compare_qty`/`compare_source` & label "Total/Volume Pembanding" terpasang di `review-boq.blade.php`; `$stages` 5-entri baru & `$stageQueryParam` terpasang di `download-preview.blade.php`; `only_stage` mendukung daftar via `whereIn` di controller; ID input/preview/tombol hapus & fungsi JS `golivePreviewFile`/`goliveClearFile` terpasang di `review-golive.blade.php`.
+
+### File yang diubah
+- `app/Http/Controllers/ProjectController.php` (`downloadZip()` -- `only_stage` jadi daftar)
+- `resources/views/admin/evidences/review-boq.blade.php` (pembanding Survey/Plan)
+- `resources/views/admin/evidences/download-preview.blade.php` (`$stages` disamakan 7-step)
+- `resources/views/admin/evidences/review-golive.blade.php` (preview & hapus file sebelum upload)
+
+## Section AS — Upload Eviden FI-OGP Golive Multi-File + Stepper Checklist Otomatis, Kartu Ringkasan & Menu Dashboard Matrix Golive utk SDI (PT 2 vs PT 3/Reguler)
+
+**Permintaan user (verbatim, 2 pesan):**
+
+> "revisi untuk upload eviden FI-OGP Golive bisa multiple banyak file, jika sudah berhasil upload semua syarat maka stepper menjadi checklist, tinggal menunggu untuk approval SDI."
+>
+> "Setelah itu sesuaikan untuk tampilan pada role SDI bedakan menu approval Golive PT 2 dan PT 3/Reguler buatkan juga card dengan desain clean white profesional Total LOP, Waiting approval adalah jumlah LOP yang menunggu untuk di lakukan approval golive, jumlah LOP Golive. Jadi di setiap menu PT 3 dan PT 2 ada card tersebut. Kemudian buatkan menu dashboard yaitu tabel matrix breakdown Region Branch dengan kolom Total LOP, Blm Golive, golive, persentase dan saat di klik angka muncul list LOP nya"
+
+Sebelum implementasi, ditanyakan 2 pertanyaan klarifikasi ke user (lewat AskUserQuestion) karena real ambiguity soal lokasi menu Dashboard baru & cakupan datanya:
+1. Lokasi menu Dashboard matrix → dijawab: **Menu baru di SDI Portal** (bukan ditambahkan ke Dashboard Admin).
+2. Data PT 2 & PT 3/Reguler di matrix digabung atau dipisah → dijawab: **Dua tabel terpisah**, konsisten dgn pemisahan menu Approval Golive PT2 vs PT3/Reguler.
+
+### 1. Upload Eviden FI-OGP Golive — Multi-File per Kategori
+
+Sebelumnya `LopGoliveSubmission` cuma menyimpan 1 path per kategori (`capture_valins_path`, `abd_valid4_path`, `kml_path`, `mancore_path`). Sekarang tiap kategori boleh **lebih dari 1 file**:
+
+- **Migration baru** `2026_09_11_070000_add_multi_file_columns_to_lop_golive_submissions_table.php` — menambah 4 kolom JSON baru (`*_paths`) di samping kolom lama (`*_path`, TIDAK dihapus/diubah tipenya — proyek ini belum pasang `doctrine/dbal` jadi `->change()` dihindari). Migration juga backfill data lama (1 path → dibungkus jadi array 1 elemen) supaya submission yg sudah pernah diupload sebelumnya tetap terhitung lengkap.
+  **PENTING: migration ini belum dijalankan** (tidak ada akses `php artisan` dari sesi ini) — user perlu jalankan `php artisan migrate` sendiri di XAMPP sebelum fitur upload multi-file ini bisa dipakai.
+- **`app/Models/LopGoliveSubmission.php`** — method baru `filesFor()`/`captureValinsFiles()`/`abdValid4Files()`/`kmlFiles()`/`mancoreFiles()` (baca dari kolom `*_paths`, fallback ke `*_path` lama). `isComplete()` sekarang cek MINIMAL 1 file per kategori (dulu: WAJIB persis 1 path).
+- **`app/Http/Controllers/ProjectController.php`**:
+  - `submitGoliveDocuments()` — validasi diubah jadi array (`capture_valins.*`, dst), file baru **ditambahkan** ke daftar yg sudah ada (bukan menimpa) lewat closure `$appendFiles()`. Kolom `*_path` lama ikut disinkron ke file TERAKHIR (kompatibilitas mundur).
+  - Method baru `removeGoliveDocument()` — hapus 1 file tersimpan dari 1 kategori (file fisik ikut dihapus dari storage). Route baru `admin.evidences.golive.remove` (POST).
+- **`resources/views/admin/evidences/review-golive.blade.php`** — ditulis ulang: tiap kategori dokumen menampilkan daftar file yg sudah tersimpan (masing-masing bisa dihapus satu-satu) + input `<input type=file multiple>` utk upload banyak file sekaligus + preview nama file yg baru dipilih (belum ter-upload) dgn tombol "Batalkan Semua Pilihan".
+- **`resources/views/sdi/golive/show.blade.php`** — daftar dokumen di sisi SDI disesuaikan menampilkan SEMUA file per kategori (bukan cuma 1 link), dgn badge jumlah file.
+
+### 2. Stepper Jadi Checklist Otomatis Begitu Upload Lengkap
+
+- **`resources/views/admin/evidences/partials/stepper.blade.php`** — `$step6Done` (Step "FI-OGP") sebelumnya dibaca dari posisi sequence LOP (`$seq >= 11`, artinya baru centang setelah LOP resmi Golive). **Sekarang dibaca langsung dari `LopGoliveSubmission::isComplete()`** — begitu ke-4 kategori dokumen sudah ada minimal 1 file, step langsung tercentang (✓) walau LOP masih menunggu approval/verifikasi SDI (belum tentu langsung auto-advance sequence, krn auto-advance punya gate tambahan spt `finishingDone`). Badge di halaman `review-golive.blade.php` juga diubah jadi "✓ Dokumen Lengkap, Menunggu Approval SDI".
+
+### 3. Kartu Ringkasan (Total LOP / Waiting Approval / Jumlah LOP Golive) — PT 2 & PT 3/Reguler
+
+Ditambahkan di KEDUA halaman approval Golive SDI, desain clean white profesional (rounded-3xl, border tipis, konsisten dgn kartu lain di app):
+
+- **`app/Http/Controllers/SdiController.php`** (`sdi.index`, Approval UIM PT 2) — `$cards` dihitung dari query dasar (`Pt2Lop` dgn `sdi_approval_status` terisi), sebelum search/filter/pagination.
+- **`app/Http/Controllers/SdiGoliveController.php`** (`sdi.golive.index`, Approval Golive PT 3/Reguler) — `$cards` dihitung dari cakupan yg LEBIH LUAS dari `$query` tabel (`status_progress` IN `fi_ogp_golive` ATAU `golive`, non-PT2 via `program_sap`), supaya "Total LOP" tidak menyusut begitu LOP-nya sudah di-golive-kan (LOP yg sudah golive otomatis hilang dari tabel listing krn query listing cuma nampilin yg masih `fi_ogp_golive`).
+- **`resources/views/sdi/index.blade.php`** & **`resources/views/sdi/golive/index.blade.php`** — 3 kartu (Total LOP / Waiting Approval / LOP Golive) ditambahkan di atas tabel.
+
+### 4. Menu Dashboard Baru — Matrix Region/Branch (2 Tabel Terpisah: PT 2 & PT 3/Reguler)
+
+- **`app/Http/Controllers/SdiDashboardController.php`** (BARU) — Region/Branch grouping pakai konstanta **SAMA PERSIS** dgn `DashboardController` (Admin): JATIM/JATENG DIY/BALNUS + daftar branch masing-masing, supaya konsisten di seluruh app. Method `index()` bangun 2 matrix terpisah (`buildMatrix()`): PT 2 dari `pt2_lops` (filter `sdi_approval_status` terisi), PT 3/Reguler dari `lops` (filter `status_progress` IN `fi_ogp_golive`/`golive`, non-PT2). Kolom: Total LOP, Blm Golive, Golive, Persentase — Region & Branch yg count-nya 0 tetap ditampilkan (pre-initialize, pola sama dgn matrix Admin).
+- Method `lops()` — endpoint JSON (dipanggil via `fetch`, tanpa reload halaman) utk modal "klik angka → muncul list LOP" sesuai permintaan user persis.
+- **Routes baru** (di dalam group `role:sdi`): `GET /sdi/matrix-golive` (`sdi.matrix.index`) & `GET /sdi/matrix-golive/lops` (`sdi.matrix.lops`) — sengaja TIDAK pakai path `/sdi/dashboard` krn path itu sudah dipakai route `sdi.index` (Approval UIM PT2) duluan.
+- **`resources/views/sdi/dashboard/index.blade.php`** (BARU) — 2 tabel matrix (Region sbg baris subtotal bold, Branch sbg baris detail di bawahnya), tiap angka Total/Blm Golive/Golive adalah tombol yg membuka modal daftar LOP via AJAX.
+
+### 5. Sidebar SDI — Menu "Approval Golive PT 3/Reguler" (Sebelumnya Tidak Ada Link-nya!) + Menu "Dashboard"
+
+Ditemukan saat investigasi: halaman `sdi.golive.index` (Approval Golive PT 3/Reguler, `SdiGoliveController`) **SUDAH ADA sejak Section AF tapi TIDAK PERNAH ditautkan di sidebar SDI** — sidebar cuma punya "Approval UIM" (badge "PT 2") dan "Data Survey Lapangan". Diperbaiki sekaligus dgn revisi ini:
+
+- **`resources/views/sdi/components/sidebar.blade.php`** & **`sidebar-mobile.blade.php`** — 2 menu baru ditambahkan (Approval Golive, badge "PT 3/REGULER"; Dashboard, badge "MATRIX"), di antara menu "Approval UIM" (PT 2) dan "Data Survey Lapangan".
+
+### Tidak Ada Perubahan
+- Alur verifikasi capture UIM oleh SDI (`SdiGoliveController::verify()`) & auto-advance sequence `fi_ogp_golive` → `golive` — tidak disentuh, tetap pakai gate yg sama (bukan PT2, belum drop/golive, tidak hold/drop).
+- Halaman Bulk Download (Section AR) & Review BOQ (Section AR/AQ) — tidak disentuh di revisi ini.
+
+### Verifikasi
+- Balance check (`<div>`/`@php`/`@foreach`/`@if`/`<a>`/kurung kurawal) lolos utk semua file Blade yg diubah/dibuat.
+- `php -l` lolos utk semua file PHP yg diubah/dibuat (`ProjectController.php`, `SdiController.php`, `SdiGoliveController.php`, `SdiDashboardController.php` baru, `LopGoliveSubmission.php`, `routes/web.php`, migration baru) — dicek via `device_stage_files` ke sandbox cloud lalu `php -l` di sana (device tidak punya PHP CLI).
+- Nama route baru (`admin.evidences.golive.remove`, `sdi.matrix.index`, `sdi.matrix.lops`) dicek tidak bentrok dgn route lain yg sudah ada.
+
+### ⚠️ Tindakan Manual Diperlukan dari User
+**Migration `2026_09_11_070000_add_multi_file_columns_to_lop_golive_submissions_table.php` belum dijalankan** — sesi ini tidak punya akses `php artisan`/mysql CLI di device. User perlu menjalankan `php artisan migrate` sendiri di XAMPP (folder project) sebelum fitur upload multi-file FI-OGP Golive bisa dipakai. Tanpa migration ini, kolom `*_paths` belum ada di DB dan upload akan gagal (SQL error kolom tidak ditemukan).
+
+### File yang Diubah/Dibuat
+- **Migration baru:** `database/migrations/2026_09_11_070000_add_multi_file_columns_to_lop_golive_submissions_table.php`
+- **Model:** `app/Models/LopGoliveSubmission.php`
+- **Controller:** `app/Http/Controllers/ProjectController.php` (submitGoliveDocuments + removeGoliveDocument baru), `app/Http/Controllers/SdiController.php`, `app/Http/Controllers/SdiGoliveController.php`
+- **Controller baru:** `app/Http/Controllers/SdiDashboardController.php`
+- **Routes:** `routes/web.php` (route baru: `admin.evidences.golive.remove`, `sdi.matrix.index`, `sdi.matrix.lops`)
+- **View diubah:** `resources/views/admin/evidences/partials/stepper.blade.php`, `resources/views/admin/evidences/review-golive.blade.php`, `resources/views/sdi/golive/show.blade.php`, `resources/views/sdi/index.blade.php`, `resources/views/sdi/golive/index.blade.php`, `resources/views/sdi/components/sidebar.blade.php`, `resources/views/sdi/components/sidebar-mobile.blade.php`
+- **View baru:** `resources/views/sdi/dashboard/index.blade.php`
+
+## Section AT — Samakan Desain Approval Golive PT 3 dgn PT 2, Kolom Tanggal FI/Tanggal Golive, Dashboard Matrix PT 3 di Urutan 1 + Accordion per Region
+
+**Permintaan user (verbatim):**
+
+> "untuk desain approval Golive PT 3 samakan persis dengan Approval PT 2 dan nama menu Approval UIM PT 2 ganti dengan Approval Golive PT 2 dan Approval Golive PT 3 namanya juga sesuaikan tidak perlu ada reguler kemudian tampilan sama seperti PT 2 ada filtering semua, waiting approval, sudah golive. Kemudian di kedua menu tersebut tambahkan kolom Tanggal finishing dengan nama kolom Tanggal FI yaitu tanggal waktu diambil dari admin selesai upload semua eviden di step FI OGP, dan kolom tanggal golive yaitu tanggal dan waktu saat SDI sudah melakukan approval golive. Tanggal Send pada tabel approval PT 2 di hapus saja
+> Menu dashboard berada di paling atas dan tabel matrix buatkan accordion per region agar tidak terlalu panjang dan Matrix PT 3 berada di paling atas urutan 1"
+
+### 1. Nama Menu Sidebar
+
+- **`resources/views/sdi/components/sidebar.blade.php`** & **`sidebar-mobile.blade.php`** — menu "Approval UIM" (PT 2) diganti jadi **"Approval Golive"** (badge tetap "PT 2"). Menu PT 3 yg sebelumnya berbadge "PT 3/REGULER" disederhanakan jadi **"PT 3"** saja (kata "Reguler" dihilangkan sesuai permintaan). Menu **"Dashboard"** dipindah ke urutan PALING ATAS (sebelumnya di bawah menu Approval Golive PT 3).
+
+### 2. Kolom "Tanggal FI" & "Tanggal Golive" (Menggantikan "Tanggal Send" di PT 2)
+
+Kolom "Tanggal FI" perlu sumber data momen "admin selesai upload semua eviden FI-OGP". PT 2 dan PT 3 punya alur berbeda sehingga sumber datanya juga beda -- **ini poin yg perlu dikonfirmasi user**:
+
+- **PT 3 (LOP Reguler)** — ADA step FI-OGP Golive yg jelas (`LopGoliveSubmission`). Ditambahkan kolom BARU `fi_completed_at` (migration `2026_09_11_070000_...`, sudah pernah dibuat di Section AS, migration blm dijalankan -- direvisi lagi di round ini utk menambah kolom ini), diisi SEKALI SAJA (tidak ditimpa lagi) di `ProjectController::submitGoliveDocuments()` pas pertama kali `isComplete()` jadi `true` (ke-4 kategori dokumen sudah minimal 1 file). Ini BEDA dari `submitted_at` yg berubah tiap kali ada upload/re-upload (termasuk setelah lengkap).
+- **PT 2** — TIDAK PUNYA step "FI-OGP" sendiri (alurnya `Pt2Lop`/`Pt2Evidence`, terpisah total dari model `Lop`/`LopGoliveSubmission`). **Keputusan interpretasi (mohon dikonfirmasi/dikoreksi user):** dipakai momen admin PT2 klik "Kirim ke SDI" (`AdminPt2Controller::sendToSdi()`, yg baru bisa dilakukan setelah semua `Pt2Evidence` disetujui/`$bautEvidenceReady`) sbg proxy paling dekat maknanya dgn "admin selesai upload semua eviden". Ditambahkan kolom BARU `fi_completed_at` pada `pt2_lops` (migration baru `2026_09_11_090000_add_fi_completed_at_to_pt2_lops_table.php`), diisi SEKALI SAJA (tidak ditimpa kalau LOP dikirim ulang ke SDI di kemudian hari).
+- **Tanggal Golive** (KEDUA menu) — TIDAK perlu kolom baru, sudah ada kolom `golive_at` yg terisi di `SdiController::submitGolive()` (PT 2) & `SdiGoliveController::verify()` (PT 3), tinggal ditampilkan.
+- **`resources/views/sdi/index.blade.php`** (PT 2) — kolom "Tanggal Send" (`$lop->updated_at`) DIHAPUS, diganti 2 kolom baru "Tanggal FI" (`$lop->fi_completed_at`) & "Tanggal Golive" (`$lop->golive_at`), format sama (`d M Y` + `H:i` WIB), tampil "-" kalau masih kosong. Judul halaman diubah dari "SDI Approval (Go Live)" jadi "Approval Golive PT 2" (konsisten dgn nama menu baru).
+- **`resources/views/sdi/golive/index.blade.php`** (PT 3) — kolom "Tanggal FI" (`$lop->goliveSubmission?->fi_completed_at`) & "Tanggal Golive" (`$lop->golive_at`) ditambahkan ke tabel baru (lihat poin 3).
+
+### 3. Desain Approval Golive PT 3 Disamakan Persis dgn PT 2
+
+**`resources/views/sdi/golive/index.blade.php`** ditulis ulang total supaya strukturnya sama persis dgn `sdi/index.blade.php` (PT 2): header (h1 "Approval Golive PT 3", subjudul tanpa kata "Reguler") + form search, 3 kartu ringkasan (Total LOP/Waiting Approval/LOP Golive, sudah ada dari Section AS), tab filter **Semua / Waiting Approval / Sudah Go-Live** (BARU -- sebelumnya PT 3 tidak punya tab filter sama sekali), tabel dgn kolom & gaya yg sama (Nama LOP+PID/IHLD, Lokasi+STO, Tanggal FI, Tanggal Golive, Status badge, Aksi), selector jumlah baris per halaman. Perbedaan yg SENGAJA dipertahankan: tombol Aksi PT 3 tetap berupa LINK ke halaman verifikasi penuh (`sdi.golive.show`, bukan modal 1-file spt PT 2) krn PT 3 perlu review beberapa kategori dokumen multi-file sekaligus -- tapi gaya tombolnya (warna, ukuran, ikon) dibuat konsisten dgn tombol PT 2.
+
+- **`app/Http/Controllers/SdiGoliveController.php`** (`index()`) — query dasar diperluas mencakup `status_progress` IN (`fi_ogp_golive`, `golive`) (sebelumnya cuma `fi_ogp_golive`, jadi LOP yg sudah Golive otomatis hilang dari tabel & tab "Sudah Go-Live" akan selalu kosong). Filter `status_filter=pending` → `fi_ogp_golive` saja; `status_filter=approved` → `golive`/`is_golive=1`, mengikuti pola persis yg sama dgn `SdiController::index()` (PT 2).
+
+### 4. Dashboard: Matrix PT 3 di Urutan 1 + Accordion per Region
+
+- **`resources/views/sdi/dashboard/index.blade.php`** — array `$tables` dibalik urutannya: **Matrix PT 3** (id `reguler`) sekarang PERTAMA, Matrix PT 2 di bawahnya. Judul tabel PT 3 disederhanakan jadi "Matrix PT 3" (drop "/ Reguler"), subjudul kedua tabel disesuaikan dgn nama menu baru ("Approval Golive PT 3"/"Approval Golive PT 2").
+- **Accordion per region** — baris Region (subtotal bold) sekarang bisa DIKLIK utk expand/collapse baris Branch di bawahnya (default COLLAPSED/hidden, supaya tabel tidak terlalu panjang spt permintaan user). Ikon chevron (▶) di baris Region berputar 90° saat expand. Guard JS `if (e.target.closest('.lop-cell')) return;` memastikan klik tombol angka (Total/Blm Golive/Golive, yg buka modal daftar LOP) TIDAK ikut memicu toggle accordion. Fungsi baru `toggleRegionRow()` ditambahkan ke `<script>` yg sudah ada (tidak mengubah fungsi modal `openLopModal`/`closeLopModal` yg sudah ada dari Section AS).
+
+### Tidak Ada Perubahan
+- Alur upload eviden FI-OGP Golive multi-file & stepper checklist otomatis (Section AS) -- tidak disentuh.
+- Alur eksekusi Go-Live PT 2 (modal upload UIM 1-file, `SdiController::submitGolive()`) & verifikasi capture UIM PT 3 (`SdiGoliveController::verify()`) -- tidak disentuh, cuma dibaca kolom `golive_at`-nya.
+- Menu "Data Survey Lapangan" (badge KML) -- tetap di posisi paling bawah, tidak disentuh.
+
+### Verifikasi
+- Balance check (`<div>`/`@if`/`@foreach`/`@forelse`/kurung kurawal/kurung biasa/`<th>`/`<a>`) lolos utk ketiga file Blade yg diubah (`sdi/index.blade.php`, `sdi/golive/index.blade.php` ditulis ulang total, `sdi/dashboard/index.blade.php`).
+- `php -l` (staging ke sandbox cloud, device tidak punya PHP CLI) lolos tanpa error utk: `sdi/index.blade.php`, `sdi/golive/index.blade.php`, `sdi/dashboard/index.blade.php`, `AdminPt2Controller.php`, `ProjectController.php`, `SdiGoliveController.php`, `LopGoliveSubmission.php`, kedua migration (`..._add_fi_completed_at_to_pt2_lops_table.php` & `..._add_multi_file_columns_to_lop_golive_submissions_table.php`).
+- Dicek route `sdi.golive.show` pakai key `$lop->id_lop` & relasi `goliveSubmission()` di `app/Models/Lop.php` -- keduanya cocok dgn yg dipakai di view PT 3 yg baru.
+- Dicek urutan array `$tables` di dashboard: `reguler` (PT 3) sekarang index 0, `pt2` index 1.
+
+### ⚠️ Tindakan Manual Diperlukan dari User
+**DUA migration BELUM DIJALANKAN** (sesi ini tidak punya akses `php artisan`/mysql CLI di device XAMPP) — user WAJIB jalankan `php artisan migrate` sendiri sebelum kolom "Tanggal FI" bisa terisi datanya:
+1. `2026_09_11_070000_add_multi_file_columns_to_lop_golive_submissions_table.php` (sudah ada dari Section AS, direvisi lagi di round ini menambah kolom `fi_completed_at` pada tabel `lop_golive_submissions`).
+2. `2026_09_11_090000_add_fi_completed_at_to_pt2_lops_table.php` (BARU, menambah kolom `fi_completed_at` pada tabel `pt2_lops`).
+
+**Mohon dikonfirmasi ke user:** untuk PT 2, "Tanggal FI" memakai momen admin klik "Kirim ke SDI" (`sendToSdi()`) sbg proxy, karena PT 2 tidak punya step FI-OGP tersendiri spt PT 3. Kalau ada momen lain yg lebih tepat menurut alur kerja user, kolom `fi_completed_at` di `pt2_lops` bisa dipindah sumbernya. Perlu diingat juga: LOP PT 2 & PT 3 yg SUDAH ADA di database SEBELUM migration dijalankan akan punya `fi_completed_at` = NULL (tampil "-") sampai LOP tsb diproses ulang lewat alur yg mengisi kolom ini -- kolom ini tidak di-backfill dari data historis krn tidak ada sumber data yg pasti utk tanggal FI dari LOP-LOP lama.
+
+### File yang Diubah/Dibuat
+- **Migration diubah/dibuat:** `database/migrations/2026_09_11_070000_add_multi_file_columns_to_lop_golive_submissions_table.php` (ditambah kolom `fi_completed_at`), `database/migrations/2026_09_11_090000_add_fi_completed_at_to_pt2_lops_table.php` (BARU)
+- **Model:** `app/Models/LopGoliveSubmission.php` (`fi_completed_at` ditambah ke `$fillable`/`$casts`)
+- **Controller:** `app/Http/Controllers/AdminPt2Controller.php` (`sendToSdi()`), `app/Http/Controllers/ProjectController.php` (`submitGoliveDocuments()`), `app/Http/Controllers/SdiGoliveController.php` (`index()` -- tab filter)
+- **View diubah:** `resources/views/sdi/index.blade.php`, `resources/views/sdi/components/sidebar.blade.php`, `resources/views/sdi/components/sidebar-mobile.blade.php`, `resources/views/sdi/dashboard/index.blade.php`
+- **View ditulis ulang total:** `resources/views/sdi/golive/index.blade.php`
+
+## Section AU — Backfill Tanggal FI PT 3, Modal Verifikasi Golive PT 3 (mirip PT 2) + Hapus Menu Data Survey Lapangan
+
+**Permintaan user (verbatim):**
+
+> "pada approval PT 3 tanggal FI masih kosong, ambil tanggal dan waktu saat admin selesai upload semua syarat di step FI Golive dan button verifikasi buatkan modal dan toggle mirip approval PT 2 dan tampilkan untuk Dokumen FI-OGP yang di upload oleh admin
+> di menu sidebar hapus menu Data Survey Lapangan"
+
+### 1. Tanggal FI PT 3 Masih Kosong — Backfill Data Lama
+
+Kode di `ProjectController::submitGoliveDocuments()` (Section AT) sudah benar: `fi_completed_at` diisi SEKALI SAJA saat `isComplete()` PERTAMA KALI jadi `true`. Masalahnya: LOP-LOP yang dokumen FI-OGP-nya **sudah lengkap SEBELUM kode ini dideploy** tidak pernah lewat jalur itu lagi, jadi `fi_completed_at`-nya tetap NULL selamanya kalau tidak dibackfill sekali.
+
+- **Migration baru** `2026_09_11_100000_backfill_fi_completed_at.php` — backfill SEKALI (bukan berjalan tiap saat):
+  - `lop_golive_submissions` (PT 3): baris yg ke-4 kolom `*_path` (legacy, selalu sinkron ke file terakhir) sudah terisi TAPI `fi_completed_at` masih NULL → diisi pakai `submitted_at` (timestamp save terakhir; kalau submission belum disentuh lagi setelah lengkap, nilainya persis sama dgn momen jadi lengkap).
+  - `pt2_lops` (PT 2, sekalian dibereskan drpd nanti muncul laporan sama) — baris yg `sdi_approval_status` sudah terisi (LOP sudah pernah dikirim ke SDI) TAPI `fi_completed_at` masih NULL → diisi pakai `updated_at` sbg perkiraan (proxy terbaik yg tersedia, krn tidak ada log historis kapan tepatnya `sendToSdi()` dipanggil utk row lama).
+  - Migration ini pakai `Schema::hasColumn()` sbg guard sebelum backfill, jadi AMAN dijalankan berapa kali pun urutannya relatif thd 2 migration kolom sebelumnya (`down()` sengaja no-op, backfill tidak reversible dgn aman).
+
+**PENTING: SEMUA TIGA migration (2 dari Section AS/AT + 1 baru ini) masih perlu `php artisan migrate` -- lihat bagian Tindakan Manual di bawah.**
+
+### 2. Tombol "Verifikasi" PT 3 Jadi Modal (mirip PT 2) + Preview Dokumen FI-OGP
+
+**`resources/views/sdi/golive/index.blade.php`** — tombol "Verifikasi" (utk LOP yg belum golive) yang sebelumnya berupa LINK ke halaman penuh `sdi.golive.show`, sekarang buka **modal** (`#verifyGoliveModal`), strukturnya disalin persis dari `#goLiveModal` di Approval Golive PT 2 (animasi buka/tutup, upload 1 file capture UIM, toggle konfirmasi "Ubah Status menjadi GO-LIVE" yg menggerbangi tombol submit). Ditambahkan 1 panel baru di atas form: **"Dokumen FI-OGP Golive (dari Admin)"** menampilkan ke-4 kategori dokumen (Capture Valins/PDF ABD & Valid4/File KML/Mancore) beserta jumlah & link tiap file (sama persis dgn yg sebelumnya cuma ada di halaman `sdi/golive/show.blade.php`), plus badge Lengkap/Belum Lengkap.
+
+- Karena 1 modal dipakai bergantian utk semua baris tabel, tiap baris merender `<template id="docs-tpl-{id_lop}">` tersembunyi berisi HTML daftar dokumen LOP itu; JS `openVerifyModal()` meng-clone `innerHTML` template yg sesuai ke dalam modal saat tombol diklik (`document.getElementById(tplId).innerHTML`).
+- Form modal `POST` ke `sdi.golive.verify` (route & validasi controller TIDAK diubah -- field `capture_uim` sudah persis cocok dgn yg divalidasi `SdiGoliveController::verify()`).
+- LOP yg SUDAH golive tetap pakai tombol "Lihat Eviden 🖼️" (link langsung, bukan modal) -- sekarang link ke file capture UIM asli (`goliveVerification->capture_uim_path`) kalau ada, fallback ke halaman `sdi.golive.show` kalau belum ada (jaga-jaga data lama).
+- Halaman penuh `sdi/golive/show.blade.php` TIDAK dihapus (masih valid diakses langsung/dari link fallback di atas), cuma jalur utama dari tabel sekarang lewat modal.
+
+### 3. Hapus Menu "Data Survey Lapangan" dari Sidebar SDI
+
+- **`resources/views/sdi/components/sidebar.blade.php`** & **`sidebar-mobile.blade.php`** — blok menu "Data Survey Lapangan" (badge "KML", route `admin.site-surveys.index`) dihapus total dari kedua file. Route & halaman `admin.site-surveys.index` itu sendiri TIDAK dihapus/disentuh (kemungkinan masih dipakai role lain, mis. Admin) -- cuma link-nya di sidebar SDI yg dicabut sesuai permintaan.
+
+### Tidak Ada Perubahan
+- Struktur tabel PT 2 & PT 3, kolom Tanggal FI/Tanggal Golive, urutan menu Dashboard/tab filter (Section AT) -- tidak disentuh lagi di sini.
+- Logika `SdiGoliveController::verify()` & auto-advance status -- tidak disentuh, modal cuma ganti cara form-nya ditampilkan (dari halaman penuh jadi modal), payload yg dikirim persis sama.
+
+### Verifikasi
+- Balance check (`<div>`/`@if`/`@foreach`/`@forelse`/`<template>`/`<script>`/`<form>`/kurung kurawal/kurung biasa/`<a>`) lolos utk `sdi/golive/index.blade.php` (file besar, ditulis ulang total).
+- Balance check `<div>`/`<a>`/`@if` lolos utk `sidebar.blade.php` & `sidebar-mobile.blade.php` stlh blok menu KML dihapus.
+- `php -l` (staging ke sandbox cloud) lolos tanpa error utk `sdi/golive/index.blade.php`, `sidebar.blade.php`, `sidebar-mobile.blade.php`, migration baru `2026_09_11_100000_backfill_fi_completed_at.php`.
+- Dicek field form modal (`capture_uim`) cocok dgn validasi `SdiGoliveController::verify()` (`'capture_uim' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120'`) & route `sdi.golive.verify` (`POST /sdi/golive/{id}/verify`).
+- Dicek relasi `goliveVerification()` & kolom `capture_uim_path` di `app/Models/LopGoliveVerification.php` cocok dgn yg dipakai di link "Lihat Eviden" baru.
+
+### ⚠️ Tindakan Manual Diperlukan dari User
+**TIGA migration BELUM DIJALANKAN** (sesi ini tidak punya akses `php artisan`/mysql CLI) — jalankan `php artisan migrate` di XAMPP sesuai urutan filename (otomatis oleh Laravel):
+1. `2026_09_11_070000_add_multi_file_columns_to_lop_golive_submissions_table.php`
+2. `2026_09_11_090000_add_fi_completed_at_to_pt2_lops_table.php`
+3. `2026_09_11_100000_backfill_fi_completed_at.php` (BARU -- migration ini yg akan langsung mengisi "Tanggal FI" utk LOP PT 3 & PT 2 yg SUDAH lengkap dokumennya sebelum hari ini)
+
+Tanpa migration #3 dijalankan, kolom "Tanggal FI" akan tetap kosong utk LOP-LOP LAMA (LOP baru yg dokumennya baru lengkap SETELAH migration #1 & #2 dijalankan akan otomatis terisi lewat kode normal, tidak perlu backfill).
+
+### File yang Diubah/Dibuat
+- **Migration baru:** `database/migrations/2026_09_11_100000_backfill_fi_completed_at.php`
+- **View ditulis ulang total:** `resources/views/sdi/golive/index.blade.php` (modal Verifikasi + panel Dokumen FI-OGP)
+- **View diubah:** `resources/views/sdi/components/sidebar.blade.php`, `resources/views/sdi/components/sidebar-mobile.blade.php` (hapus menu Data Survey Lapangan)
+
+## Section AV — Revisi: Kolom "Tanggal FI" PT 2 Balik Pakai Tanggal Send (Cuma Nama Kolom yang Berubah)
+
+**Permintaan user (verbatim):**
+
+> "sebentar ada revisi untuk tanggal FI khusus hanya untuk PT 3 sedangkan PT 2 tetap memakai Tanggal Send tapi kolom di beri nama Tanggal FI"
+
+Section AT/AU sebelumnya bikin PT 2 pakai kolom `fi_completed_at` (proxy: momen `sendToSdi()`) utk isi "Tanggal FI". User membatalkan itu: PT 2 cukup **nama kolomnya** diganti "Tanggal FI" (dari "Tanggal Send"), tapi **isinya tetap** timestamp lama (`$lop->updated_at`, sama seperti "Tanggal Send" sebelum Section AT). Perubahan `fi_completed_at` (isi dari momen `sendToSdi()`) HANYA berlaku utk **PT 3** mulai revisi ini.
+
+- **`resources/views/sdi/index.blade.php`** (PT 2) — sel kolom "Tanggal FI" dikembalikan menampilkan `$lop->updated_at` (persis logika "Tanggal Send" yg lama), header kolom TETAP "Tanggal FI". Tidak ada lagi pengecekan `@if($lop->fi_completed_at)` di kolom ini.
+- **`resources/views/sdi/golive/index.blade.php`** (PT 3) — TIDAK diubah di revisi ini, tetap pakai `$submission->fi_completed_at` (Section AT/AU) sesuai permintaan.
+
+### Tidak Ada Perubahan (Backend PT 2 — Sengaja Dibiarkan, Bukan Dihapus)
+Kolom `pt2_lops.fi_completed_at` (migration `2026_09_11_090000_...`) & kode yg mengisinya di `AdminPt2Controller::sendToSdi()` (Section AT) **TIDAK dihapus** -- cuma sudah tidak dipakai lagi utk tampilan "Tanggal FI" PT 2. Dibiarkan drpd menyentuh migration lagi (menghindari resiko kalau migration sudah sempat dijalankan user) -- kolom ini jadi data historis yg tidak ditampilkan, tidak mengganggu apa pun. Backfill `pt2_lops` di migration `2026_09_11_100000_backfill_fi_completed_at.php` (Section AU) juga dibiarkan apa adanya (tidak berbahaya, cuma sudah tidak relevan lagi utk PT 2).
+
+### Verifikasi
+- Balance check (`<div>`/`@if`/kurung kurawal/kurung biasa) lolos utk `sdi/index.blade.php`.
+- `php -l` (staging ke sandbox cloud) lolos tanpa error.
+- Dicek manual: kolom "Tanggal FI" PT 2 sekarang render `\Carbon\Carbon::parse($lop->updated_at)` tanpa syarat `@if`, identik dgn kolom "Tanggal Send" sebelum Section AT.
+
+### File yang Diubah
+- `resources/views/sdi/index.blade.php` (kolom "Tanggal FI" PT 2 balik pakai `updated_at`)
+
+## Section AW — Bersihkan Sisa Kode `fi_completed_at` di PT 2 (Menjawab: Migration Mana yang Masih Wajib Dijalankan)
+
+Menjawab pertanyaan user apakah migration `2026_09_11_090000_add_fi_completed_at_to_pt2_lops_table.php` & `2026_09_11_100000_backfill_fi_completed_at.php` masih perlu dijalankan setelah revisi Section AV (PT 2 balik pakai `updated_at` utk "Tanggal FI"):
+
+Ditemukan: `AdminPt2Controller::sendToSdi()` (Section AT) **MASIH menulis** ke kolom `pt2_lops.fi_completed_at` walau kolom itu sudah tidak ditampilkan lagi sejak Section AV. Kalau dibiarkan begitu & migration `090000` TIDAK dijalankan, tombol "Kirim ke SDI" di sisi Admin PT2 akan **ERROR** (SQL "Unknown column") krn Eloquent tetap coba nulis field yg tidak ada kolomnya di DB.
+
+- **`app/Http/Controllers/AdminPt2Controller.php`** (`sendToSdi()`) — baris `'fi_completed_at' => $lop->fi_completed_at ?? now()` DIHAPUS dari payload update. Sekarang method ini cuma update `sdi_approval_status` & `updated_at`, PERSIS spt sebelum Section AT.
+- Kolom `pt2_lops.fi_completed_at` sendiri (migration `090000`) TIDAK dihapus dari migration file -- kalau user memang sudah sempat menjalankannya, kolom itu cuma jadi kolom nganggur yg tidak dibaca/ditulis siapa pun (tidak berbahaya).
+
+### Jawaban final soal migration:
+1. **`2026_09_11_070000_add_multi_file_columns_to_lop_golive_submissions_table.php` — WAJIB.** Ini fondasi upload multi-file FI-OGP Golive PT 3 + kolom `fi_completed_at` yg PT 3 masih pakai.
+2. **`2026_09_11_090000_add_fi_completed_at_to_pt2_lops_table.php` — TIDAK WAJIB lagi.** Setelah fix di atas, tidak ada kode yg baca/tulis kolom ini. Boleh dilewati/tidak dijalankan sama sekali (aman kalau mau tetap dijalankan juga, cuma jadi kolom kosong nganggur).
+3. **`2026_09_11_100000_backfill_fi_completed_at.php` — TETAP WAJIB** (khusus bagian PT 3-nya) -- ini yg mengisi "Tanggal FI" utk LOP PT 3 yg dokumennya sudah lengkap dari SEBELUM revisi Section AT/AU. Migration ini aman dijalankan baik migration #2 dijalankan atau tidak (pakai `Schema::hasColumn()` sbg guard per tabel).
+
+**Ringkas: cukup jalankan migration #1 dan #3. Migration #2 boleh dilewati.**
+
+### Verifikasi
+- `php -l` lolos utk `AdminPt2Controller.php` (staging ke sandbox cloud).
+- Dicek tidak ada lagi referensi `fi_completed_at` di `AdminPt2Controller.php` selain di komentar penjelasan.
+
+### File yang Diubah
+- `app/Http/Controllers/AdminPt2Controller.php` (`sendToSdi()` -- hapus penulisan `fi_completed_at`)
+
+## Section AX — Fitur Baru: Menu "Timeline" (Horizontal Ringkasan + Vertical Detail + Eviden Foto) di Toggle Aksi Project ID
+
+**Permintaan user (verbatim):**
+
+> "lanjut buatkan fitur menu Timeline di toggle aksi pada menu Project ID di setiap program tambahkan Fitur Timeline yaitu menampilkan halaman timeline secara horizontal dengan detail tanggal waktu dan keterangan/update kronologi atau bisa juga semua project activity yang ada di tampilkan mulai dari upload PID BOQ sampai dengan golive
+> kemudian di bawahnya buatkan timeline vertical untuk menampilkan eviden foto yang bisa accordion dan lengkap beserta update kronolgi apabila ada. Jadi yang diatas timeline horizontal adalah ringkasan dan timeline vertical berisi detail beserta foto eviden. Buat tampilan yang modern, clean white, informatif dan user friendly serta bisa mode dark
+> fitur tersebut muncul pada role superadmin, admin, tif, supertif, officer,PM"
+
+### Riset Awal
+
+"Menu Project ID di setiap program" = menu `Project ID` (OSP/Node B/HEM/OLO/Konstruksi Eksternal) yang dikelola `ProgramController`, route group `program.*` (`routes/web.php`, role `pm,tif,admin,superadmin,super_tif,officer` -- PERSIS 6 role yg diminta user). View-nya otomatis kepilih per role lewat `ProgramController::viewForRole()`: `pm.program.*` utk role `tif`/`pm`, `admin.program.*` utk role lain (admin/superadmin/super_tif/officer) -- keduanya render partial tabel yg BEDA:
+- `resources/views/admin/program/partials/table.blade.php` -- dropdown "toggle aksi" (☰) lengkap (Detail/Tracking/Assign/KML/Edit/Delete).
+- `resources/views/pm/program/partials/table.blade.php` -- SENGAJA cuma 2 tombol icon kecil (Detail Project, Tracking Progress), tanpa dropdown, krn TIF/PM tidak punya wewenang Assign/Edit/Delete.
+
+Sudah ada fitur sejenis "Tracking Progress" (`DashboardController::tracking()` → `admin.projects.tracking` view) yg juga baca `ProjectActivityLog`, tapi layoutnya BEDA (grouping per-stage, bukan horizontal+vertical spt yg diminta) -- jadi dibuat halaman BARU terpisah ("Timeline"), bukan mengubah Tracking Progress yg sudah ada.
+
+Sumber data kronologi digabung dari 2 tabel:
+- `ProjectActivityLog` (`project_activity_logs`) -- log otomatis sistem (upload/approve/reject eviden, assign, golive, dll, ~30 jenis `activity_type` berbeda yg sudah dipakai di seluruh app).
+- `LopKronologi` (`lop_kronologis`) -- catatan "Update Kronologi" manual yg diinput Waspang (field `note` + `event_date`, bisa punya beberapa eviden foto lewat relasi `evidences()`).
+
+### 1. Route Baru (6 Role, Group Middleware Sendiri)
+
+`routes/web.php` -- route `GET /admin/projects/{project}/timeline` (`admin.projects.timeline`) ditambahkan SETELAH route `admin.projects.tracking`, TAPI dalam **group middleware baru** `role:superadmin,admin,tif,super_tif,officer,pm` (bukan nebeng group tracking yg cuma `admin,superadmin,super_tif,officer` -- TIDAK termasuk tif/pm). Ini supaya ke-6 role yg diminta user eksplisit kebagian akses.
+
+*(Catatan/temuan sampingan, TIDAK diperbaiki di revisi ini krn di luar permintaan: route `admin.projects.tracking` yg SUDAH ADA sebelumnya ternyata TIDAK termasuk role `tif`/`pm` di middleware-nya, padahal `pm/program/partials/table.blade.php` sudah lama nge-link ke route itu utk tombol "Tracking Progress" -- kemungkinan tif/pm selama ini dapat 403 kalau klik tombol itu. Timeline (fitur baru) SENGAJA dibuatkan group middleware sendiri yg benar supaya tidak mewarisi masalah yg sama.)*
+
+### 2. Controller: `DashboardController::timeline()`
+
+Method baru, diletakkan setelah `tracking()`. Query: `Project` (+ `lop`, `evidences`, `boqItems.designatorData`), `ProjectActivityLog` (urut `created_at` ASC, + relasi `user`/`targetUser`/`evidence.uploader`), `LopKronologi` (urut `event_date`+`created_at` ASC, + relasi `creator`/`permitCategory`/`evidences.uploader`) -- semua difilter `project_id`. Return view `admin.projects.timeline`.
+
+### 3. View Baru: `resources/views/admin/projects/timeline.blade.php`
+
+Dipakai lintas 6 role (sama seperti `admin.projects.tracking`, extends `layouts.admin` yg sudah otomatis switch sidebar per role & sudah support dark mode via Alpine `darkMode`/`localStorage` -- tidak perlu setup tambahan).
+
+- **Header**: PID / PID SAP / Nama Project / Progress (%), tombol Kembali.
+- **Timeline HORIZONTAL (ringkasan)**: satu baris scrollable ke samping, tiap node = titik warna + tanggal/jam + ikon+judul singkat (line-clamp 2 baris). Klik 1 node → auto-expand & scroll-smooth ke entri yg sama di timeline vertical di bawahnya (JS `jumpToEvent()`).
+- **Timeline VERTICAL (detail + eviden)**: garis vertikal kiri + ikon bulat per entri, header (tanggal/jam, badge tahap kalau ada, badge jumlah foto kalau ada, judul, "oleh [nama user]") bisa diklik utk expand/collapse (accordion, `toggleEvent()`) menampilkan body: keterangan/teks update kronologi (kalau ada) + grid thumbnail eviden foto (klik → buka file asli di tab baru, non-gambar/PDF tampil ikon 📄). Tombol "Buka Semua"/"Tutup Semua" di pojok kanan atas section.
+- **Titik mulai**: entri sintetis "Project Dibuat (PID/BOQ)" dari `$project->created_at` SELALU jadi entri pertama -- proxy "mulai dari upload PID BOQ" sesuai permintaan, supaya timeline selalu ada titik awal yg jelas walau `ProjectActivityLog` masih kosong.
+- **Data digabung & diurutkan tanggal ASC**: seluruh `ProjectActivityLog` (SEMUA `activity_type`, sesuai permintaan "bisa juga semua project activity yang ada") + seluruh `LopKronologi` (jadi entri "Update Kronologi", dgn foto dari `evidences()`) -- masing-masing entri di-mapping ke ikon+warna Tailwind sesuai kelompok `activity_type` (assign→👷 amber, upload/replace eviden→📸 biru, approve→✅ emerald, reject→❌ merah, survey/BOQ/KML→🗺️ ungu, perizinan/kronologi→📄/📝 indigo, golive→📤/🔐/🚀 biru/emerald, dll, fallback → titik abu-abu). Kelas warna Tailwind ditulis LENGKAP/literal (bukan interpolasi `bg-{{ }}-500`) supaya tetap terdeteksi build JIT.
+- **Mode gelap**: semua warna/badge/kartu punya varian `dark:` konsisten dgn skema desain existing app (rounded-3xl, border tipis, bg-gray-900 utk card).
+
+### 4. Menu "Timeline" Ditambahkan di 2 Tempat
+
+- **`resources/views/admin/program/partials/table.blade.php`** (dropdown Aksi, role admin/superadmin/super_tif/officer) -- item baru "Timeline" (ikon garis horizontal) ditambahkan tepat setelah "Tracking Progress", link ke `admin.projects.timeline`.
+- **`resources/views/pm/program/partials/table.blade.php`** (2 tombol icon, role tif/pm) -- tombol icon ke-3 "Timeline" (warna ungu, tooltip) ditambahkan setelah tombol "Tracking Progress", link ke route yg sama.
+
+### Tidak Ada Perubahan
+- Halaman "Tracking Progress" (`admin.projects.tracking`) yg sudah ada -- TIDAK disentuh/dihapus, tetap ada sbg fitur terpisah.
+- Struktur `ProjectActivityLog`/`LopKronologi` & seluruh tempat yg sudah menulis ke sana -- TIDAK disentuh, Timeline murni MEMBACA data yg sudah ada.
+- Menu Project ID lain (PT2, halaman Projects utama `admin/projects/index.blade.php`) -- TIDAK disentuh, sesuai cakupan permintaan ("setiap program" = OSP/NodeB/HEM/OLO/Konstruksi Eksternal saja).
+
+### Verifikasi
+- Balance check (`<div>`/`@if`/`@foreach`/`@php`/kurung kurawal/kurung biasa/`<script>`/`@push`/`<a>`/`<button>`) lolos utk `timeline.blade.php` (file baru) & kedua partial tabel yg diubah.
+- `php -l` (staging ke sandbox cloud) lolos tanpa error utk `timeline.blade.php`, `DashboardController.php`, `web.php`, `admin/program/partials/table.blade.php`, `pm/program/partials/table.blade.php`.
+- Dicek nama route baru (`admin.projects.timeline`) tidak bentrok dgn route lain yg sudah ada.
+- Dicek field/relasi yg dipakai di view (`Evidence::file_path/evidence_type/status`, `LopKronologi::note/event_date/evidences()/permitCategory()->name`, `ProjectActivityLog::title/description/stage/user/evidence`) semuanya cocok dgn model masing-masing.
+
+### File yang Diubah/Dibuat
+- **Route:** `routes/web.php` (route baru `admin.projects.timeline`, group middleware 6 role)
+- **Controller:** `app/Http/Controllers/DashboardController.php` (method baru `timeline()`)
+- **View baru:** `resources/views/admin/projects/timeline.blade.php`
+- **View diubah:** `resources/views/admin/program/partials/table.blade.php`, `resources/views/pm/program/partials/table.blade.php`
+
+## Section AY — Role TIF: Hapus Tombol "Tracking Progress", Tambah Modal "Review BOQ" (Plan vs Survey per Ronde vs Actual)
+
+**Permintaan user (verbatim):**
+
+> "di role tif tracking progress di hapus saja, kemudian tambahkan button tooltip Review BOQ untuk melihat perbandingan BOQ plan vs BOQ Survey ronde 1,2,dst vs BOQ Actual
+> jika BOQ survey tidak ada maka hanya BOQ plan dan BOQ actual.
+> Buat tampilan modal yang menarik, modern dan clean white serta informatif"
+
+### Riset Awal
+
+Halaman "Project ID" tif/pm (`resources/views/pm/program/partials/table.blade.php`, dipakai bersama role tif & pm) sudah punya modal "Detail Project" (`pmProjectDetailModal()`, Alpine reaktif, data dirender server-side per baris lalu dibuka via `open(@js($detailPayload))` -- BUKAN fetch AJAX). Sudah ada juga fitur "Review BOQ" LAIN yg SUDAH ADA sebelumnya (`admin.projects.review_boq`, `ProjectController::reviewBoq()`) tapi itu halaman FULL PAGE, gatenya cuma role `admin,superadmin,super_tif` (tif/pm TIDAK bisa akses), dan cuma bandingkan 2 kolom (Survey TERBARU/fallback Plan vs Actual) -- BUKAN semua ronde Survey sekaligus. Karena beda total (modal vs halaman, multi-ronde vs 1 kolom pembanding, beda role), dibuat FITUR BARU terpisah, bukan mengubah/reuse yg lama.
+
+Sumber data ronde Survey ditemukan dari migration `2026_09_10_140000_create_boq_survey_rounds_tables` & `2026_09_10_160000_split_quantity_survey_from_quantity_actual`: tabel `boq_survey_rounds` (1 baris per ronde per LOP, `round_number` 1/2/3/dst) + `boq_survey_round_items` (snapshot `quantity_survey` per item BOQ PADA SAAT ronde itu selesai). `boq_items.quantity_plan` & `quantity_actual` (setelah migration Section terdahulu) MURNI mewakili Plan & Actual TERKINI.
+
+### 1. Role TIF: Tombol "Tracking Progress" Dihapus, Tombol "Review BOQ" Ditambahkan
+
+**`resources/views/pm/program/partials/table.blade.php`** -- ditambahkan flag `$isTifRole = auth()->user()?->role === 'tif'`:
+- Tombol "Tracking Progress" dibungkus `@unless($isTifRole)` -- HANYA hilang utk role tif, role **pm TIDAK berubah** (tetap ada, sesuai permintaan yg spesifik menyebut "di role tif").
+- Tombol icon BARU "Review BOQ" (hijau emerald, ikon dokumen) ditambahkan, dibungkus `@if($isTifRole)` -- HANYA muncul utk role tif. Klik tombol men-dispatch event Alpine `open-boq-compare` membawa payload BOQ compare (lihat poin 2) ke modal baru (poin 3).
+
+### 2. Payload BOQ Compare (Dihitung Server-Side per Baris Project)
+
+Ditambahkan di `@php` block yg sama dgn `$detailPayload` (pola SAMA -- data language sudah tersedia per baris, TIDAK butuh route/controller/AJAX baru):
+
+```
+$lopIdForBoq = $project->lop?->id_lop;
+$surveyRounds = BoqSurveyRound::where('lop_id', $lopIdForBoq)->orderBy('round_number')->get();
+$roundNumbers = $surveyRounds->pluck('round_number'); // [] kalau LOP belum pernah Survey
+$roundItemsMap = [...]; // [boq_item_id][round_number] => quantity_survey, dari BoqSurveyRoundItem
+$boqCompareItems = $project->boqItems->map(...); // designator, item_name, unit, plan, survey[] (align dgn $roundNumbers), actual
+$latestBoqRound = $surveyRounds->last(); // utk ambil deviation_percent ronde TERAKHIR
+```
+
+Kalau `$roundNumbers` kosong (LOP belum pernah Survey/Re-Survey sama sekali) -- modal otomatis HANYA menampilkan kolom Plan & Actual (kolom Survey R1/R2/dst tidak dirender sama sekali di tabel, sesuai permintaan "jika BOQ survey tidak ada maka hanya BOQ plan dan BOQ actual").
+
+### 3. Modal Baru: `resources/views/pm/program/partials/boq-compare-modal.blade.php`
+
+Pola Alpine SAMA persis dgn modal "Detail Project" yg sudah ada (1 modal reaktif per halaman, `x-data="boqCompareModal()"`, dibuka via `open(data)`) -- tapi didengarkan lewat event window `x-on:open-boq-compare.window="open($event.detail)"` supaya tombol pemicu (di scope Alpine `pmProjectDetailModal()` yg BEDA) tetap bisa membukanya via `$dispatch()`, tanpa perlu menyatukan 2 komponen Alpine jadi satu.
+
+Desain (permintaan: "menarik, modern, clean white, informatif"):
+- Header gradient emerald→teal, judul Nama LOP, subjudul Nama Project/PID/PID SAP.
+- 4 kartu ringkasan: Total Item, Total Plan (sum), Total Actual (sum), Jumlah Ronde Survey + deviasi % ronde terakhir (kalau ada) / "Belum ada Survey" (kalau kosong).
+- Banner info kecil muncul KHUSUS kalau LOP belum pernah Survey, menjelaskan tabel di bawah cuma Plan vs Actual.
+- Tabel: Designator | Item Pekerjaan | Satuan | **Plan** (biru) | **Survey R1, R2, dst** (ungu, kolom dinamis sejumlah ronde yg ada -- otomatis TIDAK render kalau kosong) | **Actual** (emerald) | **Status** (badge Sesuai/Lebih -- emerald, Kurang -- amber, Belum Ada Data -- abu, dibandingkan thd Survey ronde TERAKHIR kalau ada, fallback Plan -- logic sama dgn `compare_qty` di `review-boq.blade.php` lama).
+- Legenda warna badge di bawah tabel.
+- Dark mode: semua elemen (header, kartu, tabel, badge) punya varian `dark:` konsisten dgn skema desain modal Detail Project yg sudah ada (slate palette).
+
+### 4. Modal Di-include di 5 Halaman Program TIF/PM
+
+`resources/views/pm/program/{osp,nodeb,hem,olo,konstruk}.blade.php` -- masing-masing ditambah `@include('pm.program.partials.boq-compare-modal')` tepat setelah `@include('pm.program.partials.detail-modal')` yg sudah ada.
+
+### Tidak Ada Perubahan
+- Halaman "Review BOQ" LAMA (`admin.projects.review_boq`, role admin/superadmin/super_tif) -- TIDAK disentuh, tetap ada sbg fitur terpisah utk role tsb.
+- Tombol "Detail Project" & "Timeline" di halaman yg sama -- TIDAK disentuh, tetap ada utk role tif MAUPUN pm (Timeline dari Section AX tetap muncul di kedua role, sesuai permintaan sebelumnya).
+- Role pm -- SAMA SEKALI tidak berubah (Tracking Progress tetap ada, Review BOQ tidak ditambahkan), krn permintaan user spesifik "di role tif".
+- Model/migration `BoqSurveyRound`/`BoqSurveyRoundItem`/`boq_items` -- TIDAK disentuh, modal murni MEMBACA data yg sudah ada.
+
+### Verifikasi
+- Balance check (`<div>`/`@if`/`@unless`/kurung kurawal/kurung biasa/`<a>`/`<button>`/`<svg>`/`<table>`/`<thead>`/`<tbody>`/`<tr>`/`<th>`/`<td>`/`<template>`/`<script>`) lolos utk `boq-compare-modal.blade.php` (file baru) & `pm/program/partials/table.blade.php`.
+- `php -l` (staging ke sandbox cloud) lolos tanpa error utk `boq-compare-modal.blade.php`, `pm/program/partials/table.blade.php`, & ke-5 file halaman program (`osp/nodeb/hem/olo/konstruk.blade.php`) yg baru ditambah `@include`.
+- Dicek field yg dipakai (`BoqSurveyRound::round_number/deviation_percent`, `BoqSurveyRoundItem::boq_survey_round_id/boq_item_id/quantity_survey`, `BoqItem::designator/item_name/unit/quantity_plan/quantity_actual`) cocok dgn model masing-masing.
+- Dicek event Alpine `open-boq-compare` konsisten antara tombol pemicu (`$dispatch`) & listener modal (`x-on:...window`).
+
+### File yang Diubah/Dibuat
+- **View baru:** `resources/views/pm/program/partials/boq-compare-modal.blade.php`
+- **View diubah:** `resources/views/pm/program/partials/table.blade.php` (payload BOQ compare + tombol Review BOQ khusus tif, Tracking Progress disembunyikan khusus tif), `resources/views/pm/program/osp.blade.php`, `nodeb.blade.php`, `hem.blade.php`, `olo.blade.php`, `konstruk.blade.php` (tambah `@include` modal baru)
+
+## Section AZ — Revisi Modal "Review BOQ" (Role TIF): Header Clean White (Bukan Gradient) + Total Plan Cuma Item Material
+
+Permintaan user (verbatim): "untuk modal review boq ganti warna white clean yang bisa mode dark tidak perlu warna gradient, kemudian untuk perhitungan total plan atau total survey yang di hitung adalah item designator material saja".
+
+### 1. Header modal: gradient → clean white (dark mode tetap didukung)
+
+File: `resources/views/pm/program/partials/boq-compare-modal.blade.php`
+
+Sebelumnya header modal pakai `bg-gradient-to-br from-emerald-600 to-teal-700 text-white`. Diganti jadi konsisten dengan card/modal lain di sesi ini: `bg-white dark:bg-slate-900` + `border-b border-slate-200 dark:border-slate-800`, teks judul jadi `text-slate-900 dark:text-white`, label "Review BOQ" jadi aksen warna (`text-emerald-600 dark:text-emerald-400`, bukan putih transparan di atas gradient), tombol close jadi `bg-slate-100 dark:bg-slate-800` alih-alih `bg-white/20`. Body & footer modal tidak diubah (sudah clean white dari awal).
+
+### 2. Total Plan (kartu ringkasan) cuma menghitung item designator Material
+
+Konteks: modal ini menampilkan SEMUA item BOQ (Material + Jasa) di tabel perbandingan, tapi user minta kartu ringkasan "Total Plan" (dan "Total Survey" kalau ada) cuma menjumlahkan item yang designator-nya Material, bukan Jasa. Saat ini belum ada kartu "Total Survey" terpisah di modal (survey ditampilkan per-ronde per-baris di tabel, bukan sebagai 1 angka agregat) — jadi bagian "atau total survey" pada permintaan user belum applicable ke UI yang ada sekarang; kalau nanti dibutuhkan kartu Total Survey per ronde, filter Material yang sama tinggal dipakai ulang (lihat `is_material` di bawah).
+
+Konvensi "item Material" dipakai SAMA PERSIS dengan yang sudah established di `WaspangController` (`$materialBoqItems` filter, dipakai juga di `review-boq.blade.php`, `review-final.blade.php`, dst): designator berawalan `"M-"` ATAU `designatorData->type === 'material'` (bukan berdasarkan `progress_category`, yang ternyata dipakai utk kategori lain spt KABEL/TIANG di fitur Waspang, bukan Material/Jasa split).
+
+- `resources/views/pm/program/partials/table.blade.php` — di `$boqCompareItems` mapping (yang membangun payload per item utk modal `boqCompareData`), ditambahkan field baru `'is_material' => $isMaterialItem` per item, dihitung dari `str_starts_with($boq->designator ?? '', 'M-') || optional($boq->designatorData)->type === 'material'`.
+- `resources/views/pm/program/partials/boq-compare-modal.blade.php` — method `totalPlan()` di Alpine `boqCompareModal()` diubah dari menjumlah SEMUA item jadi `.filter((item) => item.is_material)` dulu sebelum di-reduce. `totalActual()` SENGAJA TIDAK diubah (tetap menjumlah semua item Material+Jasa) karena user cuma menyebut "total plan atau total survey", bukan "total actual" — dan pada praktiknya qty actual pada baris Jasa hampir selalu 0 (item Jasa tidak pernah diisi actual langsung oleh Waspang, lihat komentar di `review-boq.blade.php` baris ~93-95), jadi dampaknya minimal. Tabel perbandingan baris-per-baris tetap menampilkan SEMUA item (Material & Jasa) tanpa disaring — yang difilter cuma angka agregat "Total Plan" di kartu ringkasan.
+
+### Verifikasi
+
+- Balance-check (python, hitung pasangan `{`/`}` dan `(`/`)`) pada kedua file: cocok, tidak ada yang timpang.
+- `php -l` via `device_stage_files` + cloud `Bash` pada kedua file (disalin dulu ke `_verify_tmp/`, di-stage, dilint, lalu `_verify_tmp/` dihapus): "No syntax errors detected" untuk keduanya.
+- Tidak ada perubahan skema DB, tidak ada migration baru, tidak ada perubahan route/controller.
+
+## Section BA — Dashboard PM: Ganti "Rekap Progress per Program" (+ widget Total Nilai) Jadi Tabel "Rekap Status Progress LOP" (Region/Branch, 8 Kolom Status)
+
+Permintaan user (verbatim): "Tabel Rekap Progress per Program dan widget card di bawah tabel tersebut di hapus kemudian tabel tersebut diganti dengan tabel berisi kolom status progress DROP, HOLD, Preparing (sub step inisiasi dan survey masuk ke kolom Preparing), Kolom perizinan sesuaisub step perizinan, Kolom Matdel sesuai substep material delivery, kolom instalasi yaitu step instalasi dan finishing, Kolom FI - OGP Golive sesuai step dan kolom Golive sesuai dengan step, kemudian isinya adalah LOP dan angka nya bisa di klik, Breakdown Region dan branch".
+
+Halaman: `resources/views/pm/dashboard.blade.php` (Dashboard PM, role pm & tif — TIF pakai dashboard yang sama persis dengan PM). Bukan halaman `rekap-progress` terpisah (route `pm.rekap_progress`) — itu halaman lain, tidak disentuh.
+
+### 1. Yang dihapus
+
+- Tabel "Rekap Progress per Program" (Kabel/Tiang Plan vs Actual + Total Nilai per program regular OSP/OLO/HEM/NODE B/EKSBIS).
+- Widget card grid "Total Nilai per Program" persis di bawahnya.
+
+Kedua elemen ini sumber datanya (`$programRekap`, dibangun oleh `DashboardPmController::buildProgramRekap()`) sudah tidak dipakai view manapun lagi setelah perubahan ini — pemanggilannya di `buildIndexData()` dihapus, tapi method `buildProgramRekap()`/`kabelTiangByProgram()` SENGAJA TIDAK dihapus dari controller (dibiarkan sebagai kode legacy yang aman, tidak dipanggil) karena `computeNilaiPerProgram()` (dipanggil `buildProgramRekap()`) masih dipakai langsung oleh halaman lain (`rekapProgress()`, baris ~847).
+
+### 2. Yang ditambahkan: tabel "Rekap Status Progress LOP"
+
+Pola tampilan disamakan PERSIS dengan tabel "Rekap Assignment & Status Project PT 3" tepat di bawahnya (breakdown Region -> accordion klik nama Region -> daftar Branch, `toggleRegion()` JS yang sama, angka bisa diklik buka modal `matrixDetailModal()` yang sudah ada).
+
+8 kolom status yang diminta user dipetakan dari 13 kode `project_stages` (lihat migration `2026_09_08_090000_create_project_stages_table`) lewat method baru `DashboardPmController::stageBreakdownBucket($statusProgress, $isGoLive)`:
+
+- **Drop** — `status_progress = 'drop'`.
+- **Hold** — `status_progress = 'hold'` (BEDA dgn `regularStatusBucket()` yang dipakai tabel Matrix lain: di sana LOP hold "diteruskan" ke tahap sebelum di-hold; di tabel BARU ini LOP hold TETAP masuk kolom HOLD sendiri, karena user memang minta kolom HOLD terpisah).
+- **Preparing** — `inisiasi`, `survey` (disebut eksplisit oleh user) + `drm`, `persiapan_instalasi` (TIDAK disebut eksplisit — judgment call: dikelompokkan ke Preparing juga supaya tidak ada LOP yang "hilang" dari rekap manapun, konsisten dengan konvensi lama `regularStatusBucket()`/query `$projectStats` yang juga selalu menganggap status di luar instalasi/pengukuran/finishing/fi_ogp_golive/golive/hold/drop sebagai "preparation").
+- **Perizinan** — `status_progress = 'perizinan'` (persis 1 sub-step, sesuai permintaan).
+- **Matdel** — `status_progress = 'material_delivery'` (persis 1 sub-step, sesuai permintaan).
+- **Instalasi** — `instalasi`, `finishing` (disebut eksplisit oleh user) + `pengukuran` (TIDAK disebut eksplisit — judgment call: digabung ke sini juga karena kalau tidak, LOP di tahap Pengukuran tidak akan masuk kolom manapun; ini konsisten dengan konvensi lama di codebase yang SELALU menyatukan `pengukuran` dengan `instalasi`, lihat `$projectStats`/`regularStatusBucket()`).
+- **FI-OGP Golive** — `status_progress = 'fi_ogp_golive'`.
+- **Golive** — `status_progress = 'golive'` ATAU `lops.is_golive = 1` (override sama seperti tabel Matrix lain di dashboard ini).
+
+PENTING: query sumber data untuk tabel ini (`DB::table('lops')->get(...)` di `buildIndexData()`, dan query sejenis di `matrixDetail()` untuk modal) SENGAJA TIDAK exclude `status_progress = 'drop'` — semua tabel/widget LAIN di dashboard ini selalu `where('status_progress', '!=', 'drop')`, tapi tabel baru ini justru butuh LOP drop & hold ikut terhitung karena masing-masing punya kolomnya sendiri.
+
+Kolom "Total LOP" ditambahkan di depan kolom Drop (angka statis, tidak diklik) supaya konsisten dengan tabel Rekap Assignment/Matrix lain yang selalu menampilkan Total sebagai konteks — tidak diminta eksplisit oleh user tapi tidak mengubah/menghilangkan informasi apapun yang diminta.
+
+### 3. Implementasi
+
+- `app/Http/Controllers/DashboardPmController.php`:
+  - `buildIndexData()`: blok query `$programRekap` dihapus, diganti akumulasi `$stageAccumulator`/`$stageBreakdown` per Region & Branch (pola identik dengan `$statsAccumulator`/`$statsByRegion` yang sudah ada), lalu `stageBreakdown` ditambahkan ke `compact(...)` yang dikembalikan ke view (menggantikan `programRekap`).
+  - Method baru `stageBreakdownBucket(?string $statusProgress, bool $isGoLive): string` — definisi mapping 8 kolom di atas.
+  - `matrixDetail()`: ditambah branch baru `elseif ($type === 'stage_breakdown')` — query `lops` join `projects`, filter `stageBreakdownBucket() === $metric`, TIDAK exclude drop (supaya klik kolom Drop/Hold tetap menampilkan daftar LOP-nya), `detail_url` pakai route yang sama (`admin.projects.tracking`) dengan tipe modal lain.
+  - Cache key dashboard PM dibump dari `pm_dashboard_index_v2` -> `pm_dashboard_index_v3` (bentuk data cache berubah — `programRekap` hilang, `stageBreakdown` baru — supaya user pertama yang buka dashboard setelah deploy tidak sempat baca cache lama yang belum punya key `stageBreakdown`; cache lama otomatis expired 90 detik).
+- `resources/views/pm/dashboard.blade.php`: blok "REKAP PROGRESS PER PROGRAM" (tabel) + "TOTAL NILAI PER PROGRAM" (card grid) dihapus, diganti 1 tabel baru "Rekap Status Progress LOP" tepat sebelum tabel "Rekap Assignment & Status Project PT 3" (urutan section di halaman tidak berubah). Tombol angka pakai `@click.stop="show({type:'stage_breakdown', region:'...', branch:'...', metric:'...'})"` — fungsi `show()` di `matrixDetailModal()` sudah generic (tidak ada whitelist type di JS), jadi type baru ini otomatis jalan tanpa perlu ubah JS modal-nya.
+
+### Verifikasi
+
+- Balance-check (python, hitung pasangan `{`/`}`, `(`/`)`, serta tag `<div>`/`<table>`/`<tr>`/`<td>` pada view) pada kedua file: semua cocok.
+- `php -l` via `device_stage_files` + cloud `Bash` pada kedua file: "No syntax errors detected" untuk keduanya (di-cek ulang setelah bump cache key juga).
+- Tidak ada migration baru — tabel `project_stages` & kolom `lops.status_progress`/`lops.is_golive` sudah ada dari sebelumnya.
+- Halaman lain yang memakai `computeNilaiPerProgram()` (fungsi `rekapProgress()`/halaman Rekap Progress LOP terpisah) TIDAK terdampak — hanya `buildProgramRekap()` yang berhenti dipanggil, method-nya sendiri tetap ada.
+
+## Section BB — Revisi "Rekap Status Progress LOP" -> "Reporting Deployment" + Filter Region/Branch/Program + Kolom & Baris Grand Total
+
+Permintaan user (verbatim): "ada revisi judul Rekap Status Progress LOP ganti dengan Reporting Deployment kemudian pada card tabel matrix tersebut tambahkan filter berdasarkan region branch dan program, kemudian tambahkan kolom setelah golive kolom grand total, dan di bawah tabel tambahk kolom grand total juga untuk menghitung jumlah status progress".
+
+Lanjutan revisi dari Section BA, file yang sama: `resources/views/pm/dashboard.blade.php` + `app/Http/Controllers/DashboardPmController.php`.
+
+### 1. Judul
+
+"Rekap Status Progress LOP" -> **"Reporting Deployment"**.
+
+### 2. Filter Region / Branch / Program
+
+Sebelumnya tabel ini cuma breakdown per Region -> Branch (tanpa dimensi Program sama sekali, karena LOP di-agregat lintas semua program). Untuk mendukung filter Program TANPA bikin tabel ini butuh round-trip ke server tiap ganti filter (dan tanpa merusak cache dashboard 90 detik yang dipakai bersama semua widget lain), datanya sekarang dikirim ke browser sebagai **"cube"** -- pre-agregat per kombinasi (Region, Branch, Program), bukan cuma per (Region, Branch):
+
+- `DashboardPmController::buildIndexData()`: `$stageBreakdown` (lama) diganti `$stageCube` -- array flat, tiap elemen = 1 kombinasi region+branch+program beserta 8 hitungan status + total. Query sumber ditambah join ke `projects` supaya dapat kolom `program` (UPPER+TRIM, fallback `'LAINNYA'` kalau kosong).
+- View: `$stageCube` di-embed ke JS via `@json()` di dalam `matrixDetailModal()` (`stageCube: @json($stageCube ?? [])`), lalu 3 filter (`stageFilterRegion`, `stageFilterBranch`, `stageFilterProgram`, semua Alpine `x-model` pada `<select>`) MENGHITUNG ULANG tabel di browser lewat method `stageFilteredCube()` -> `stageGroupedRows()` (grouping ulang jadi Region -> Branch, breakdown Program "hilang" jadi angka gabungan sesuai filter yang dipilih -- Program di sini murni FILTER, bukan dimensi breakdown baris/kolom baru, sesuai kalimat user "tambahkan filter ... program").
+- Dropdown Branch otomatis cascading ke Region yang dipilih (`stageBranchOptions()`), direset otomatis kalau Branch yang sedang dipilih tidak valid lagi untuk Region baru.
+- Tombol "Reset" muncul begitu ada filter aktif.
+- Modal detail (klik angka) ikut menghormati filter Program yang aktif: `stageShow()` mengirim `program_filter` ke `DashboardPmController::matrixDetail()` (parameter baru, khusus type `stage_breakdown`), supaya daftar LOP di modal selalu konsisten dengan angka yang diklik di tabel (region/branch dari argumen `show()` seperti biasa, program dari filter dropdown yang sedang aktif).
+
+### 3. Kolom & Baris "Grand Total"
+
+- **Kolom** "Grand Total" ditambahkan di paling kanan, setelah kolom "Golive" -- nilainya = jumlah SEMUA kolom status pada baris itu (drop+hold+preparing+perizinan+matdel+instalasi+fi_ogp_golive+golive), yang secara matematis akan selalu sama dengan kolom "Total LOP" di paling kiri (karena ke-8 kolom status itu saling eksklusif & lengkap/exhaustive -- tidak ada LOP yang masuk 2 kolom sekaligus atau tidak masuk kolom manapun, lihat `stageBreakdownBucket()` di Section BA). Sengaja tetap ditambahkan sesuai instruksi eksplisit user (supaya total tetap kelihatan tanpa scroll balik ke kolom paling kiri saat mata sedang di ujung kanan tabel). Kolom Grand Total ini juga bisa diklik (metric `'total'`, menampilkan SEMUA LOP pada baris itu terlepas status-nya).
+- **Baris** "Grand Total" ditambahkan sebagai `<tfoot>` di bawah tabel (`stageGrandTotal()`) -- menjumlahkan tiap kolom status ke bawah dari SELURUH baris yang lagi ditampilkan (mengikuti filter Region/Branch/Program yang aktif, bukan selalu grand total keseluruhan data).
+
+### Implementasi teknis (ringkas)
+
+- Struktur tabel diubah dari `@forelse` server-rendered jadi Alpine reaktif penuh: `<template x-for="reg in stageGroupedRows()">` menghasilkan 1 `<tbody>` per Region (baris Region + baris-baris Branch di dalamnya, accordion via `stageExpanded[region]` + `x-show`, bukan lagi `toggleRegion()` DOM lama). PENTING soal HTML: `<template>` sebagai anak langsung `<table>` yang menghasilkan elemen `<tbody>` valid (banyak `<tbody>` dalam 1 `<table>` itu sah menurut spek HTML) -- sempat salah tulis draft pertama (nge-nest `<tbody>` di dalam `<tbody>` lain, TIDAK valid HTML), sudah diperbaiki sebelum verifikasi.
+- `matrixDetailModal()` (Alpine, `x-data` di root halaman) diperluas dengan properti `stageCube`/`stageFilter*`/`stageExpanded` dan method `stageRegions()`, `stageBranchOptions()`, `stagePrograms()`, `stageFilteredCube()`, `stageGroupedRows()`, `stageGrandTotal()`, `stageToggle()`, `stageShow()`, `stageResetFilters()`. Method `show()` yang sudah ada ditambah 1 parameter query baru: `program_filter`.
+- `DashboardPmController::matrixDetail()`, branch `stage_breakdown`: baca `program_filter` dari request, filter baris sebelum dicocokkan ke `metric` (pakai `strcasecmp` supaya tidak sensitif huruf besar/kecil), dan metric `'total'` sekarang berarti "semua status" (dipakai kolom/baris Grand Total).
+- Cache key dashboard PM dibump lagi dari `pm_dashboard_index_v3` (Section BA) -> **`pm_dashboard_index_v4`**, karena bentuk data yang di-cache berubah lagi (`stageBreakdown` -> `stageCube`) -- supaya user pertama yang buka dashboard setelah deploy tidak sempat baca cache lama yang belum punya key `stageCube`.
+
+### Verifikasi
+
+- Balance-check (python: `{`/`}`, `(`/`)`, `<div>`, `<table>`, `<tbody>`, `<tfoot>`, `<template>`, `<tr>`, `<td>`, `<select>`) pada kedua file: semua cocok setelah perbaikan nesting `<tbody>`.
+- `php -l` via `device_stage_files` + cloud `Bash` pada kedua file: "No syntax errors detected" untuk keduanya.
+- Tidak ada migration baru.
+
+## Section BC — Hapus Kolom "Total LOP", Exclude Program "Konstruksi Eksternal" utk Role TIF, + Menu Baru "Report Deployment" (Role Admin/Superadmin/Officer/PM, Program Lengkap)
+
+Permintaan user (verbatim): "kolom total LOP di hapus dan filtering nama Region, Branch, Program pada role tif program Konstruksi Eksternal tidak perlu di tampilkan. Kemudian buatkan menu baru dengan nama Report Deployment diatas menu rekap progress pada role admin, superadmin, officer, PM untuk role tersebut tampilkan program lengkap".
+
+Lanjutan revisi dari Section BA/BB.
+
+### 1. Kolom "Total LOP" dihapus
+
+Dihapus dari tabel "Reporting Deployment" di Dashboard PM (`resources/views/pm/dashboard.blade.php`): header `<th>`, cell di baris Region, cell di baris Branch, dan cell di baris footer "Grand Total" -- kolom "Grand Total" di ujung kanan tabel (ditambahkan di Section BB) tetap ada dan menggantikan fungsinya sebagai penanda total per baris. `colspan` pada baris "Tidak ada data" disesuaikan dari 11 jadi 10.
+
+### 2. Role TIF: program "Konstruksi Eksternal" tidak ditampilkan sama sekali di tabel ini
+
+Interpretasi yang diambil: BUKAN cuma disembunyikan dari dropdown filter Program, tapi LOP-nya juga tidak ikut dijumlahkan ke breakdown Region/Branch/Grand Total SAMA SEKALI utk role tif -- konsisten dengan preseden yang SUDAH ADA di codebase ini: submenu "Rekap Progress" di `pm/components/sidebar.blade.php` juga sudah lebih dulu menyembunyikan link program "Konstruksi Eksternal" khusus utk role tif (`@if(auth()->user()->role !== 'tif')`).
+
+Implementasi: `DashboardPmController::index()` -- SETELAH `Cache::remember(...)` mengambil `$data['stageCube']` (bukan SEBELUM/di dalam `buildIndexData()`), baru difilter buang baris dengan `program === 'KONSTRUKSI EKSTERNAL'` kalau `auth()->user()->role === 'tif'`. Ini SENGAJA dilakukan setelah cache lookup, bukan di dalam fungsi yang di-cache -- cache dashboard PM ini 1 KEY GLOBAL dipakai bersama oleh SEMUA user pm & tif (bukan per-role), jadi kalau filter role dipasang SEBELUM data di-cache, siapa pun yang kebetulan men-generate cache duluan akan menentukan versi data yang dilihat role lain juga selama 90 detik ke depan -- bug yang harus dihindari.
+
+### 3. Menu baru "Report Deployment" (role admin, superadmin, officer, PM -- program lengkap)
+
+Menu baru diletakkan tepat DI ATAS menu "Rekap Progress" pada sidebar 4 role tsb (super_tif & tif SENGAJA TIDAK dapat menu ini, sesuai permintaan eksplisit user). Halaman baru ini isinya SAMA (tabel breakdown 8 status + Grand Total + filter Region/Branch/Program), TAPI program-nya LENGKAP (Konstruksi Eksternal tetap tampil, tidak ada exclude apapun -- beda dgn versi inline Dashboard PM yang exclude Konstruksi Eksternal utk tif di poin 2 di atas).
+
+**Refactor pendukung (`app/Http/Controllers/DashboardPmController.php`):**
+- Logic pembangunan "cube" (query + akumulasi 8 kolom per Region+Branch+Program) di-extract dari `buildIndexData()` jadi method baru `public function buildStageCube(): array` (public, bukan private) -- supaya bisa dipanggil ulang dari `reportDeployment()` di controller yang sama MAUPUN dari `DashboardController` (role admin/superadmin/officer) tanpa duplikasi logic/mapping 8 kolom (yang sudah didokumentasikan lengkap di Section BA). `buildIndexData()` sekarang cuma memanggil `$this->buildStageCube()`.
+- `stageBreakdownBucket()` visibility diubah dari `private` jadi `public` (dipanggil dari `DashboardController` juga).
+- Method baru `reportDeployment()`: `$stageCube = Cache::remember('pm_report_deployment_cube_v1', 90, fn() => $this->buildStageCube());` lalu `return view('pm.report_deployment', compact('stageCube'));` -- TANPA filter role apapun (route-nya sendiri sudah dibatasi role:pm saja, jadi tif tidak akan pernah sampai ke sini).
+
+**`app/Http/Controllers/DashboardController.php`:**
+- Tambah `use Illuminate\Support\Facades\Cache;`.
+- Method baru `reportDeployment()`: ambil `$stageCube` dari CACHE KEY YANG SAMA (`pm_report_deployment_cube_v1`) via `app(DashboardPmController::class)->buildStageCube()` -- sengaja disamakan cache key-nya dengan method di atas karena hasil `buildStageCube()` identik utk semua role (tidak dipengaruhi siapa pemanggilnya), supaya tidak query DB 2x utk data yang sama persis.
+- `matrixDetail()`: ditambah `elseif ($type === 'stage_breakdown')` -- logic IDENTIK dengan `DashboardPmController::matrixDetail()` (query lops+projects, filter `program_filter` opsional, bucket via `app(DashboardPmController::class)->stageBreakdownBucket()` lewat instance controller lain drpd duplikasi definisi mapping-nya).
+
+**Routing (`routes/web.php`):**
+- `GET /admin/report-deployment` -> `DashboardController::reportDeployment()`, name `admin.report_deployment`, middleware GROUP BARU `role:admin,superadmin,officer` (SENGAJA terpisah dari group `role:admin,superadmin,super_tif,officer` yang sudah ada di baris 94 -- kalau nebeng group itu, super_tif ikut kebagian menu ini, padahal user cuma minta admin/superadmin/officer/PM).
+- `GET /pm/report-deployment` -> `DashboardPmController::reportDeployment()`, name `pm.report_deployment`, middleware GROUP BARU `role:pm` (SENGAJA terpisah dari group `role:pm,tif` yang sudah ada -- kalau nebeng group itu, tif ikut kebagian menu ini).
+
+**View baru:**
+- `resources/views/partials/report-deployment.blade.php` -- partial reusable berisi filter+tabel+modal detail LOP + komponen Alpine `reportDeploymentWidget(cube, matrixDetailUrl)` (versi BERDIRI SENDIRI dari `matrixDetailModal()` milik Dashboard PM -- method-nya sama persis: `stageRegions()`, `stageBranchOptions()`, `stagePrograms()`, `stageFilteredCube()`, `stageGroupedRows()`, `stageGrandTotal()`, `stageToggle()`, `stageShow()`, `show()`, `close()` -- plus markup modal detail LOP-nya sendiri, karena halaman baru ini tidak "menumpang" root `x-data="matrixDetailModal()"` milik `pm.dashboard.blade.php`). Kolom "Total LOP" TIDAK ada dari awal di partial ini (dibuat setelah revisi poin 1 di atas).
+- `resources/views/pm/report_deployment.blade.php` -- extends `layouts.pm`, `@include('partials.report-deployment', ['stageCube' => $stageCube, 'matrixDetailRoute' => 'pm.dashboard.matrix-detail'])`.
+- `resources/views/admin/report_deployment.blade.php` -- extends `layouts.admin`, `@include('partials.report-deployment', ['stageCube' => $stageCube, 'matrixDetailRoute' => 'admin.dashboard.matrix-detail'])`.
+
+**Sidebar (link baru "Report Deployment", ikon `layout-dashboard`, ditempatkan tepat di atas link/menu "Rekap Progress"):**
+- `resources/views/admin/components/sidebar.blade.php` + `sidebar-mobile.blade.php` -- selalu tampil (superadmin ikut karena berbagi file sidebar yang sama dengan admin, dikonfirmasi lewat `layouts/admin.blade.php` yang cuma pecah sidebar berdasar role `super_tif`/`officer`/`tif,pm`, selain itu semua fallback ke `admin.components.sidebar`).
+- `resources/views/officer/components/sidebar.blade.php` + `sidebar-mobile.blade.php` -- selalu tampil.
+- `resources/views/pm/components/sidebar.blade.php` + `sidebar-mobile.blade.php` -- dibungkus `@if(auth()->user()->role === 'pm')` supaya TIDAK muncul utk tif (pola sama dgn exclude Konstruksi Eksternal di sub-menu Rekap Progress yang sudah ada di file yang sama).
+
+Catatan: link "Rekap Progress" di `admin/components/sidebar-mobile.blade.php` ternyata sudah lebih dulu memakai `href="#"` (placeholder, belum pernah di-wire ke route) -- bug pre-existing, TIDAK diperbaiki di sesi ini (di luar scope permintaan), link "Report Deployment" yang baru ditambahkan tetap di-wire dengan benar ke `route('admin.report_deployment')`.
+
+### Verifikasi
+
+- Balance-check (python: `{`/`}`, `(`/`)`, serta tag HTML relevan) pada seluruh file yang diubah/dibuat (2 controller, `routes/web.php`, `pm/dashboard.blade.php`, partial baru, 2 halaman baru, 6 file sidebar). Satu file (`admin/components/sidebar-mobile.blade.php`) menunjukkan selisih `<div>`/`</div>` 1 angka -- dikonfirmasi PRE-EXISTING (ada SEBELUM perubahan sesi ini, tidak disebabkan oleh edit yang dilakukan), bukan bug baru.
+- `php -l` via `device_stage_files` + cloud `Bash` pada seluruh file PHP/blade yang diubah/dibuat: "No syntax errors detected" untuk semuanya.
+- Tidak ada migration baru.
+
+## Section BD — Fix: "Report Deployment" Tidak Muncul Data utk Role Admin/Superadmin/Officer/PM
+
+### Keluhan user
+"kenapa report deployment pada role admin, superadmin, officer, PM tidak muncul data nya seperti di role TIF sesuaikan agar datanya muncul persis seperti role tif" -- halaman baru "Report Deployment" (Section BC) tampil (layout, header, filter, tabel kosong) tapi TIDAK ada satupun baris data yang muncul, padahal tabel "Reporting Deployment" versi inline di Dashboard PM (dilihat role tif/pm) berfungsi normal dgn data yg sama persis.
+
+### Root cause (ditemukan & dikonfirmasi via `php -r` langsung)
+Di `resources/views/partials/report-deployment.blade.php`, cube data di-pass sbg ARGUMEN FUNGSI langsung di dalam atribut HTML:
+```blade
+<div x-data="reportDeploymentWidget(@json($stageCube), '{{ route($matrixDetailRoute) }}')">
+```
+Asumsi sebelumnya (Section BC): `@json()` Laravel pakai flag default `JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT`, jadi dikira SEMUA tanda kutip dobel (termasuk yg jadi pembatas struktural JSON) otomatis di-escape jadi `"`, sehingga aman ditaruh di dalam atribut HTML yg dibatasi tanda kutip dobel juga.
+
+Ternyata SALAH -- diverifikasi ulang dgn `php -r`:
+```php
+json_encode(["region" => "JATIM"], JSON_HEX_QUOT); // => {"region":"JATIM"}  (tanda kutip struktural TETAP literal!)
+json_encode(["label" => "He said \"hi\""], JSON_HEX_QUOT); // => {"label":"He said "hi""} (hanya quote yg jadi ISI string yg di-escape)
+```
+`JSON_HEX_QUOT` hanya meng-escape karakter `"` yang muncul sbg ISI/nilai string (yang tanpa flag ini akan jadi `\"` di output JSON), BUKAN tanda kutip struktural pembatas key/value JSON (`"region":"JATIM"`) -- itu SELALU tetap `"` literal di semua kondisi, krn kalau di-escape jadi bukan JSON valid lagi.
+
+Akibatnya, HTML yang dihasilkan Blade adalah:
+```html
+<div x-data="reportDeploymentWidget([{"region":"JATIM","branch":"SIDOARJO",...}], '...')">
+```
+Atribut HTML `x-data="..."` (dibatasi tanda kutip dobel) LANGSUNG TERPUTUS di kutip pertama yang ditemui parser HTML (persis setelah `[{`) -- sisa teks JSON (`region":"JATIM",...`) jadi teks/atribut liar di luar `x-data`. Alpine.js membaca isi atribut `x-data` yang sudah terpotong (`reportDeploymentWidget([{`) sbg ekspresi JS -- ini SYNTAX ERROR, Alpine gagal inisialisasi komponen sama sekali (biasanya cuma log warning di console, tidak ada error yang terlihat user) -- semua binding `x-show`/`x-text`/`x-for` di dalam `<div>` itu jadi tidak pernah jalan. Ini PERSIS gejala "halaman tampil normal (layout/header/filter ada) tapi baris data kosong total".
+
+Kenapa tabel INLINE di `pm/dashboard.blade.php` (dipakai role tif/pm) tidak kena bug yang sama: di situ `@json($stageCube ?? [])` ditaruh di DALAM `<script>` sbg literal JS biasa (`stageCube: @json($stageCube ?? []),`), BUKAN di dalam atribut HTML -- `<script>` bukan atribut yg dibatasi tanda kutip, jadi tanda kutip dobel literal dari JSON tidak masalah sama sekali di situ.
+
+### Fix
+`resources/views/partials/report-deployment.blade.php`:
+- `x-data="reportDeploymentWidget(@json($stageCube), '{{ route($matrixDetailRoute) }}')"` -> `x-data="reportDeploymentWidget('{{ route($matrixDetailRoute) }}')"` (HANYA kirim URL route lewat atribut HTML -- aman krn tidak mengandung tanda kutip dobel).
+- `function reportDeploymentWidget(initialCube, matrixDetailUrl) { return { stageCube: initialCube, ...` -> `function reportDeploymentWidget(matrixDetailUrl) { return { stageCube: @json($stageCube ?? []), ...` -- `@json()` dipindah ke DALAM `<script>` (pola disamakan persis dgn `matrixDetailModal()` di `pm/dashboard.blade.php`).
+
+Tidak ada perubahan lain (controller/route/view wrapper admin & pm sudah benar dari Section BC, root cause murni di 1 baris `x-data` + 1 baris inisialisasi `stageCube` pada partial).
+
+### Verifikasi
+- Balance-check (python: `{`/`}` 48/48, `(`/`)` 136/136, `<div>`/`</div>` 18/18, `<script>`/`</script>` 1/1 -- 2 kemunculan lain string "<script>" adalah teks komentar penjelasan, bukan tag sungguhan) pada `resources/views/partials/report-deployment.blade.php` setelah fix.
+- `php -l` via `device_stage_files` + cloud `Bash`: "No syntax errors detected".
+- Tidak ada migration baru, tidak ada file lain yang perlu diubah (root cause murni salah taruh `@json()` di 1 partial).
+
+### Addendum Section BD — Fix Susulan: Halaman Error (bukan cuma "kosong") Setelah Fix Pertama
+
+Setelah fix pertama di atas diterapkan, user melaporkan halaman "Report Deployment" JADI ERROR (sebelumnya cuma "kosong tanpa data", bukan error). Dicek `storage/logs/laravel.log`:
+```
+local.ERROR: syntax error, unexpected token "," (View: .../partials/report-deployment.blade.php)
+  at storage/framework/views/dd4a25af1bac7ac78635c46308b52a2d.php:199
+```
+Baris hasil kompilasi Blade yang error: `<?php echo json_encode(, 15, 512) ?>` -- argumen pertama `json_encode()` KOSONG.
+
+**Penyebab**: komentar penjelasan yang ditambahkan pada fix pertama (di dalam `<script>...</script>`, sbg komentar JS `//`) SECARA TIDAK SENGAJA menuliskan teks `@json($stageCube)` dan `@json()` apa adanya sbg PROSA PENJELASAN. Blade compiler TIDAK tahu itu ada di dalam komentar JS (`//`) -- Blade cuma scan raw text file utk pola `@namaDirective(...)` di MANA SAJA yang bukan di dalam blok komentar Blade sendiri (`{{-- --}}`), lalu compile jadi PHP. Jadi `@json()` (tanpa argumen, di tengah kalimat "Jadi hasil @json() masih mengandung...") ikut ke-compile Blade jadi `json_encode(, 15, 512)` -- argumen kosong -- PHP parse error.
+
+**Fix**: 3 kemunculan `@json(...)`/`@json()` di dalam komentar JS pada `resources/views/partials/report-deployment.blade.php` diganti jadi `@@json(...)`/`@@json()` -- `@@` adalah escape resmi Blade utk menghasilkan `@` literal tanpa di-compile jadi directive. 1 kemunculan `@json($stageCube ?? [])` yang MEMANG directive asli (baris `stageCube: @json($stageCube ?? []),`) TIDAK diubah.
+
+Compiled view cache lama (`storage/framework/views/dd4a25af1bac7ac78635c46308b52a2d.php`, yang isinya sudah rusak/mengandung syntax error tsb) ikut dihapus manual supaya tidak ada risiko file rusak itu ke-serve lagi sebelum Laravel sempat recompile (harusnya otomatis recompile krn mtime source lebih baru, tapi dihapus manual utk jaga-jaga/pasti bersih).
+
+**Pelajaran utk sesi ke depan**: JANGAN PERNAH menuliskan literal `@namaDirective(...)` (terutama `@json`, `@if`, `@include`, `@foreach`, dst) di dalam KOMENTAR PROSA di file `.blade.php` KECUALI di dalam blok komentar Blade `{{-- --}}` (yang aman krn di-strip duluan sebelum compile directive lain) -- kalau perlu menyebut nama directive di komentar JS/CSS/HTML biasa, WAJIB pakai `@@` (mis. `@@json(...)`) supaya tidak ikut ke-compile.
+
+### Verifikasi (addendum)
+- Balance-check ulang: `{`/`}` 48/48, `(`/`)` 136/136, `<div>`/`</div>` 18/18 -- tidak berubah dari fix pertama (cuma teks komentar yg diubah).
+- `php -l` via `device_stage_files` + cloud `Bash` pada `partials/report-deployment.blade.php`, `admin/report_deployment.blade.php`, `pm/report_deployment.blade.php`: "No syntax errors detected" utk ketiganya.
+- Grep manual seluruh `@[a-zA-Z]+` pattern di ketiga file utk pastikan tidak ada directive Blade "liar" lain yang tidak sengaja ter-tulis di komentar biasa (hanya ditemukan directive asli: `@include`, `@extends`, `@section`, `@endsection`, `@click` [Alpine, bukan Blade], `@change` [Alpine], `@json` [1x, asli] -- semua aman).

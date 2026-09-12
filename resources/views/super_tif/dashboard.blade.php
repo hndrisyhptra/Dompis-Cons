@@ -246,6 +246,7 @@
                             <th class="px-6 py-3 text-left">Breakdown (Region / Branch)</th>
                             <th class="px-3 py-3 text-center">Total LOP</th>
                             <th class="px-3 py-3 text-center">Assign</th>
+                            <th class="px-3 py-3 text-center">Blm Assign</th>
                             <th class="px-3 py-3 text-center">In Review</th>
                             <th class="px-3 py-3 text-center">Complete (Done)</th>
                             <th class="px-6 py-3 text-right">Progress Rate</th>
@@ -266,6 +267,7 @@
                                     <span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'total'})">{{ $reg['total'] }}</span>
                                 </td>
                                 <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-blue-50 text-blue-700 font-black hover:bg-blue-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'assigned'})">{{ $reg['assigned'] }}</span></td>
+                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-rose-50 text-rose-700 font-black hover:bg-rose-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'unassigned'})">{{ $reg['total'] - $reg['assigned'] }}</span></td>
                                 <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-amber-50 text-amber-700 font-black hover:bg-amber-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'waiting'})">{{ $reg['waiting'] }}</span></td>
                                 <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black hover:bg-emerald-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'completed'})">{{ $reg['completed'] }}</span></td>
                                 <td class="px-6 py-4 text-right">
@@ -287,6 +289,7 @@
                                         <span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'total'})">{{ $br['total'] }}</span>
                                     </td>
                                     <td class="px-3 py-3 text-center"><span class="cursor-pointer text-blue-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'assigned'})">{{ $br['assigned'] }}</span></td>
+                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-rose-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'unassigned'})">{{ $br['total'] - $br['assigned'] }}</span></td>
                                     <td class="px-3 py-3 text-center"><span class="cursor-pointer text-amber-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'waiting'})">{{ $br['waiting'] }}</span></td>
                                     <td class="px-3 py-3 text-center"><span class="cursor-pointer text-emerald-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'completed'})">{{ $br['completed'] }}</span></td>
                                     <td class="px-6 py-3 text-right font-black text-slate-500">{{ $br['percent'] }}%</td>
@@ -294,7 +297,7 @@
                             @endforeach
                         @empty
                             <tr>
-                                <td colspan="6" class="px-6 py-10 text-center text-slate-400 font-medium">Tidak ada data statistik tersedia berdasarkan filter.</td>
+                                <td colspan="7" class="px-6 py-10 text-center text-slate-400 font-medium">Tidak ada data statistik tersedia berdasarkan filter.</td>
                             </tr>
                         @endforelse
                     </tbody>

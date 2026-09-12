@@ -558,6 +558,21 @@ class WaspangController extends Controller
 
     public function pengukuran($id)
     {
+
+        // Self-heal: kalau semua item Pengukuran sudah lengkap/Tidak Ada
+        // tapi status_progress LOP masih nyangkut di 'pengukuran' (mis. LOP
+        // lama yg item2-nya ditandai N/A SEBELUM gate auto-advance di
+        // toggleMeasurementCheck() ada, atau transisi lain yg sempat
+        // terlewat), majukan DULU di sini sebelum $project utk view
+        // di-fetch -- supaya "Posisi" di header stepper (resources/views/
+        // waspang/partials/stepper.blade.php) tidak pernah nyangkut
+        // permanen walau Waspang sudah benar2 selesai. Pakai instance
+        // TERPISAH (bukan $project di bawah) supaya progressSummary()
+        // cache milik $project yg dipakai view tidak ikut basi kalau
+        // status_progress berubah di tengah request ini.
+        $this->maybeAdvancePengukuranStage(
+            Project::with(['evidences', 'lop.stage'])->findOrFail($id)
+        );
         $project = Project::with([
             'evidences',
             'boqItems',
@@ -618,6 +633,57 @@ class WaspangController extends Controller
     }
 
     /**
+     * Gate tunggal "boleh maju status_progress pengukuran -> finishing?"
+     * (Section AJ) -- dipakai baik oleh toggleMeasurementCheck() (dipicu
+     * user menandai/batal-menandai item Tidak Ada) maupun oleh
+     * pengukuran() (self-heal saat halaman dibuka, jaga-jaga kalau ada LOP
+     * yg transisinya sempat terlewat, mis. semua item ditandai N/A sebelum
+     * gate ini ada). Sama persis syaratnya dgn barier di ProjectController
+     * (approveEvidence()/submitGoliveDocuments()): bukan PT2, belum
+     * drop/golive, tidak sedang hold/drop, persis di sequence 8
+     * (Pengukuran), dan pengukuranDone (5 item lop_measurement_checks
+     * sudah lengkap/Tidak Ada semua). Idempotent -- aman dipanggil
+     * berkali-kali walau LOP sudah lewat tahap ini.
+     */
+    private function maybeAdvancePengukuranStage(Project $project): void
+    {
+        $lop = $project->lop;
+
+        if (! $lop) {
+            return;
+        }
+
+        $programSap = strtoupper($lop->program_sap ?? '');
+        $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
+        $isAlreadyClosed = in_array($lop->status_progress, ['drop', 'golive'], true) || (bool) $lop->is_golive;
+        $currentStage = $lop->stage;
+        $currentSequence = $currentStage?->sequence;
+        $isPausedOrDropped = (bool) ($currentStage?->is_pause_type || $currentStage?->is_terminal);
+
+        if ($isPt2 || $isAlreadyClosed || $isPausedOrDropped || $currentSequence !== 8) {
+            return;
+        }
+
+        $summary = $project->progressSummary();
+
+        if (! ($summary['pengukuranDone'] ?? false)) {
+            return;
+        }
+
+        Lop::where('project_id', $project->id_project)->update(['status_progress' => 'finishing']);
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'lop_stage_advance',
+            'title' => 'LOP Maju ke Finishing',
+            'description' => 'Seluruh item Pengukuran sudah lengkap/Tidak Ada, LOP maju otomatis ke tahap Finishing.',
+            'status_before' => 'pengukuran',
+            'status_after' => 'finishing',
+        ]);
+    }
+
+    /**
      * Toggle "Tidak Ada" (N/A) untuk 1 item pengukuran (Stage 4 -- gate
      * nyata lop_measurement_checks, lihat Project::progressSummary()).
      * Hanya boleh ditandai N/A kalau item tsb BELUM ada eviden sama sekali
@@ -670,32 +736,13 @@ class WaspangController extends Controller
         $check->checked_by = auth()->user()->id_user;
         $check->save();
 
-        // Section AE: sebelumnya status_progress LOP CUMA bisa maju dari
-        // 'pengukuran' -> 'finishing' lewat 1 jalur: admin approve eviden
-        // stage='pengukuran' (lihat ProjectController, blok auto-transisi).
-        // Kalau SEMUA 5 item Pengukuran ditandai "Tidak Ada" (N/A) -- tanpa
-        // upload eviden APAPUN -- tidak pernah ada evidence utk di-approve,
-        // jadi transisi itu TIDAK PERNAH kepicu walau pengukuranDone sudah
-        // true (LopMeasurementCheck::isDone() -- lihat Project::
-        // progressSummary()). Stepper jadi tidak pernah checklist utk Step 4
-        // meski Waspang sudah "selesai" (semua item N/A). Replikasi gate yg
-        // SAMA PERSIS dgn ProjectController supaya konsisten (PT2/hold/drop
-        // tidak disentuh, urutan sequence tidak boleh dilompati).
-        $summaryAfterToggle = $project->progressSummary();
-        $programSap = strtoupper($lop->program_sap ?? '');
-        $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
-        $isAlreadyClosed = in_array($lop->status_progress, ['drop', 'golive'], true) || (bool) $lop->is_golive;
-        $currentStage = $lop->stage;
-        $currentSequence = $currentStage?->sequence;
-        $isPausedOrDropped = (bool) ($currentStage?->is_pause_type || $currentStage?->is_terminal);
-
-        if (
-            ! $isPt2 && ! $isAlreadyClosed && ! $isPausedOrDropped
-            && $currentSequence === 8 // persis di tahap Pengukuran
-            && ($summaryAfterToggle['pengukuranDone'] ?? false)
-        ) {
-            Lop::where('project_id', $project->id_project)->update(['status_progress' => 'finishing']);
-        }
+        // Gate "boleh maju ke Finishing?" dipusatkan di
+        // maybeAdvancePengukuranStage() -- dipakai bersama oleh toggle ini
+        // maupun self-heal saat halaman Pengukuran dibuka (lihat
+        // WaspangController::pengukuran()), supaya aturannya selalu 1 sumber
+        // & konsisten (PT2/hold/drop/golive tidak disentuh, urutan sequence
+        // tidak boleh dilompati).
+        $this->maybeAdvancePengukuranStage($project);
 
         ProjectActivityService::log([
             'project_id' => $project->id_project,
@@ -1893,22 +1940,34 @@ class WaspangController extends Controller
         // 3. Pisahkan item berdasarkan arsitektur modul Anda (KPI vs Non-KPI / Material)
         $boqItems = $project->boqItems ?? collect();
 
-        // Anda bisa memilah item material saja atau semua item sesuai kebutuhan cetak UT
-        // quantity_plan !== null WAJIB (bag. AC): item tambahan BOQ Survey
-        // tidak punya Plan, jadi tidak relevan dibandingkan Plan vs Aktual di sini.
+        // Section AQ (permintaan user): pembanding Review BOQ Final BUKAN lagi
+        // selalu BOQ Plan -- prioritas BOQ Survey TERBARU (quantity_survey,
+        // kolom ini SELALU disinkronkan ke ronde survey terakhir, lihat
+        // ensureBaselineSurveyRound()/updateSurveyBoq()), fallback ke BOQ
+        // Plan (quantity_plan) HANYA kalau item itu tidak punya data Survey
+        // sama sekali. Item tanpa Plan MAUPUN Survey tetap dikecualikan
+        // (tidak ada dasar pembanding sama sekali).
         $materialBoqItems = $boqItems->filter(function ($boq) {
-            return $boq->quantity_plan !== null
+            return ($boq->quantity_survey !== null || $boq->quantity_plan !== null)
                 && (str_starts_with($boq->designator, 'M-')
                     || optional($boq->designatorData)->type === 'material');
         })->values();
 
+        // Lampirkan nilai & sumber pembanding per item (atribut transient,
+        // TIDAK disimpan ke DB) supaya view tidak perlu hitung ulang & tetap
+        // konsisten dengan summary di bawah.
+        $materialBoqItems->each(function ($item) {
+            $item->compare_qty = $item->quantity_survey ?? $item->quantity_plan;
+            $item->compare_source = $item->quantity_survey !== null ? 'survey' : 'plan';
+        });
+
         // 4. Hitung ringkasan akumulasi total untuk widget pencapaian di atas halaman
         $summary = [
             'total_items' => $materialBoqItems->count(),
-            'total_plan' => $materialBoqItems->sum('quantity_plan'),
+            'total_plan' => $materialBoqItems->sum('compare_qty'),
             'total_actual' => $materialBoqItems->sum('quantity_actual'),
             'matched' => $materialBoqItems->filter(function ($item) {
-                return (float) $item->quantity_actual >= (float) $item->quantity_plan;
+                return (float) $item->quantity_actual >= (float) $item->compare_qty;
             })->count(),
         ];
 

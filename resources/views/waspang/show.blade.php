@@ -10,7 +10,13 @@
         // disiapkan controller (WaspangController::persiapan()) -- view ini
         // TIDAK menghitung ulang status dari evidence, murni menampilkan
         // posisi NYATA LOP (project_stages.sequence) supaya selalu sinkron.
-        $progressPercent = $summary['progress'] ?? 0;
+        // Section AQ (permintaan user): setelah eviden Finishing disetujui
+        // (finishingDone), progress yg ditampilkan ke Waspang HARUS 100% --
+        // step Waspang memang cuma sampai Finishing (FI-OGP Golive & Golive
+        // murni tahap Admin/SDI, di luar jangkauan Waspang), padahal formula
+        // progress standar (sequence-based, 11 tahap) masih mentok di 80% di
+        // titik ini karena 2 tahap terakhir itu belum dijangkau LOP.
+        $progressPercent = ($summary['finishingDone'] ?? false) ? 100 : ($summary['progress'] ?? 0);
     @endphp
 
     {{-- HEADER & STEPPER --}}

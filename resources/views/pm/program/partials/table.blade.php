@@ -79,11 +79,16 @@
                             }
                         }
 
-                        if ($progress == 100) { $stageBadge = 'bg-green-100 text-green-700'; $progressColor = 'bg-green-600'; }
-                        elseif ($stageLabel === 'Finishing') { $stageBadge = 'bg-purple-100 text-purple-700'; $progressColor = 'bg-purple-600'; }
-                        elseif ($stageLabel === 'Pengukuran') { $stageBadge = 'bg-blue-100 text-blue-700'; $progressColor = 'bg-blue-600'; }
-                        elseif ($stageLabel === 'Instalasi') { $stageBadge = 'bg-yellow-100 text-yellow-700'; $progressColor = 'bg-yellow-600'; }
-                        else { $stageBadge = 'bg-red-100 text-red-700'; $progressColor = 'bg-red-600'; }
+                        // Section AL: warna badge tahap diselaraskan ke skema standar
+                        // Project::stageColorClasses() (sama dgn admin/projects/index,
+                        // project-card, project-detail, evidences/approval) -- sebelumnya
+                        // if/elseif manual ini cuma kenal label 'Finishing'/'Pengukuran'/
+                        // 'Instalasi', tahap lain (termasuk Persiapan Instalasi & FI-OGP
+                        // Golive yg progress-nya sudah tinggi) selalu jatuh ke else -> badge
+                        // MERAH seolah bermasalah, padahal tidak.
+                        $stageColors = \App\Models\Project::stageColorClasses($summary['effectiveStageColor'] ?? null);
+                        $stageBadge = $stageColors['badge'];
+                        $progressColor = $stageColors['progress'];
 
                         $statusProgress = $summary['effectiveStageCode'] ?? $project->lop?->status_progress ?? '-';
                         $statusBadge = match ($statusProgress) {
@@ -101,6 +106,76 @@
                             'unit' => $boq->unit ?? '-',
                             'quantity_plan' => (float) ($boq->quantity_plan ?? 0),
                         ])->values();
+
+                        // Revisi (permintaan user): role 'tif' -- tombol Tracking
+                        // Progress dihapus, diganti tombol "Review BOQ" (modal
+                        // perbandingan Plan vs Survey ronde 1,2,dst vs Actual). Role
+                        // 'pm' TIDAK disentuh -- Tracking Progress tetap ada, tombol
+                        // Review BOQ TIDAK ditambahkan (sesuai permintaan user,
+                        // khusus role tif saja).
+                        $isTifRole = auth()->user()?->role === 'tif';
+
+                        // Data BOQ Survey per ronde (BoqSurveyRound/BoqSurveyRoundItem,
+                        // lihat migration 2026_09_10_140000_create_boq_survey_rounds_tables
+                        // & 2026_09_10_160000_split_quantity_survey_from_quantity_actual)
+                        // -- kalau LOP belum pernah Survey/Re-Survey sama sekali,
+                        // $roundNumbers kosong & modal cuma tampilkan Plan vs Actual.
+                        $lopIdForBoq = $project->lop?->id_lop;
+                        $surveyRounds = $lopIdForBoq
+                            ? \App\Models\BoqSurveyRound::where('lop_id', $lopIdForBoq)->orderBy('round_number')->get()
+                            : collect();
+                        $roundNumbers = $surveyRounds->pluck('round_number')->values();
+
+                        $roundItemsMap = [];
+                        if ($surveyRounds->isNotEmpty()) {
+                            $roundIdToNumber = $surveyRounds->pluck('round_number', 'id');
+                            $allRoundItems = \App\Models\BoqSurveyRoundItem::whereIn('boq_survey_round_id', $surveyRounds->pluck('id'))->get();
+                            foreach ($allRoundItems as $ri) {
+                                $rn = $roundIdToNumber[$ri->boq_survey_round_id] ?? null;
+                                if ($rn === null || !$ri->boq_item_id) {
+                                    continue;
+                                }
+                                $roundItemsMap[$ri->boq_item_id][$rn] = (float) $ri->quantity_survey;
+                            }
+                        }
+
+                        $boqCompareItems = $project->boqItems->map(function ($boq) use ($roundItemsMap, $roundNumbers) {
+                            $surveyPerRound = [];
+                            foreach ($roundNumbers as $rn) {
+                                $surveyPerRound[] = $roundItemsMap[$boq->id_boq][$rn] ?? null;
+                            }
+
+                            // Revisi (permintaan user): perhitungan Total Plan/Total
+                            // Survey pada modal ini cuma menghitung item designator
+                            // MATERIAL saja (Jasa dikecualikan) -- pakai konvensi yang
+                            // sama persis dgn WaspangController (materialBoqItems):
+                            // designator berawalan "M-" ATAU type master designator
+                            // = 'material'.
+                            $isMaterialItem = str_starts_with($boq->designator ?? '', 'M-')
+                                || optional($boq->designatorData)->type === 'material';
+
+                            return [
+                                'designator' => $boq->designator ?? '-',
+                                'item_name' => $boq->item_name ?? '-',
+                                'unit' => $boq->unit ?? '-',
+                                'plan' => (float) ($boq->quantity_plan ?? 0),
+                                'survey' => $surveyPerRound,
+                                'actual' => $boq->quantity_actual !== null ? (float) $boq->quantity_actual : null,
+                                'is_material' => $isMaterialItem,
+                            ];
+                        })->values();
+
+                        $latestBoqRound = $surveyRounds->last();
+
+                        $boqCompareData = [
+                            'projectName' => $project->project_name,
+                            'pid' => $project->pid ?? '-',
+                            'pidSap' => $project->pid_sap ?? '-',
+                            'lopName' => $project->lop?->lop_name ?? '-',
+                            'rounds' => $roundNumbers,
+                            'deviationPercent' => $latestBoqRound?->deviation_percent,
+                            'items' => $boqCompareItems,
+                        ];
 
                         $detailPayload = [
                             'projectId' => $project->id_project,
@@ -173,12 +248,39 @@
                                     </svg>
                                 </button>
 
+                                @unless($isTifRole)
                                 <a href="{{ route('admin.projects.tracking', $project->id_project) }}"
                                    class="w-8 h-8 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition inline-flex items-center justify-center pm-tooltip"
                                    data-tooltip="Tracking Progress">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25A7.5 7.5 0 1119.5 10.5z" />
+                                    </svg>
+                                </a>
+                                @endunless
+
+                                @if($isTifRole)
+                                {{-- Revisi (permintaan user): tombol BARU "Review BOQ" khusus
+                                role tif -- buka modal perbandingan Plan vs Survey per
+                                ronde vs Actual (lihat pm.program.partials.boq-compare-modal). --}}
+                                <button type="button"
+                                        @click="$dispatch('open-boq-compare', @js($boqCompareData))"
+                                        class="w-8 h-8 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition inline-flex items-center justify-center pm-tooltip"
+                                        data-tooltip="Review BOQ">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </button>
+                                @endif
+
+                                {{-- Revisi (permintaan user): tombol BARU "Timeline" -- halaman
+                                kronologi horizontal+vertical lengkap dgn eviden foto. --}}
+                                <a href="{{ route('admin.projects.timeline', $project->id_project) }}"
+                                   class="w-8 h-8 rounded-lg border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 transition inline-flex items-center justify-center pm-tooltip"
+                                   data-tooltip="Timeline">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6.75v.008M10.5 12v.008M15 17.25v.008" />
                                     </svg>
                                 </a>
                             </div>

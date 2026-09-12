@@ -23,7 +23,33 @@
             Main Menu
         </p>
 
-        {{-- Menu Approval UIM --}}
+        {{-- Revisi (permintaan user): menu Dashboard dipindah ke PALING ATAS. --}}
+        <a href="{{ route('sdi.matrix.index') }}"
+        class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+        {{ request()->routeIs('sdi.matrix.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+            @if(request()->routeIs('sdi.matrix.*'))
+                <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+            @endif
+
+            <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0
+                {{ request()->routeIs('sdi.matrix.*') ? 'bg-blue-100 dark:bg-blue-600/60' : 'bg-gray-100 dark:bg-gray-800' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="{{ request()->routeIs('sdi.matrix.*') ? 'text-blue-600 dark:text-blue-300' : 'text-gray-500' }}">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 15l3-3 3 3 5-6" />
+                </svg>
+            </div>
+
+            <div class="flex flex-1 items-center justify-between">
+                <span>Dashboard</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full {{ request()->routeIs('sdi.matrix.*') ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
+                    MATRIX
+                </span>
+            </div>
+        </a>
+
+        {{-- Revisi (permintaan user): nama menu "Approval UIM" diganti jadi
+        "Approval Golive" (badge tetap "PT 2"). --}}
         <a href="{{ route('sdi.index') }}"
         class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
         {{ request()->routeIs('sdi.index') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
@@ -34,7 +60,7 @@
             @endif
 
             {{-- Ikon --}}
-            <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 
+            <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0
                 {{ request()->routeIs('sdi.index') ? 'bg-blue-100 dark:bg-blue-600/60' : 'bg-gray-100 dark:bg-gray-800' }}">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="{{ request()->routeIs('sdi.index') ? 'text-blue-600 dark:text-blue-300' : 'text-gray-500' }}">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4C15.5 8.5 16.5 7 18 6" />
@@ -44,33 +70,35 @@
 
             {{-- Teks & Badge --}}
             <div class="flex flex-1 items-center justify-between">
-                <span>Approval UIM</span>
+                <span>Approval Golive</span>
                 <span class="text-[10px] px-2 py-0.5 rounded-full {{ request()->routeIs('sdi.index') ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
                     PT 2
                 </span>
             </div>
         </a>
 
-        {{-- Menu Data Survey Lapangan (Hasil Survey Surveyor) --}}
-        <a href="{{ route('admin.site-surveys.index') }}"
+        {{-- Revisi (permintaan user): badge "PT 3/REGULER" disederhanakan
+        jadi "PT 3" saja (tidak perlu ada kata Reguler). --}}
+        <a href="{{ route('sdi.golive.index') }}"
         class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
-        {{ request()->routeIs('admin.site-surveys.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+        {{ request()->routeIs('sdi.golive.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
-            @if(request()->routeIs('admin.site-surveys.*'))
+            @if(request()->routeIs('sdi.golive.*'))
                 <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
             @endif
 
             <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0
-                {{ request()->routeIs('admin.site-surveys.*') ? 'bg-blue-100 dark:bg-blue-600/60' : 'bg-gray-100 dark:bg-gray-800' }}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="{{ request()->routeIs('admin.site-surveys.*') ? 'text-blue-600 dark:text-blue-300' : 'text-gray-500' }}">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" />
+                {{ request()->routeIs('sdi.golive.*') ? 'bg-blue-100 dark:bg-blue-600/60' : 'bg-gray-100 dark:bg-gray-800' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" class="{{ request()->routeIs('sdi.golive.*') ? 'text-blue-600 dark:text-blue-300' : 'text-gray-500' }}">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4C15.5 8.5 16.5 7 18 6" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
                 </svg>
             </div>
 
             <div class="flex flex-1 items-center justify-between">
-                <span>Data Survey Lapangan</span>
-                <span class="text-[10px] px-2 py-0.5 rounded-full {{ request()->routeIs('admin.site-surveys.*') ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
-                    KML
+                <span>Approval Golive</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full {{ request()->routeIs('sdi.golive.*') ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
+                    PT 3
                 </span>
             </div>
         </a>

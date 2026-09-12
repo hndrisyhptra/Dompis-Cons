@@ -21,6 +21,9 @@
 
     @include('pm.program.partials.detail-modal')
 
+    {{-- Revisi (permintaan user): modal BARU "Review BOQ" khusus role tif --}}
+    @include('pm.program.partials.boq-compare-modal')
+
 </div>
 
 @endsection

@@ -33,6 +33,11 @@
     $stepSummary = [
         [
             'label' => 'Persiapan',
+            'stage' => ['perizinan', 'material_delivery'],
+            'route' => route('admin.evidences.review.persiapan', $project->id_project),
+        ],
+        [
+            'label' => 'Persiapan Instalasi',
             'stage' => 'persiapan',
             'route' => route('admin.evidences.review.project', $project->id_project),
         ],
@@ -60,7 +65,7 @@
         <div class="p-4 flex items-center justify-between gap-3">
             <div>
                 <h2 class="text-base font-bold text-gray-900 dark:text-white">
-                    Step 4 — Finishing
+                    Step 5 — Finishing
                 </h2>
                 <p class="text-xs text-gray-500 mt-1">
                     Review hanya item material yang diwajibkan memiliki Eviden Final.
@@ -77,10 +82,12 @@
     </div>
 
     {{-- REVIEW SUMMARY CARDS --}}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         @foreach($stepSummary as $step)
             @php
-                $stepItems = $project->evidences->where('stage', $step['stage']);
+                $stepItems = is_array($step['stage'])
+                    ? $project->evidences->whereIn('stage', $step['stage'])
+                    : $project->evidences->where('stage', $step['stage']);
                 $approved = $stepItems->where('status', 'approved')->count();
                 $pending = $stepItems->where('status', 'pending')->count();
                 $rejected = $stepItems->where('status', 'rejected')->count();
@@ -376,7 +383,7 @@
     {{-- FOOTER NAVIGATION --}}
     <div class="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-800">
         <a href="{{ route('admin.evidences.review.pengukuran', $project->id_project) }}" class="h-11 px-6 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition inline-flex items-center shadow-sm">
-            ← Step 3 (Pengukuran)
+            ← Step 4 (Pengukuran)
         </a>
 
         <div class="flex items-center gap-3">

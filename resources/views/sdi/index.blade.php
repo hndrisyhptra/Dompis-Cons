@@ -6,7 +6,7 @@
     {{-- Filter & Search Header --}}
     <div class="mb-6 bg-white dark:bg-gray-900 rounded-3xl p-5 shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
-            <h1 class="text-xl font-black text-gray-900 dark:text-white">SDI Approval (Go Live)</h1>
+            <h1 class="text-xl font-black text-gray-900 dark:text-white">Approval Golive PT 2</h1>
             <p class="text-sm text-gray-500 mt-1">Validasi UIM khusus Program PT 2 per LOP</p>
         </div>
         <form method="GET" action="{{ route('sdi.index') }}" class="w-full md:w-auto relative">
@@ -14,6 +14,52 @@
                    class="w-full md:w-80 h-11 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 pl-10 pr-4 text-sm font-medium focus:ring-2 focus:ring-blue-100 focus:border-blue-600 outline-none transition">
             <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</div>
         </form>
+    </div>
+
+    {{-- Revisi (permintaan user): kartu ringkasan Total LOP / Waiting
+    Approval / Jumlah LOP Golive -- desain clean white profesional,
+    konsisten dgn kartu lain di app (rounded-3xl + border tipis). --}}
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div class="bg-white dark:bg-gray-900 rounded-3xl p-5 border border-gray-200 dark:border-gray-800 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">Total LOP</span>
+                <div class="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950 flex items-center justify-center text-blue-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7a2 2 0 0 1 2-2h6.5L21 8.5V17a2 2 0 0 1-2 2H11a2 2 0 0 1-2-2Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 13H7a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1" />
+                    </svg>
+                </div>
+            </div>
+            <p class="text-3xl font-black text-gray-900 dark:text-white">{{ $cards['total'] }}</p>
+            <p class="text-xs text-gray-400 mt-1">LOP PT 2 dalam antrean Golive</p>
+        </div>
+
+        <div class="bg-white dark:bg-gray-900 rounded-3xl p-5 border border-gray-200 dark:border-gray-800 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">Waiting Approval</span>
+                <div class="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950 flex items-center justify-center text-amber-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l2.5 2.5" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
+                    </svg>
+                </div>
+            </div>
+            <p class="text-3xl font-black text-amber-600">{{ $cards['waiting'] }}</p>
+            <p class="text-xs text-gray-400 mt-1">Menunggu approval Golive</p>
+        </div>
+
+        <div class="bg-white dark:bg-gray-900 rounded-3xl p-5 border border-gray-200 dark:border-gray-800 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">LOP Golive</span>
+                <div class="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950 flex items-center justify-center text-emerald-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                </div>
+            </div>
+            <p class="text-3xl font-black text-emerald-600">{{ $cards['golive'] }}</p>
+            <p class="text-xs text-gray-400 mt-1">Sudah resmi Golive</p>
+        </div>
     </div>
 
         {{-- Tambahkan tab filter ini di atas tabel untuk SDI --}}
@@ -49,7 +95,15 @@
                     <tr>
                         <th class="px-5 py-3 text-left text-[11px] font-black uppercase text-gray-500 tracking-wider">Nama LOP</th>
                         <th class="px-5 py-3 text-left text-[11px] font-black uppercase text-gray-500 tracking-wider">Lokasi</th>
-                        <th class="px-5 py-3 text-left text-[11px] font-black uppercase text-gray-500 tracking-wider">Tanggal Send</th>
+                        {{-- Revisi (permintaan user): kolom "Tanggal Send" dihapus,
+                        diganti "Tanggal FI" (revisi lanjutan: KHUSUS PT 2 kolom ini
+                        TETAP menampilkan nilai yg sama dgn Tanggal Send lama --
+                        $lop->updated_at -- cuma NAMA kolomnya yg diganti jd
+                        "Tanggal FI" spy konsisten dgn PT 3. PT 2 tidak pakai
+                        fi_completed_at lagi krn tidak ada step FI-OGP yg jelas) &
+                        "Tanggal Golive" (golive_at). --}}
+                        <th class="px-5 py-3 text-left text-[11px] font-black uppercase text-gray-500 tracking-wider">Tanggal FI</th>
+                        <th class="px-5 py-3 text-left text-[11px] font-black uppercase text-gray-500 tracking-wider">Tanggal Golive</th>
                         <th class="px-5 py-3 text-left text-[11px] font-black uppercase text-gray-500 tracking-wider">Status</th>
                         <th class="px-5 py-3 text-center text-[11px] font-black uppercase text-gray-500 tracking-wider">Aksi</th>
                     </tr>
@@ -76,6 +130,16 @@
                                     {{ \Carbon\Carbon::parse($lop->updated_at)->format('d M Y') }}
                                 </p>
                                 <p class="text-xs text-gray-500 mt-0.5">{{ \Carbon\Carbon::parse($lop->updated_at)->format('H:i') }} WIB</p>
+                            </td>
+                            <td class="px-5 py-4">
+                                @if($lop->golive_at)
+                                    <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        {{ \Carbon\Carbon::parse($lop->golive_at)->format('d M Y') }}
+                                    </p>
+                                    <p class="text-xs text-gray-500 mt-0.5">{{ \Carbon\Carbon::parse($lop->golive_at)->format('H:i') }} WIB</p>
+                                @else
+                                    <p class="text-sm text-gray-400">-</p>
+                                @endif
                             </td>
                             <td class="px-5 py-4">
                                 @if($isGoLive)
@@ -107,7 +171,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-16 text-center">
+                            <td colspan="6" class="px-6 py-16 text-center">
                                 <div class="text-4xl mb-3 opacity-30">📭</div>
                                 <p class="font-black text-gray-900 text-lg">Antrean Kosong</p>
                                 <p class="text-gray-500 text-sm mt-1">Belum ada LOP PT 2 yang dikirim ke SDI.</p>

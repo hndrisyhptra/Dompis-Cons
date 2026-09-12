@@ -38,9 +38,26 @@ class SdiController extends Controller
             $query->where('sdi_approval_status', $request->status_filter);
         }
 
+        // Revisi (permintaan user): kartu ringkasan (Total LOP / Waiting
+        // Approval / Jumlah LOP Golive) utk menu Approval Golive PT 2 --
+        // dihitung dari query dasar yg sama (sebelum search/status_filter/
+        // pagination) supaya kartunya menggambarkan keseluruhan antrean PT 2,
+        // bukan cuma hasil filter/halaman yg sedang dilihat.
+        $summaryBase = \App\Models\Pt2Lop::whereNotNull('sdi_approval_status')
+            ->where('sdi_approval_status', '!=', '')
+            ->whereIn('sdi_approval_status', ['pending', 'approved']);
+
+        $cards = [
+            'total' => (clone $summaryBase)->count(),
+            'waiting' => (clone $summaryBase)->where('sdi_approval_status', 'pending')->count(),
+            'golive' => (clone $summaryBase)->where(function ($q) {
+                $q->where('sdi_approval_status', 'approved')->orWhere('is_golive', 1);
+            })->count(),
+        ];
+
         $lops = $query->latest('updated_at')->paginate($request->per_page ?? 10)->withQueryString();
-        
-        return view('sdi.index', compact('lops'));
+
+        return view('sdi.index', compact('lops', 'cards'));
     }
 
     // Memproses Upload Eviden UIM dan Go-Live Per LOP

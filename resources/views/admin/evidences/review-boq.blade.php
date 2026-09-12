@@ -11,7 +11,7 @@
                     Review Tahap Akhir
                 </span>
                 <h1 class="text-xl font-black text-slate-900 dark:text-white tracking-tight mt-2">
-                    Rekapitulasi Quantity BOQ (Plan vs Actual)
+                    Rekapitulasi Quantity BOQ (BOQ Survey vs Actual)
                 </h1>
                 <div class="pt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 font-bold">
                     <span>LOP: <b class="text-slate-700 dark:text-slate-300"> {{ $project->project_name }}</b></span>
@@ -40,6 +40,17 @@
             return str_starts_with($boq->designator, 'M-') || optional($designator)->type === 'material';
         });
 
+        // Section AR (permintaan user): samakan dgn Review BOQ Final milik
+        // Waspang (Section AQ) -- pembanding BUKAN lagi cuma BOQ Plan, tapi
+        // prioritas BOQ Survey TERBARU (quantity_survey), fallback ke BOQ
+        // Plan (quantity_plan) kalau item itu tidak punya data Survey sama
+        // sekali. Atribut transient (tidak disimpan ke DB), sama pola dgn
+        // WaspangController::reviewFinal().
+        $materialBoqItems->each(function ($item) {
+            $item->compare_qty = $item->quantity_survey ?? $item->quantity_plan;
+            $item->compare_source = $item->quantity_survey !== null ? 'survey' : 'plan';
+        });
+
         // Klasifikasi Jasa disamakan persis dengan detail Data BOQ: murni dari
         // relasi designator_id -> designators.type (tanpa fallback kode/prefix),
         // supaya daftar & nilainya konsisten dengan yang tampil di Data BOQ.
@@ -61,9 +72,9 @@
             return $category === 'TIANG';
         });
 
-        $planKabel = $kabelItems->sum('quantity_plan');
+        $planKabel = $kabelItems->sum('compare_qty');
         $actualKabel = $kabelItems->sum('quantity_actual');
-        $planTiang = $tiangItems->sum('quantity_plan');
+        $planTiang = $tiangItems->sum('compare_qty');
         $actualTiang = $tiangItems->sum('quantity_actual');
 
         $accKabel = $planKabel > 0 ? round(($actualKabel / $planKabel) * 100) : 0;
@@ -122,7 +133,7 @@
                 
                 <div class="grid grid-cols-2 gap-4 border-b border-slate-50 dark:border-slate-800 pb-4">
                     <div>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase">Total Plan</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Total Pembanding</p>
                         <p class="text-xl font-black text-slate-800 dark:text-white mt-0.5 font-mono">{{ number_format($planKabel, 0, ',', '.') }} <span class="text-xs font-normal text-slate-400">meter</span></p>
                     </div>
                     <div>
@@ -148,7 +159,7 @@
                 
                 <div class="grid grid-cols-2 gap-4 border-b border-slate-50 dark:border-slate-800 pb-4">
                     <div>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase">Total Plan</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Total Pembanding</p>
                         <p class="text-xl font-black text-slate-800 dark:text-white mt-0.5 font-mono">{{ number_format($planTiang, 0, ',', '.') }} <span class="text-xs font-normal text-slate-400">pcs</span></p>
                     </div>
                     <div>
@@ -215,7 +226,7 @@
                     <tr class="bg-slate-50/80 dark:bg-slate-800/60 text-slate-400 font-bold uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
                         <th class="py-3.5 px-6">Designator</th>
                         <th class="py-3.5 px-4">Uraian Pekerjaan</th>
-                        <th class="py-3.5 px-4 text-center">Volume Plan</th>
+                        <th class="py-3.5 px-4 text-center">Volume Pembanding</th>
                         <th class="py-3.5 px-4 text-center">Volume Actual</th>
                         <th class="py-3.5 px-4 text-center">Satuan</th>
                         <th class="py-3.5 px-4 text-right">Nilai Material</th>
@@ -225,8 +236,9 @@
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
                     @forelse($materialBoqItems as $item)
                         @php
-                            $isMatch = (float)$item->quantity_actual >= (float)$item->quantity_plan;
+                            $isMatch = (float)$item->quantity_actual >= (float)$item->compare_qty;
                             $itemNilaiMaterial = $nilaiItem($item);
+                            $itemSourceLabel = $item->compare_source === 'survey' ? 'Survey' : 'Plan';
                         @endphp
                         <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition">
                             <td class="py-4 px-6 font-mono font-bold text-slate-600 dark:text-slate-400">
@@ -238,7 +250,8 @@
                                 {{ $item->item_name }}
                             </td>
                             <td class="py-4 px-4 text-center font-mono font-bold text-slate-700 dark:text-slate-300">
-                                {{ number_format($item->quantity_plan, 0, ',', '.') }}
+                                {{ number_format($item->compare_qty, 0, ',', '.') }}
+                                <span class="block text-[9px] font-black uppercase tracking-wide {{ $itemSourceLabel === 'Survey' ? 'text-blue-500' : 'text-slate-400' }}">{{ $itemSourceLabel }}</span>
                             </td>
                             <td class="py-4 px-4 text-center font-mono font-black {{ $isMatch ? 'text-emerald-600' : 'text-amber-600' }}">
                                 {{ number_format($item->quantity_actual ?? 0, 0, ',', '.') }}
@@ -250,12 +263,12 @@
                                 Rp {{ number_format($itemNilaiMaterial, 0, ',', '.') }}
                             </td>
                             <td class="py-4 px-6 text-center">
-                                @if((float)$item->quantity_actual > (float)$item->quantity_plan)
+                                @if((float)$item->quantity_actual > (float)$item->compare_qty)
                                     {{-- STATUS BARU: JIKA AKTUAL MELEBIHI TARGET PLAN --}}
                                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-extrabold text-[10px] border border-blue-100">
                                         ▲ Kelebihan Volume
                                     </span>
-                                @elseif((float)$item->quantity_actual == (float)$item->quantity_plan)
+                                @elseif((float)$item->quantity_actual == (float)$item->compare_qty)
                                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-extrabold text-[10px] border border-emerald-100">
                                         ✓ Terpenuhi
                                     </span>

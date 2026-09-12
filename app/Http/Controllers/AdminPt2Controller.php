@@ -312,9 +312,15 @@ class AdminPt2Controller extends Controller
     {
         $lop = Pt2Lop::findOrFail($lop_id);
 
-        // Update status spesifik LOP untuk masuk antrean SDI
+        // Update status spesifik LOP untuk masuk antrean SDI.
+        // Revisi (permintaan user, dibatalkan lagi di revisi lanjutan):
+        // `fi_completed_at` SEMPAT diisi di sini, tapi user membatalkan --
+        // kolom "Tanggal FI" PT 2 balik pakai `updated_at` (spt "Tanggal
+        // Send" lama), jadi `fi_completed_at` TIDAK perlu ditulis lagi di
+        // sini. Kolom `pt2_lops.fi_completed_at` sendiri dibiarkan ada di
+        // DB (tidak dihapus), cuma sudah tidak diisi/dipakai lagi.
         $lop->update([
-            'sdi_approval_status' => 'pending', 
+            'sdi_approval_status' => 'pending',
             'updated_at' => now(),
         ]);
 

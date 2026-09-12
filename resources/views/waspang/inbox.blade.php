@@ -163,7 +163,7 @@
                     @if($allStepDone)
                         <a href="{{ route('waspang.projects.review_final', $project->id_project) }}"
                            class="h-10 col-span-2 inline-flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md transition">
-                            Review BOQ Final & UT
+                            Review BOQ Final
                         </a>
                     @else
                         @if($kendalaIssue)

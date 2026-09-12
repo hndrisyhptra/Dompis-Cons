@@ -150,6 +150,25 @@
             </div>
         </div>
 
+        {{-- Report Deployment: menu BARU (permintaan user), HANYA role pm
+             (TIDAK utk tif -- lihat route pm.report_deployment, role:pm
+             saja). Pola @if role sama dgn exclude Konstruksi Eksternal di
+             sub-menu Rekap Progress di bawah. --}}
+        @if(auth()->user()->role === 'pm')
+        <a href="{{ route('pm.report_deployment') }}"
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            {{ request()->routeIs('pm.report_deployment') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+            <div class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-600/60 flex items-center justify-center text-indigo-600 dark:text-indigo-300">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard">
+                    <rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>
+                </svg>
+            </div>
+
+            <span>Report Deployment</span>
+        </a>
+        @endif
+
         {{-- KONTAINER UTAMA MENU DENGAN STATE ALPINE.JS --}}
         {{-- x-data "{ open: true }" membuat dropdown otomatis terbuka jika PM sedang berada di halaman rekap --}}
         <div x-data="{ open: {{ request()->routeIs('pm.rekap_progress') ? 'true' : 'false' }} }" class="space-y-1">

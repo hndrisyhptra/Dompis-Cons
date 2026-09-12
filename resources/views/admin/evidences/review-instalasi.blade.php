@@ -103,7 +103,7 @@
 
         <a href="{{ route('admin.evidences.review.project', $project->id_project) }}"
            class="h-10 px-5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-bold inline-flex items-center justify-center hover:bg-gray-50 transition">
-            ← Step 1 Persiapan
+            ← Step 2 Persiapan Instalasi
         </a>
 
         <a href="{{ route('admin.evidences.review.pengukuran', $project->id_project) }}"

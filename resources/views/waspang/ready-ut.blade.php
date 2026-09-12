@@ -129,7 +129,7 @@
                 <div class="mt-3.5">
                     <a href="{{ route('waspang.projects.review_final', $project->id_project) }}"
                        class="h-10 w-full inline-flex items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md transition tracking-wide">
-                        Review BOQ Final & UT
+                        Review BOQ Final
                     </a>
                 </div>
 

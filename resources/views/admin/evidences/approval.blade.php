@@ -166,7 +166,7 @@
                             // admin langsung mendarat di step yang relevan, bukan selalu
                             // balik ke Step 1 (Persiapan).
                             $seq = $summary['effectiveStageSequence'] ?? null;
-                            $reviewRoute = 'admin.evidences.review.project';
+                            $reviewRoute = 'admin.evidences.review.persiapan';
                             if ($seq !== null) {
                                 if ($seq >= 10) {
                                     $reviewRoute = 'admin.evidences.review.golive';
@@ -176,6 +176,8 @@
                                     $reviewRoute = 'admin.evidences.review.pengukuran';
                                 } elseif ($seq == 7) {
                                     $reviewRoute = 'admin.evidences.review.instalasi';
+                                } elseif ($seq == 6) {
+                                    $reviewRoute = 'admin.evidences.review.project';
                                 }
                             }
                         @endphp

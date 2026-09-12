@@ -35,7 +35,6 @@
     $step3Done = $seq !== null ? $seq > 7 : ($summary['instalasiDone'] ?? false);
     $step4Done = $seq !== null ? $seq > 8 : ($summary['pengukuranDone'] ?? false);
     $step5Done = $seq !== null ? $seq > 9 : ($summary['finishingDone'] ?? false);
-    $step6Done = $seq !== null ? $seq > 9 : false; // Selesai = sudah lewat Finishing (FI-OGP Golive/Golive)
 
     // Section AD (revisi): checklist stepper 2 warna. HIJAU ($stepNDone di
     // atas) tetap murni posisi sequence/approval admin -- TIDAK diubah,
@@ -155,16 +154,6 @@
             'active' => $isStep5,
             'rejected' => $step5Rejected,
         ],
-        [
-            'number' => 6,
-            'label' => 'Selesai',
-            'href' => null, // belum ada halaman waspang -- murni indikator status
-            'open' => false,
-            'done' => $step6Done,
-            'uploaded' => false,
-            'active' => false,
-            'rejected' => false,
-        ],
     ];
 @endphp
 
@@ -205,7 +194,7 @@
         {{-- garis penghubung --}}
         <div class="absolute top-4 left-4 right-4 h-0.5 bg-white/25 rounded-full"></div>
 
-        <div class="relative grid grid-cols-6 text-center gap-0.5">
+        <div class="relative grid grid-cols-5 text-center gap-0.5">
             @foreach($segments as $seg)
                 @php
                     // Aturan warna sesuai spesifikasi:

@@ -4,13 +4,16 @@
 <div class="container mx-auto px-4 py-6 max-w-2xl">
 
     @php
+        // Revisi (permintaan user): tiap kategori dokumen sekarang boleh
+        // MULTIPLE file -- SDI perlu melihat SEMUA file per kategori
+        // (bukan cuma 1) sebelum verifikasi capture UIM.
         $submission = $lop->goliveSubmission;
         $complete = $submission?->isComplete() ?? false;
         $docs = [
-            'Capture Valins' => $submission?->capture_valins_path,
-            'PDF ABD & Valid4' => $submission?->abd_valid4_path,
-            'File KML' => $submission?->kml_path,
-            'Mancore' => $submission?->mancore_path,
+            'Capture Valins' => $submission?->captureValinsFiles() ?? [],
+            'PDF ABD & Valid4' => $submission?->abdValid4Files() ?? [],
+            'File KML' => $submission?->kmlFiles() ?? [],
+            'Mancore' => $submission?->mancoreFiles() ?? [],
         ];
     @endphp
 
@@ -47,11 +50,20 @@
             </span>
         </div>
         <ul class="space-y-2">
-            @foreach($docs as $label => $path)
-                <li class="flex items-center justify-between text-sm border-b border-gray-50 dark:border-gray-800 pb-2 last:border-0 last:pb-0">
-                    <span class="text-gray-600 dark:text-gray-300">{{ $label }}</span>
-                    @if($path)
-                        <a href="{{ Storage::url($path) }}" target="_blank" class="text-xs font-bold text-blue-600 hover:underline">Lihat ↗</a>
+            @foreach($docs as $label => $paths)
+                <li class="text-sm border-b border-gray-50 dark:border-gray-800 pb-2 last:border-0 last:pb-0">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600 dark:text-gray-300">{{ $label }}</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ count($paths) > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400' }}">
+                            {{ count($paths) }} file
+                        </span>
+                    </div>
+                    @if(count($paths) > 0)
+                        <div class="mt-1.5 flex flex-wrap gap-2">
+                            @foreach($paths as $i => $path)
+                                <a href="{{ Storage::url($path) }}" target="_blank" class="text-xs font-bold text-blue-600 hover:underline">File {{ $i + 1 }} ↗</a>
+                            @endforeach
+                        </div>
                     @else
                         <span class="text-xs text-gray-400">Belum ada</span>
                     @endif

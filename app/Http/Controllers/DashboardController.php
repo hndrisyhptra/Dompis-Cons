@@ -15,6 +15,7 @@ use App\Models\ProjectStage;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardController extends Controller
 {
@@ -137,6 +138,7 @@ class DashboardController extends Controller
         $matrixRows = $matrixQuery->get([
                 'l.branch',
                 'l.status_progress',
+                'l.status_progress_before_hold',
                 'p.program',
                 'l.is_golive',
             ]);
@@ -156,7 +158,7 @@ class DashboardController extends Controller
                 continue;
             }
 
-            $statusKey = $this->regularStatusBucket($row->status_progress, (int) $row->is_golive === 1);
+            $statusKey = $this->regularStatusBucket($row->status_progress, (int) $row->is_golive === 1, $row->status_progress_before_hold);
 
             $matrixAccumulator[$regionName]['programs'][$program][$statusKey]++;
 
@@ -768,6 +770,7 @@ class DashboardController extends Controller
                 ->whereIn(DB::raw('UPPER(TRIM(l.branch))'), $branchList)
                 ->select([
                     'l.id_lop', 'l.lop_name', 'l.branch', 'l.sto', 'l.status_progress',
+                    'l.status_progress_before_hold',
                     'p.id_project', 'p.pid', 'p.pid_sap', 'p.project_name', 'l.is_golive',
                 ])
                 ->get();
@@ -776,6 +779,7 @@ class DashboardController extends Controller
                 $statusKey = $this->regularStatusBucket(
                     $row->status_progress,
                     (int) $row->is_golive === 1,
+                    $row->status_progress_before_hold,
                 );
 
                 if ($statusKey !== $metric) {
@@ -874,6 +878,71 @@ class DashboardController extends Controller
             ][$metric] ?? $metric;
 
             $title = 'Matriks PT 2 — ' . $regionKey . ($branchKey !== '' ? ' / ' . $branchKey : '') . ' — ' . $metricLabel;
+        } elseif ($type === 'stage_breakdown') {
+            // Revisi (permintaan user): modal detail utk halaman baru
+            // "Report Deployment" (role admin/superadmin/officer) --
+            // logic-nya identik dengan DashboardPmController::matrixDetail()
+            // (type sama, 'stage_breakdown'), termasuk bucket 8 kolomnya
+            // (stageBreakdownBucket()) -- SENGAJA dipanggil dari
+            // DashboardPmController lewat app() drpd diduplikasi, supaya
+            // definisi mapping-nya tetap 1 sumber kebenaran. TIDAK exclude
+            // status_progress = 'drop' -- kolom DROP & HOLD justru harus
+            // bisa diklik & menampilkan daftar LOP-nya.
+            $pmDashboard = app(\App\Http\Controllers\DashboardPmController::class);
+            $programFilter = trim((string) $request->input('program_filter', ''));
+
+            $stageRows = DB::table('lops as l')
+                ->join('projects as p', 'l.project_id', '=', 'p.id_project')
+                ->whereIn(DB::raw('UPPER(TRIM(l.branch))'), $branchList)
+                ->select([
+                    'l.id_lop', 'l.lop_name', 'l.branch', 'l.sto', 'l.status_progress', 'l.is_golive',
+                    'p.id_project', 'p.pid', 'p.pid_sap', 'p.project_name', 'p.program',
+                ])
+                ->get();
+
+            foreach ($stageRows as $row) {
+                $rowProgram = trim((string) ($row->program ?? ''));
+                $rowProgram = $rowProgram !== '' ? $rowProgram : 'LAINNYA';
+
+                if ($programFilter !== '' && strcasecmp($rowProgram, $programFilter) !== 0) {
+                    continue;
+                }
+
+                $stageKey = $pmDashboard->stageBreakdownBucket($row->status_progress, (int) $row->is_golive === 1);
+
+                if ($metric !== 'total' && $stageKey !== $metric) {
+                    continue;
+                }
+
+                $rows->push([
+                    'pid' => $row->pid ?: ($row->pid_sap ?: '-'),
+                    'project_name' => $row->project_name ?: '-',
+                    'lop_name' => $row->lop_name ?: '-',
+                    'branch' => strtoupper((string) ($row->branch ?? '-')),
+                    'sto' => strtoupper((string) ($row->sto ?? '-')),
+                    'program' => $rowProgram,
+                    'progress' => null,
+                    'status_label' => ucwords(str_replace('_', ' ', strtolower((string) $row->status_progress))),
+                    'detail_url' => route('admin.projects.tracking', $row->id_project),
+                ]);
+            }
+
+            $metricLabel = [
+                'drop' => 'Drop',
+                'hold' => 'Hold',
+                'preparing' => 'Preparing',
+                'perizinan' => 'Perizinan',
+                'matdel' => 'Material Delivery',
+                'instalasi' => 'Instalasi',
+                'fi_ogp_golive' => 'FI-OGP Golive',
+                'golive' => 'Golive',
+                'total' => 'Grand Total',
+            ][$metric] ?? $metric;
+
+            $regionLabel = $regionKey !== '' ? $regionKey : 'Semua Region';
+
+            $title = 'Report Deployment — ' . $regionLabel . ($branchKey !== '' ? ' / ' . $branchKey : '')
+                . ($programFilter !== '' ? ' / ' . $programFilter : '') . ' — ' . $metricLabel;
         } else {
             return response()->json(['message' => 'Tipe matrix tidak dikenal.'], 422);
         }
@@ -888,6 +957,30 @@ class DashboardController extends Controller
             'count' => $rows->count(),
             'rows' => $rows,
         ]);
+    }
+
+    /**
+     * MENU BARU: "Report Deployment" (permintaan user) -- role
+     * admin/superadmin/officer (super_tif TIDAK termasuk, sesuai
+     * permintaan). "Untuk role tersebut tampilkan program lengkap" --
+     * TIDAK ada exclude Konstruksi Eksternal di sini (beda dgn behaviour
+     * $isSuperTif di matrixDetail() utk type lain / role super_tif).
+     *
+     * Data cube-nya dibangun oleh DashboardPmController::buildStageCube()
+     * (dipanggil lewat app(), bukan diduplikasi -- lihat catatan di
+     * matrixDetail() type 'stage_breakdown' di atas).
+     */
+    public function reportDeployment()
+    {
+        // Cache key SENGAJA disamakan dgn DashboardPmController::reportDeployment()
+        // -- buildStageCube() hasilnya identik utk semua role (tidak
+        // dipengaruhi role pemanggil), jadi 1 cache key yang sama dipakai
+        // bersama supaya tidak query DB 2x utk data yang sama.
+        $stageCube = Cache::remember('pm_report_deployment_cube_v1', 90, function () {
+            return app(\App\Http\Controllers\DashboardPmController::class)->buildStageCube();
+        });
+
+        return view('admin.report_deployment', compact('stageCube'));
     }
 
     public function show($id)
@@ -1010,6 +1103,53 @@ class DashboardController extends Controller
 
         return view('admin.projects.tracking', compact('project', 'logs'));
     }
+
+    /**
+     * Revisi (permintaan user): fitur BARU "Timeline" -- terpisah dari
+     * Tracking Progress (method di atas, tracking()). Timeline Project
+     * menampilkan 2 bagian: (1) timeline HORIZONTAL di atas -- ringkasan
+     * kronologi dari awal (PID/BOQ) s.d. Golive, berisi SEMUA
+     * ProjectActivityLog + LopKronologi (update kronologi manual Waspang)
+     * yang ada utk project ini, diurutkan berdasarkan tanggal; (2)
+     * timeline VERTICAL di bawahnya -- detail per entri (bisa
+     * accordion/expand-collapse), lengkap dgn eviden foto (dari
+     * ProjectActivityLog::evidence ATAU LopKronologi::evidences()) & teks
+     * update kronologi kalau ada.
+     *
+     * Sengaja pakai controller & data source yg SAMA dgn tracking() (biar
+     * konsisten & tidak query ulang logic yg beda), cuma view-nya beda
+     * total -- lihat resources/views/admin/projects/timeline.blade.php.
+     */
+    public function timeline($project)
+    {
+        $project = Project::with([
+            'lop',
+            'evidences',
+            'boqItems.designatorData',
+        ])->where('id_project', $project)->firstOrFail();
+
+        $logs = ProjectActivityLog::with([
+            'user',
+            'targetUser',
+            'evidence.uploader',
+        ])
+            ->where('project_id', $project->id_project)
+            ->orderBy('created_at')
+            ->get();
+
+        $kronologis = \App\Models\LopKronologi::with([
+            'creator',
+            'permitCategory',
+            'evidences.uploader',
+        ])
+            ->where('project_id', $project->id_project)
+            ->orderBy('event_date')
+            ->orderBy('created_at')
+            ->get();
+
+        return view('admin.projects.timeline', compact('project', 'logs', 'kronologis'));
+    }
+
 
     public function adminInbox(Request $request)
     {
@@ -2251,15 +2391,32 @@ class DashboardController extends Controller
     );
 }
 
-    private function regularStatusBucket(?string $statusProgress, bool $isGoLive): string
+    private function regularStatusBucket(?string $statusProgress, bool $isGoLive, ?string $statusBeforeHold = null): string
     {
         $status = strtolower(trim((string) $statusProgress));
 
-        if ($isGoLive || in_array($status, ['finishing', 'fi_ogp_golive', 'golive'], true)) {
+        // Section AL: LOP yang sedang HOLD sebelumnya SELALU jatuh ke
+        // bucket "preparation" di Matrix (tidak pernah melihat tahap
+        // sebenarnya sebelum di-hold), beda dgn halaman lain (stepper
+        // mobile Waspang, tracking, Approval Eviden Section AH/AI) yang
+        // sudah resolve ke status_progress_before_hold. Samakan di sini
+        // juga supaya Matrix tidak salah taruh LOP yg di-hold saat sudah
+        // jauh (mis. di Finishing) ke kolom Preparation.
+        if ($status === 'hold' && $statusBeforeHold) {
+            $status = strtolower(trim($statusBeforeHold));
+        }
+
+        // Revisi tampilan Matrix (diminta user 2026-09-11): kolom "Prepare"
+        // sekarang mencakup seluruh fase Persiapan (inisiasi/survey/drm/
+        // perizinan/material_delivery) DAN Persiapan Instalasi; kolom
+        // "Progress" mencakup Instalasi, Pengukuran, DAN Finishing; kolom
+        // "Finish" HANYA FI-OGP Golive & Golive (sebelumnya finishing ikut
+        // masuk kolom Finish -- sekarang finishing pindah ke Progress).
+        if ($isGoLive || in_array($status, ['fi_ogp_golive', 'golive'], true)) {
             return 'finishing';
         }
 
-        if (in_array($status, ['instalasi', 'pengukuran'], true)) {
+        if (in_array($status, ['instalasi', 'pengukuran', 'finishing'], true)) {
             return 'instalasi';
         }
 

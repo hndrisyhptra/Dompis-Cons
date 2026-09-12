@@ -222,6 +222,36 @@ Route::middleware(['auth', 'role:admin,superadmin,super_tif,officer'])->group(fu
 
 /*
 |--------------------------------------------------------------------------
+| TIMELINE PROJECT (permintaan user) -- role: superadmin, admin, tif,
+| super_tif, officer, pm. Fitur BARU, terpisah dari route tracking() di
+| atas -- sengaja pakai group middleware SENDIRI (bukan nebeng group
+| role:admin,superadmin,super_tif,officer di atas) supaya tif & pm
+| eksplisit ikut kebagian akses, sesuai daftar role yg diminta user.
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:superadmin,admin,tif,super_tif,officer,pm'])->group(function () {
+    Route::get('/admin/projects/{project}/timeline', [DashboardController::class, 'timeline'])
+        ->name('admin.projects.timeline');
+});
+
+/*
+|--------------------------------------------------------------------------
+| REPORT DEPLOYMENT (permintaan user) -- menu BARU khusus role admin,
+| superadmin, officer, PM (super_tif & tif SENGAJA TIDAK termasuk -- beda
+| dgn group Timeline di atas). Role-role ini melihat PROGRAM LENGKAP (tidak
+| ada exclude Konstruksi Eksternal, beda dgn tabel sejenis yang sudah ada
+| di Dashboard PM utk role tif). Route admin/superadmin/officer pakai
+| DashboardController, route PM pakai DashboardPmController (role:pm SAJA,
+| BUKAN nebeng group role:pm,tif di bawah, supaya tif tidak kebagian).
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:admin,superadmin,officer'])->group(function () {
+    Route::get('/admin/report-deployment', [DashboardController::class, 'reportDeployment'])
+        ->name('admin.report_deployment');
+});
+
+/*
+|--------------------------------------------------------------------------
 | APPROVAL EVIDEN (role: admin, superadmin, super_tif -- OFFICER DI-EXCLUDE)
 |--------------------------------------------------------------------------
 | Sesuai migration seed_officer_role.php: "Menu sama seperti Admin KECUALI
@@ -250,6 +280,9 @@ Route::middleware(['auth', 'role:admin,superadmin,super_tif'])->group(function (
     Route::get('/admin/evidences/review/{project}', [ProjectController::class, 'reviewProject'])
         ->name('admin.evidences.review.project');
 
+    Route::get('/admin/evidences/review/{project}/persiapan', [ProjectController::class, 'reviewPersiapan'])
+        ->name('admin.evidences.review.persiapan');
+
     Route::post('/admin/evidences/{id}/reset', [ProjectController::class, 'resetEvidence'])
     ->name('admin.evidences.reset');
 
@@ -272,6 +305,11 @@ Route::middleware(['auth', 'role:admin,superadmin,super_tif'])->group(function (
 
     Route::post('/admin/evidences/review/{project}/golive/submit', [ProjectController::class, 'submitGoliveDocuments'])
     ->name('admin.evidences.golive.submit');
+
+    // Revisi (permintaan user): hapus 1 file dokumen FI-OGP Golive yg
+    // sudah tersimpan (kategori sekarang multi-file).
+    Route::post('/admin/evidences/review/{project}/golive/remove', [ProjectController::class, 'removeGoliveDocument'])
+    ->name('admin.evidences.golive.remove');
 
     Route::post('/admin/evidences/bulk-approve', [\App\Http\Controllers\ProjectController::class, 'bulkApprove'])
     ->name('admin.evidences.bulk-approve');
@@ -728,6 +766,20 @@ Route::middleware(['auth', 'role:pm,tif'])->prefix('pm')->name('pm.')->group(fun
 
 /*
 |--------------------------------------------------------------------------
+| REPORT DEPLOYMENT (permintaan user) -- menu BARU khusus role PM (role:pm
+| SAJA, SENGAJA group middleware terpisah dari role:pm,tif di atas supaya
+| role tif TIDAK kebagian menu ini -- lihat juga
+| DashboardController::reportDeployment() utk role admin/superadmin/
+| officer). PM lihat PROGRAM LENGKAP (Konstruksi Eksternal tetap tampil).
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:pm'])->prefix('pm')->name('pm.')->group(function () {
+    Route::get('/report-deployment', [DashboardPmController::class, 'reportDeployment'])
+        ->name('report_deployment');
+});
+
+/*
+|--------------------------------------------------------------------------
 | ROLE TEKNISI (PT2)
 |--------------------------------------------------------------------------
 */
@@ -832,6 +884,16 @@ Route::prefix('admin/pt2')->name('admin.pt2.')->middleware(['auth', 'role:admin,
 */
 Route::middleware(['auth', 'role:sdi'])->prefix('sdi')->name('sdi.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\SdiController::class, 'index'])->name('index');
+
+    // Revisi (permintaan user): menu "Dashboard" baru -- matrix
+    // breakdown Region/Branch (Total LOP, Blm Golive, Golive,
+    // Persentase) utk PT 2 & PT 3/Reguler, DUA tabel terpisah. Nama
+    // route 'sdi.matrix.*' (bukan 'sdi.dashboard.*') supaya tidak
+    // bentrok dgn route '/dashboard' di atas (itu nama route-nya
+    // 'sdi.index', bukan 'sdi.dashboard.index', tapi URL-nya SUDAH
+    // pakai path /dashboard -- jadi menu baru ini pakai path lain).
+    Route::get('/matrix-golive', [\App\Http\Controllers\SdiDashboardController::class, 'index'])->name('matrix.index');
+    Route::get('/matrix-golive/lops', [\App\Http\Controllers\SdiDashboardController::class, 'lops'])->name('matrix.lops');
 
     // Route untuk mengeksekusi go-live per LOP PT 2
     Route::post('/golive/{id}', [\App\Http\Controllers\SdiController::class, 'submitGolive'])->name('golive.store');

@@ -24,11 +24,24 @@
     $pendingEvidence = $evidences->where('status', 'pending')->count();
     $rejectedEvidence = $evidences->where('status', 'rejected')->count();
 
-    $readyForUt =
-        $totalEvidence > 0 &&
-        $pendingEvidence == 0 &&
-        $rejectedEvidence == 0 &&
-        $approvedEvidence == $totalEvidence;
+    // Section AK: SEBELUMNYA $readyForUt dihitung dari SELURUH eviden
+    // project ($project->evidences, lintas SEMUA stage: persiapan/
+    // instalasi/pengukuran/finishing sekaligus) yg mensyaratkan NOL
+    // pending & NOL rejected di SELURUH RIWAYAT project. Begitu 1 eviden
+    // di tahap manapun (termasuk yg sudah lama, sudah diganti/di-reupload)
+    // pernah berstatus rejected/pending, baris lama itu TETAP ada di DB
+    // (upload ulang = INSERT baris BARU, bukan update baris lama -- lihat
+    // WaspangController::uploadEvidence()) sehingga tombol Uji Terima
+    // NYANGKUT disabled SELAMANYA walau seluruh eviden yg BENAR-BENAR
+    // relevan sekarang sudah di-approve admin. Ganti ke satu sumber
+    // kebenaran yg SAMA PERSIS dipakai stepper (Step 5 checklist hijau)
+    // & auto-advance status_progress finishing -> fi_ogp_golive
+    // (ProjectController::submitGoliveDocuments()) -- Project::
+    // progressSummary()['finishingDone'], yg sudah dihitung PER ITEM BOQ
+    // yg BENAR-BENAR wajib finishing evidence saat ini (bukan hitungan
+    // mentah lintas stage), sekaligus mensyaratkan tahap2 sebelumnya
+    // (persiapan/instalasi/pengukuran) sudah selesai juga.
+    $readyForUt = $project->progressSummary()['finishingDone'] ?? false;
 @endphp
 
 {{-- HEADER --}}

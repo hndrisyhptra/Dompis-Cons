@@ -38,17 +38,24 @@
     {{-- LOOPING PER-STEP MANAGEMENT --}}
     <div class="space-y-6">
         @php
+            // Section AR: disamakan dgn 7-step Approval Konstruksi terbaru
+            // (Section AP). Step 1 'Persiapan' (BARU) key-nya array (2 stage
+            // sekaligus: perizinan + material_delivery) -- di-download jadi 1
+            // ZIP lewat only_stage bentuk daftar (lihat downloadZip()).
             $stages = [
-                ['key' => 'persiapan', 'title' => 'Step 1 - Persiapan', 'color' => 'bg-red-500'],
-                ['key' => 'instalasi', 'title' => 'Step 2 - Instalasi', 'color' => 'bg-blue-600'],
-                ['key' => 'pengukuran', 'title' => 'Step 3 - Pengukuran', 'color' => 'bg-amber-500'],
-                ['key' => 'finishing', 'title' => 'Step 4 - Finishing', 'color' => 'bg-emerald-600']
+                ['key' => ['perizinan', 'material_delivery'], 'title' => 'Step 1 - Persiapan', 'color' => 'bg-rose-500'],
+                ['key' => 'persiapan', 'title' => 'Step 2 - Persiapan Instalasi', 'color' => 'bg-red-500'],
+                ['key' => 'instalasi', 'title' => 'Step 3 - Instalasi', 'color' => 'bg-blue-600'],
+                ['key' => 'pengukuran', 'title' => 'Step 4 - Pengukuran', 'color' => 'bg-amber-500'],
+                ['key' => 'finishing', 'title' => 'Step 5 - Finishing', 'color' => 'bg-emerald-600']
             ];
         @endphp
 
         @foreach($stages as $stage)
-            @php 
-                $stageEvidences = $project->evidences->where('stage', $stage['key']); 
+            @php
+                $stageKeys = (array) $stage['key'];
+                $stageEvidences = $project->evidences->whereIn('stage', $stageKeys);
+                $stageQueryParam = implode(',', $stageKeys);
             @endphp
             
             <div class="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-xs overflow-hidden">
@@ -62,11 +69,11 @@
 
                     @if($stageEvidences->count() > 0)
                         {{-- Button download zip dengan parameter query khusus step agar dinamis di controller --}}
-                        <a href="{{ route('admin.projects.download_zip', $project->id_project) }}?only_stage={{ $stage['key'] }}"
-                        onclick="triggerDownloadAnimation('{{ $stage['key'] }}')"
+                        <a href="{{ route('admin.projects.download_zip', $project->id_project) }}?only_stage={{ $stageQueryParam }}"
+                        onclick="triggerDownloadAnimation('{{ $stage['title'] }}')"
                         class="h-8 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[11px] font-black shadow-2xs inline-flex items-center justify-center gap-1.5 transition hover:bg-slate-50 text-slate-700 dark:text-slate-300">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-download-icon lucide-download"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>
-                        Download Step {{ ucfirst($stage['key']) }}
+                        Download {{ $stage['title'] }}
                         </a>
                     @endif
                 </div>

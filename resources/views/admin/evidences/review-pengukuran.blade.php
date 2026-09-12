@@ -136,7 +136,7 @@
 
         <a href="{{ route('admin.evidences.review.instalasi', $project->id_project) }}"
            class="h-10 px-5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-bold inline-flex items-center justify-center hover:bg-gray-50 transition">
-            ← Step 2 Instalasi
+            ← Step 3 Instalasi
         </a>
 
         <a href="{{ route('admin.evidences.review.finishing', $project->id_project) }}"

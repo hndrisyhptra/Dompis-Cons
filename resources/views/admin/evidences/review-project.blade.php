@@ -54,7 +54,7 @@
         <div class="p-4 flex items-center justify-between">
             <div>
                 <h2 class="text-base font-bold text-gray-900 dark:text-white">
-                    Step 1 — Persiapan
+                    Step 2 — Persiapan Instalasi
                 </h2>
                 <p class="text-sm text-gray-500">
                     2 item eviden wajib: barang tiba & perizinan
@@ -91,9 +91,10 @@
     {{-- Footer --}}
     <div class="flex items-center justify-between pt-2">
 
-        <p class="text-sm text-gray-600">
-            Step 1 dari 4
-        </p>
+        <a href="{{ route('admin.evidences.review.persiapan', $project->id_project) }}"
+        class="h-10 px-5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm font-bold inline-flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+            ← Step 1 Persiapan
+        </a>
 
         <a href="{{ route('admin.evidences.review.instalasi', $project->id_project) }}"
         class="h-10 px-5 rounded-xl bg-gray-900 text-white text-sm font-bold inline-flex items-center justify-center">

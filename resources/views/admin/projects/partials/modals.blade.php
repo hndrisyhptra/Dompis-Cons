@@ -22,11 +22,15 @@
         $isPT2 = (str_replace(' ', '', strtoupper($programName)) === 'PT2');
         $labelRole = $isPT2 ? 'Teknisi' : 'Waspang';
 
-        if ($progress == 100) { $stageBadge = 'bg-green-100 text-green-700'; } 
-        elseif ($stageLabel === 'Finishing') { $stageBadge = 'bg-purple-100 text-purple-700'; } 
-        elseif ($stageLabel === 'Pengukuran') { $stageBadge = 'bg-blue-100 text-blue-700'; } 
-        elseif ($stageLabel === 'Instalasi') { $stageBadge = 'bg-yellow-100 text-yellow-700'; } 
-        else { $stageBadge = 'bg-red-100 text-red-700'; }
+        // Section AL: warna badge tahap diselaraskan ke skema standar
+        // Project::stageColorClasses() (sama dgn admin/projects/index,
+        // project-card, project-detail, evidences/approval) -- sebelumnya
+        // if/elseif manual ini cuma kenal label 'Finishing'/'Pengukuran'/
+        // 'Instalasi', tahap lain (termasuk Persiapan Instalasi & FI-OGP
+        // Golive yg progress-nya sudah tinggi) selalu jatuh ke else -> badge
+        // MERAH seolah bermasalah, padahal tidak.
+        $stageColors = \App\Models\Project::stageColorClasses($summary['effectiveStageColor'] ?? null);
+        $stageBadge = $stageColors['badge'];
     @endphp
 
     <div id="detail-modal-{{ $project->id_project }}" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 p-4">

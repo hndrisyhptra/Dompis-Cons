@@ -1,20 +1,25 @@
 @extends('layouts.waspang') {{-- Sesuaikan dengan layout parent mobile Anda --}}
 
 @section('content')
-<div class="min-h-screen max-w-md mx-auto bg-[#F8FAFC] pb-32 font-sans selection:bg-blue-500 selection:text-white">
+<div class="min-h-screen max-w-md mx-auto bg-[#F8FAFC] pb-10 font-sans selection:bg-blue-500 selection:text-white">
 
     {{-- TOP GRADIENT STICKY HEADER --}}
+    {{--
+        Section AQ (permintaan user): step Waspang cuma sampai Finishing --
+        halaman ini murni RINGKASAN/validasi (read-only), bukan lagi step
+        aksi ke-4 yang butuh dikunci & dikirim manual (tombol "Kunci & Kirim
+        Berkas UT" dihapus, lihat bawah). Header disederhanakan jadi 1 baris
+        teks "Validasi Akhir Review BOQ Final", tanpa tombol.
+    --}}
     <div class="sticky top-0 z-50 bg-[#1565D8] backdrop-blur-md text-white px-5 pt-6 pb-5 rounded-b-[2rem] shadow-lg shadow-slate-900/10 transition-all">
         <div class="flex items-center gap-4">
             <a href="{{ route('waspang.projects.finishing', $project->id_project) }}"
                class="w-10 h-10 shrink-0 rounded-2xl bg-white/15 hover:bg-white/25 inline-flex items-center justify-center transition active:scale-90">
                 <i class="fa-solid fa-chevron-left text-sm"></i>
             </a>
-            <div class="min-w-0">
-                <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-blue-100">
-                    <i class="fa-solid fa-clipboard-check"></i> Step 4: Validasi Akhir
-                </span>
-                <h1 class="text-lg font-black tracking-tight truncate mt-0.5">Review BOQ Final</h1>
+            <div class="min-w-0 flex items-center gap-2">
+                <i class="fa-solid fa-clipboard-check text-blue-100"></i>
+                <h1 class="text-base font-black tracking-tight truncate">Validasi Akhir Review BOQ Final</h1>
             </div>
         </div>
     </div>
@@ -45,6 +50,12 @@
 
     {{-- METRICS SUMMARY WIDGET (DASHBOARD-STYLE) --}}
     @php
+        // Section AQ: pembanding sekarang BOQ Survey TERBARU (quantity_survey),
+        // fallback ke BOQ Plan (quantity_plan) kalau item itu tidak punya
+        // data Survey sama sekali -- lihat WaspangController::reviewFinal(),
+        // yang sudah melampirkan atribut transient compare_qty/compare_source
+        // per item supaya perhitungan di sini konsisten dgn $summary.
+
         // 1. Saring item material yang benar-benar memiliki data designator
         $kpiItems = $materialBoqItems->filter(function($item) {
             return optional($item->designatorData)->progress_category !== null;
@@ -61,11 +72,11 @@
             return $category === 'TIANG';
         });
 
-        // 3. Akumulasi Plan & Actual khusus untuk KABEL dan TIANG
-        $planKabel   = $kabelItems->sum('quantity_plan');
+        // 3. Akumulasi Pembanding (Survey/Plan) & Actual khusus untuk KABEL dan TIANG
+        $planKabel   = $kabelItems->sum('compare_qty');
         $actualKabel = $kabelItems->sum('quantity_actual');
 
-        $planTiang   = $tiangItems->sum('quantity_plan');
+        $planTiang   = $tiangItems->sum('compare_qty');
         $actualTiang = $tiangItems->sum('quantity_actual');
 
         // 4. Hitung Persentase Akurasi Masing-Masing (Max 100%)
@@ -84,13 +95,13 @@
 
             {{-- GRID KOMPARASI SIDE-BY-SIDE --}}
             <div class="grid grid-cols-2 gap-3">
-                {{-- CARD TOTAL TARGET PLAN --}}
+                {{-- CARD TOTAL PEMBANDING (BOQ Survey terbaru, fallback BOQ Plan) --}}
                 <div class="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex flex-col justify-between">
                     <div>
                         <div class="w-7 h-7 rounded-lg bg-blue-100 text-[#1565D8] flex items-center justify-center mb-2">
                             <i class="fa-solid fa-bullseye text-xs"></i>
                         </div>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Plan</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Total Pembanding</p>
                     </div>
                     <div class="mt-2 space-y-1">
                         <div class="flex items-baseline justify-between">
@@ -162,19 +173,20 @@
     {{-- DETAIL ITEM COMPARISON LIST --}}
     <div class="px-4 mt-6 space-y-3">
         <div class="flex items-center justify-between px-1">
-            <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">Item BOQ Plan vs BOQ Actual</h3>
+            <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider">Item BOQ Pembanding vs BOQ Actual</h3>
             <span class="text-[11px] text-slate-500 font-medium">Scroll ke bawah</span>
         </div>
-        
+
         @forelse($materialBoqItems as $item)
             @php
-                $isMatch = (float)$item->quantity_actual >= (float)$item->quantity_plan;
+                $isMatch = (float)$item->quantity_actual >= (float)$item->compare_qty;
                 // Deteksi warna badge / text dinamis
-                $themeClass = $isMatch 
-                    ? 'border-emerald-100 bg-emerald-50/40 text-emerald-700' 
+                $themeClass = $isMatch
+                    ? 'border-emerald-100 bg-emerald-50/40 text-emerald-700'
                     : 'border-amber-100 bg-amber-50/40 text-amber-700';
+                $sourceLabel = $item->compare_source === 'survey' ? 'Survey' : 'Plan';
             @endphp
-            
+
             <div class="bg-white rounded-2xl border border-slate-100 p-4 shadow-xs hover:border-blue-200 transition-all duration-200">
                 {{-- Bagian Atas Card: Informasi Identitas Material --}}
                 <div class="flex justify-between items-start gap-3">
@@ -198,9 +210,9 @@
                 {{-- Bagian Bawah Card: Perbandingan Berdampingan (Side-by-Side) --}}
                 <div class="grid grid-cols-2 gap-2 mt-4 pt-3.5 border-t border-dashed border-slate-100">
                     <div class="bg-slate-50/60 rounded-xl px-3 py-2.5">
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Target Plan</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Target {{ $sourceLabel }}</p>
                         <p class="text-sm font-extrabold text-slate-700 mt-0.5">
-                            {{ number_format($item->quantity_plan, 0, ',', '.') }}
+                            {{ number_format($item->compare_qty, 0, ',', '.') }}
                             <span class="text-[10px] text-slate-400 font-normal ml-0.5">{{ $item->unit }}</span>
                         </p>
                     </div>
@@ -222,53 +234,5 @@
         @endforelse
     </div>
 
-    {{-- BOTTOM BAR ACTION BUTTON (MODERN FIXATION STYLE) --}}
-    <div class="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-lg border-t border-slate-100 px-5 py-4 z-50 shadow-xl max-w-md mx-auto rounded-t-[1.8rem]">
-        <button type="button" 
-                onclick="confirmSubmitUt()" 
-                class="w-full h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm tracking-wide shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 cursor-pointer">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-            Kunci & Kirim Berkas UT
-        </button>
-    </div>
-
 </div>
-@endsection
-
-@section('scripts')
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-<script>
-function confirmSubmitUt() {
-    Swal.fire({
-        title: 'Kunci Data BOQ?',
-        text: "Setelah dikirim, data kuantitas aktual akan dikunci secara permanen untuk proses cetak berkas Uji Terima (UT).",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#059669', // Emerald 600
-        cancelButtonColor: '#64748B',  // Slate 500
-        confirmButtonText: 'Ya, Kunci & Kirim!',
-        cancelButtonText: 'Batal',
-        customClass: {
-            popup: 'rounded-3xl shadow-2xl font-sans',
-            title: 'text-lg font-black text-slate-800',
-            confirmButton: 'rounded-xl px-4 py-2 text-xs font-bold',
-            cancelButton: 'rounded-xl px-4 py-2 text-xs font-bold'
-        }
-    }).then((result) => {
-        if (result.isConfirmed) {
-            Swal.fire({
-                title: 'Memproses Berkas...',
-                text: 'Mohon tunggu sebentar.',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-            
-            // Logika kelanjutan AJAX submit anda disematkan di sini
-            // window.location.href = "/url-proses-uji-terima";
-        }
-    });
-}
-</script>
 @endsection

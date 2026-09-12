@@ -1040,6 +1040,79 @@ class ProjectController extends Controller
         return view('admin.evidences.approval', compact('   '));
     }
 
+    /**
+     * Section AP: Step "Persiapan" (baru) di Approval Konstruksi admin --
+     * ringkasan 4 sub-step LOP sebelum Persiapan Instalasi (inisiasi/survey/
+     * perizinan/material_delivery, sequence 1-5), menyamakan struktur
+     * stepper Approval Konstruksi dgn stepper Waspang terbaru (permintaan
+     * user). Inisiasi & Survey tidak punya eviden foto yg perlu di-approve
+     * di sini (murni indikator posisi LOP) -- Perizinan & Material Delivery
+     * PUNYA eviden foto (lihat WaspangController::persiapan()/addPerizinan()/
+     * finishMaterialDelivery()), jadi ditampilkan & bisa di-approve/reject
+     * lewat partial review-item yg sama dgn step lain (route generik
+     * admin.evidences.approve/reject/reset TIDAK dibatasi per-stage, jadi
+     * otomatis berfungsi tanpa perubahan backend approve/reject).
+     */
+    public function reviewPersiapan($id)
+    {
+        $project = Project::with([
+            'evidences',
+        ])->findOrFail($id);
+
+        $summary = $project->progressSummary();
+        $seq = $summary['effectiveStageSequence'] ?? null;
+        $stageCode = $summary['effectiveStageCode'] ?? null;
+        if ($stageCode === 'drm') {
+            $stageCode = 'perizinan';
+        }
+
+        // Breakdown 4 sub-step -- status murni dari posisi sequence LOP,
+        // persis pola WaspangController::persiapan().
+        $subSteps = [
+            'inisiasi' => [
+                'label' => 'Inisiasi',
+                'done' => $seq !== null && $seq > 1,
+                'active' => $stageCode === 'inisiasi',
+            ],
+            'survey' => [
+                'label' => 'Survey',
+                'done' => $seq !== null && $seq > 2,
+                'active' => $stageCode === 'survey',
+            ],
+            'perizinan' => [
+                'label' => 'Perizinan',
+                'done' => $seq !== null && $seq > 4,
+                'active' => $stageCode === 'perizinan',
+            ],
+            'material_delivery' => [
+                'label' => 'Material Delivery',
+                'done' => $seq !== null && $seq > 5,
+                'active' => $stageCode === 'material_delivery',
+            ],
+        ];
+
+        $evidences = $project->evidences ?? collect();
+
+        // Eviden yang BISA di-approve Admin di step ini (stage='perizinan'
+        // evidence_type eviden_perizinan/ba_kp, dan stage='material_delivery').
+        $perizinanEvidences = $evidences->where('stage', 'perizinan')
+            ->where('evidence_type', '!=', 'ba_kp');
+        $baKpEvidences = $evidences->where('stage', 'perizinan')
+            ->where('evidence_type', 'ba_kp');
+        $materialDeliveryEvidences = $evidences->where('stage', 'material_delivery');
+
+        $persiapanDone = $seq !== null && $seq > 5;
+
+        return view('admin.evidences.review-persiapan', compact(
+            'project',
+            'subSteps',
+            'perizinanEvidences',
+            'baKpEvidences',
+            'materialDeliveryEvidences',
+            'persiapanDone'
+        ));
+    }
+
     public function reviewProject($id)
     {
         $project = Project::with([
@@ -1174,11 +1247,15 @@ class ProjectController extends Controller
         }
 
         $request->validate([
-            'capture_valins' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
-            'abd_valid4' => 'nullable|file|mimes:pdf|max:10240',
-            'kml' => 'nullable|file|mimes:kml,xml|max:5120',
+            'capture_valins' => 'nullable|array',
+            'capture_valins.*' => 'image|mimes:jpeg,png,jpg,webp|max:5120',
+            'abd_valid4' => 'nullable|array',
+            'abd_valid4.*' => 'file|mimes:pdf|max:10240',
+            'kml' => 'nullable|array',
+            'kml.*' => 'file|mimes:kml,xml|max:5120',
             'mancore_input_type' => 'nullable|in:photo,excel',
-            'mancore' => 'nullable|file|mimes:jpeg,png,jpg,webp,xls,xlsx|max:10240',
+            'mancore' => 'nullable|array',
+            'mancore.*' => 'file|mimes:jpeg,png,jpg,webp,xls,xlsx|max:10240',
         ]);
 
         $submission = \App\Models\LopGoliveSubmission::firstOrNew(['lop_id' => $lop->id_lop]);
@@ -1186,25 +1263,47 @@ class ProjectController extends Controller
 
         $folder = 'evidences/golive/'.$lop->id_lop;
 
-        if ($request->hasFile('capture_valins')) {
-            $file = $request->file('capture_valins');
-            $submission->capture_valins_path = $file->storeAs($folder, 'capture_valins_'.time().'.'.$file->getClientOriginalExtension(), 'public');
+        // Revisi (permintaan user): tiap kategori sekarang boleh MULTIPLE
+        // file -- file baru DITAMBAHKAN ke daftar yg sudah ada (bukan
+        // menimpa), supaya upload boleh dilakukan bertahap/berkali-kali
+        // tanpa menghilangkan file yg sudah tersimpan. Kolom *_path lama
+        // ikut disinkron ke file TERAKHIR (kompatibilitas mundur, dibaca
+        // di tempat lain yg belum diupdate ke *_paths).
+        $appendFiles = function (string $key, string $prefix) use ($request, $folder, $submission) {
+            if (! $request->hasFile($key)) {
+                return;
+            }
+
+            $existing = $submission->filesFor($key);
+
+            foreach ((array) $request->file($key) as $file) {
+                if (! $file) {
+                    continue;
+                }
+
+                $filename = $prefix.'_'.time().'_'.uniqid().'.'.$file->getClientOriginalExtension();
+                $existing[] = $file->storeAs($folder, $filename, 'public');
+            }
+
+            $submission->{$key.'_paths'} = $existing;
+            $submission->{$key.'_path'} = end($existing) ?: null;
+        };
+
+        $appendFiles('capture_valins', 'capture_valins');
+        $appendFiles('abd_valid4', 'abd_valid4');
+        $appendFiles('kml', 'kml');
+        $appendFiles('mancore', 'mancore');
+
+        if ($request->filled('mancore_input_type')) {
+            $submission->mancore_input_type = $request->input('mancore_input_type');
         }
 
-        if ($request->hasFile('abd_valid4')) {
-            $file = $request->file('abd_valid4');
-            $submission->abd_valid4_path = $file->storeAs($folder, 'abd_valid4_'.time().'.'.$file->getClientOriginalExtension(), 'public');
-        }
-
-        if ($request->hasFile('kml')) {
-            $file = $request->file('kml');
-            $submission->kml_path = $file->storeAs($folder, 'kml_'.time().'.'.$file->getClientOriginalExtension(), 'public');
-        }
-
-        if ($request->hasFile('mancore')) {
-            $file = $request->file('mancore');
-            $submission->mancore_path = $file->storeAs($folder, 'mancore_'.time().'.'.$file->getClientOriginalExtension(), 'public');
-            $submission->mancore_input_type = $request->input('mancore_input_type', $submission->mancore_input_type);
+        // Revisi (permintaan user): "Tanggal FI" = momen admin SELESAI
+        // upload ke-4 kategori dokumen (isComplete() PERTAMA KALI true).
+        // Sengaja TIDAK ditimpa lagi kalau admin upload/hapus file lagi
+        // setelahnya -- ini histori, bukan status live.
+        if ($submission->isComplete() && ! $submission->fi_completed_at) {
+            $submission->fi_completed_at = now();
         }
 
         $submission->submitted_by = auth()->id();
@@ -1263,6 +1362,52 @@ class ProjectController extends Controller
         return back()->with('success', 'Dokumen FI-OGP Golive berhasil disimpan.');
     }
 
+    // Revisi (permintaan user): hapus 1 file yg sudah tersimpan dari salah
+    // satu kategori dokumen FI-OGP Golive (sekarang multi-file per
+    // kategori) -- file fisik ikut dihapus dari storage. Kolom *_path
+    // lama disinkron ulang ke file TERAKHIR yg tersisa (atau null kalau
+    // kategori itu jadi kosong).
+    public function removeGoliveDocument(Request $request, $id)
+    {
+        $request->validate([
+            'key' => 'required|in:capture_valins,abd_valid4,kml,mancore',
+            'path' => 'required|string',
+        ]);
+
+        $project = Project::with(['lop.goliveSubmission'])->where('id_project', $id)->firstOrFail();
+        $lop = $project->lop;
+        $submission = $lop?->goliveSubmission;
+
+        if (! $submission) {
+            return back()->with('error', 'Belum ada dokumen FI-OGP Golive untuk LOP ini.');
+        }
+
+        $key = $request->input('key');
+        $path = $request->input('path');
+        $existing = $submission->filesFor($key);
+
+        if (! in_array($path, $existing, true)) {
+            return back()->with('error', 'File tidak ditemukan atau sudah dihapus sebelumnya.');
+        }
+
+        $existing = array_values(array_filter($existing, fn ($p) => $p !== $path));
+        $submission->{$key.'_paths'} = $existing;
+        $submission->{$key.'_path'} = end($existing) ?: null;
+        $submission->save();
+
+        Storage::disk('public')->delete($path);
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'activity_type' => 'golive_submission_delete',
+            'title' => 'File Dokumen FI-OGP Golive Dihapus',
+            'description' => 'Admin menghapus 1 file kategori '.$key.' pada dokumen FI-OGP Golive LOP: '.$lop->lop_name,
+        ]);
+
+        return back()->with('success', 'File berhasil dihapus.');
+    }
+
     public function reviewBoq($id)
     {
         // Ambil project lengkap dengan relasi LOP dan item BOQ beserta data master designator-nya
@@ -1313,10 +1458,18 @@ class ProjectController extends Controller
     {
         $onlyStage = $request->query('only_stage'); // Ambil info parameter pemicu unduhan step
 
-        $project = Project::with(['evidences' => function ($q) use ($onlyStage) {
+        // Section AR: only_stage sekarang boleh berupa daftar dipisah koma
+        // (mis. 'perizinan,material_delivery' utk tombol Step 1 Persiapan
+        // yg baru, Section AP) -- 1 nilai tunggal tetap jalan persis seperti
+        // sebelumnya (whereIn dgn 1 elemen setara where biasa).
+        $onlyStages = $onlyStage
+            ? array_values(array_filter(array_map('trim', explode(',', $onlyStage))))
+            : [];
+
+        $project = Project::with(['evidences' => function ($q) use ($onlyStages) {
             $q->where('status', 'approved')
-                ->when($onlyStage, function ($sub) use ($onlyStage) {
-                    $sub->where('stage', $onlyStage); // Filter stage jika diklik tombol per-step
+                ->when(! empty($onlyStages), function ($sub) use ($onlyStages) {
+                    $sub->whereIn('stage', $onlyStages); // Filter stage jika diklik tombol per-step
                 });
         }])->findOrFail($id);
 
@@ -1327,7 +1480,7 @@ class ProjectController extends Controller
         }
 
         // Nama file dinamis
-        $suffix = $onlyStage ? '_'.ucfirst($onlyStage) : '_Semua_Eviden';
+        $suffix = $onlyStage ? '_'.ucfirst(str_replace(',', '-', $onlyStage)) : '_Semua_Eviden';
         $zipFileName = 'Eviden'.$suffix.'_'.Str::slug($project->project_name).'.zip';
         $zipPath = storage_path('app/public/'.$zipFileName);
 

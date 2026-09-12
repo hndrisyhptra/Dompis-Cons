@@ -20,8 +20,27 @@ class SdiGoliveController extends Controller
 {
     public function index(Request $request)
     {
+        // Revisi (permintaan user): tampilan Approval Golive PT 3
+        // disamakan dgn PT 2 -- filter tab Semua/Waiting Approval/Sudah
+        // Go-Live. Query dasar sekarang mencakup fi_ogp_golive DAN golive
+        // (non-PT2) supaya "Semua" & "Sudah Go-Live" tidak kosong (dulu
+        // cuma nampilin fi_ogp_golive, LOP yg sudah golive otomatis
+        // hilang dari tabel ini).
         $query = Lop::with(['project', 'goliveSubmission', 'goliveVerification'])
-            ->where('status_progress', 'fi_ogp_golive');
+            ->whereIn('status_progress', ['fi_ogp_golive', 'golive'])
+            ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT2%'")
+            ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT-2%'")
+            ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT 2%'");
+
+        if ($request->filled('status_filter')) {
+            if ($request->status_filter === 'pending') {
+                $query->where('status_progress', 'fi_ogp_golive');
+            } elseif ($request->status_filter === 'approved') {
+                $query->where(function ($q) {
+                    $q->where('status_progress', 'golive')->orWhere('is_golive', 1);
+                });
+            }
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -32,9 +51,31 @@ class SdiGoliveController extends Controller
             });
         }
 
+        // Revisi (permintaan user): kartu ringkasan (Total LOP / Waiting
+        // Approval / Jumlah LOP Golive) utk menu Approval Golive PT
+        // 3/Reguler. Cakupannya SENGAJA lebih luas dari $query di atas
+        // ($query cuma nampilin yg masih fi_ogp_golive -- LOP yg sudah
+        // golive otomatis hilang dari tabel) -- kartu di sini menghitung
+        // SEMUA LOP yg pernah masuk antrean Golive (fi_ogp_golive ATAU
+        // golive), non-PT2 (dari program_sap, konsisten dgn helper isPt2 di
+        // ProjectController/SdiGoliveController::verify()), supaya "Total
+        // LOP" tidak menyusut begitu LOP-nya sudah di-golive-kan.
+        $summaryBase = Lop::whereIn('status_progress', ['fi_ogp_golive', 'golive'])
+            ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT2%'")
+            ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT-2%'")
+            ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT 2%'");
+
+        $cards = [
+            'total' => (clone $summaryBase)->count(),
+            'waiting' => (clone $summaryBase)->where('status_progress', 'fi_ogp_golive')->count(),
+            'golive' => (clone $summaryBase)->where(function ($q) {
+                $q->where('status_progress', 'golive')->orWhere('is_golive', 1);
+            })->count(),
+        ];
+
         $lops = $query->latest('updated_at')->paginate($request->per_page ?? 10)->withQueryString();
 
-        return view('sdi.golive.index', compact('lops'));
+        return view('sdi.golive.index', compact('lops', 'cards'));
     }
 
     public function show($id)

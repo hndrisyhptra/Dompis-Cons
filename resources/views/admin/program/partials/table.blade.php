@@ -54,11 +54,16 @@
                         // Karena file ini untuk OSP, NODEB, dsb, label default adalah Waspang
                         $labelRole = 'Waspang';
 
-                        if ($progress == 100) { $stageBadge = 'bg-green-100 text-green-700'; $progressColor = 'bg-green-600'; } 
-                        elseif ($stageLabel === 'Finishing') { $stageBadge = 'bg-purple-100 text-purple-700'; $progressColor = 'bg-purple-600'; } 
-                        elseif ($stageLabel === 'Pengukuran') { $stageBadge = 'bg-blue-100 text-blue-700'; $progressColor = 'bg-blue-600'; } 
-                        elseif ($stageLabel === 'Instalasi') { $stageBadge = 'bg-yellow-100 text-yellow-700'; $progressColor = 'bg-yellow-600'; } 
-                        else { $stageBadge = 'bg-red-100 text-red-700'; $progressColor = 'bg-red-600'; }
+                        // Section AL: warna badge tahap diselaraskan ke skema standar
+                        // Project::stageColorClasses() (sama dgn admin/projects/index,
+                        // project-card, project-detail, evidences/approval) -- sebelumnya
+                        // if/elseif manual ini cuma kenal label 'Finishing'/'Pengukuran'/
+                        // 'Instalasi', tahap lain (termasuk Persiapan Instalasi & FI-OGP
+                        // Golive yg progress-nya sudah tinggi) selalu jatuh ke else -> badge
+                        // MERAH seolah bermasalah, padahal tidak.
+                        $stageColors = \App\Models\Project::stageColorClasses($summary['effectiveStageColor'] ?? null);
+                        $stageBadge = $stageColors['badge'];
+                        $progressColor = $stageColors['progress'];
                     @endphp
 
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
@@ -117,6 +122,16 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25s-7.5-4.108-7.5-11.25A7.5 7.5 0 1119.5 10.5z" />
                                         </svg>
                                         <span class="font-semibold">Tracking Progress</span>
+                                    </a>
+                                    {{-- Revisi (permintaan user): menu BARU "Timeline" -- halaman
+                                    kronologi horizontal+vertical lengkap dgn eviden foto. --}}
+                                    <a href="{{ route('admin.projects.timeline', $project->id_project) }}"
+                                    class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-gray-800 hover:text-indigo-700 transition-colors">
+                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6.75v.008M10.5 12v.008M15 17.25v.008" />
+                                        </svg>
+                                        <span class="font-semibold">Timeline</span>
                                     </a>
 
                                     <button type="button" onclick="openAssignModal('{{ $project->id_project }}', @js($project->project_name), @js($programName))"
