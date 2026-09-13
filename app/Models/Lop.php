@@ -10,6 +10,29 @@ class Lop extends Model
     protected $table = 'lops';
     protected $primaryKey = 'id_lop';
 
+    /**
+     * FIX (permintaan user): saat LOP baru DIBUAT (create()), otomatis
+     * buka baris histori pertama di lop_stage_histories utk status_progress
+     * awalnya (biasanya 'inisiasi') -- entered_at = created_at LOP itu
+     * sendiri. Ini SATU-SATUNYA tempat pembuatan histori yang tidak lewat
+     * advanceStage() (lihat method advanceStage() di bawah utk transisi
+     * SESUDAH LOP dibuat -- WAJIB lewat situ, bukan assignment manual
+     * status_progress).
+     */
+    protected static function booted(): void
+    {
+        static::created(function (self $lop) {
+            if (! $lop->status_progress) {
+                return;
+            }
+
+            $lop->stageHistories()->create([
+                'stage_code' => $lop->status_progress,
+                'entered_at' => $lop->created_at ?? now(),
+            ]);
+        });
+    }
+
     protected $fillable = [
         'project_id',
         'id_ihld',
@@ -125,5 +148,51 @@ class Lop extends Model
     public function surveyRounds()
     {
         return $this->hasMany(BoqSurveyRound::class, 'lop_id', 'id_lop')->orderBy('round_number');
+    }
+
+    /**
+     * Permintaan user: log waktu masuk/selesai per staging supaya durasi
+     * per tahap bisa dihitung (dipakai halaman Timeline per-LOP & laporan
+     * agregat durasi per tahap). SEMUA tempat yang mengubah status_progress
+     * SETELAH LOP dibuat WAJIB lewat method ini -- JANGAN pernah langsung
+     * ->update(['status_progress' => ...]) atau assignment property manual
+     * lagi, supaya lop_stage_histories selalu konsisten & lengkap.
+     *
+     * Idempotent -- kalau stage tujuan SAMA dgn stage sekarang, tidak
+     * melakukan apa-apa (aman dipanggil berkali-kali/dari gate yang bisa
+     * ke-trigger ulang).
+     *
+     * @param string $newStageCode kode stage tujuan (harus ada di project_stages.code)
+     * @param int|null $userId auth()->id() user yang menyelesaikan tahap sebelumnya (nullable, mis. dipicu job/system)
+     * @param string|null $note catatan opsional (mis. alasan drop/hold)
+     */
+    public function advanceStage(string $newStageCode, ?int $userId = null, ?string $note = null): void
+    {
+        if ($this->status_progress === $newStageCode) {
+            return;
+        }
+
+        $now = now();
+
+        $openHistory = $this->stageHistories()
+            ->whereNull('completed_at')
+            ->latest('entered_at')
+            ->first();
+
+        if ($openHistory) {
+            $openHistory->update([
+                'completed_at' => $now,
+                'completed_by' => $userId,
+            ]);
+        }
+
+        $this->stageHistories()->create([
+            'stage_code' => $newStageCode,
+            'entered_at' => $now,
+            'note' => $note,
+        ]);
+
+        $this->status_progress = $newStageCode;
+        $this->save();
     }
 }

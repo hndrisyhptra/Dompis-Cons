@@ -250,8 +250,23 @@ class ImportPidJob implements ShouldQueue
                         ->first();
                 }
 
+                // FIX (permintaan user, log durasi per staging): sama spt
+                // ImportController::updatePidData() -- status_progress LOP
+                // yang SUDAH ADA wajib lewat advanceStage() supaya
+                // lop_stage_histories ikut tercatat saat import job ini
+                // memindahkan tahap (mis. re-upload template dgn status
+                // baru). LOP BARU (create()) histori awalnya otomatis
+                // dibuat lewat Lop::booted()::created().
                 if ($lop) {
+                    $newStageCode = $lopPayload['status_progress'] ?? null;
+                    unset($lopPayload['status_progress']);
                     $lop->update($lopPayload);
+                    if ($newStageCode) {
+                        // Job queue tidak selalu punya konteks auth() user (bisa
+                        // jalan di background tanpa request HTTP aktif) -- completed_by
+                        // histori dibiarkan null utk transisi via import job ini.
+                        $lop->advanceStage($newStageCode, null);
+                    }
                     $lopUpdated++;
                 } else {
                     Lop::create($lopPayload);

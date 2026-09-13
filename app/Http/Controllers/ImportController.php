@@ -881,9 +881,24 @@ public function updatePid(\Illuminate\Http\Request $request, \App\Models\Project
             'status_progress' => $request->status_progress,
         ];
 
+        // FIX (permintaan user, log durasi per staging): status_progress
+        // WAJIB lewat Lop::advanceStage() (bukan ikut ->update($payload)
+        // biasa) supaya perpindahan tahap dari form edit manual ini juga
+        // tercatat ke lop_stage_histories -- lihat Lop::advanceStage() &
+        // Section BE ANALISA_REFACTOR_PERSIAPAN.md. Utk LOP baru
+        // (Lop::create()), histori awal otomatis dibuat lewat
+        // Lop::booted()::created(), jadi status_progress tetap ikut
+        // $payload spt semula di jalur create.
+        $newStageCode = $payload['status_progress'] ?? null;
+        unset($payload['status_progress']);
+
         if ($lop) {
             $lop->update($payload);
+            if ($newStageCode) {
+                $lop->advanceStage($newStageCode, auth()->id());
+            }
         } else {
+            $payload['status_progress'] = $newStageCode;
             \App\Models\Lop::create($payload);
         }
     });

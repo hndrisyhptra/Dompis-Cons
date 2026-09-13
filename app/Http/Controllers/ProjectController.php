@@ -176,7 +176,7 @@ class ProjectController extends Controller
             $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
 
             if (! $isPt2 && $lop->status_progress === 'inisiasi') {
-                $lop->update(['status_progress' => 'survey']);
+                $lop->advanceStage('survey', auth()->id());
             }
         }
 
@@ -858,21 +858,21 @@ class ProjectController extends Controller
                         // dikerjakan). Eviden 'persiapan' yang ada sekarang
                         // (barang_tiba + perizinan) masih dianggap mewakili
                         // SELURUH fase Persiapan lama.
-                        Lop::where('project_id', $project->id_project)->update(['status_progress' => 'instalasi']);
+                        $lop->advanceStage('instalasi', auth()->id());
 
                     } elseif (
                         $evidence->stage == 'instalasi'
                         && ($summary['instalasiDone'] ?? false)
                         && $currentSequence === 7 // persis di tahap Instalasi
                     ) {
-                        Lop::where('project_id', $project->id_project)->update(['status_progress' => 'pengukuran']);
+                        $lop->advanceStage('pengukuran', auth()->id());
 
                     } elseif (
                         $evidence->stage == 'pengukuran'
                         && ($summary['pengukuranDone'] ?? false)
                         && $currentSequence === 8 // persis di tahap Pengukuran
                     ) {
-                        Lop::where('project_id', $project->id_project)->update(['status_progress' => 'finishing']);
+                        $lop->advanceStage('finishing', auth()->id());
                     }
                 }
             } // <-- Akhir dari Barier Pelindung
@@ -1346,7 +1346,7 @@ class ProjectController extends Controller
             && $currentSequence === 9
             && $submission->isComplete()
         ) {
-            Lop::where('project_id', $project->id_project)->update(['status_progress' => 'fi_ogp_golive']);
+            $lop->advanceStage('fi_ogp_golive', auth()->id());
 
             ProjectActivityService::log([
                 'project_id' => $project->id_project,

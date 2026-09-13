@@ -181,7 +181,10 @@ class SyncLegacyLopStatusProgress extends Command
             foreach ($changes as $c) {
                 /** @var Lop $lop */
                 $lop = $c['lop'];
-                $lop->update(['status_progress' => $c['to']]);
+                // FIX (permintaan user, log durasi per staging): lewat
+                // advanceStage() jg supaya lop_stage_histories konsisten,
+                // bukan cuma status_progress live-nya yang berubah.
+                $lop->advanceStage($c['to'], null, 'Sync legacy status_progress (php artisan lops:sync-legacy-status)');
 
                 ProjectActivityService::log([
                     'project_id' => $c['project']->id_project,

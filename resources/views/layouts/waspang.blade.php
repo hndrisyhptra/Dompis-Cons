@@ -1,5 +1,16 @@
 <!DOCTYPE html>
-<html lang="id" class="h-full">
+{{--
+    Permintaan user: versi mode dark utk halaman Inbox Waspang. State
+    darkMode ditaruh di <html> di sini (bukan per-halaman) -- pola SAMA
+    persis dgn layouts/admin.blade.php -- supaya persisten (localStorage)
+    & bisa dipakai/di-toggle dari HALAMAN MANAPUN di bawah layout ini,
+    bukan cuma Inbox (kelas dark: di halaman lain yang belum ditambahkan
+    cukup tidak berefek, aman/tidak breaking).
+--}}
+<html lang="id" class="h-full"
+      x-data="{ darkMode: localStorage.getItem('darkMode') === 'true' }"
+      x-init="$watch('darkMode', value => localStorage.setItem('darkMode', value))"
+      :class="{ 'dark': darkMode }">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -29,11 +40,11 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="bg-[#F8FAFC] text-slate-900 min-h-full antialiased selection:bg-blue-500 selection:text-white">
+<body class="bg-[#F8FAFC] dark:bg-slate-950 text-slate-900 dark:text-slate-100 min-h-full antialiased selection:bg-blue-500 selection:text-white transition-colors">
 
     {{-- Main Mobile Container Wrapper (Stage 4b redesign: palet fresh
          indigo/blue, tetap 1 keluarga desain dgn admin/PM) --}}
-    <main class="relative min-h-screen max-w-md mx-auto bg-[#F8FAFC] shadow-2xl shadow-slate-900/10 border-x border-slate-200/60">
+    <main class="relative min-h-screen max-w-md mx-auto bg-[#F8FAFC] dark:bg-slate-950 shadow-2xl shadow-slate-900/10 dark:shadow-black/40 border-x border-slate-200/60 dark:border-slate-800 transition-colors">
 
         {{-- Flash Session Toast/Alert Bawaan (Jika Ada) --}}
         @if(session('success'))

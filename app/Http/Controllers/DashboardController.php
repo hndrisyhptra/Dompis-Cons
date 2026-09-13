@@ -983,6 +983,24 @@ class DashboardController extends Controller
         return view('admin.report_deployment', compact('stageCube'));
     }
 
+    /**
+     * MENU BARU: "Durasi per Tahap" (agregat, permintaan user) -- sama
+     * persis dgn DashboardPmController::stageDurationReport() (cache key
+     * DISAMAKAN krn buildStageDurationCube() hasilnya identik utk semua
+     * role -- lihat catatan reportDeployment() di atas).
+     */
+    public function stageDurationReport()
+    {
+        $pmController = app(\App\Http\Controllers\DashboardPmController::class);
+
+        $durationCube = Cache::remember('pm_stage_duration_cube_v2', 90, function () use ($pmController) {
+            return $pmController->buildStageDurationCube();
+        });
+        $stageMeta = $pmController->stageDurationMeta();
+
+        return view('admin.stage_duration_report', compact('durationCube', 'stageMeta'));
+    }
+
     public function show($id)
     {
         $project = Project::with([
@@ -1123,7 +1141,9 @@ class DashboardController extends Controller
     public function timeline($project)
     {
         $project = Project::with([
-            'lop',
+            'lop.stageHistories' => function ($query) {
+                $query->orderBy('entered_at');
+            },
             'evidences',
             'boqItems.designatorData',
         ])->where('id_project', $project)->firstOrFail();
@@ -1147,7 +1167,88 @@ class DashboardController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        return view('admin.projects.timeline', compact('project', 'logs', 'kronologis'));
+        $stageDurations = $this->buildStageDurations($project->lop);
+
+        return view('admin.projects.timeline', compact('project', 'logs', 'kronologis', 'stageDurations'));
+    }
+
+    /**
+     * Permintaan user: "durasi per staging" (persiapan/persiapan
+     * instalasi/instalasi/pengukuran/finishing/FI-OGP Golive/Golive)
+     * dihitung dari lop_stage_histories yang diisi Lop::advanceStage()
+     * (lihat Section BE ANALISA_REFACTOR_PERSIAPAN.md). Dipakai halaman
+     * Timeline per-project (di sini) MAUPUN laporan agregat durasi per
+     * tahap (lihat stageDurationReport() di bawah) -- method public
+     * spy bisa dipanggil DashboardPmController juga (pola sama dgn
+     * buildStageCube()/stageBreakdownBucket()).
+     *
+     * Menampilkan SEMUA tahap alur normal (project_stages::sequential(),
+     * exclude 'drm' krn tidak dipakai flow sekarang -- lihat scope-nya di
+     * ProjectStage), termasuk tahap yang BELUM pernah dicapai LOP ini
+     * (durasi null/'-'), supaya urutan tabelnya selalu lengkap & konsisten
+     * dgn alur 11 tahap. Kalau LOP sempat "bolak-balik" ke tahap yang sama
+     * (mis. resume setelah Hold), durasi dari SEMUA kunjungan ke tahap itu
+     * dijumlahkan (bukan cuma kunjungan terakhir).
+     */
+    public function buildStageDurations(?\App\Models\Lop $lop): \Illuminate\Support\Collection
+    {
+        $stages = \App\Models\ProjectStage::sequential()->get();
+        $result = collect();
+
+        if (! $lop) {
+            foreach ($stages as $stage) {
+                $result->push([
+                    'code' => $stage->code,
+                    'label' => $stage->label,
+                    'entered_at' => null,
+                    'completed_at' => null,
+                    'is_current' => false,
+                    'duration_seconds' => null,
+                    'visits' => 0,
+                ]);
+            }
+
+            return $result;
+        }
+
+        $historiesByCode = $lop->stageHistories->groupBy('stage_code');
+
+        foreach ($stages as $stage) {
+            $rows = $historiesByCode->get($stage->code, collect());
+
+            if ($rows->isEmpty()) {
+                $result->push([
+                    'code' => $stage->code,
+                    'label' => $stage->label,
+                    'entered_at' => null,
+                    'completed_at' => null,
+                    'is_current' => $lop->status_progress === $stage->code,
+                    'duration_seconds' => null,
+                    'visits' => 0,
+                ]);
+
+                continue;
+            }
+
+            $isOngoing = $rows->contains(fn ($r) => is_null($r->completed_at));
+            $durationSeconds = $rows->sum(function ($r) {
+                $end = $r->completed_at ?? now();
+
+                return $r->entered_at->diffInSeconds($end);
+            });
+
+            $result->push([
+                'code' => $stage->code,
+                'label' => $stage->label,
+                'entered_at' => $rows->min('entered_at'),
+                'completed_at' => $isOngoing ? null : $rows->max('completed_at'),
+                'is_current' => $lop->status_progress === $stage->code,
+                'duration_seconds' => $durationSeconds,
+                'visits' => $rows->count(),
+            ]);
+        }
+
+        return $result;
     }
 
 

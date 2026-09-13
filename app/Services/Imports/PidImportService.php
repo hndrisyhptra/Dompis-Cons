@@ -567,10 +567,28 @@ class PidImportService
             if ($lop) {
                 // Status progress hanya disentuh jika kolomnya dikirim eksplisit.
                 // BOQ, evidence, assignment, dan data Go-Live tetap tidak disentuh.
-                $lop->fill($payload);
+                // FIX (permintaan user, log durasi per staging): status_progress
+                // di-pisah dari $payload & di-apply lewat Lop::advanceStage()
+                // (bukan ikut fill()+save() biasa) supaya perpindahan tahap
+                // dari import PID ini juga tercatat ke lop_stage_histories --
+                // lihat Lop::advanceStage() & Section BE
+                // ANALISA_REFACTOR_PERSIAPAN.md.
+                $newStageCode = $payload['status_progress'] ?? null;
+                unset($payload['status_progress']);
+                $stageWillChange = $newStageCode && $newStageCode !== $lop->status_progress;
 
-                if ($lop->isDirty()) {
+                $lop->fill($payload);
+                $wasDirty = $lop->isDirty();
+
+                if ($wasDirty) {
                     $lop->save();
+                }
+
+                if ($stageWillChange) {
+                    $lop->advanceStage($newStageCode, auth()->id());
+                }
+
+                if ($wasDirty || $stageWillChange) {
                     $counters['lop_updated']++;
                 } else {
                     $counters['unchanged']++;

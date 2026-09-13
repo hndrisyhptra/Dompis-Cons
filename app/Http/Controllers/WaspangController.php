@@ -153,6 +153,15 @@ class WaspangController extends Controller
     {
         $search = request('search');
 
+        // Permintaan user: toggle filter Active/Complete di atas search
+        // (sebelumnya inbox() SELALU exclude LOP yang sudah "Ready UT",
+        // versi lengkapnya cuma bisa dilihat lewat menu terpisah
+        // readyUt()/waspang.ready-ut -- sekarang toggle di halaman yang
+        // SAMA, "Active" = perilaku lama (default, exclude ready UT),
+        // "Complete" = pakai gate isProjectReadyUt() yang SAMA persis dgn
+        // readyUt() supaya konsisten 1 definisi "selesai").
+        $filter = request('filter', 'active') === 'complete' ? 'complete' : 'active';
+
         $projects = Project::with([
             'lop.stage',
             'evidences',
@@ -174,11 +183,13 @@ class WaspangController extends Controller
             })
             ->latest('updated_at')
             ->get()
-            ->filter(function ($project) {
-                return ! $this->isProjectReadyUt($project);
+            ->filter(function ($project) use ($filter) {
+                $isReadyUt = $this->isProjectReadyUt($project);
+
+                return $filter === 'complete' ? $isReadyUt : ! $isReadyUt;
             });
 
-        return view('waspang.inbox', compact('projects', 'search'));
+        return view('waspang.inbox', compact('projects', 'search', 'filter'));
     }
 
     public function readyUt()
@@ -670,7 +681,7 @@ class WaspangController extends Controller
             return;
         }
 
-        Lop::where('project_id', $project->id_project)->update(['status_progress' => 'finishing']);
+        $lop->advanceStage('finishing', auth()->id());
 
         ProjectActivityService::log([
             'project_id' => $project->id_project,
@@ -1323,7 +1334,7 @@ class WaspangController extends Controller
             $lop->survey_redesign_required = $needsRedesignApproval;
 
             if (! $needsRedesignApproval) {
-                $lop->status_progress = 'perizinan';
+                $lop->advanceStage('perizinan', auth()->id());
                 $this->completeSurveyRound($round, $lop);
             }
 
@@ -1399,7 +1410,7 @@ class WaspangController extends Controller
             }
 
             $lop->survey_redesign_required = false;
-            $lop->status_progress = 'perizinan';
+            $lop->advanceStage('perizinan', auth()->id());
             $lop->save();
 
             // Ronde ini baru benar-benar tuntas setelah bukti Approval
@@ -1472,7 +1483,7 @@ class WaspangController extends Controller
                 'started_at' => now(),
             ]);
 
-            $lop->status_progress = 'survey';
+            $lop->advanceStage('survey', auth()->id());
             $lop->survey_redesign_required = false;
             $lop->survey_deviation_percent = null;
             $lop->save();
@@ -1752,8 +1763,8 @@ class WaspangController extends Controller
 
         $lop->update([
             'perizinan_completed_at' => now(),
-            'status_progress' => 'material_delivery',
         ]);
+        $lop->advanceStage('material_delivery', auth()->id());
 
         ProjectActivityService::log([
             'project_id' => $project->id_project,
@@ -1794,7 +1805,7 @@ class WaspangController extends Controller
             return back()->with('error', 'Upload minimal 1 eviden foto material delivery sebelum melanjutkan.');
         }
 
-        $lop->update(['status_progress' => 'persiapan_instalasi']);
+        $lop->advanceStage('persiapan_instalasi', auth()->id());
 
         ProjectActivityService::log([
             'project_id' => $project->id_project,
@@ -1848,7 +1859,7 @@ class WaspangController extends Controller
             return back()->with('error', 'Perbaiki dulu eviden yang ditolak (upload ulang) sebelum melanjutkan.');
         }
 
-        $lop->update(['status_progress' => 'instalasi']);
+        $lop->advanceStage('instalasi', auth()->id());
 
         ProjectActivityService::log([
             'project_id' => $project->id_project,

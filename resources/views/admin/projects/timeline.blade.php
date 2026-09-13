@@ -183,6 +183,92 @@
         </div>
     </div>
 
+    {{--
+        DURASI PER TAHAP (permintaan user) -- berapa lama LOP ini
+        "menginap" di tiap staging (Persiapan s.d. Golive), dihitung dari
+        lop_stage_histories (diisi otomatis lewat Lop::advanceStage()
+        setiap kali status_progress berubah -- lihat Section BE
+        ANALISA_REFACTOR_PERSIAPAN.md). $stageDurations dikirim dari
+        DashboardController::timeline() -> buildStageDurations(), SATU
+        baris per tahap alur normal (project_stages::sequential()), tahap
+        yang belum dicapai LOP ini tetap ditampilkan (durasi '-').
+
+        CATATAN: histori baru mulai dicatat sejak fitur ini aktif -- utk
+        LOP yang sudah lama & sempat melewati tahap2 SEBELUM fitur ini ada,
+        durasi tahap yang SUDAH dilewati sebelum tanggal aktif bisa kosong
+        (tidak ada data lama utk direkonstruksi), tapi tahap yang SEDANG
+        berjalan & seluruh transisi SETELAH fitur ini aktif akan tercatat
+        lengkap.
+    --}}
+    <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-5">
+            <div>
+                <h2 class="text-base font-black text-gray-900 dark:text-white">Durasi per Tahap</h2>
+                <p class="text-xs text-gray-400 mt-0.5">Berapa lama LOP ini berada di tiap staging, dari masuk s.d. selesai (atau s.d. sekarang kalau masih berjalan)</p>
+            </div>
+        </div>
+
+        @php
+            $formatStageDuration = function (?int $seconds) {
+                if ($seconds === null) {
+                    return '-';
+                }
+
+                $days = intdiv($seconds, 86400);
+                $hours = intdiv($seconds % 86400, 3600);
+
+                if ($days > 0) {
+                    return $days.' hari '.$hours.' jam';
+                }
+
+                $minutes = intdiv($seconds % 3600, 60);
+
+                if ($hours > 0) {
+                    return $hours.' jam '.$minutes.' menit';
+                }
+
+                return $minutes.' menit';
+            };
+        @endphp
+
+        @if(! $project->lop)
+            <p class="text-sm text-gray-400 py-6 text-center">LOP belum ada untuk project ini.</p>
+        @else
+            <div class="overflow-x-auto -mx-2 px-2">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs font-bold text-gray-400 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
+                            <th class="py-2 pr-3">Tahap</th>
+                            <th class="py-2 px-3">Masuk</th>
+                            <th class="py-2 px-3">Selesai</th>
+                            <th class="py-2 px-3">Durasi</th>
+                            <th class="py-2 pl-3 text-right">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($stageDurations as $sd)
+                            <tr class="border-b border-gray-50 dark:border-gray-800/60 {{ $sd['is_current'] ? 'bg-blue-50/50 dark:bg-blue-950/20' : '' }}">
+                                <td class="py-2.5 pr-3 font-bold text-gray-700 dark:text-gray-200">{{ $sd['label'] }}</td>
+                                <td class="py-2.5 px-3 text-gray-500">{{ $sd['entered_at'] ? $sd['entered_at']->format('d M Y H:i') : '-' }}</td>
+                                <td class="py-2.5 px-3 text-gray-500">{{ $sd['completed_at'] ? $sd['completed_at']->format('d M Y H:i') : ($sd['is_current'] ? 'Masih berjalan' : '-') }}</td>
+                                <td class="py-2.5 px-3 font-semibold text-gray-700 dark:text-gray-200">{{ $formatStageDuration($sd['duration_seconds']) }}</td>
+                                <td class="py-2.5 pl-3 text-right">
+                                    @if($sd['is_current'])
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">Sedang Berjalan</span>
+                                    @elseif($sd['visits'] > 0)
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">Selesai</span>
+                                    @else
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Belum Dimulai</span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+
     {{-- TIMELINE HORIZONTAL (RINGKASAN) --}}
     <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
         <div class="flex items-center justify-between mb-5">

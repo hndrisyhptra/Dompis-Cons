@@ -138,8 +138,8 @@ class SdiGoliveController extends Controller
         $isPausedOrDropped = (bool) ($currentStage?->is_pause_type || $currentStage?->is_terminal);
 
         if (! $isPt2 && ! $isAlreadyClosed && $currentSequence === 10 && ! $isPausedOrDropped) {
+            $lop->advanceStage('golive', auth()->id());
             $lop->update([
-                'status_progress' => 'golive',
                 'is_golive' => true,
                 'golive_at' => now(),
             ]);

@@ -831,6 +831,25 @@
             </span>
         </a>
 
+        <a href="{{ route('admin.stage_duration_report') }}"
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            {{ request()->routeIs('admin.stage_duration_report') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+            @if(request()->routeIs('admin.stage_duration_report'))
+                <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
+            @endif
+
+            <div class="w-8 h-8 rounded-xl bg-teal-100 dark:bg-teal-600/60 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-timer">
+                    <line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/>
+                </svg>
+            </div>
+
+            <span>
+                Durasi per Tahap
+            </span>
+        </a>
+
         <a href="#"
            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
           

@@ -248,6 +248,15 @@ Route::middleware(['auth', 'role:superadmin,admin,tif,super_tif,officer,pm'])->g
 Route::middleware(['auth', 'role:admin,superadmin,officer'])->group(function () {
     Route::get('/admin/report-deployment', [DashboardController::class, 'reportDeployment'])
         ->name('admin.report_deployment');
+
+    // MENU BARU: "Durasi per Tahap" (agregat, permintaan user) -- rata-rata
+    // durasi tiap staging per Region/Branch/Program, lihat
+    // DashboardController::stageDurationReport() & Section BE
+    // ANALISA_REFACTOR_PERSIAPAN.md. Nebeng group role yang sama dgn
+    // Report Deployment (admin,superadmin,officer -- super_tif TIDAK
+    // termasuk, konsisten dgn menu Report Deployment di atas).
+    Route::get('/admin/stage-duration-report', [DashboardController::class, 'stageDurationReport'])
+        ->name('admin.stage_duration_report');
 });
 
 /*
@@ -776,6 +785,12 @@ Route::middleware(['auth', 'role:pm,tif'])->prefix('pm')->name('pm.')->group(fun
 Route::middleware(['auth', 'role:pm'])->prefix('pm')->name('pm.')->group(function () {
     Route::get('/report-deployment', [DashboardPmController::class, 'reportDeployment'])
         ->name('report_deployment');
+
+    // MENU BARU: "Durasi per Tahap" (agregat, permintaan user) -- role PM
+    // saja (role:pm SAJA, sama spt report-deployment di atas -- tif TIDAK
+    // kebagian menu ini).
+    Route::get('/stage-duration-report', [DashboardPmController::class, 'stageDurationReport'])
+        ->name('stage_duration_report');
 });
 
 /*

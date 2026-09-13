@@ -2415,3 +2415,131 @@ Compiled view cache lama (`storage/framework/views/dd4a25af1bac7ac78635c46308b52
 - Balance-check ulang: `{`/`}` 48/48, `(`/`)` 136/136, `<div>`/`</div>` 18/18 -- tidak berubah dari fix pertama (cuma teks komentar yg diubah).
 - `php -l` via `device_stage_files` + cloud `Bash` pada `partials/report-deployment.blade.php`, `admin/report_deployment.blade.php`, `pm/report_deployment.blade.php`: "No syntax errors detected" utk ketiganya.
 - Grep manual seluruh `@[a-zA-Z]+` pattern di ketiga file utk pastikan tidak ada directive Blade "liar" lain yang tidak sengaja ter-tulis di komentar biasa (hanya ditemukan directive asli: `@include`, `@extends`, `@section`, `@endsection`, `@click` [Alpine, bukan Blade], `@change` [Alpine], `@json` [1x, asli] -- semua aman).
+
+## Section BE — Log Waktu per Staging (Durasi per Tahap): Per-LOP (Timeline) & Agregat Portofolio
+
+### Permintaan user
+1. "jika ada tambahan fitur staging seperti ini untuk tiap stagingnya (persiapan, persiapan instalasi, Instalasi, pengukuran, finishing, FI - OGP Golive - Golive) dikasih log waktu sehingga bisa dihitung durasi per stagingnya. Cocoknya di letakkan sebelah mana, apakah di timeline atau ada ide lain?"
+2. Follow-up: "kebutuhan utama dua-duanya" -- baik durasi per LOP (di halaman Timeline) MAUPUN ringkasan agregat lintas LOP/portofolio.
+
+### Temuan awal (sebelum implementasi)
+Ternyata tabel `lop_stage_histories` (migration `2026_09_08_090600_create_lop_stage_histories_table.php`, kolom `lop_id`, `stage_code`, `entered_at`, `completed_at`, `completed_by`, `note`) SUDAH ADA sejak refactor flow 11-tahap, dan komentarnya eksplisit bilang tujuannya persis utk ini ("supaya bisa dianalisa, berapa lama macet di suatu tahap"). Tapi setelah digrep MENYELURUH, tabel ini TIDAK PERNAH diisi di manapun -- infrastruktur sudah ada, tapi kosong total. Ditemukan juga `status_progress` LOP di-update dari BANYAK titik tersebar (WaspangController 7 lokasi, ProjectController 5 lokasi, SdiGoliveController 1, ImportController 1, ImportPidJob 1, PidImportService 1, SyncLegacyLopStatusProgress 1 -- total 17 titik) TANPA lewat satu fungsi terpusat.
+
+### A. Instrumentasi (fondasi -- WAJIB sebelum UI manapun bisa nampilkan data)
+
+**`app/Models/Lop.php`:**
+- `protected static function booted()` baru -- event `created`: LOP baru otomatis dapat 1 baris histori pertama (`entered_at` = `created_at` LOP, `stage_code` = `status_progress` awal).
+- Method baru `public function advanceStage(string $newStageCode, ?int $userId = null, ?string $note = null): void` -- SATU-SATUNYA cara resmi memindahkan status_progress SETELAH LOP dibuat: tutup histori tahap lama yang masih terbuka (`completed_at` = now, `completed_by` = $userId), buka histori baru (`entered_at` = now), baru set `status_progress` & save(). Idempotent (no-op kalau stage tujuan == stage sekarang).
+
+**17 titik update `status_progress` diarahkan lewat `advanceStage()`** (bukan lagi `->update(['status_progress' => ...])` atau assignment property manual):
+- `WaspangController.php`: 7 lokasi (finishing, perizinan x2, survey, persiapan_instalasi, instalasi, material_delivery).
+- `ProjectController.php`: 5 lokasi (survey saat assign waspang, instalasi/pengukuran/finishing dari approve eviden, fi_ogp_golive dari submit dokumen FI-OGP).
+- `SdiGoliveController.php`: 1 lokasi (auto-advance ke golive).
+- `ImportController.php::updatePid()`: 1 lokasi (form edit manual PID) -- `status_progress` di-`unset` dari `$payload` sebelum `$lop->update()`, lalu di-apply lewat `advanceStage()` terpisah (LOP baru tetap lewat `Lop::create()` biasa, histori awal otomatis via `booted()`).
+- `app/Jobs/ImportPidJob.php`: 1 lokasi (bulk import Excel) -- pola sama dgn ImportController, `completed_by` = null (job queue tidak selalu punya konteks `auth()`).
+- `app/Services/Imports/PidImportService.php`: 1 lokasi (`fill()`+`isDirty()`+`save()` pattern) -- `status_progress` dipisah dari `$payload` sebelum `fill()`, dicek `$stageWillChange` SEBELUM `advanceStage()` dipanggil (bukan `getOriginal()` SESUDAH, krn `save()` di dalam `advanceStage()` sudah men-sync `original`).
+- `app/Console/Commands/SyncLegacyLopStatusProgress.php`: 1 lokasi (command legacy Section AM) -- ikut lewat `advanceStage()` jg utk konsistensi kalau command ini dipakai lagi.
+
+Sudah di-grep ULANG menyeluruh (`->status_progress =`, `['status_progress'] =`, `'status_progress' =>`) setelah semua perubahan -- SISA yang ada semuanya cuma QUERY/FILTER (bukan write) atau ada di dalam `Lop::create()`/array `return` biasa (bukan write ke LOP yang sudah ada), sudah dikonfirmasi aman. Hold/Drop TIDAK ditemukan actionable write-nya di manapun (masih schema-only, belum ada fitur Hold/Drop yang jalan) -- konsisten dgn tidak disebut di permintaan user.
+
+### B. Durasi per Tahap PER-LOP (di halaman Timeline yang sudah ada)
+
+**`app/Http/Controllers/DashboardController.php`:**
+- `timeline()`: eager-load `lop.stageHistories` (order by `entered_at`), panggil `buildStageDurations($project->lop)`, kirim `$stageDurations` ke view.
+- Method baru `public function buildStageDurations(?Lop $lop): Collection` -- 1 baris per tahap `ProjectStage::sequential()` (10 tahap alur normal, exclude `drm`), termasuk tahap yg BELUM dicapai LOP ini (durasi null). Kalau LOP sempat bolak-balik ke tahap sama (mis. resume setelah Hold), durasi dari SEMUA kunjungan dijumlahkan.
+
+**`resources/views/admin/projects/timeline.blade.php`:** card baru "Durasi per Tahap" ditaruh SETELAH header, SEBELUM Timeline Horizontal -- tabel Tahap/Masuk/Selesai/Durasi/Status (badge Sedang Berjalan/Selesai/Belum Dimulai).
+
+### C. Durasi per Tahap AGREGAT (menu baru, portofolio-level)
+
+**`app/Http/Controllers/DashboardPmController.php`:**
+- Extract `regionBranchMap(): array` dari `buildStageCube()` (1 sumber kebenaran Region/Branch, dipakai bersama).
+- Method baru `buildStageDurationCube(): array` -- query `lop_stage_histories` JOIN `lops`+`projects`, HANYA histori yg SUDAH SELESAI (`completed_at` tidak null, supaya rata2 tidak bias oleh tahap yg baru saja dimasuki), breakdown Region/Branch/Program, per bucket simpan `sum_seconds` + `count` TERPISAH (bukan rata2 langsung) supaya bisa di-agregat ulang dgn benar (weighted average) saat difilter.
+- Method baru `stageDurationBucket(?string $stageCode): ?string` -- kelompokkan 13 kode mentah jadi 7 bucket sesuai daftar user: `persiapan` (gabungan inisiasi+survey+perizinan+material_delivery), `persiapan_instalasi`, `instalasi`, `pengukuran`, `finishing`, `fi_ogp_golive`, `golive`. `hold`/`drop`/`drm` return null (tidak ditampilkan).
+- Method baru `stageDurationReport()`: cache 90 detik (`pm_stage_duration_cube_v1`), return `view('pm.stage_duration_report', ...)`.
+
+**`app/Http/Controllers/DashboardController.php`:** method baru `stageDurationReport()` -- pola sama persis dgn `reportDeployment()` (cache key DISAMAKAN, panggil `app(DashboardPmController::class)->buildStageDurationCube()`).
+
+**Routing:** `GET /admin/stage-duration-report` (name `admin.stage_duration_report`, nebeng group `role:admin,superadmin,officer` yg sama dgn Report Deployment) & `GET /pm/stage-duration-report` (name `pm.stage_duration_report`, group `role:pm`).
+
+**View baru:**
+- `resources/views/partials/stage-duration-report.blade.php` -- partial reusable: filter Region/Branch/Program (Alpine `stageDurationWidget()`) + tabel 7 kolom durasi (avg hari + jumlah LOP dalam kurung) + baris Grand Total. TIDAK ada modal drill-down LOP (beda dgn Report Deployment) -- scope v1 cukup ringkasan angka dulu. **PELAJARAN dari Section BD**: cube data (`@json($durationCube ?? [])`) SENGAJA ditaruh di DALAM `<script>` sbg literal JS (BUKAN di atribut HTML `x-data="..."`) supaya tidak kena bug quote-breaking yang sama.
+- `resources/views/pm/stage_duration_report.blade.php` & `resources/views/admin/stage_duration_report.blade.php` -- wrapper tipis, `@include('partials.stage-duration-report', ['durationCube' => $durationCube])`.
+
+**Sidebar** (link baru "Durasi per Tahap", ikon `timer`, ditaruh TEPAT SETELAH "Report Deployment"): `admin/components/sidebar(.mobile).blade.php`, `officer/components/sidebar(.mobile).blade.php` (selalu tampil, pola sama dgn Report Deployment), `pm/components/sidebar(.mobile).blade.php` (dibungkus `@if(auth()->user()->role === 'pm')`, TIDAK utk tif).
+
+### Catatan penting utk user
+- Data BARU MULAI TERCATAT sejak fitur ini aktif -- LOP yang sudah lama & sempat melewati tahap2 SEBELUM tanggal ini TIDAK punya data durasi utk tahap2 yang sudah lewat (tidak direkonstruksi/ditebak, supaya angkanya tidak menyesatkan). Tahap yang SEDANG berjalan sekarang & semua transisi SETELAH fitur ini aktif akan tercatat lengkap. Laporan agregat & durasi per-LOP akan makin akurat/lengkap seiring waktu berjalan.
+- Laporan agregat (Durasi per Tahap) SENGAJA hanya menghitung histori yang SUDAH SELESAI (`completed_at` tidak null) supaya rata-rata tidak bias oleh LOP yang baru saja masuk suatu tahap.
+
+### Verifikasi
+- Balance-check (python `{`/`}`, `(`/`)`, tag HTML relevan) pada SELURUH file yang diubah/dibuat (2 model+controller data layer: Lop, WaspangController, SdiGoliveController, ImportController, ImportPidJob, ProjectController, PidImportService, SyncLegacyLopStatusProgress, DashboardController, DashboardPmController; 5 view: timeline.blade.php, partial baru, 2 wrapper baru, 6 file sidebar). SEMUA balance kecuali `admin/components/sidebar-mobile.blade.php` yang menunjukkan selisih `<div>`/`</div>` 1 angka -- SAMA PERSIS dgn pre-existing imbalance yg sudah dikonfirmasi di Section BC (bukan bug baru, insertion baru di sesi ini sendiri balance 1/1).
+- `php -l` via `device_stage_files` + cloud `Bash` pada seluruh file PHP/blade yang diubah/dibuat: "No syntax errors detected" utk semuanya.
+- Grep manual `@[a-zA-Z]+` pada seluruh view baru/diubah utk pastikan tidak ada directive Blade "liar" ter-tulis di komentar biasa (pelajaran dari Section BD) -- semua bersih.
+- Tidak ada migration baru (tabel `lop_stage_histories` & `project_stages` sudah ada sejak refactor 11-tahap).
+
+## Section BF -- Redesign Inbox Waspang (progress akurat, status dinamis, toggle Active/Complete, dark mode)
+
+Permintaan user: perbaiki tampilan Inbox Waspang -- (1) sesuaikan persentase progress, (2) hapus badge stepper "○ Persiapan/Instalasi/Pengukuran/Finishing", (3) status pojok kanan atas mengikuti status_progress sebenarnya, (4) hapus tombol "Laporkan Kendala" (sudah ada di tiap step/sub-step), (5) tambah toggle filter Active/Complete di atas search, (6) buat versi dark mode.
+
+### 1. Progress % -- switch ke `Project::progressSummary()`
+
+`resources/views/waspang/inbox.blade.php`: kalkulasi lama (persiapanDone/instalasiDone/pengukuranDone/finishingDone dihitung manual dari `$project->evidences`, tanpa fallback sequence) DIHAPUS. Sekarang pakai `$summary = $project->progressSummary()` (1 sumber kebenaran yang sudah sequence-aware, sama persis dipakai Dashboard/Timeline/Report Deployment/Durasi per Tahap) -- `$progress = $summary['progress']`, `$allDone = $summary['finishingDone']`. Ini memperbaiki LOP flow baru yang sebelumnya bisa keliatan macet di 0%/33% karena tidak lagi menulis eviden stage='persiapan'.
+
+### 2. Badge stepper dihapus
+
+4 span "○ Persiapan / ○ Instalasi / ○ Pengukuran / ○ Finishing" (dihitung dari eviden mentah) dihapus total dari card. Progress kini cukup direpresentasikan oleh progress bar + angka %.
+
+### 3. Badge status pojok kanan atas -- status sebenarnya
+
+Sebelumnya teks statis "Selesai"/"On Progress". Sekarang pakai `$rawStage = $project->lop?->stage` (stage LOP MENTAH, BUKAN "effective" pre-hold dari progressSummary, supaya Hold/Drop tampil apa adanya, tidak ketutup label tahap sebelum hold) -> `$statusLabel = $rawStage?->label` dan warna dari `Project::stageColorClasses($rawStage?->color)` (fungsi statis existing, 1 sumber kebenaran warna tahap yang sudah dipakai di halaman admin/PM). Border kiri card & progress bar ikut pakai warna yang sama (`$statusColors['border']`/`['progress']`/`['badge']`).
+
+### 4. Tombol "Laporkan Kendala" dihapus (kondisi belum ada kendala aktif)
+
+Cabang `@else` (LOP tanpa kendala aktif) sebelumnya 2 tombol: "Laporkan Kendala" (buka modal) + "Upload Eviden". Tombol "Laporkan Kendala" dihapus krn pelaporan kendala baru sudah tersedia di tiap step/sub-step upload eviden; "Upload Eviden" dijadikan `col-span-2` (full width). Cabang `@if($kendalaIssue)` (LOP YANG SUDAH ada kendala aktif) TETAP dipertahankan apa adanya -- "Update Kendala" (buka modal existing utk update laporan yang sudah ada) + "Resume Project" -- karena ini mengelola kendala yang SUDAH terlanjur dilaporkan, beda konteks dari "melaporkan kendala baru" yang diminta user utk dihapus. Modal popup kendala & JS-nya (compress gambar, preview, submit) TIDAK diubah/dihapus, karena masih dipakai tombol "Update Kendala".
+
+### 5. Toggle filter Active/Complete
+
+`WaspangController::inbox()`: tambah `$filter = request('filter', 'active') === 'complete' ? 'complete' : 'active'`, lalu `->filter(fn($project) => $filter === 'complete' ? $this->isProjectReadyUt($project) : !$this->isProjectReadyUt($project))` setelah query utama. Reuse method PRIVATE `isProjectReadyUt()` yang sudah ada (dipakai jg oleh menu terpisah `readyUt()`/`waspang.ready-ut`) supaya definisi "selesai" SAMA PERSIS di 2 tempat (1 sumber kebenaran). Default `'active'` (perilaku lama tetap jadi default -- LOP yang sudah Ready UT otomatis ke-exclude kecuali user toggle ke "Complete"). View: 2 link `<a>` di atas search bar, styling pill sama pola dgn menu lain di app; search form ditambah `<input type="hidden" name="filter">` supaya filter ikut terbawa saat search. `readyUt()`/`waspang.ready-ut` (menu terpisah lama) TIDAK disentuh/dihapus -- tetap ada sbg halaman tersendiri.
+
+### 6. Dark mode
+
+Pola SAMA PERSIS dgn `layouts/admin.blade.php` (state di `<html>`, localStorage, Alpine `x-data`/`x-init`/`:class`):
+- `resources/views/layouts/waspang.blade.php`: `<html>` ditambah `x-data="{ darkMode: localStorage.getItem('darkMode') === 'true' }"`, `x-init="$watch(...)"`, `:class="{ 'dark': darkMode }"` (scope `darkMode` cascade ke semua descendant tanpa perlu `x-data` baru di tiap halaman). `<body>`/`<main>` ditambah kelas `dark:*`.
+- `resources/views/waspang/inbox.blade.php`: kelas `dark:*` ditambah di SELURUH elemen (wrapper, alert, header, toggle Active/Complete, search bar, card, progress bar, footer, tombol aksi, kotak info kendala, modal popup kendala lengkap dgn form/select/textarea/upload). Tombol toggle dark/light mode baru ditaruh di header (icon bulan/matahari, `@click="darkMode = !darkMode"`).
+- `resources/views/waspang/partials/bottom-nav.blade.php`: kelas `dark:*` ditambah di container, 4 nav-link (aktif/nonaktif), label "Survey", ring tombol FAB tengah.
+- **Catatan**: mekanisme toggle dark mode kini GLOBAL (tersimpan di layout, persisten lintas halaman waspang via localStorage), TAPI styling `dark:*` BARU diterapkan di Inbox + bottom-nav + shell layout. Halaman waspang lain (dashboard, show/step detail, profile, notifications, ready-ut, dll) BELUM dapat kelas `dark:*` sendiri -- toggle akan tetap berfungsi (tidak error/breaking) tapi tampilannya belum berubah sampai halaman itu ditambahkan `dark:*` di sesi berikutnya bila diminta.
+
+### Verifikasi
+- Balance-check (python `{`/`}`, `(`/`)`, `<div>`/`</div>`, `@php`/`@endphp`, `@if`/`@endif`, `@forelse`/`@endforelse`) pada `inbox.blade.php`, `WaspangController.php`, `layouts/waspang.blade.php`, `bottom-nav.blade.php` -- SEMUA balance.
+- `php -l` via `device_stage_files` + cloud `Bash` pada `WaspangController.php`: "No syntax errors detected" (file blade tidak dilint via `php -l` krn bukan PHP murni -- diverifikasi via balance-check + grep directive di bawah, sesuai pola sesi ini utk file blade tanpa akses `artisan` di device).
+- Grep manual `@[a-zA-Z]+` pada ketiga file blade yang diubah -- semua match adalah directive Blade/Alpine yang sah (`@if`/`@endif`/`@forelse`/`@php`/`@csrf`/`@include`/`@section`/`@extends`/`@vite`/`@yield`/`@click`), TIDAK ADA teks directive liar di komentar (pelajaran Section BD).
+
+## Section BG -- "Durasi per Tahap" AGREGAT: breakdown lengkap sub-tahap Persiapan + redesign UI modern/informatif
+
+Permintaan user: (1) tampilkan jg sub-step pada tahap Persiapan supaya breakdown-nya detail & lengkap semua step (SEBELUMNYA Inisiasi+Survey+Perizinan+Material Delivery digabung jadi 1 kolom "Persiapan"), (2) buat tampilan UI yang lebih user-friendly, modern, clean, informatif, dgn visualisasi yang mudah dimengerti.
+
+### 1. Data layer -- breakdown 1:1, tidak digabung lagi
+
+`DashboardPmController`:
+- `buildStageDurationCube()`: bucket key SEKARANG diambil dari `stageDurationBucketKeys()` (10 kode `project_stages` alur normal: inisiasi, survey, perizinan, material_delivery, persiapan_instalasi, instalasi, pengukuran, finishing, fi_ogp_golive, golive -- via `ProjectStage::sequential()`, exclude drm/hold/drop), BUKAN 7 bucket gabungan spt sebelumnya. Query ditambah `whereIn('h.stage_code', $bucketKeys)` supaya cuma stage_code yang relevan yg diproses.
+- `stageDurationBucket()`: SEKARANG cuma passthrough (`in_array` check) -- tidak ada lagi penggabungan `inisiasi/survey/perizinan/material_delivery -> 'persiapan'`.
+- Method baru `stageDurationBucketKeys(): array` -- daftar 10 kode, cache statis per-request (`ProjectStage::sequential()->pluck('code')`).
+- Method baru `stageDurationMeta(): array` -- metadata tampilan (code/label/phase_group/sequence/color) per stage, 1 sumber kebenaran SAMA dgn `project_stages` (dipakai jg oleh Timeline/stepper LOP) -- dikirim ke view supaya PENGELOMPOKAN visual "Persiapan" (4 sub-step) dikerjakan di CLIENT (Alpine), BUKAN di data layer, supaya data selalu lengkap & bisa ditampilkan kedua mode (ringkas/detail) tanpa query ulang.
+- `stageDurationReport()` (di `DashboardPmController` MAUPUN `DashboardController`): cache key dinaikkan `pm_stage_duration_cube_v1` -> `pm_stage_duration_cube_v2` (bentuk data cube berubah dari 7 jadi 10 kolom -- WAJIB supaya tidak ada cache lama v1 yg ke-serve dgn shape lama & bikin error di view baru). Tambah kirim `$stageMeta` ke view.
+- 2 wrapper view (`admin/stage_duration_report.blade.php`, `pm/stage_duration_report.blade.php`): teruskan `$stageMeta` ke partial, subtitle diupdate menyebut breakdown sub-tahap Persiapan.
+
+### 2. UI redesign -- `resources/views/partials/stage-duration-report.blade.php` (rewrite total)
+
+- **Toggle "Detail Sub-Tahap Persiapan"** (default OFF): mode ringkas (7 baris/kolom, Persiapan digabung -- TAMPILAN SAMA PERSIS spt versi lama, supaya tidak overwhelming secara default) vs mode lengkap (10 baris/kolom, Inisiasi/Survey/Perizinan/Material Delivery tampil terpisah dgn label "Persiapan · <nama>"). Toggle ini SATU sumber (fungsi `displayStages()`/`tableStages()`/`overviewStages()`) yg dipakai bersama oleh visualisasi bar & tabel Region/Branch, supaya konsisten -- tidak ada 2 definisi breakdown yg bisa divergen.
+- **4 kartu KPI ringkasan** di atas (Total Rata-rata Siklus akumulasi Inisiasi->Golive, Tahap Tercepat, Tahap Terlama/Bottleneck dgn ikon warning, Data Tercatat/jumlah histori terbanyak) -- supaya user langsung dapat insight tanpa harus baca tabel detail.
+- **Visualisasi bar horizontal per tahap** (baru) -- 1 baris per tahap, panjang bar proporsional thdp tahap TERLAMA yg sedang ditampilkan (relatif, bukan absolut, supaya selalu ada 1 bar yg penuh sbg pembanding), warna bar per `phase_group` (pakai palet SAMA dgn `Project::stageColorClasses()` PHP -- di-mirror di JS supaya konsisten TANPA duplikasi definisi warna baru), diberi label grup "Sub-Tahap Persiapan" saat mode detail aktif. ↳ dipakai sbg penanda visual sub-step.
+- **Tabel breakdown Region/Branch** dipertahankan (expand/collapse per Region, drill ke Branch) tapi header & sel SEKARANG dinamis mengikuti `tableStages()` (bukan hardcode 7 `<th>`/`<td>`), sel durasi diberi 2 baris (angka hari + jumlah LOP di bawahnya) supaya lebih mudah dibaca drpd 1 baris teks "3.2 hari (12)".
+- Grand Total footer jg dinamis mengikuti stage yg sedang ditampilkan.
+- Warna & style badge/bar tetap 1 keluarga desain dgn Report Deployment/Timeline (Tailwind dark: variant lengkap, konsisten dark-mode existing).
+
+### Verifikasi
+- Balance-check (python `{`/`}`, `(`/`)`, `<div>`/`</div>`, `<template>`/`</template>`) pada partial baru + 2 wrapper + `DashboardPmController.php` + `DashboardController.php` -- SEMUA balance.
+- `php -l` via `device_stage_files` + cloud `Bash` pada kedua controller & partial blade: "No syntax errors detected".
+- Grep manual `@[a-zA-Z]+` pada partial + 2 wrapper -- semua match directive Blade sah (`@extends`/`@section`/`@include`/`@endsection`/`@json` di dalam `<script>`) & Alpine (`@click`/`@change`), TIDAK ADA teks directive liar di komentar (pelajaran Section BD, tetap dijaga di komentar besar bagian atas file yg SELURUHNYA di dalam blok `{{-- --}}`).
+- Cache key dinaikkan ke v2 supaya tidak ada risiko cache lama (shape 7 kolom) ke-serve stale ke view baru (yang mengharapkan 10 kolom) selama 90 detik pertama setelah deploy.

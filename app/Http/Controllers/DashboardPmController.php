@@ -78,6 +78,25 @@ class DashboardPmController extends Controller
         return view('pm.report_deployment', compact('stageCube'));
     }
 
+    /**
+     * MENU BARU: "Durasi per Tahap" (agregat, permintaan user) -- rata-rata
+     * durasi tiap staging (Persiapan s.d. Golive) di-breakdown Region/
+     * Branch/Program, dihitung dari lop_stage_histories (lihat
+     * buildStageDurationCube() & Section BE ANALISA_REFACTOR_PERSIAPAN.md).
+     * Role PM lihat PROGRAM LENGKAP (sama spt reportDeployment() di atas,
+     * TIDAK exclude Konstruksi Eksternal -- route-nya sendiri sudah
+     * dibatasi role:pm saja).
+     */
+    public function stageDurationReport()
+    {
+        $durationCube = Cache::remember('pm_stage_duration_cube_v2', 90, function () {
+            return $this->buildStageDurationCube();
+        });
+        $stageMeta = $this->stageDurationMeta();
+
+        return view('pm.stage_duration_report', compact('durationCube', 'stageMeta'));
+    }
+
     private function buildIndexData(): array
     {
         // FIX (2026-09-08): kode 'preparation' sudah tidak pernah ada lagi di
@@ -422,7 +441,13 @@ class DashboardPmController extends Controller
      * SENGAJA tidak filter `status_progress != 'drop'` -- LOP drop & hold
      * justru harus ikut terhitung (masing-masing punya kolomnya sendiri).
      */
-    public function buildStageCube(): array
+    /**
+     * Peta Branch -> Region (dipakai bersama oleh buildStageCube() &
+     * buildStageDurationCube() -- di-extract SUPAYA 1 sumber kebenaran,
+     * bukan didupliksi 2x). Region/Branch di sini SAMA PERSIS dengan yang
+     * sudah dipakai tabel "Reporting Deployment"/"Report Deployment".
+     */
+    public function regionBranchMap(): array
     {
         $regions = [
             'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
@@ -436,6 +461,13 @@ class DashboardPmController extends Controller
                 $branchToRegion[$branchName] = $regionName;
             }
         }
+
+        return $branchToRegion;
+    }
+
+    public function buildStageCube(): array
+    {
+        $branchToRegion = $this->regionBranchMap();
 
         $stageKeys = ['drop', 'hold', 'preparing', 'perizinan', 'matdel', 'instalasi', 'fi_ogp_golive', 'golive'];
         $emptyStageStats = static function () use ($stageKeys) {
@@ -474,6 +506,147 @@ class DashboardPmController extends Controller
         }
 
         return array_values($stageCubeAccumulator);
+    }
+
+    /**
+     * Permintaan user (revisi): SEBELUMNYA sub-step "Persiapan" (Inisiasi,
+     * Survey, Perizinan, Material Delivery) digabung jadi 1 kolom
+     * "Persiapan" -- user minta breakdown LENGKAP semua step TERMASUK
+     * sub-step Persiapan-nya, bukan digabung lagi. Sekarang bucket-nya
+     * 1:1 dengan `project_stages.code` alur normal (10 kode, lihat
+     * ProjectStage::scopeSequential() -- exclude drm/hold/drop), TIDAK
+     * ADA lagi penggabungan. Grouping visual "Persiapan" (4 sub-step) vs
+     * tahap lain tetap ada, tapi dikerjakan di VIEW (metadata phase_group
+     * per stage dikirim lewat stageDurationMeta()), bukan di sini lagi.
+     *
+     * "durasi per staging" AGREGAT (rata-rata durasi tiap tahap,
+     * di-breakdown Region/Branch/Program) -- dipakai halaman "Durasi per
+     * Tahap" (agregat, beda dgn Durasi per Tahap PER-LOP di halaman
+     * Timeline, lihat DashboardController::buildStageDurations()). Sumber
+     * data: lop_stage_histories yang diisi Lop::advanceStage() (lihat
+     * Section BE ANALISA_REFACTOR_PERSIAPAN.md).
+     *
+     * SENGAJA hanya menghitung histori yang SUDAH SELESAI (completed_at
+     * TIDAK null) -- durasi tahap yang MASIH BERJALAN belum final, kalau
+     * ikut dirata-rata akan bias (LOP yang baru saja masuk suatu tahap
+     * seolah2 "cepat" padahal cuma belum selesai). sum_seconds & count
+     * disimpan terpisah per bucket (BUKAN rata2 langsung) supaya bisa
+     * di-agregat ulang dgn benar (weighted average) saat filter Region/
+     * Branch/Program diterapkan di sisi client (Alpine) -- kalau yang
+     * disimpan cuma rata2 per baris, gabungan dari beberapa baris jadi
+     * salah (rata2-dari-rata2 != rata2 sesungguhnya).
+     */
+    public function buildStageDurationCube(): array
+    {
+        $branchToRegion = $this->regionBranchMap();
+
+        $bucketKeys = $this->stageDurationBucketKeys();
+        $emptyBucketStats = static function () use ($bucketKeys) {
+            $stats = [];
+            foreach ($bucketKeys as $key) {
+                $stats[$key] = ['sum_seconds' => 0, 'count' => 0];
+            }
+
+            return $stats;
+        };
+
+        $historyRows = DB::table('lop_stage_histories as h')
+            ->join('lops as l', 'h.lop_id', '=', 'l.id_lop')
+            ->join('projects as p', 'l.project_id', '=', 'p.id_project')
+            ->whereNotNull('h.completed_at')
+            ->whereIn('h.stage_code', $bucketKeys)
+            ->get([
+                'l.branch',
+                'h.stage_code',
+                DB::raw('UPPER(TRIM(p.program)) as program'),
+                DB::raw('TIMESTAMPDIFF(SECOND, h.entered_at, h.completed_at) as duration_seconds'),
+            ]);
+
+        $cubeAccumulator = [];
+
+        foreach ($historyRows as $row) {
+            $branch = strtoupper(trim($row->branch ?? ''));
+            $regionName = $branchToRegion[$branch] ?? null;
+            if (!$regionName) {
+                continue;
+            }
+
+            $bucketKey = $this->stageDurationBucket($row->stage_code);
+            if (!$bucketKey) {
+                continue;
+            }
+
+            $program = trim((string) ($row->program ?? ''));
+            $program = $program !== '' ? $program : 'LAINNYA';
+
+            $cubeKey = $regionName . '|' . $branch . '|' . $program;
+            if (!isset($cubeAccumulator[$cubeKey])) {
+                $cubeAccumulator[$cubeKey] = $emptyBucketStats() + [
+                    'region' => $regionName,
+                    'branch' => $branch,
+                    'program' => $program,
+                ];
+            }
+
+            $cubeAccumulator[$cubeKey][$bucketKey]['sum_seconds'] += max(0, (int) $row->duration_seconds);
+            $cubeAccumulator[$cubeKey][$bucketKey]['count']++;
+        }
+
+        return array_values($cubeAccumulator);
+    }
+
+    /**
+     * Daftar kode bucket durasi -- SEKARANG 1:1 dgn seluruh kode
+     * `project_stages` alur normal (10 kode: inisiasi, survey, perizinan,
+     * material_delivery, persiapan_instalasi, instalasi, pengukuran,
+     * finishing, fi_ogp_golive, golive), TIDAK lagi digabung. `drm`
+     * sengaja TETAP dikeluarkan (tidak dipakai flow sekarang, lihat
+     * ProjectStage::scopeSequential()), begitu jg hold/drop (bukan tahap
+     * progres). Cache statis per-request krn dipanggil berkali-kali.
+     */
+    public function stageDurationBucketKeys(): array
+    {
+        static $keys = null;
+
+        if ($keys === null) {
+            $keys = \App\Models\ProjectStage::sequential()->pluck('code')->all();
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Metadata tampilan (label, phase_group, color, sequence) utk tiap
+     * bucket durasi, dikirim ke view supaya bisa mengelompokkan sub-step
+     * Persiapan (inisiasi/survey/perizinan/material_delivery) secara
+     * visual TANPA menggabung angkanya di data layer. 1 sumber kebenaran
+     * yang SAMA dgn project_stages (dipakai jg oleh Timeline/stepper LOP).
+     */
+    public function stageDurationMeta(): array
+    {
+        return \App\Models\ProjectStage::sequential()
+            ->get(['code', 'label', 'phase_group', 'sequence', 'color'])
+            ->map(fn ($stage) => [
+                'code' => $stage->code,
+                'label' => $stage->label,
+                'phase_group' => $stage->phase_group,
+                'sequence' => $stage->sequence,
+                'color' => $stage->color,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Kode stage MENTAH (project_stages.code) yang valid utk laporan
+     * durasi ini SEKARANG diteruskan 1:1 (tidak digabung lagi -- lihat
+     * catatan buildStageDurationCube()). Return null utk kode yang
+     * SENGAJA tidak ditampilkan (hold/drop -- bukan tahap progres, dan
+     * drm -- sudah tidak dipakai flow sekarang).
+     */
+    public function stageDurationBucket(?string $stageCode): ?string
+    {
+        return in_array($stageCode, $this->stageDurationBucketKeys(), true) ? $stageCode : null;
     }
 
     /**
