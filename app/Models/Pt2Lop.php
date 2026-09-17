@@ -43,6 +43,38 @@ class Pt2Lop extends Model
         return $this->hasMany(Pt2Evidence::class, 'pt2_lop_id', 'id_pt2_lop');
     }
     
+    /**
+     * Update status_progress LOP PT2 secara aman/terurut -- TIDAK PERNAH
+     * memundurkan status (mis. eviden instalasi diupload ulang setelah LOP
+     * sudah masuk finishing tidak akan menurunkan status_progress balik ke
+     * instalasi). Status di luar urutan baku (golive/drop) sengaja tidak
+     * disentuh method ini -- itu diatur mekanisme approval SDI/hold terpisah.
+     * Lihat ANALISA_REFACTOR_PERSIAPAN.md Section BM.
+     */
+    private const STAGE_ORDER = [
+        'inisiasi' => 0,
+        'survey' => 1,
+        'instalasi' => 2,
+        'finishing' => 3,
+        'fi_ogp_golive' => 4,
+    ];
+
+    public function advanceStatusProgress(string $newStatus): void
+    {
+        $newOrder = self::STAGE_ORDER[$newStatus] ?? null;
+
+        if ($newOrder === null) {
+            return;
+        }
+
+        $currentOrder = self::STAGE_ORDER[strtolower((string) $this->status_progress)] ?? -1;
+
+        if ($newOrder > $currentOrder) {
+            $this->status_progress = $newStatus;
+            $this->save();
+        }
+    }
+
     // Fungsi Kalkulasi Progress LOP
     public function progressSummary()
     {
@@ -72,25 +104,27 @@ class Pt2Lop extends Model
         // 3. DYNAMIC CHECKING FISIK DATA (TOP-DOWN)
         // Mengecek dari tahap paling akhir ke tahap paling awal. Jika tahap akhir ada, otomatis override tahap sebelumnya.
 
-        // Step 5: Complete (Mancore)
+        // Step 5: Mancore -> tahap akhir Waspang, status "FI-OGP Golive" (verifikasi
+        // Golive oleh SDI -- eviden UIM + toggle -- terpisah, sudah dicek di atas
+        // lewat sdi_approval_status/is_golive, TIDAK diubah di sini).
         if (\App\Models\MancorePt2::where('pt2_lop_id', $this->id_pt2_lop)->exists()) {
             $progress = 100; 
-            $stageLabel = 'Complete';
+            $stageLabel = 'FI-OGP Golive';
         }
-        // Step 4: Dismantle
+        // Step 4: Dismantle -> ikut label "Finishing" (digabung dgn Step 3, lihat Section BM)
         elseif (\App\Models\DismantlePt2::where('pt2_lop_id', $this->id_pt2_lop)->exists() || \App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->whereRaw("LOWER(stage) = 'dismantle'")->exists()) {
             $progress = 80; 
-            $stageLabel = 'Dismantle';
+            $stageLabel = 'Finishing';
         }
-        // Step 3: Finish (Dulu Redaman)
-        elseif (\App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->whereRaw("LOWER(stage) IN ('redaman', 'finish')")->exists()) {
+        // Step 3: Finish/Redaman -> label "Finishing" (Section BM)
+        elseif (\App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->whereRaw("LOWER(stage) IN ('redaman', 'finish', 'finishing')")->exists()) {
             $progress = 60; 
-            $stageLabel = 'Finish';
+            $stageLabel = 'Finishing';
         }
-        // Step 2: Progress (Dulu Instalasi)
+        // Step 2: Progress/Instalasi -> label "Instalasi" (Section BM)
         elseif (\App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->whereRaw("LOWER(stage) IN ('instalasi', 'progress')")->exists()) {
             $progress = 40; 
-            $stageLabel = 'Progress';
+            $stageLabel = 'Instalasi';
         }
         // Step 1: Survey
         elseif (\App\Models\SurveyPt2::where('pt2_lop_id', $this->id_pt2_lop)->exists()) {
@@ -101,13 +135,15 @@ class Pt2Lop extends Model
         // 4. FALLBACK: Cek kolom status_progress
         // Berjaga-jaga jika bukti fisik terhapus tapi status progress di database masih tinggi
         $dbStatus = strtolower($this->status_progress ?? '');
+        // Istilah baru (Section BM) + istilah lama tetap dikenali utk kompatibilitas
+        // mundur (baris lama yang mungkin belum ter-backfill).
         $statusMap = [
-            'preparation' => 0, 'persiapan' => 0,
-            'survey' => 20, 
-            'instalasi' => 40, 'progress' => 40, 
-            'redaman' => 60, 'finish' => 60, 
-            'dismantle' => 80, 
-            'mancore' => 100, 'done' => 100, 'complete' => 100
+            'inisiasi' => 0, 'preparation' => 0, 'persiapan' => 0,
+            'survey' => 20,
+            'instalasi' => 40, 'progress' => 40,
+            'finishing' => 60, 'redaman' => 60, 'finish' => 60,
+            'dismantle' => 80,
+            'fi_ogp_golive' => 100, 'mancore' => 100, 'done' => 100, 'complete' => 100,
         ];
         
         $dbProgress = $statusMap[$dbStatus] ?? 0;
@@ -117,10 +153,10 @@ class Pt2Lop extends Model
             $progress = $dbProgress;
             
             if ($dbProgress == 20) $stageLabel = 'Survey';
-            elseif ($dbProgress == 40) $stageLabel = 'Progress';
-            elseif ($dbProgress == 60) $stageLabel = 'Finish';
-            elseif ($dbProgress == 80) $stageLabel = 'Dismantle';
-            elseif ($dbProgress == 100) $stageLabel = 'Complete';
+            elseif ($dbProgress == 40) $stageLabel = 'Instalasi';
+            elseif ($dbProgress == 60) $stageLabel = 'Finishing';
+            elseif ($dbProgress == 80) $stageLabel = 'Finishing';
+            elseif ($dbProgress == 100) $stageLabel = 'FI-OGP Golive';
         }
 
         // 5. MAPPING WARNA SESUAI TAHAPAN BARU

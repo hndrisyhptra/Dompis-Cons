@@ -72,14 +72,16 @@ class AdminPt2Controller extends Controller
         $branches = Pt2Lop::whereNotNull('branch')->where('branch', '!=', '')->distinct()->orderBy('branch')->pluck('branch');
         $assignableUsers = User::roleCode(['teknisi', 'waspang'])->get();
 
+        // Istilah disamakan dgn flow Reguler (Section BM) -- istilah lama
+        // (preparation/progress/finish/dismantle/mancore/complete) tetap
+        // dikenali di filter query (whereIn di bawah), tapi dropdown ini
+        // hanya menampilkan istilah baru supaya tidak membingungkan user.
         $statusOptions = [
-            'preparation' => 'Preparation',
+            'inisiasi' => 'Inisiasi',
             'survey' => 'Survey',
-            'progress' => 'Progress',
-            'finish' => 'Finish',
-            'dismantle' => 'Dismantle',
-            'mancore' => 'Mancore',
-            'complete' => 'Complete',
+            'instalasi' => 'Instalasi',
+            'finishing' => 'Finishing',
+            'fi_ogp_golive' => 'FI-OGP Golive',
             'golive' => 'Go-Live',
             'drop' => 'Drop (Batal)',
         ];
@@ -140,7 +142,9 @@ class AdminPt2Controller extends Controller
         } elseif ($statusFilter === 'completed') {
             // SELESAI: Sudah sampai tahap akhir (Mancore), atau sudah dikirim ke SDI, atau Go-Live
             $query->where(function($q) {
-                $q->whereIn('status_progress', ['done', 'mancore', 'complete'])
+                // 'fi_ogp_golive' = istilah baru (Section BM); done/mancore/complete
+                // tetap dicek utk baris lama yang belum sempat ter-backfill.
+                $q->whereIn('status_progress', ['fi_ogp_golive', 'done', 'mancore', 'complete'])
                   ->orWhere('is_golive', 1)
                   ->orWhereIn('sdi_approval_status', ['pending', 'approved']);
             });
@@ -153,7 +157,7 @@ class AdminPt2Controller extends Controller
             $query->whereDoesntHave('evidences', function($qEv) {
                 $qEv->where('status', 'pending');
             })->where(function($q) {
-                $q->whereNotIn('status_progress', ['done', 'mancore', 'complete'])
+                $q->whereNotIn('status_progress', ['fi_ogp_golive', 'done', 'mancore', 'complete'])
                   ->orWhereNull('status_progress');
             })->where(function($q) {
                 $q->whereNull('sdi_approval_status')

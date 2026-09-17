@@ -63,6 +63,12 @@ class Pt2AssignmentController extends Controller
             ],
         ]);
 
+        // Assignment pertama kali (atau reassign) -> status_progress minimal
+        // "survey" (kalau masih di bawahnya, mis. baru diimport = "inisiasi").
+        // Lihat Pt2Lop::advanceStatusProgress() & ANALISA_REFACTOR_PERSIAPAN.md Section BM.
+        $pt2LopForStage = \App\Models\Pt2Lop::find($request->pt2_lop_id);
+        $pt2LopForStage?->advanceStatusProgress('survey');
+
         // WEBHOOK EVENT: project PT2 baru di-assign -- event pribadi utk teknisi.
         $pt2Project = \App\Models\Pt2Project::find($request->pt2_project_id);
         $pt2Lop = \App\Models\Pt2Lop::find($request->pt2_lop_id);

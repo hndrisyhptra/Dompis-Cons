@@ -801,43 +801,12 @@ class ProjectController extends Controller
 
             $summary = $project->progressSummary();
 
-            /*
-            |--------------------------------------------------------------------------
-            | BARIER PELINDUNG PT2 & GOLIVE
-            |--------------------------------------------------------------------------
-            | Kita cegah sistem reguler mengubah status LOP jika ini adalah PT2
-            | atau jika project sudah ditutup / Go-Live.
-            */
             $programSap = strtoupper($project->lop->program_sap ?? '');
             $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
 
             $isAlreadyClosed = in_array($project->lop?->status_progress, ['drop', 'golive'], true)
                 || (bool) $project->lop?->is_golive;
 
-            /*
-            |--------------------------------------------------------------------------
-            | UPDATE STATUS PROGRESS LOP (KHUSUS REGULER)
-            |--------------------------------------------------------------------------
-            | FIX (2026-09-08, Stage 2 refactor "flow 11-tahap"):
-            | 1. Setiap transisi sekarang di-gate pada POSISI SEKARANG
-            |    (project_stages.sequence via lops.status_progress), bukan
-            |    ditimpa langsung -- supaya approve eviden yang telat/re-order
-            |    tidak bisa memundurkan ATAU melompati tahap LOP.
-            | 2. LOP yang sedang HOLD/DROP TIDAK disentuh sama sekali -- itu
-            |    jeda/batal yang sengaja; resume adalah aksi eksplisit
-            |    terpisah, di luar scope approve eviden.
-            | 3. Instalasi selesai -> berhenti dulu di 'pengukuran' (dulu
-            |    langsung loncat ke 'finishing', itu sebabnya Pengukuran
-            |    dulu cuma alias dari Instalasi -- lihat Project::progressSummary()).
-            | 4. 'finishing' (seq 9) adalah tahap terakhir yang dijangkau
-            |    otomatis dari approve eviden. Project TIDAK di-close lagi di
-            |    sini -- 2 tahap setelahnya (FI-OGP Golive & Golive, seq
-            |    10-11) adalah gate baru yang butuh aksi manual Admin/SDI
-            |    (Stage 5, belum dikerjakan). Sampai Stage 5 jadi, LOP yang
-            |    sudah finishingDone akan berhenti di status_progress
-            |    'finishing' -- ini disengaja,
-            |    BUKAN bug, dan sudah didiskusikan di ANALISA_REFACTOR_PERSIAPAN.md.
-            */
             if (! $isPt2 && ! $isAlreadyClosed) {
 
                 $lop = $project->lop;
@@ -852,12 +821,7 @@ class ProjectController extends Controller
                         && ($summary['persiapanDone'] ?? false)
                         && $currentSequence <= 6 // masih di fase Persiapan / Persiapan Instalasi (seq 1-6)
                     ) {
-                        // Kelima sub-step Persiapan baru (inisiasi/survey/drm/
-                        // perizinan/material_delivery) + Persiapan Instalasi
-                        // belum punya UI upload sendiri (Stage 4, belum
-                        // dikerjakan). Eviden 'persiapan' yang ada sekarang
-                        // (barang_tiba + perizinan) masih dianggap mewakili
-                        // SELURUH fase Persiapan lama.
+                   
                         $lop->advanceStage('instalasi', auth()->id());
 
                     } elseif (
@@ -875,17 +839,7 @@ class ProjectController extends Controller
                         $lop->advanceStage('finishing', auth()->id());
                     }
                 }
-            } // <-- Akhir dari Barier Pelindung
-
-            /*
-            |--------------------------------------------------------------------------
-            | PROJECT COMPLETE ACTIVITY (KHUSUS REGULER)
-            |--------------------------------------------------------------------------
-            | FIX: trigger dipindah dari `progress == 100` (yang sekarang
-            | berarti sungguh-sungguh Golive, seq 11) ke `finishingDone` --
-            | ini yang secara semantik berarti "seluruh eviden wajib s.d.
-            | Finishing sudah disetujui, siap lanjut ke FI-OGP Golive".
-            */
+            } 
             $alreadyCompleteLogged = ProjectActivityLog::where('project_id', $project->id_project)
                 ->where('activity_type', 'project_completed')
                 ->exists();

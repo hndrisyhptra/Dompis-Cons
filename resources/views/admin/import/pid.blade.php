@@ -82,7 +82,7 @@
                     <p class="text-xs font-black text-blue-700 uppercase tracking-widest">Import Data</p>
                     <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mt-1">Bulk Import PID</h1>
                     <p class="text-sm text-slate-500 mt-2 max-w-3xl">
-                        File disimpan terlebih dahulu lalu diproses oleh background worker. Regular menggunakan 1 PID = 1 LOP, sedangkan PT 2 mendukung 1 PID dengan banyak LOP berdasarkan ID IHLD.
+                        File disimpan terlebih dahulu lalu diproses oleh background worker. PT 3 & Exbis menggunakan 1 PID = 1 LOP, sedangkan PT 2 mendukung 1 PID dengan banyak LOP berdasarkan ID IHLD. Khusus PT 3, minimal 2 dari 3 field (PID SAP, ID IHLD, Nama LOP) wajib terisi per baris.
                     </p>
                 </div>
 
@@ -350,7 +350,7 @@
                                     <input type="radio" name="project_type" value="internal"
                                            {{ old('project_type', 'internal') === 'internal' ? 'checked' : '' }}
                                            onchange="toggleProjectType()">
-                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">TIF / Regular</span>
+                                    <span class="text-sm font-bold text-slate-700 dark:text-slate-200">PT 3</span>
                                 </label>
 
                                 <label class="flex items-center gap-2 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 cursor-pointer">
@@ -460,9 +460,9 @@
                     <h2 class="text-sm font-black text-slate-900 dark:text-white">Mandatory Field</h2>
                     <div class="mt-4 space-y-3">
                         @foreach([
-                            ['PID SAP', 'Identitas parent project.'],
-                            ['ID IHLD', 'Identitas LOP. Wajib terutama untuk multi-LOP PT 2.'],
-                            ['Nama LOP', 'Nama pekerjaan pada level LOP.'],
+                            ['PID SAP', 'Identitas parent project. Wajib utk PT 2 & Exbis. Khusus PT 3: minimal 2 dari 3 field (PID SAP, ID IHLD, Nama LOP) harus terisi.'],
+                            ['ID IHLD', 'Identitas LOP. Wajib utk PT 2. Khusus PT 3: ikut aturan minimal 2 dari 3 field.'],
+                            ['Nama LOP', 'Nama pekerjaan pada level LOP. Wajib utk PT 2 & Exbis. Khusus PT 3: ikut aturan minimal 2 dari 3 field.'],
                         ] as [$label, $desc])
                             <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
                                 <p class="text-sm font-black text-emerald-700">{{ $label }}</p>

@@ -712,7 +712,7 @@
                                         onchange="toggleCustomerType()"
                                     >
                                     <span class="text-sm font-bold">
-                                        TIF / Regular
+                                        PT 3
                                     </span>
                                 </label>
 

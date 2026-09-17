@@ -262,6 +262,10 @@ class TeknisiPt2Controller extends Controller
             \App\Models\Pt2BoqItem::where('pt2_lop_id', $lop->id_pt2_lop)->delete();
         }
 
+        // Survey (terkendala maupun tidak) sudah dilakukan -> status_progress
+        // minimal "survey". Lihat ANALISA_REFACTOR_PERSIAPAN.md Section BM.
+        $lop->advanceStatusProgress('survey');
+
         if ($hasKendala) {
              return redirect()->route('teknisi.pt2.inbox')->with('warning', 'Survey terkendala dilaporkan. Menunggu Approval PM.');
         }
@@ -502,6 +506,9 @@ class TeknisiPt2Controller extends Controller
                 }
             }
             
+            // Eviden Instalasi terupload -> status_progress minimal "instalasi".
+            $lop->advanceStatusProgress('instalasi');
+
             $this->publishPt2StepUploadedEvent($lop, 'Instalasi (Step 2)');
 
             return back()->with('success', 'Eviden Instalasi berhasil diupload!');
@@ -579,6 +586,9 @@ class TeknisiPt2Controller extends Controller
                     }
                 }
             }
+            // Eviden Finish/Redaman terupload -> status_progress minimal "finishing".
+            $lop->advanceStatusProgress('finishing');
+
             $this->publishPt2StepUploadedEvent($lop, 'Redaman/Finishing (Step 3)');
 
             return redirect(url('teknisi/pt2/survey/'.$lop->id_pt2_lop.'/step4'))->with('success', 'Eviden Redaman berhasil disimpan! Lanjut ke Step 4.');
@@ -658,6 +668,11 @@ class TeknisiPt2Controller extends Controller
             $this->publishPt2StepUploadedEvent($lop, 'Dismantle (Step 4)');
         }
 
+        // Dismantle (data ODP/Splitter tersimpan) -> status_progress minimal "finishing"
+        // (digabung dgn Step 3 Finish/Redaman, lihat Section BM). Berlaku walau
+        // tidak ada eviden foto baru diupload di step ini.
+        $lop->advanceStatusProgress('finishing');
+
         return redirect(url('teknisi/pt2/survey/'.$lop->id_pt2_lop.'/step5'))->with('success', 'Data Dismantle & Eviden berhasil disimpan! Lanjut Step 5.');
     }
 
@@ -692,6 +707,12 @@ class TeknisiPt2Controller extends Controller
                 'feeder_core' => $request->feeder_core,
             ]
         );
+
+        // Mancore = tahap akhir Waspang -> status_progress "fi_ogp_golive".
+        // Verifikasi Golive oleh SDI (eviden UIM + toggle) tetap mekanisme
+        // terpisah (sdi_approval_status/is_golive), TIDAK disentuh di sini.
+        // Lihat ANALISA_REFACTOR_PERSIAPAN.md Section BM.
+        $lop->advanceStatusProgress('fi_ogp_golive');
 
         return redirect()->route('teknisi.pt2.inbox')
                          ->with('success', '🎉 Luar biasa! Data LOP PT 2 berhasil di-submit dan sedang menunggu Approval Admin.');

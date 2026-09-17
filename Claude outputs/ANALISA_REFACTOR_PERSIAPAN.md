@@ -2543,3 +2543,192 @@ Permintaan user: (1) tampilkan jg sub-step pada tahap Persiapan supaya breakdown
 - `php -l` via `device_stage_files` + cloud `Bash` pada kedua controller & partial blade: "No syntax errors detected".
 - Grep manual `@[a-zA-Z]+` pada partial + 2 wrapper -- semua match directive Blade sah (`@extends`/`@section`/`@include`/`@endsection`/`@json` di dalam `<script>`) & Alpine (`@click`/`@change`), TIDAK ADA teks directive liar di komentar (pelajaran Section BD, tetap dijaga di komentar besar bagian atas file yg SELURUHNYA di dalam blok `{{-- --}}`).
 - Cache key dinaikkan ke v2 supaya tidak ada risiko cache lama (shape 7 kolom) ke-serve stale ke view baru (yang mengharapkan 10 kolom) selama 90 detik pertama setelah deploy.
+
+## Section BH -- Audit Dump Database Terbaru + SDLC dan CDM/PDM Target (14 September 2026)
+
+Permintaan user: membandingkan `/Users/hendrisyahputra/Downloads/dompis_cons-new.sql` dengan dump/audit sebelumnya, lalu menyusun SDLC serta CDM/PDM sebelum database baru dibuat.
+
+### Sumber yang diaudit
+
+- Dump lama: `/Users/hendrisyahputra/Documents/dompis_cons.sql` (MariaDB 10.4.28, 54 tabel).
+- Dump baru: `/Users/hendrisyahputra/Downloads/dompis_cons-new.sql` (MySQL 8.0.45, 55 tabel).
+- Baseline repo: `database/schema/mysql-schema.sql`.
+- Migration Laravel dan metadata baca-saja database aktif `dompis_cons` (MariaDB 10.4.28).
+
+### Kesimpulan utama
+
+Dump baru **belum boleh langsung di-import atau dijadikan source of truth tunggal**. Perubahan fitur Survey/Re-Survey, kronologi, dan upload Golive di dalamnya valid, tetapi dump juga mengandung regresi:
+
+- kolom status pada `projects` dan `pt2_projects` muncul kembali, padahal migration batch 33 sudah menghapusnya;
+- `import_logs` pada dump baru hanya 12 kolom, sedangkan database aktif memiliki 22 kolom dan consumer legacy masih memerlukan sebagian kolom tersebut;
+- dump memakai MySQL 8.0.45 serta `utf8mb4_0900_ai_ci`, sementara database aplikasi aktif memakai MariaDB 10.4.28;
+- baseline repo masih memuat `approvals` dan belum memuat seluruh perubahan sampai batch 39.
+
+### Perubahan valid dump lama -> baru
+
+- `approvals` dihapus;
+- `boq_survey_rounds` dan `boq_survey_round_items` ditambahkan;
+- `boq_items.quantity_survey` ditambahkan;
+- field deviasi/redesign ditambahkan pada LOP;
+- relasi eviden-kronologi dan permit category kronologi ditambahkan;
+- upload FI-OGP multi-file serta `fi_completed_at` ditambahkan.
+
+### Hasil profiling baca-saja database aktif
+
+- 1.310 Project reguler, 1.362 LOP reguler, 19.115 BOQ;
+- 7 Project PT2 dan 297 LOP PT2;
+- 5 ronde Survey completed dengan 16 snapshot item;
+- 4 LOP, 42 BOQ, 6 eviden, 5 kendala, dan 55 activity log menunjuk Project yang tidak ada;
+- 18 activity log memiliki pasangan Project-LOP yang tidak konsisten;
+- 17 Project mempunyai lebih dari satu LOP, sehingga `site_surveys.project_id` dan `Project::lop()` tidak cukup sebagai identitas kanonik;
+- 176 kelompok designator duplikat pada `(customer_id, designator)`;
+- 1.360 dari 1.362 LOP belum memiliki histori tahap;
+- status LOP aktif sendiri konsisten: tidak ada kode stage invalid, dan dua LOP Golive konsisten antara stage/approval/flag.
+
+Audit ini hanya melakukan pembacaan. Tidak ada DDL, migration, import, update, atau delete data.
+
+### Keputusan model target
+
+- LOP tetap menjadi sumber tunggal proses/status; Project hanya header dan agregasi.
+- Project:LOP adalah 1:N.
+- Site Survey harus dimiliki LOP dan berversi; satu current per LOP, versi lama immutable.
+- BOQ Plan, Survey terbaru, dan Actual instalasi dipisahkan; snapshot tiap ronde immutable.
+- uang menggunakan `DECIMAL`, bukan `varchar`/`double`.
+- multi-file eviden/Golive dinormalisasi menjadi child rows.
+- PT2 dipertahankan terpisah pada target v1 untuk mengurangi risiko.
+- database dibentuk melalui migration/baseline terverifikasi, bukan restore dump lintas-engine.
+
+### Artefak baru
+
+- `Claude outputs/AUDIT_DATABASE_DOMPIS_CONS_2026-09-14.md` -- perbandingan rinci, temuan P0/P1/P2, metrik integritas, keputusan, dan acceptance criteria.
+- `Claude outputs/SDLC_REFACTOR_DATABASE_DOMPIS_CONS.md` -- tahap SDLC, quality gate, expand-migrate-contract, test plan, cutover, rollback, dan RACI.
+- `Claude outputs/CDM_PDM_DOMPIS_CONS_TARGET.md` -- diagram CDM, business rules, data dictionary PDM target, index/constraint, serta mapping current ke target.
+
+### Langkah berikut yang diizinkan setelah review
+
+1. Pilih engine target (MariaDB atau MySQL 8) melalui ADR.
+2. Review dan setujui business key serta aturan delete/FK pada PDM.
+3. Putuskan parent/survivor untuk data yatim dan master duplikat.
+4. Baru susun migration expand dan skrip rekonsiliasi; jangan membuat database target sebelum gate ini selesai.
+
+## Catatan -- Fitur "Lewati LOP yang sudah ada eviden" Dibatalkan (16 September 2026)
+
+Fitur skip-eviden pada bulk import PID (yang sebelumnya didokumentasikan sebagai Section BH kedua dan Section BI) DIBATALKAN oleh user sebelum sempat di-commit ke git -- kode di `ImportController.php`, `ImportProcess.php`, `PidImportService.php`, `pid.blade.php` sudah dikembalikan (`git checkout`) ke versi commit terakhir (`235cb81 durasi per LOP/Tahap`), dan migration `2026_09_14_090000_add_skip_lop_with_evidence_to_import_processes_table.php` sudah dihapus. Tidak ada jejak fitur ini yang tersisa di kode. Dua sub-bagian dokumentasinya dihapus dari file ini supaya tidak membingungkan pembaca berikutnya.
+
+## Section BJ -- Diagnosis Error "Field 'id' doesn't have a default value" saat Upload Bulk PID
+
+Permintaan user: laporan error saat upload bulk PID -- `SQLSTATE[HY000]: General error: 1364 Field 'id' doesn't have a default value` pada saat INSERT ke tabel `jobs` (import id 238), sehingga file gagal masuk antrean sama sekali.
+
+**Root cause**: error terjadi PERSIS di titik `ProcessPidImportJob::dispatch()` dipanggil dari `ImportController::importPid()` -- yaitu SEBELUM `PidImportService::process()` (kode Section BH/BI) sempat jalan sama sekali. Ini murni masalah skema tabel queue `jobs` pada database aktif (`dompis_cons`), BUKAN bug dari fitur skip-eviden/Nama-LOP yang baru dikerjakan.
+
+Migration resmi (`database/migrations/0001_01_01_000002_create_jobs_table.php`) sudah benar -- `id` didefinisikan via `$table->id()` (BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY). Error 1364 spesifik ini hanya muncul kalau kolom `id` pada tabel `jobs` yang SEDANG BERJALAN di database kehilangan atribut `AUTO_INCREMENT`-nya (mis. tabel pernah di-drop lalu dibuat ulang secara manual, direstore dari dump/export yang tidak menyertakan `AUTO_INCREMENT`, atau dibuat ulang lewat `CREATE TABLE ... LIKE`/`... SELECT *` yang tidak mewarisi atribut tsb) -- jadi ini penyimpangan skema di level data, tidak bisa dikonfirmasi lebih lanjut dari sini karena `device_bash` (VM Linux di sisi user) tidak punya akses jaringan ke MySQL/MariaDB (`127.0.0.1:3306` di host macOS) maupun binari `mysql`/`php artisan`.
+
+**Rekomendasi perbaikan** (dijalankan user langsung lewat phpMyAdmin/Adminer bawaan XAMPP terhadap database `dompis_cons`):
+
+```sql
+ALTER TABLE `jobs` MODIFY `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT;
+ALTER TABLE `failed_jobs` MODIFY `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT;
+```
+
+Verifikasi lewat `SHOW CREATE TABLE jobs;` -- baris `id` harus mengandung `AUTO_INCREMENT`. Import id 238 yang gagal tidak perlu dihapus manual; cukup upload ulang filenya setelah kolom diperbaiki (baris lama di `import_processes` untuk id 238 tetap berstatus gagal sebagai riwayat).
+
+### Verifikasi
+- Belum bisa diverifikasi end-to-end dari sisi Claude karena tidak ada akses jaringan/CLI ke MySQL aktif dari `device_bash`. Perbaikan dan pengujian ulang upload PID perlu dilakukan oleh user.
+
+## Section BK -- Bulk Import PID: Rename "TIF / Regular" -> "PT 3" + Aturan Field Longgar (Minimal 2 dari 3)
+
+Permintaan user: pada form Bulk Import PID, label kategori "TIF / Regular" diganti jadi "PT 3". Untuk kategori ini (project_type = `internal`), field PID SAP / ID IHLD / Nama LOP tidak lagi wajib semuanya -- cukup MINIMAL 2 dari 3 field yang terisi per baris; kalau cuma 1 yang terisi, baris tsb gagal (invalid).
+
+### Keputusan (dikonfirmasi user via AskUserQuestion)
+- Aturan longgar ini HANYA berlaku utk PT 3 (`project_type = internal`). Exbis (`external`) tetap pakai aturan lama (PID SAP & Nama LOP wajib semua). PT 2 tidak berubah (3 field wajib semua).
+- PID SAP boleh ikut kosong juga (bukan cuma ID IHLD/Nama LOP) -- selama 2 dari 3 field terisi. Mekanisme penanganannya dirancang sendiri (lihat di bawah), karena PID SAP selama ini jadi kunci utama pencarian/pembuatan Project ("1 PID = 1 LOP").
+- Rename label "TIF / Regular" -> "PT 3" diterapkan di semua tempat yang ada teks itu: form Bulk Import PID (`pid.blade.php`) dan Bulk Import BOQ (`boq.blade.php`).
+
+### Implementasi
+
+**Rename label**: `resources/views/admin/import/pid.blade.php` & `resources/views/admin/import/boq.blade.php` -- teks "TIF / Regular" diganti "PT 3" (radio pilihan kategori project_type=internal tetap `value="internal"`, cuma label tampilan yang berubah). Teks penjelasan "Mandatory Field" dan deskripsi di atas form juga diperbarui supaya tidak lagi menyatakan PID SAP/Nama LOP selalu wajib utk PT 3.
+
+**`app/Services/Imports/PidImportService.php`**:
+- `process()`: tambah `$relaxedRequiredFields = $import->project_type === 'internal';`, terpisah dari `$isPt2`.
+- Validasi header: PT2 tetap wajib 3 kolom ada di file. PT3 (`$relaxedRequiredFields`): minimal 2 dari 3 kolom (`pid_sap`, `id_ihld`, `nama_lop`) harus ADA sbg kolom di file (kalau file cuma punya 1 dari 3 kolom itu, seluruh file ditolak sejak awal -- tidak mungkin ada baris yang bisa lolos aturan 2-dari-3 kalau kolomnya sendiri kurang dari 2). Exbis (`external`): tetap wajib `pid_sap` + `nama_lop` seperti sebelumnya.
+- `parseRow()`: tambah parameter `bool $relaxedRequiredFields`. Blok validasi dipecah 3 cabang (PT2 / PT3-relaxed / Exbis-lama). Cabang PT3: hitung `$filledCount` dari ketiga field, gagal kalau `< 2`. Karena `lops.lop_name` & `projects.project_name` NOT NULL di DB, kalau yang kosong justru Nama LOP (berarti PID SAP dan/atau ID IHLD pasti ada, sesuai aturan 2-dari-3), sistem generate placeholder nama otomatis (`"LOP {pid_sap} - IHLD {id_ihld}"` atau `"LOP IHLD {id_ihld}"` kalau PID SAP juga kosong) supaya insert tidak gagal krn constraint NOT NULL.
+- **Masalah tersembunyi yang HARUS diperbaiki**: sebelum perubahan ini, project/LOP di `persistChunk()` selalu di-grouping & di-resolve pakai `key(pid_sap)`. Kalau PID SAP boleh kosong, banyak baris kosong PID SAP akan collide ke kunci yang sama (`key('')`) dan SALING TERTIMPA -- cuma 1 project/LOP yang kebentuk padahal harusnya beberapa baris berbeda. Diperbaiki dengan method baru `groupKeyForRow()`: kalau `pid_sap` terisi, tetap pakai `key(pid_sap)` seperti biasa (match ke project existing tetap jalan); kalau `pid_sap` kosong, pakai kunci unik per nomor baris (`'__no_pid_sap__row_' . $row['row']`) supaya SETIAP baris tanpa PID SAP SELALU jadi Project & LOP baru sendiri-sendiri (tidak pernah dicocokkan ke Project existing maupun ke sesama baris tanpa PID SAP lainnya). Dipakai di titik grouping (`$projectGroups`) dan titik resolusi akhir per-baris (`$resolvedProjects`).
+- Duplicate-in-file check (`$seenKeys`) TETAP hanya berjalan kalau `pid_sap` terisi (tidak diubah) -- baris tanpa PID SAP tidak dicek duplikat dalam file yang sama, konsekuensi wajar dari tidak adanya kunci yang bisa diandalkan.
+
+**`app/Http/Controllers/ImportController.php`**: hanya update komentar dokumentasi di `downloadPidTemplate()` (template file-nya sendiri TIDAK berubah -- kolom `pid_sap`, `id_ihld`, `nama_lop` sudah lengkap semua di template lama, jadi sudah otomatis memenuhi syarat header PT3 yang baru).
+
+### Catatan penting / asumsi yang perlu diverifikasi user
+- Placeholder nama LOP otomatis (kalau Nama LOP kosong) memakai format `"LOP {pid_sap} - IHLD {id_ihld}"` -- kalau tim lapangan mau format lain, tinggal ubah di `parseRow()`.
+- Baris PT3 tanpa PID SAP TIDAK PERNAH dicocokkan ke Project manapun (baik existing di DB maupun sesama baris lain di file yang sama) -- selalu bikin Project+LOP baru. Ini disengaja krn tidak ada kunci yang bisa diandalkan tanpa PID SAP, tapi berarti upload berulang dari file yang sama (kalau semua barisnya tanpa PID SAP) akan terus bikin Project baru berulang kali, BUKAN update yang sudah ada -- perlu diinfokan ke user yang upload.
+
+### Verifikasi
+- Balance-check (`{`/`}`, `(`/`)`) pada `PidImportService.php` dan `ImportController.php` -- balance (127/127 & 416/416; 191/191 & 1202/1202).
+- `php -l` via `device_stage_files` + cloud `Bash` -- "No syntax errors detected" utk kedua file.
+- Sweep stray `@`-directive di `pid.blade.php` & `boq.blade.php` yang disentuh -- semua directive yang terdeteksi valid (bagian dari struktur Blade asli), tidak ada yang nyasar dari perubahan teks label.
+
+### Catatan lain (di luar scope, ditemukan tidak sengaja)
+Saat cek `git status`, ternyata `app/Http/Controllers/ProjectController.php` juga berstatus "modified" (uncommitted) -- isinya penghapusan beberapa blok komentar dokumentasi (bukan logika). Perubahan ini BUKAN dari sesi ini/pekerjaan di atas, kemungkinan sisa dari sesi/edit sebelumnya yang belum dikonfirmasi atau di-commit user. Tidak disentuh sama sekali di sesi ini -- perlu dicek langsung oleh user, apakah itu perubahan yang disengaja atau perlu dikembalikan juga.
+
+## Section BL -- Fix Bug: Upload PID PT 2 Error "Call to undefined method Pt2Lop::advanceStage()"
+
+Permintaan user: laporan error saat upload bulk PID kategori PT 2 -- "Call to undefined method App\Models\Pt2Lop::advanceStage()".
+
+### Root cause
+Bug LAMA (sudah ada sejak commit `235cb81`, BUKAN dari perubahan PT3/Section BK) -- di `PidImportService::persistChunk()`, block update LOP existing memanggil `$lop->advanceStage($newStageCode, ...)` TANPA guard `$isPt2` sama sekali. `advanceStage()` cuma didefinisikan di model `Lop` (reguler, utk audit trail `lop_stage_histories`), TIDAK ada di model `Pt2Lop`. Jadi begitu file PT2 punya baris yang mengirim `status_progress`/`status_project` eksplisit DAN nilainya beda dari status LOP existing di DB, kode mencoba panggil method yang tidak ada di `Pt2Lop` -> fatal error, seluruh import gagal.
+
+Ini murni bug lama yang baru ketahuan sekarang (kemungkinan sebelumnya jarang/tidak pernah ada file PT2 yang eksplisit ubah status_progress ke nilai berbeda saat re-upload).
+
+### Fix
+`persistChunk()`: block update LOP existing dipecah jadi 2 cabang berdasarkan `$isPt2`:
+- **PT2**: `status_progress` cukup ikut `fill()`+`save()` biasa seperti field lain (PT2 memang tidak punya mekanisme audit trail per-stage seperti `lop_stage_histories`, jadi tidak butuh `advanceStage()`).
+- **Reguler**: tetap seperti sebelumnya -- `status_progress` dipisah & diterapkan lewat `Lop::advanceStage()` supaya tercatat di `lop_stage_histories` (perilaku Section BE tidak berubah).
+
+### Verifikasi
+- Balance-check (`{`/`}`, `(`/`)`) pada `PidImportService.php` -- balance (130/130, 427/427).
+- `php -l` via `device_stage_files` + cloud `Bash` -- "No syntax errors detected".
+- Tidak ada file blade yang disentuh, jadi tidak perlu grep stray-`@`-directive ulang.
+
+## Section BM -- Penyesuaian status_progress LOP PT 2 ke Istilah Alur Terbaru (Sejalan dgn Reguler)
+
+Permintaan user: status_progress PT2 disamakan istilahnya dgn alur terbaru -- step Survey -> `survey`, step Progress -> `instalasi`, step Finish & Dismantle -> `finishing`, step Mancore -> `fi_ogp_golive`. LOP baru diimport mulai dari `inisiasi`, begitu di-assign ke teknisi berubah jadi `survey`.
+
+### Keputusan (dikonfirmasi user via AskUserQuestion)
+- Mancore tetap jadi tahap akhir utk Waspang (`fi_ogp_golive`); verifikasi Golive oleh SDI (upload eviden UIM + toggle) TIDAK diubah -- mekanismenya (`sdi_approval_status`, `is_golive`) sudah ada & sudah dicek duluan di `Pt2Lop::progressSummary()` sebelum fallback status_progress, jadi tidak perlu tahap tambahan baru.
+- Kolom `status_progress` di database HARUS ditulis otomatis (bukan cuma label tampilan) di titik-titik: assignment, survey, upload eviden instalasi, upload eviden finish/dismantle, mancore.
+- Data LOP PT2 existing di-backfill (bukan dibiarkan campur istilah lama & baru).
+
+### Root cause / temuan penting
+Sebelum perubahan ini, kolom `pt2_lops.status_progress` TIDAK PERNAH otomatis ditulis di titik manapun kecuali saat bulk import PID -- seluruh progress bar PT2 dihitung ON-THE-FLY oleh `Pt2Lop::progressSummary()` dari keberadaan data fisik (SurveyPt2/Pt2Evidence/DismantlePt2/MancorePt2), `status_progress` cuma dipakai sbg FALLBACK kalau bukti fisik "hilang". Jadi permintaan ini pada dasarnya nambah mekanisme baru: assignment/survey/upload-eviden/mancore sekarang ikut MENULIS `status_progress`, bukan cuma dihitung untuk ditampilkan.
+
+Ditemukan juga sekalian: `storeStep3Eviden()` (Finish/Redaman) sudah lama menyimpan `Pt2Evidence.stage = 'finishing'` (BUKAN `'finish'`/`'redaman'` seperti yang dicek `progressSummary()` sebelumnya) -- jadi cek dinamis Step 3 sebenarnya sudah lama tidak pernah match datanya sendiri. Sudah ikut diperbaiki (ditambah `'finishing'` ke daftar yang dicek).
+
+### Implementasi
+
+**`app/Models/Pt2Lop.php`**:
+- Method baru `advanceStatusProgress(string $newStatus): void` + konstanta urutan `STAGE_ORDER` (`inisiasi=0, survey=1, instalasi=2, finishing=3, fi_ogp_golive=4`). TIDAK PERNAH memundurkan status (guard `$newOrder > $currentOrder`), dan status di luar urutan baku (`golive`/`drop`) sengaja diabaikan method ini (`return` diam-diam) -- biar tidak menabrak mekanisme approval SDI / hold yang terpisah.
+- `progressSummary()`: label tahap dinamis (section 3) diperbarui -- Step 2 "Progress"->"Instalasi", Step 3 & Step 4 (Finish + Dismantle) sama-sama jadi label "Finishing", Step 5 (Mancore) "Complete"->"FI-OGP Golive". Fallback `$statusMap` (section 4) diperluas mengenali istilah baru (`inisiasi`, `finishing`, `fi_ogp_golive`) SEKALIGUS istilah lama (backward-compat utk baris yang belum ter-backfill).
+
+**Titik penulisan `status_progress` baru** (semua lewat `advanceStatusProgress()`, guard anti-mundur otomatis berlaku):
+- `Pt2AssignmentController::assignTeknisi()` -- begitu assignment disimpan -> `advanceStatusProgress('survey')`.
+- `TeknisiPt2Controller::storeStep1()` (Survey, baik ada kendala maupun tidak) -> `advanceStatusProgress('survey')`.
+- `TeknisiPt2Controller::storeStep2Eviden()` (eviden Instalasi) -> `advanceStatusProgress('instalasi')`.
+- `TeknisiPt2Controller::storeStep3Eviden()` (eviden Finish/Redaman) -> `advanceStatusProgress('finishing')`.
+- `TeknisiPt2Controller::storeStep4Eviden()` (Dismantle) -> `advanceStatusProgress('finishing')` (berlaku walau tidak ada eviden foto baru di step ini, krn data ODP/Splitter-nya sendiri sudah tersimpan).
+- `TeknisiPt2Controller::storeStep5()` (Mancore) -> `advanceStatusProgress('fi_ogp_golive')`.
+
+**`app/Services/Imports/PidImportService.php`**:
+- LOP baru (reguler MAUPUN PT2) sekarang seragam mulai dari `inisiasi` (sebelumnya PT2 mulai dari `preparation`).
+- `$legacyStatusMap` utk PT2 diperluas -- baik alias lama (`init`/`active`/`close`/`bast`) MAUPUN istilah literal lama (`preparation`/`progress`/`finish`/`redaman`/`dismantle`/`mancore`/`done`/`complete`) dinormalisasi ke istilah baru saat import, supaya file lama yang masih pakai istilah lama otomatis konsisten dgn data yang sudah di-backfill.
+- `$allowedStatuses` utk PT2 disederhanakan jadi `['inisiasi','survey','instalasi','finishing','fi_ogp_golive','golive','drop']`.
+
+**`app/Http/Controllers/AdminPt2Controller.php`**:
+- `$statusOptions` (dropdown filter) diganti ke istilah baru (`Inisiasi`/`Survey`/`Instalasi`/`Finishing`/`FI-OGP Golive`/`Go-Live`/`Drop`).
+- Tab "Selesai" & "On Progress" di `approvalList()`: `whereIn`/`whereNotIn('status_progress', [...])` ditambah `'fi_ogp_golive'` (istilah lama `done`/`mancore`/`complete` tetap ikut dicek sbg jaring pengaman baris yang belum ter-backfill).
+
+**Migration baru** `database/migrations/2026_09_17_020000_backfill_pt2_lops_status_progress_terms.php` -- backfill SEMUA baris `pt2_lops` existing: `preparation`/`persiapan`->`inisiasi`, `progress`->`instalasi`, `finish`/`redaman`/`dismantle`->`finishing`, `mancore`/`done`/`complete`->`fi_ogp_golive`. `survey`/`golive`/`drop` tidak berubah. `down()` sengaja no-op (finish & dismantle digabung jadi satu istilah baru, tidak bisa direkonstruksi 1:1 saat rollback). **BELUM DIJALANKAN** (`php artisan migrate` perlu dieksekusi user sendiri -- tidak ada akses `php`/`mysql` dari `device_bash`).
+
+### Verifikasi
+- Balance-check (`{`/`}`, `(`/`)`) pada `Pt2Lop.php`, `Pt2AssignmentController.php`, `TeknisiPt2Controller.php`, `PidImportService.php`, `AdminPt2Controller.php` -- semua balance.
+- `php -l` via `device_stage_files` + cloud `Bash` -- "No syntax errors detected" utk keenam file (5 file PHP di atas + migration baru).
+- Tidak ada file blade yang disentuh -- tidak perlu sweep stray-`@`-directive.
+- **BELUM diverifikasi end-to-end** (upload PT2 baru -> assign -> survey -> instalasi -> finishing -> mancore, cek `status_progress` di tiap step) krn perlu migration dijalankan dulu & akses UI langsung -- perlu ditest oleh user.

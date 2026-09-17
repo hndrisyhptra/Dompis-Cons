@@ -18,8 +18,7 @@
     @include('admin.evidences.partials.stepper')
 
     {{-- Step Title --}}
-    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-        <div class="h-1 bg-red-500"></div>
+    <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
 
         <div class="p-4 flex items-center justify-between">
             <div>

@@ -37,6 +37,12 @@ class PidImportService
         }
 
         $isPt2 = $import->project_type === 'pt2';
+        // PT 3 (dulu label "TIF / Regular", project_type = internal) pakai aturan
+        // input lebih longgar: minimal 2 dari 3 field (PID SAP, ID IHLD, Nama LOP)
+        // wajib terisi -- BUKAN pid_sap & nama_lop selalu wajib seperti sebelumnya.
+        // Exbis (external) TETAP pakai aturan lama (pid_sap & nama_lop wajib).
+        // Lihat ANALISA_REFACTOR_PERSIAPAN.md Section BK.
+        $relaxedRequiredFields = $import->project_type === 'internal';
         $customerId = $isPt2 ? 1 : $import->customer_id;
 
         if (!$isPt2 && !$customerId) {
@@ -118,15 +124,29 @@ class PidImportService
                 $highestColumn
             );
 
-            // id_ihld wajib untuk PT2 (kunci dedup 1 PID = banyak LOP per IHLD),
-            // tapi OPSIONAL untuk LOP reguler -- cukup pid_sap + nama_lop yang
-            // wajib (dikonfirmasi pemilik project, lihat ANALISA_REFACTOR_PERSIAPAN.md J.1).
-            $requiredHeaders = $isPt2
-                ? ['pid_sap', 'id_ihld', 'nama_lop']
-                : ['pid_sap', 'nama_lop'];
-            $missingHeaders = array_values(
-                array_diff($requiredHeaders, array_values($headers))
-            );
+            // id_ihld wajib untuk PT2 (kunci dedup 1 PID = banyak LOP per IHLD).
+            // PT3/internal: minimal 2 dari 3 kolom (pid_sap, id_ihld, nama_lop) wajib
+            // ADA di header file -- validasi isi per-baris (minimal 2 dari 3 TERISI)
+            // dilakukan di parseRow(). Exbis/external: pid_sap & nama_lop tetap wajib
+            // (dikonfirmasi pemilik project, lihat ANALISA_REFACTOR_PERSIAPAN.md J.1 & BK).
+            $trioHeaders = ['pid_sap', 'id_ihld', 'nama_lop'];
+
+            if ($isPt2) {
+                $missingHeaders = array_values(
+                    array_diff($trioHeaders, array_values($headers))
+                );
+            } elseif ($relaxedRequiredFields) {
+                $presentTrioHeaders = array_values(
+                    array_intersect($trioHeaders, array_values($headers))
+                );
+                $missingHeaders = count($presentTrioHeaders) < 2
+                    ? array_values(array_diff($trioHeaders, $presentTrioHeaders))
+                    : [];
+            } else {
+                $missingHeaders = array_values(
+                    array_diff(['pid_sap', 'nama_lop'], array_values($headers))
+                );
+            }
 
             if (!empty($missingHeaders)) {
                 ImportProcessError::create([
@@ -179,6 +199,7 @@ class PidImportService
                         $rawRow,
                         $rowNumber,
                         $isPt2,
+                        $relaxedRequiredFields,
                         $seenKeys
                     );
 
@@ -342,7 +363,7 @@ class PidImportService
         $projectGroups = [];
 
         foreach ($rows as $row) {
-            $projectKey = $this->key($row['pid_sap']);
+            $projectKey = $this->groupKeyForRow($row);
 
             if (!isset($projectGroups[$projectKey])) {
                 $projectGroups[$projectKey] = $row;
@@ -485,7 +506,7 @@ class PidImportService
         }
 
         foreach ($rows as $row) {
-            $project = $resolvedProjects[$this->key($row['pid_sap'])] ?? null;
+            $project = $resolvedProjects[$this->groupKeyForRow($row)] ?? null;
 
             if (!$project) {
                 $counters['skipped']++;
@@ -565,39 +586,56 @@ class PidImportService
             $payload[$lopProjectFk] = $projectId;
 
             if ($lop) {
-                // Status progress hanya disentuh jika kolomnya dikirim eksplisit.
-                // BOQ, evidence, assignment, dan data Go-Live tetap tidak disentuh.
-                // FIX (permintaan user, log durasi per staging): status_progress
-                // di-pisah dari $payload & di-apply lewat Lop::advanceStage()
-                // (bukan ikut fill()+save() biasa) supaya perpindahan tahap
-                // dari import PID ini juga tercatat ke lop_stage_histories --
-                // lihat Lop::advanceStage() & Section BE
-                // ANALISA_REFACTOR_PERSIAPAN.md.
-                $newStageCode = $payload['status_progress'] ?? null;
-                unset($payload['status_progress']);
-                $stageWillChange = $newStageCode && $newStageCode !== $lop->status_progress;
+                // BUGFIX: advanceStage() cuma ada di model Lop (reguler), TIDAK
+                // ada di Pt2Lop -- sebelumnya block ini dipanggil tanpa guard
+                // $isPt2 sama sekali, jadi upload PT2 yang mengubah status_progress
+                // crash "Call to undefined method Pt2Lop::advanceStage()".
+                // PT2 tidak punya audit trail per-stage (lop_stage_histories),
+                // jadi cukup diisi langsung lewat fill()+save() seperti field lain.
+                if ($isPt2) {
+                    $lop->fill($payload);
+                    $wasDirty = $lop->isDirty();
 
-                $lop->fill($payload);
-                $wasDirty = $lop->isDirty();
+                    if ($wasDirty) {
+                        $lop->save();
+                    }
 
-                if ($wasDirty) {
-                    $lop->save();
-                }
-
-                if ($stageWillChange) {
-                    $lop->advanceStage($newStageCode, auth()->id());
-                }
-
-                if ($wasDirty || $stageWillChange) {
-                    $counters['lop_updated']++;
+                    $counters[$wasDirty ? 'lop_updated' : 'unchanged']++;
                 } else {
-                    $counters['unchanged']++;
+                    // Status progress hanya disentuh jika kolomnya dikirim eksplisit.
+                    // BOQ, evidence, assignment, dan data Go-Live tetap tidak disentuh.
+                    // FIX (permintaan user, log durasi per staging): status_progress
+                    // di-pisah dari $payload & di-apply lewat Lop::advanceStage()
+                    // (bukan ikut fill()+save() biasa) supaya perpindahan tahap
+                    // dari import PID ini juga tercatat ke lop_stage_histories --
+                    // lihat Lop::advanceStage() & Section BE
+                    // ANALISA_REFACTOR_PERSIAPAN.md.
+                    $newStageCode = $payload['status_progress'] ?? null;
+                    unset($payload['status_progress']);
+                    $stageWillChange = $newStageCode && $newStageCode !== $lop->status_progress;
+
+                    $lop->fill($payload);
+                    $wasDirty = $lop->isDirty();
+
+                    if ($wasDirty) {
+                        $lop->save();
+                    }
+
+                    if ($stageWillChange) {
+                        $lop->advanceStage($newStageCode, auth()->id());
+                    }
+
+                    if ($wasDirty || $stageWillChange) {
+                        $counters['lop_updated']++;
+                    } else {
+                        $counters['unchanged']++;
+                    }
                 }
             } else {
-                // LOP reguler baru mulai dari 'inisiasi' (tahap pertama flow
-                // Persiapan yang baru); PT2 tetap pakai 'preparation' seperti
-                // semula karena refactor ini tidak menyentuh flow PT2.
-                $payload['status_progress'] ??= $isPt2 ? 'preparation' : 'inisiasi';
+                // LOP baru (reguler maupun PT2) mulai dari 'inisiasi' -- PT2
+                // disamakan dgn Reguler sejak penyesuaian alur PT2 baru
+                // (lihat ANALISA_REFACTOR_PERSIAPAN.md Section BM).
+                $payload['status_progress'] ??= 'inisiasi';
                 $lop = $lopClass::create($payload);
                 $counters['lop_created']++;
 
@@ -616,6 +654,7 @@ class PidImportService
         array $data,
         int $rowNumber,
         bool $isPt2,
+        bool $relaxedRequiredFields,
         array &$seenKeys
     ): array {
         $pid = $this->cleanValue($data['pid'] ?? null);
@@ -629,19 +668,50 @@ class PidImportService
         $errors = [];
         $errorCode = 'invalid_data';
 
-        if (!$pidSap) {
-            $errors[] = 'PID SAP wajib diisi';
-            $errorCode = 'missing_required_field';
-        }
+        if ($isPt2) {
+            if (!$pidSap) {
+                $errors[] = 'PID SAP wajib diisi';
+                $errorCode = 'missing_required_field';
+            }
 
-        if ($isPt2 && !$idIhld) {
-            $errors[] = 'ID IHLD wajib diisi untuk import PT2';
-            $errorCode = 'missing_required_field';
-        }
+            if (!$idIhld) {
+                $errors[] = 'ID IHLD wajib diisi untuk import PT2';
+                $errorCode = 'missing_required_field';
+            }
 
-        if (!$namaLop) {
-            $errors[] = 'Nama LOP wajib diisi';
-            $errorCode = 'missing_required_field';
+            if (!$namaLop) {
+                $errors[] = 'Nama LOP wajib diisi';
+                $errorCode = 'missing_required_field';
+            }
+        } elseif ($relaxedRequiredFields) {
+            // PT3 (dulu "TIF / Regular"): minimal 2 dari 3 field wajib terisi --
+            // PID SAP, ID IHLD, maupun Nama LOP boleh kosong asal 2 lainnya ada.
+            $filledCount = (!empty($pidSap) ? 1 : 0)
+                + (!empty($idIhld) ? 1 : 0)
+                + (!empty($namaLop) ? 1 : 0);
+
+            if ($filledCount < 2) {
+                $errors[] = 'Minimal 2 dari 3 field (PID SAP, ID IHLD, Nama LOP) wajib diisi';
+                $errorCode = 'missing_required_field';
+            } elseif (!$namaLop) {
+                // lop_name & project_name NOT NULL di DB -- karena minimal 2 dari 3
+                // field ada dan nama_lop yang kosong, pid_sap dan/atau id_ihld pasti
+                // ada, dipakai sbg placeholder nama LOP (lihat ANALISA_REFACTOR_PERSIAPAN.md Section BK).
+                $namaLop = $pidSap
+                    ? 'LOP ' . $pidSap . ($idIhld ? ' - IHLD ' . $idIhld : '')
+                    : 'LOP IHLD ' . $idIhld;
+            }
+        } else {
+            // Exbis (external) & lainnya: aturan lama, pid_sap & nama_lop wajib.
+            if (!$pidSap) {
+                $errors[] = 'PID SAP wajib diisi';
+                $errorCode = 'missing_required_field';
+            }
+
+            if (!$namaLop) {
+                $errors[] = 'Nama LOP wajib diisi';
+                $errorCode = 'missing_required_field';
+            }
         }
 
         if ($pidSap) {
@@ -684,12 +754,20 @@ class PidImportService
             true
         ) ? $rawExecution : 'kemitraan';
 
+        // PT2 disamakan istilahnya dgn flow Reguler (Section BM) -- baik alias
+        // lama (init/active/close/bast) MAUPUN istilah literal lama
+        // (preparation/progress/finish/redaman/dismantle/mancore/done/complete)
+        // dinormalisasi ke istilah baru, supaya file import lama yang masih
+        // pakai istilah lama tetap otomatis konsisten dgn data yang sudah
+        // di-backfill.
         $legacyStatusMap = $isPt2
             ? [
-                'init' => 'preparation',
-                'active' => 'preparation',
-                'close' => 'complete',
-                'bast' => 'complete',
+                'init' => 'inisiasi', 'active' => 'inisiasi',
+                'preparation' => 'inisiasi', 'persiapan' => 'inisiasi',
+                'progress' => 'instalasi',
+                'finish' => 'finishing', 'redaman' => 'finishing', 'dismantle' => 'finishing',
+                'mancore' => 'fi_ogp_golive', 'done' => 'fi_ogp_golive', 'complete' => 'fi_ogp_golive',
+                'close' => 'fi_ogp_golive', 'bast' => 'fi_ogp_golive',
             ]
             : [
                 'init' => 'inisiasi',
@@ -700,11 +778,11 @@ class PidImportService
 
         $statusProgress = $legacyStatusMap[$rawStatus] ?? $rawStatus;
         $allowedStatuses = $isPt2
-            ? ['preparation', 'survey', 'progress', 'instalasi', 'finish', 'finishing', 'dismantle', 'mancore', 'complete', 'golive', 'drop']
+            ? ['inisiasi', 'survey', 'instalasi', 'finishing', 'fi_ogp_golive', 'golive', 'drop']
             : ['inisiasi', 'survey', 'perizinan', 'material_delivery', 'persiapan_instalasi', 'instalasi', 'pengukuran', 'finishing', 'fi_ogp_golive', 'golive', 'hold', 'drop'];
 
         if (!in_array($statusProgress, $allowedStatuses, true)) {
-            $statusProgress = $isPt2 ? 'preparation' : 'inisiasi';
+            $statusProgress = 'inisiasi';
         }
 
         return [
@@ -1021,6 +1099,24 @@ class PidImportService
     private function key(mixed $value): string
     {
         return mb_strtolower(trim((string) $value));
+    }
+
+    /**
+     * Kunci grouping/resolusi project per row. Untuk row PT3 (internal) yang
+     * PID SAP-nya kosong (diizinkan sejak aturan "minimal 2 dari 3 field"),
+     * TIDAK boleh dikunci pakai key(pid_sap) kosong -- itu bikin semua row
+     * tanpa PID SAP saling tertimpa/tergabung jadi satu project/LOP yang sama.
+     * Row seperti ini diberi kunci unik per nomor baris supaya masing-masing
+     * SELALU jadi project & LOP baru sendiri (lihat ANALISA_REFACTOR_PERSIAPAN.md
+     * Section BK).
+     */
+    private function groupKeyForRow(array $row): string
+    {
+        if (!empty($row['pid_sap'])) {
+            return $this->key($row['pid_sap']);
+        }
+
+        return '__no_pid_sap__row_' . $row['row'];
     }
 
     private function isEmptyRow(array $row): bool

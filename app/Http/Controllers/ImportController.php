@@ -2501,12 +2501,13 @@ private function buildRegularPidMatrix(array $regions, $programs, array $statusO
 
     public function downloadPidTemplate()
     {
-        // Kolom wajib HANYA pid_sap dan nama_lop (id_ihld wajib khusus untuk
-        // import PT2; untuk LOP reguler boleh dikosongkan). Semua kolom lain
+        // PT2: pid_sap, id_ihld, nama_lop wajib semua. PT3 (internal): minimal
+        // 2 dari 3 field (pid_sap, id_ihld, nama_lop) wajib terisi per baris.
+        // Exbis (external): pid_sap & nama_lop tetap wajib. Semua kolom lain
         // di bawah ini opsional -- kalau dikosongkan saat upload, bisa
         // dilengkapi belakangan lewat edit data LOP di UI. Daftar ini sudah
         // mencakup seluruh kolom tabel `lops` (lihat ANALISA_REFACTOR_PERSIAPAN.md
-        // bagian J.1 & K untuk rincian audit-nya).
+        // bagian J.1, K, & BK untuk rincian audit-nya).
         $headers = [
             'pid',
             'pid_sap',
