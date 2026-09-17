@@ -2732,3 +2732,36 @@ Ditemukan juga sekalian: `storeStep3Eviden()` (Finish/Redaman) sudah lama menyim
 - `php -l` via `device_stage_files` + cloud `Bash` -- "No syntax errors detected" utk keenam file (5 file PHP di atas + migration baru).
 - Tidak ada file blade yang disentuh -- tidak perlu sweep stray-`@`-directive.
 - **BELUM diverifikasi end-to-end** (upload PT2 baru -> assign -> survey -> instalasi -> finishing -> mancore, cek `status_progress` di tiap step) krn perlu migration dijalankan dulu & akses UI langsung -- perlu ditest oleh user.
+
+## Section BN — Tabel "Report Deployment PT 2" (permintaan user 2026-09-17)
+
+### Permintaan user
+"buatkan tabel Report Deployment PT 2 di menu Report Deployment tampilan tabel samakan dengan PT 3 dengan breakdown Region/branch dan grand total"
+
+### Keputusan (dikonfirmasi via AskUserQuestion)
+1. Tabel PT2 ditaruh sebagai **tabel KEDUA, di bawah tabel PT3** yang sudah ada, pada halaman Report Deployment yang sama (bukan tab/toggle terpisah, bukan halaman baru).
+2. Kolom bucket PT2 mengikuti **istilah baru PT2** hasil Section BM (**7 kolom**: Drop, Inisiasi, Survey, Instalasi, Finishing, FI-OGP Golive, Golive) -- **TIDAK ada kolom "Hold"** (PT2 tidak mengenal status hold, beda dgn PT3 yang punya 8 kolom termasuk Hold).
+3. **Filter "Program" DIHILANGKAN** di tabel PT2 (PT2 memang cuma 1 program, beda dgn PT3 yang mencakup banyak program spt OSP/OLO/HEM/dst) -- tabel PT2 hanya ada filter Region & Branch.
+
+### Implementasi
+
+**Backend (2 file, method baru semua, tidak mengubah method lain):**
+- `app/Http/Controllers/DashboardPmController.php`:
+  - `pt2StageBreakdownBucket(?string $statusProgress, bool $isGoLive): string` -- bucket mapping utk PT2, versi PT2 dari `stageBreakdownBucket()`. Karena istilah `status_progress` PT2 (Section BM) sudah 1:1 dgn nama bucket-nya sendiri (`inisiasi/survey/instalasi/finishing/fi_ogp_golive/golive/drop`), mapping-nya jauh lebih sederhana drpd versi PT3 -- tinggal langsung match, TANPA bucket "hold". `is_golive=1` override ke bucket `golive` (sama pola dgn `pt2StatusBucket()` yang sudah ada sebelumnya utk widget Matrix PT2 di dashboard).
+  - `buildPt2StageCube(): array` -- versi PT2 dari `buildStageCube()`. Query `pt2_lops` JOIN `pt2_projects`, branch pakai `COALESCE(NULLIF(TRIM(l.branch), ''), p.branch)` (pola yg SUDAH ADA sebelumnya di `matrixDetail()` type `'pt2'` -- pt2_lops.branch bisa kosong, fallback ke pt2_projects.branch). Cube key HANYA `region|branch` (TANPA dimensi program, beda dgn PT3 yang `region|branch|program`) krn Program dihilangkan dari tabel PT2. 7 stage keys (drop/inisiasi/survey/instalasi/finishing/fi_ogp_golive/golive) + total.
+  - `reportDeployment()` -- ditambah `$pt2StageCube` (cache key baru `pm_report_deployment_pt2_cube_v1`, dipanggil dari `buildPt2StageCube()`), dikirim ke view `pm.report_deployment`.
+  - `matrixDetail()` -- ditambah branch baru `elseif ($type === 'stage_breakdown_pt2')`, query `pt2_lops`/`pt2_projects` langsung (pola sama dgn branch `'stage_breakdown'` PT3 yang sudah ada, TANPA filter `program_filter`), pakai `$this->pt2StageBreakdownBucket()`. `detail_url` pakai route `admin.pt2.tracking` (sama spt branch `'pt2'` yang sudah ada sebelumnya).
+- `app/Http/Controllers/DashboardController.php`:
+  - `reportDeployment()` -- ditambah `$pt2StageCube` (cache key SAMA `pm_report_deployment_pt2_cube_v1`, dipanggil via `app(DashboardPmController::class)->buildPt2StageCube()` -- 1 sumber kebenaran & 1 cache lintas role, pola sama persis dgn `$stageCube` yang sudah ada), dikirim ke view `admin.report_deployment`.
+  - `matrixDetail()` -- ditambah branch baru `elseif ($type === 'stage_breakdown_pt2')`, logic identik dgn versi di `DashboardPmController` (bucket mapping dipanggil via `app(DashboardPmController::class)->pt2StageBreakdownBucket()`, pola sama dgn branch `'stage_breakdown'` PT3 yang sudah ada).
+
+**Frontend (1 file baru + 2 file existing diubah):**
+- **BARU** `resources/views/partials/report-deployment-pt2.blade.php` -- clone dari `partials/report-deployment.blade.php` (PT3), tampilan/struktur SAMA PERSIS (region row collapsible, klik angka buka modal detail, tfoot Grand Total), tapi: 9 kolom (bukan 10 -- tanpa Hold, tanpa Program filter), Alpine component baru `reportDeploymentPt2Widget()` (bukan reuse `reportDeploymentWidget()`, krn stage keys & filter-nya beda) dgn `stageShow()` mengirim `type: 'stage_breakdown_pt2'` (bukan `'stage_breakdown'`) dan TANPA param `program_filter`. Variabel wajib: `$pt2StageCube`, `$matrixDetailRoute` (route AJAX detail LOP, SAMA dgn yang dipakai tabel PT3 di halaman yang sama).
+- `resources/views/admin/report_deployment.blade.php` & `resources/views/pm/report_deployment.blade.php` -- ditambah heading "Report Deployment — PT 2" + `@include('partials.report-deployment-pt2', [...])` di bawah `@include` tabel PT3 yang sudah ada.
+
+### Verifikasi
+- Balance-check (`{`/`}`, `(`/`)`) pada `DashboardController.php` & `DashboardPmController.php` -- keduanya balance (selisih 0).
+- `php -l` via `device_stage_files` + cloud `Bash` -- "No syntax errors detected" utk kedua file controller.
+- Sweep stray-`@`-directive (`grep -noE "@[a-zA-Z]+"`) pada `report-deployment-pt2.blade.php`, `admin/report_deployment.blade.php`, `pm/report_deployment.blade.php` -- semua directive yang muncul (`@click`, `@change`, `@json`, `@include`, `@section`, `@endsection`, `@extends`) valid & disengaja, tidak ada artefak typo.
+- **BELUM diverifikasi end-to-end di browser** (buka halaman Report Deployment role admin & PM, cek 2 tabel muncul, filter Region/Branch PT2 jalan, klik angka buka modal & datanya benar) -- perlu ditest oleh user, TIDAK bisa diverifikasi dari sisi Claude krn tidak ada akses `php artisan serve` / MySQL dari `device_bash`.
+- Cache lama (`pm_report_deployment_cube_v1`) TIDAK terpengaruh (key beda, `pm_report_deployment_pt2_cube_v1` baru) -- tidak perlu `cache:clear`, tapi kalau user mau lihat data PT2 langsung ter-update tanpa nunggu TTL 90 detik, bisa jalankan `php artisan cache:clear` sekali stelah deploy.

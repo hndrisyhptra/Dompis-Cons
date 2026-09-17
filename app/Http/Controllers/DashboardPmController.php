@@ -75,7 +75,11 @@ class DashboardPmController extends Controller
             return $this->buildStageCube();
         });
 
-        return view('pm.report_deployment', compact('stageCube'));
+        $pt2StageCube = Cache::remember('pm_report_deployment_pt2_cube_v1', 90, function () {
+            return $this->buildPt2StageCube();
+        });
+
+        return view('pm.report_deployment', compact('stageCube', 'pt2StageCube'));
     }
 
     /**
@@ -1078,6 +1082,60 @@ class DashboardPmController extends Controller
 
             $title = 'Reporting Deployment — ' . $regionLabel . ($branchKey !== '' ? ' / ' . $branchKey : '')
                 . ($programFilter !== '' ? ' / ' . $programFilter : '') . ' — ' . $metricLabel;
+        } elseif ($type === 'stage_breakdown_pt2') {
+            // Modal detail utk tabel "Report Deployment PT 2" (permintaan
+            // user 2026-09-17) -- variasi PT2 dari 'stage_breakdown' di
+            // atas: 7 bucket sesuai istilah PT2 baru (Section BM), TANPA
+            // kolom Hold & TANPA filter Program (PT2 cuma 1 program).
+            $pt2StageRows = DB::table('pt2_lops as l')
+                ->join('pt2_projects as p', 'l.pt2_project_id', '=', 'p.id_pt2_project')
+                ->whereIn(
+                    DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch)))"),
+                    $branchList
+                )
+                ->select([
+                    'l.id_pt2_lop', 'l.lop_name', 'l.sto', 'l.status_progress',
+                    DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch))) as branch"),
+                    DB::raw('COALESCE(l.is_golive, 0) as lop_is_golive'),
+                    'p.pid', 'p.pid_sap', 'p.project_name',
+                ])
+                ->get();
+
+            foreach ($pt2StageRows as $row) {
+                $isGoLive = (int) ($row->lop_is_golive ?? 0) === 1;
+                $stageKey = $this->pt2StageBreakdownBucket($row->status_progress, $isGoLive);
+
+                if ($metric !== 'total' && $stageKey !== $metric) {
+                    continue;
+                }
+
+                $rows->push([
+                    'pid' => $row->pid ?: ($row->pid_sap ?: '-'),
+                    'project_name' => $row->project_name ?: '-',
+                    'lop_name' => $row->lop_name ?: '-',
+                    'branch' => strtoupper((string) ($row->branch ?? '-')),
+                    'sto' => strtoupper((string) ($row->sto ?? '-')),
+                    'program' => 'PT 2',
+                    'progress' => null,
+                    'status_label' => $isGoLive ? 'Go-Live' : ucwords(str_replace('_', ' ', strtolower((string) $row->status_progress))),
+                    'detail_url' => route('admin.pt2.tracking', $row->id_pt2_lop),
+                ]);
+            }
+
+            $metricLabel = [
+                'drop' => 'Drop',
+                'inisiasi' => 'Inisiasi',
+                'survey' => 'Survey',
+                'instalasi' => 'Instalasi',
+                'finishing' => 'Finishing',
+                'fi_ogp_golive' => 'FI-OGP Golive',
+                'golive' => 'Golive',
+                'total' => 'Grand Total',
+            ][$metric] ?? $metric;
+
+            $regionLabel = $regionKey !== '' ? $regionKey : 'Semua Region';
+
+            $title = 'Report Deployment PT 2 — ' . $regionLabel . ($branchKey !== '' ? ' / ' . $branchKey : '') . ' — ' . $metricLabel;
         } else {
             return response()->json(['message' => 'Tipe matrix tidak dikenal.'], 422);
         }
@@ -1465,5 +1523,91 @@ class DashboardPmController extends Controller
             // belum dikenal -- semua masuk "Preparing".
             default => 'preparing',
         };
+    }
+
+    /**
+     * Bucket mapping utk tabel "Report Deployment PT 2" (permintaan user
+     * 2026-09-17) -- versi PT2 dari stageBreakdownBucket() di atas. Beda
+     * dgn PT3: PT2 pakai istilah status_progress BARU hasil Section BM
+     * ANALISA_REFACTOR_PERSIAPAN.md (inisiasi/survey/instalasi/finishing/
+     * fi_ogp_golive/golive/drop) yang SUDAH 1:1 dgn nama bucket-nya sendiri
+     * (tidak perlu pengelompokan spt PT3 krn PT2 memang tidak punya status
+     * sebanyak & serumit Regular), dan TIDAK ada bucket "hold" (PT2 tidak
+     * mengenal status hold).
+     */
+    public function pt2StageBreakdownBucket(?string $statusProgress, bool $isGoLive): string
+    {
+        $status = strtolower(trim((string) $statusProgress));
+
+        if ($status === 'drop') {
+            return 'drop';
+        }
+
+        if ($isGoLive) {
+            return 'golive';
+        }
+
+        return match ($status) {
+            'survey' => 'survey',
+            'instalasi' => 'instalasi',
+            'finishing' => 'finishing',
+            'fi_ogp_golive' => 'fi_ogp_golive',
+            'golive' => 'golive',
+            // inisiasi dan kode lain yang belum dikenal -- semua masuk
+            // "Inisiasi" (bucket paling awal utk PT2).
+            default => 'inisiasi',
+        };
+    }
+
+    /**
+     * Cube data utk tabel "Report Deployment PT 2" (permintaan user
+     * 2026-09-17) -- versi PT2 dari buildStageCube() di atas. Beda dgn
+     * PT3: TIDAK di-breakdown per Program (PT2 memang cuma 1 program),
+     * jadi cube key hanya region|branch. Branch pakai fallback yang sama
+     * dgn matrixDetail() type 'pt2' & type 'stage_breakdown_pt2' di bawah
+     * (COALESCE ke pt2_projects.branch kalau pt2_lops.branch kosong).
+     */
+    public function buildPt2StageCube(): array
+    {
+        $branchToRegion = $this->regionBranchMap();
+
+        $stageKeys = ['drop', 'inisiasi', 'survey', 'instalasi', 'finishing', 'fi_ogp_golive', 'golive'];
+        $emptyStageStats = static function () use ($stageKeys) {
+            return array_fill_keys($stageKeys, 0) + ['total' => 0];
+        };
+
+        $stageRows = DB::table('pt2_lops as l')
+            ->join('pt2_projects as p', 'l.pt2_project_id', '=', 'p.id_pt2_project')
+            ->get([
+                DB::raw("COALESCE(NULLIF(TRIM(l.branch), ''), p.branch) as branch"),
+                'l.status_progress',
+                DB::raw('COALESCE(l.is_golive, 0) as is_golive'),
+            ]);
+
+        $stageCubeAccumulator = [];
+
+        foreach ($stageRows as $row) {
+            $branch = strtoupper(trim($row->branch ?? ''));
+            $regionName = $branchToRegion[$branch] ?? null;
+            if (!$regionName) {
+                continue;
+            }
+
+            $stageKey = $this->pt2StageBreakdownBucket($row->status_progress, (int) $row->is_golive === 1);
+
+            $cubeKey = $regionName . '|' . $branch;
+            if (!isset($stageCubeAccumulator[$cubeKey])) {
+                $stageCubeAccumulator[$cubeKey] = $emptyStageStats() + [
+                    'region' => $regionName,
+                    'branch' => $branch,
+                    'program' => 'PT 2',
+                ];
+            }
+
+            $stageCubeAccumulator[$cubeKey][$stageKey]++;
+            $stageCubeAccumulator[$cubeKey]['total']++;
+        }
+
+        return array_values($stageCubeAccumulator);
     }
 }

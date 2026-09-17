@@ -943,6 +943,65 @@ class DashboardController extends Controller
 
             $title = 'Report Deployment — ' . $regionLabel . ($branchKey !== '' ? ' / ' . $branchKey : '')
                 . ($programFilter !== '' ? ' / ' . $programFilter : '') . ' — ' . $metricLabel;
+        } elseif ($type === 'stage_breakdown_pt2') {
+            // Modal detail utk tabel "Report Deployment PT 2" (permintaan
+            // user 2026-09-17) -- logic-nya identik dengan
+            // DashboardPmController::matrixDetail() (type sama,
+            // 'stage_breakdown_pt2'), bucket mapping-nya via
+            // DashboardPmController::pt2StageBreakdownBucket() (dipanggil
+            // lewat app(), 1 sumber kebenaran spt pola 'stage_breakdown'
+            // PT3 di atas). TANPA filter Program (PT2 cuma 1 program).
+            $pmDashboard = app(\App\Http\Controllers\DashboardPmController::class);
+
+            $pt2StageRows = DB::table('pt2_lops as l')
+                ->join('pt2_projects as p', 'l.pt2_project_id', '=', 'p.id_pt2_project')
+                ->whereIn(
+                    DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch)))"),
+                    $branchList
+                )
+                ->select([
+                    'l.id_pt2_lop', 'l.lop_name', 'l.sto', 'l.status_progress',
+                    DB::raw("UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch))) as branch"),
+                    DB::raw('COALESCE(l.is_golive, 0) as lop_is_golive'),
+                    'p.pid', 'p.pid_sap', 'p.project_name',
+                ])
+                ->get();
+
+            foreach ($pt2StageRows as $row) {
+                $isGoLive = (int) ($row->lop_is_golive ?? 0) === 1;
+                $stageKey = $pmDashboard->pt2StageBreakdownBucket($row->status_progress, $isGoLive);
+
+                if ($metric !== 'total' && $stageKey !== $metric) {
+                    continue;
+                }
+
+                $rows->push([
+                    'pid' => $row->pid ?: ($row->pid_sap ?: '-'),
+                    'project_name' => $row->project_name ?: '-',
+                    'lop_name' => $row->lop_name ?: '-',
+                    'branch' => strtoupper((string) ($row->branch ?? '-')),
+                    'sto' => strtoupper((string) ($row->sto ?? '-')),
+                    'program' => 'PT 2',
+                    'progress' => null,
+                    'status_label' => $isGoLive ? 'Go-Live' : ucwords(str_replace('_', ' ', strtolower((string) $row->status_progress))),
+                    'detail_url' => route('admin.pt2.tracking', $row->id_pt2_lop),
+                ]);
+            }
+
+            $metricLabel = [
+                'drop' => 'Drop',
+                'inisiasi' => 'Inisiasi',
+                'survey' => 'Survey',
+                'instalasi' => 'Instalasi',
+                'finishing' => 'Finishing',
+                'fi_ogp_golive' => 'FI-OGP Golive',
+                'golive' => 'Golive',
+                'total' => 'Grand Total',
+            ][$metric] ?? $metric;
+
+            $regionLabel = $regionKey !== '' ? $regionKey : 'Semua Region';
+
+            $title = 'Report Deployment PT 2 — ' . $regionLabel . ($branchKey !== '' ? ' / ' . $branchKey : '') . ' — ' . $metricLabel;
         } else {
             return response()->json(['message' => 'Tipe matrix tidak dikenal.'], 422);
         }
@@ -980,7 +1039,11 @@ class DashboardController extends Controller
             return app(\App\Http\Controllers\DashboardPmController::class)->buildStageCube();
         });
 
-        return view('admin.report_deployment', compact('stageCube'));
+        $pt2StageCube = Cache::remember('pm_report_deployment_pt2_cube_v1', 90, function () {
+            return app(\App\Http\Controllers\DashboardPmController::class)->buildPt2StageCube();
+        });
+
+        return view('admin.report_deployment', compact('stageCube', 'pt2StageCube'));
     }
 
     /**
