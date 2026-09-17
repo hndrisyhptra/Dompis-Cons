@@ -2765,3 +2765,74 @@ Ditemukan juga sekalian: `storeStep3Eviden()` (Finish/Redaman) sudah lama menyim
 - Sweep stray-`@`-directive (`grep -noE "@[a-zA-Z]+"`) pada `report-deployment-pt2.blade.php`, `admin/report_deployment.blade.php`, `pm/report_deployment.blade.php` -- semua directive yang muncul (`@click`, `@change`, `@json`, `@include`, `@section`, `@endsection`, `@extends`) valid & disengaja, tidak ada artefak typo.
 - **BELUM diverifikasi end-to-end di browser** (buka halaman Report Deployment role admin & PM, cek 2 tabel muncul, filter Region/Branch PT2 jalan, klik angka buka modal & datanya benar) -- perlu ditest oleh user, TIDAK bisa diverifikasi dari sisi Claude krn tidak ada akses `php artisan serve` / MySQL dari `device_bash`.
 - Cache lama (`pm_report_deployment_cube_v1`) TIDAK terpengaruh (key beda, `pm_report_deployment_pt2_cube_v1` baru) -- tidak perlu `cache:clear`, tapi kalau user mau lihat data PT2 langsung ter-update tanpa nunggu TTL 90 detik, bisa jalankan `php artisan cache:clear` sekali stelah deploy.
+
+## Section BO — Restyle Dashboard PM/TIF: hapus Matriks PT3, tambah Report Deployment PT2 inline + menu Project ID PT2 (permintaan user 2026-09-17)
+
+### Permintaan user
+"ada perubahan tampilan pada dashboard TIF, tabel reporting deployment samakan dengan yang barusan kita buat / untuk tabel Matriks Progress Project PT 3 di hapus dari dashboard tif / tambahkan report deployment PT 2 dan tambahkan menu project ID program PT 2"
+
+### Keputusan (dikonfirmasi via AskUserQuestion, 2 ronde)
+1. Dashboard `/pm/dashboard` (`resources/views/pm/dashboard.blade.php`) adalah SATU halaman yang sama dipakai role **pm & tif** (bukan halaman terpisah per role) -- user konfirmasi semua perubahan berlaku utk **kedua role** (bukan cuma tif), jadi TIDAK perlu kondisi `@if role`.
+2. Tabel "Reporting Deployment" (PT3) yang sudah ada inline di dashboard ini SUDAH identik tampilannya dgn tabel Report Deployment yang dibuat di Section BN (memang sumber aslinya) -- **tidak ada perubahan** di bagian ini.
+3. Menu "Project ID > PT 2" yang diminta dibuatkan **halaman baru read-only** (bukan link ke `admin.pt2.index` yang pakai layout Admin + ada tombol Import/Hapus -- tidak cocok utk role pm/tif).
+
+### Implementasi
+
+**1. Hapus tabel "Matriks Progress Project PT 3" dari dashboard PM/TIF:**
+- `resources/views/pm/dashboard.blade.php` -- blok `{{-- MATRIX PROGRESS PROJECT REGULAR --}}` (breakdown region/branch x program x Prepare/Progress/Finish, pakai `$matrixData`) DIHAPUS SELURUHNYA, digantikan `@include('partials.report-deployment-pt2', [...])` di posisi yang sama. Tabel "Matriks Progress Project PT 2" (pakai `$matrixPt2Data`) di bawahnya TIDAK disentuh (tetap ada, TIDAK diminta dihapus).
+- `$matrixData` di `DashboardPmController::buildIndexData()`/`index()` SENGAJA TIDAK dihapus dari controller (query & variabelnya tetap dihitung tiap request) -- cuma sudah tidak dipakai di view manapun lagi. Dibiarkan drpd dihapus supaya diff minimal & tidak berisiko ada tempat lain yang diam-diam masih butuh; bisa dibersihkan lain waktu kalau user mau.
+
+**2. Tabel "Report Deployment PT 2" inline (BARU) di dashboard PM/TIF:**
+- `app/Http/Controllers/DashboardPmController.php`: `buildIndexData()` ditambah `$pt2StageCube = $this->buildPt2StageCube();` (method yang sama persis dgn yang dipakai halaman Report Deployment terpisah, Section BN -- 1 sumber kebenaran), ditambahkan ke `compact(...)` yang di-return & di-cache (`pm_dashboard_index_v4`).
+- `resources/views/pm/dashboard.blade.php`: `@include('partials.report-deployment-pt2', ['pt2StageCube' => $pt2StageCube, 'matrixDetailRoute' => 'pm.dashboard.matrix-detail'])` -- pakai partial yang SAMA dgn Section BN (bukan duplikat), nested di dalam root `x-data="matrixDetailModal()"` milik dashboard (aman, Alpine mendukung nested x-data scope independen).
+
+**3. Menu "Project ID > PT 2" (halaman baru read-only utk pm/tif):**
+- Route baru di `routes/web.php`, group `program.` yang sudah ada (role:pm,tif,admin,superadmin,super_tif,officer): `GET /program/pt2` (`program.pt2`) dan `GET /program/pt2/export` (`program.pt2.export`).
+- `app/Http/Controllers/ProgramController.php`:
+  - `pt2(Request $request)` -- kalau role BUKAN pm/tif, redirect ke `admin.pt2.index` (halaman admin yang sudah ada & lebih lengkap) drpd render view admin yang percuma dibuat. Role pm/tif dapat view `pm.program.pt2`.
+  - `getPt2ProgramData(Request $request)` -- query `Pt2Lop::with(['project', 'assignment.teknisi', 'boqItems'])`, **1 baris = 1 LOP PT2** (BEDA dgn `getProgramData()` Regular yang 1 baris = 1 Project, krn 1 Project PT2 bisa punya banyak LOP). Filter search/region/branch/status_progress pakai pola yang sama (branch pakai fallback COALESCE ke `pt2_projects.branch` spt di tempat lain).
+  - `pt2StatusProgressOptions()` -- opsi status PT2 istilah BARU (Section BM: inisiasi/survey/instalasi/finishing/fi_ogp_golive/golive/drop), BUKAN `ProjectStage::active()` (itu master Regular).
+  - `exportPt2(Request $request)` -- export Excel LOP PT2 mengikuti filter aktif, pola sama dgn `exportProgramLop()` (Regular) tapi query dari `pt2_lops`/`pt2_projects`/`pt2_assignments` (kolom lebih sedikit -- tanpa Execution Type & Waspang, PT2 cuma kenal Teknisi).
+- View BARU:
+  - `resources/views/pm/program/pt2.blade.php` -- clone struktur `pm/program/osp.blade.php`, TANPA modal Review BOQ (fitur khusus tif utk Regular, belum ada versi PT2).
+  - `resources/views/pm/program/partials/pt2-table.blade.php` -- clone `pm/program/partials/table.blade.php` tapi disederhanakan: TANPA tombol Tracking Progress/Timeline/Review BOQ (belum ada route PT2 yang aman diakses pm/tif), cuma tombol "Detail" (modal). Progress & label tahap dari `Pt2Lop::progressSummary()` (Section BM).
+  - `resources/views/pm/program/partials/pt2-detail-modal.blade.php` -- clone `detail-modal.blade.php` tapi field Program/Execution Type dihapus (tidak relevan PT2), tombol footer "Tracking Progress" diganti "Tutup" (alasan sama, belum ada route aman).
+  - `pm/program/partials/filters.blade.php` (yang sudah ada) DIPAKAI ULANG APA ADANYA (generik, cukup dikirim `$regions`/`$branches`/`$statusOptions`/`routeName`/`exportRouteName`) -- tidak perlu file filter baru.
+- Menu sidebar: `resources/views/pm/components/sidebar.blade.php` & `sidebar-mobile.blade.php` -- sub-menu baru "PT 2" ditambahkan di dropdown "Project ID" (setelah Eksternal), link ke `program.pt2`, tampil utk **pm & tif** (TIDAK ada exclude role, beda dgn Eksternal yang exclude tif).
+
+### Verifikasi
+- Balance-check (`{`/`}`, `(`/`)`) pada `DashboardPmController.php` & `ProgramController.php` -- keduanya balance.
+- `php -l` via `device_stage_files` + cloud `Bash` -- "No syntax errors detected" utk `DashboardPmController.php`, `ProgramController.php`, `routes/web.php`.
+- Sweep stray-`@`-directive pada seluruh file blade yang disentuh/dibuat (`pm/dashboard.blade.php`, `pm/program/pt2.blade.php`, `pm/program/partials/pt2-table.blade.php`, `pm/program/partials/pt2-detail-modal.blade.php`, `pm/components/sidebar.blade.php`, `pm/components/sidebar-mobile.blade.php`) -- semua directive yang muncul valid & disengaja.
+- **BELUM diverifikasi end-to-end di browser** (buka /pm/dashboard role pm & tif -- pastikan Matriks PT3 sudah hilang, tabel Report Deployment PT2 muncul & datanya benar; buka menu Project ID > PT 2 -- pastikan list LOP muncul, filter jalan, modal Detail jalan, export Excel jalan) -- perlu ditest oleh user, tidak bisa diverifikasi dari sisi Claude krn tidak ada akses `php artisan serve`/MySQL dari `device_bash`.
+- Cache dashboard (`pm_dashboard_index_v4`) TIDAK di-bump versinya -- data baru (`pt2StageCube`) baru muncul setelah cache lama (TTL 90 detik) kadaluarsa, atau setelah `php artisan cache:clear`.
+
+## Section BP — "Download Semua LOP" split PT3/PT2, role superadmin & TIF/PM (permintaan user 2026-09-17)
+
+### Permintaan user
+"tambahkan buat download all LOP yang ada di database dompis cons di split download PT 3 dan Download PT 2 pada role superadmin dan TIF/PM"
+
+### Keputusan (dikonfirmasi via AskUserQuestion, 2 ronde + 1 klarifikasi free-text)
+1. Role admin/superadmin/officer SUDAH punya halaman "Data PID" (tab Regular/PT2 + tombol Download) yang sebenarnya sudah memenuhi kebutuhan ini -- tapi user tetap minta **fitur baru khusus** utk superadmin (halaman sederhana, terpisah dari Data PID yang sudah ada, TANPA KPI/filter kompleks).
+2. Utk role TIF/PM: awalnya diminta ditaruh di halaman "Report Deployment" (menu terpisah) -- tapi halaman itu SELAMA INI sengaja HANYA utk role PM (tif tidak py akses). Diklarifikasi: user minta "sesuaikan dengan button download di Data PID download all data regular dan PT 2" -- diartikan sbg konfirmasi MEKANISME download (reuse endpoint yang sama persis dgn tombol Download di Data PID, download SEMUA data tanpa filter), bukan menjawab soal lokasi. Krn tidak ada instruksi eksplisit utk membuka akses tif ke halaman Report Deployment terpisah (perubahan permission yang lebih besar drpd yang diminta), diputuskan: **2 tombol download ditaruh di Dashboard PM/TIF (inline)** -- halaman yang SUDAH bisa diakses kedua role, bukan di halaman Report Deployment terpisah. User bisa minta pindah kalau ternyata maksudnya beda.
+
+### Implementasi
+
+**1. Endpoint download (dipakai bersama, TIDAK diduplikasi):**
+- `ImportController::exportPid()` (endpoint yang SUDAH ADA, dipakai tombol "Download Excel" di halaman Data PID admin) ditambah 1 baris: kalau `auth()->user()->role === 'tif'` DAN `type=regular`, exclude program "Konstruksi Eksternal" dari hasil export (konsisten dgn exclude yang sudah ada di tempat lain -- `index()`, `program.konstruk`, cube Reporting Deployment). Role lain (admin/superadmin/super_tif/officer/pm) tetap dapat data lengkap termasuk Konstruksi Eksternal.
+
+**2. Role TIF/PM -- 2 tombol di Dashboard (inline, `resources/views/pm/dashboard.blade.php`):**
+- Route baru `GET /program/download-lop` (`program.download-lop`), di grup `program.` yang sudah ada (role:pm,tif,admin,superadmin,super_tif,officer) -- **reuse langsung** `ImportController::exportPid` (bukan controller/method baru), query `?type=regular` (PT3, exclude Konstruksi Eksternal utk tif) / `?type=pt2`.
+- 2 tombol "Download PT 3" & "Download PT 2" ditambahkan sbg toolbar kecil di atas tabel "Reporting Deployment", link ke `program.download-lop` dgn `type` masing-masing.
+
+**3. Role superadmin -- halaman baru "Download Semua LOP":**
+- Route baru `GET /admin/download-lop` (`admin.download-lop`), grup middleware `role:superadmin` SAJA (bukan admin/super_tif/officer -- sesuai permintaan eksplisit user, terpisah dari grup `admin/import` yang sudah ada).
+- `ImportController::downloadLopPage()` -- cuma hitung total LOP regular & PT2 (`DB::table('lops')->count()`, `DB::table('pt2_lops')->count()`) utk ditampilkan sbg info, TIDAK ada logic export baru.
+- View baru `resources/views/admin/download_lop.blade.php` -- 2 card besar "PT 3 (Regular)" & "PT 2" dgn tombol Download yang link ke route **`admin.data-pid.export`** yang SUDAH ADA (type=regular/pt2) -- endpoint yang SAMA dgn dipakai tombol Download di halaman Data PID (1 sumber kebenaran).
+- Menu sidebar: `resources/views/admin/components/sidebar.blade.php` & `sidebar-mobile.blade.php` -- link baru "Download Semua LOP" ditambahkan di submenu "Master Data" (sejajar Data PID/Data BOQ), dibungkus `@if(auth()->user()->role === 'superadmin')` (TIDAK tampil utk admin/super_tif/officer meski mereka teknisnya bisa akses route `admin.data-pid.export` juga).
+
+### Verifikasi
+- Balance-check (`{`/`}`, `(`/`)`) pada `ImportController.php` -- balance (selisih 0/0). `routes/web.php` sempat menunjukkan selisih paren 2 tapi itu false-positive dari tanda kurung di dalam teks komentar Indonesia (bukan kode) -- dikonfirmasi via `php -l`.
+- `php -l` via `device_stage_files` + cloud `Bash` -- "No syntax errors detected" utk `ImportController.php` & `routes/web.php`.
+- Sweep stray-`@`-directive pada `admin/download_lop.blade.php`, `admin/components/sidebar.blade.php`, `admin/components/sidebar-mobile.blade.php`, `pm/dashboard.blade.php` -- semua directive yang muncul valid & disengaja.
+- **BELUM diverifikasi end-to-end di browser** (klik tombol Download PT3/PT2 di Dashboard PM & TIF -- pastikan file Excel ke-download & datanya benar, exclude Konstruksi Eksternal utk tif; buka menu Download Semua LOP role superadmin -- pastikan angka total & tombol download jalan) -- perlu ditest oleh user.

@@ -732,6 +732,22 @@ Route::prefix('admin/import')
 
 /*
 |--------------------------------------------------------------------------
+| DOWNLOAD SEMUA LOP (permintaan user 2026-09-17) -- menu BARU khusus role
+| superadmin (bukan admin/super_tif/officer -- lihat AskUserQuestion:
+| "Tetap buat fitur baru khusus" utk superadmin, terpisah dari halaman
+| Data PID yang sudah ada). Halaman-nya cuma 2 tombol download, endpoint
+| filenya reuse ImportController::exportPid() lewat route
+| admin.data-pid.export yang SUDAH ADA (di grup role:admin,superadmin,
+| super_tif,officer di atas, jadi tetap bisa dipanggil dari sini).
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:superadmin'])->group(function () {
+    Route::get('/admin/download-lop', [ImportController::class, 'downloadLopPage'])
+        ->name('admin.download-lop');
+});
+
+/*
+|--------------------------------------------------------------------------
 | DASHBOARD PM (role: pm, tif -- DashboardController::index() HANYA
 | redirect kedua role ini ke sini; role admin-ish dapat dashboard admin yang
 | BEDA. "TIF memakai menu & dashboard yang sama persis dengan PM" per
@@ -1087,6 +1103,24 @@ Route::middleware(['auth', 'role:pm,tif,admin,superadmin,super_tif,officer'])->p
     Route::get('/hem/export', [ProgramController::class, 'exportHem'])->name('hem.export');
     Route::get('/olo/export', [ProgramController::class, 'exportOlo'])->name('olo.export');
     Route::get('/konstruksi-eksternal/export', [ProgramController::class, 'exportKonstruk'])->name('konstruk.export');
+
+    // Menu BARU "Project ID > PT 2" (permintaan user 2026-09-17) -- daftar
+    // read-only LOP PT2 utk role pm/tif (role lain di grup ini dialihkan ke
+    // admin.pt2.index oleh ProgramController::pt2(), lihat catatan di sana).
+    Route::get('/pt2', [ProgramController::class, 'pt2'])->name('pt2');
+    Route::get('/pt2/export', [ProgramController::class, 'exportPt2'])->name('pt2.export');
+
+    // Menu BARU "Download Semua LOP" (permintaan user 2026-09-17) -- 2
+    // tombol "Download PT 3" & "Download PT 2" utk role superadmin & tif/pm
+    // (ditaruh di Dashboard PM/TIF, lihat pm/dashboard.blade.php), download
+    // SELURUH LOP lintas program/region (bukan per-program spt export di
+    // atas). SENGAJA reuse ImportController::exportPid() (endpoint yang
+    // SAMA dipakai tombol "Download Excel" di halaman Data PID milik admin,
+    // permintaan user: "sesuaikan dengan button download di Data PID") --
+    // BUKAN diduplikasi, supaya format file & datanya identik 1 sumber
+    // kebenaran. Query ?type=regular (PT3, exclude Konstruksi Eksternal
+    // utk tif, lihat ImportController::exportPid()) / ?type=pt2.
+    Route::get('/download-lop', [ImportController::class, 'exportPid'])->name('download-lop');
 });
 
 require __DIR__.'/auth.php';

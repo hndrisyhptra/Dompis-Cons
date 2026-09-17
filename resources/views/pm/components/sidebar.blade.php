@@ -146,6 +146,19 @@
                 </a>
                 @endif
 
+                {{-- Project ID > PT 2 (menu BARU, permintaan user 2026-09-17) --
+                     tampil utk pm & tif (tidak ada exclude role di sini, beda
+                     dgn Eksternal di atas). Lihat ProgramController::pt2(). --}}
+                <a href="{{ route('program.pt2') }}"
+                class="group flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition
+                {{ request()->routeIs('program.pt2') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+                    <span class="flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                        PT 2
+                    </span>
+                    <span class="text-[9px] px-1.5 py-0.5 rounded-md bg-indigo-100/80 text-indigo-700 font-bold dark:bg-indigo-900/40 dark:text-indigo-300">Program</span>
+                </a>
+
             </div>
         </div>
 

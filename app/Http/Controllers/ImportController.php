@@ -728,6 +728,18 @@ class ImportController extends Controller
             $base = \Illuminate\Support\Facades\DB::table('projects as p');
             $this->applyRegularPidFilters($base, $request, $regions);
 
+            // Revisi (permintaan user 2026-09-17): endpoint ini SEKARANG juga
+            // dipakai tombol "Download PT 3" di Dashboard PM/TIF (route
+            // program.download-lop, lihat routes/web.php) -- role tif TIDAK
+            // boleh lihat program Konstruksi Eksternal sama sekali (konsisten
+            // dgn exclude di tempat lain: index(), program.konstruk,
+            // Reporting Deployment). Role admin/superadmin/super_tif/officer/pm
+            // yang akses via admin.data-pid.export atau program.download-lop
+            // TETAP dapat data lengkap.
+            if (auth()->user()?->role === 'tif') {
+                $base->whereRaw('UPPER(TRIM(p.program)) != ?', ['KONSTRUKSI EKSTERNAL']);
+            }
+
             $rows = (clone $base)
                 ->leftJoin('lops as l', 'l.project_id', '=', 'p.id_project')
                 ->orderByDesc('p.id_project')
@@ -813,6 +825,23 @@ class ImportController extends Controller
         }, $fileName, [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
+    }
+
+    /**
+     * MENU BARU: "Download Semua LOP" (permintaan user 2026-09-17) -- khusus
+     * role superadmin, halaman sederhana berisi 2 tombol besar "Download
+     * PT 3" & "Download PT 2" (TIDAK ada KPI/filter/tabel kompleks spt
+     * halaman Data PID -- itu tetap ada terpisah utk yang butuh filter).
+     * Tombolnya link ke route admin.data-pid.export yang SUDAH ADA
+     * (type=regular/pt2) -- endpoint yang SAMA dgn dipakai tombol "Download
+     * Excel" di halaman Data PID (1 sumber kebenaran, bukan diduplikasi).
+     */
+    public function downloadLopPage()
+    {
+        $totalRegularLop = \Illuminate\Support\Facades\DB::table('lops')->count();
+        $totalPt2Lop = \Illuminate\Support\Facades\DB::table('pt2_lops')->count();
+
+        return view('admin.download_lop', compact('totalRegularLop', 'totalPt2Lop'));
     }
 
 public function updatePid(\Illuminate\Http\Request $request, \App\Models\Project $project)

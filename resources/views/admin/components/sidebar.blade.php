@@ -555,6 +555,21 @@
                     </span>
                 </a>
 
+                {{-- Download Semua LOP: menu BARU (permintaan user
+                     2026-09-17), HANYA role superadmin (route
+                     admin.download-lop, role:superadmin saja). --}}
+                @if(auth()->user()->role === 'superadmin')
+                <a href="{{ route('admin.download-lop') }}"
+                class="block px-3 py-2 rounded-lg text-sm font-semibold transition
+                {{ request()->routeIs('admin.download-lop*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
+
+                    <span class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        Download Semua LOP
+                    </span>
+                </a>
+                @endif
+
             </div>
         </div>
 

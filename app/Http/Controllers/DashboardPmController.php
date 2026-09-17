@@ -393,10 +393,17 @@ class DashboardPmController extends Controller
         */
         $stageCube = $this->buildStageCube();
 
+        // Tabel BARU "Report Deployment PT 2" inline di Dashboard PM/TIF
+        // (permintaan user 2026-09-17) -- data cube-nya sama dgn yang
+        // dipakai halaman Report Deployment terpisah (buildPt2StageCube()),
+        // dipanggil ulang di sini (bukan diduplikasi) supaya 1 sumber
+        // kebenaran.
+        $pt2StageCube = $this->buildPt2StageCube();
+
         return compact(
             'pendingEvidence',
             'stageSummary', 'regularPrograms', 'matrixData', 'matrixPt2Data', 'statsByRegion',
-            'stageCube',
+            'stageCube', 'pt2StageCube',
             'totalLop', 'boqReady', 'assignedLop', 'onProgress', 'completedApproval'
         );
     }

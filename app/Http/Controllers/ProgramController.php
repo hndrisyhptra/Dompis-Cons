@@ -365,4 +365,249 @@ class ProgramController extends Controller
 
         return $this->exportProgramLop($request, 'Konstruksi Eksternal');
     }
+
+    /**
+     * MENU BARU: "Project ID > PT 2" (permintaan user 2026-09-17) -- daftar
+     * read-only LOP PT2 utk role pm/tif, mirip pola OSP/NODE B/HEM/OLO di
+     * atas, TAPI:
+     * - Query-nya BUKAN dari getProgramData() (itu khusus tabel
+     *   projects/lops Regular) -- data PT2 disimpan di pt2_projects/pt2_lops
+     *   (model Pt2Project/Pt2Lop), jadi dibuatkan getPt2ProgramData()
+     *   terpisah di bawah.
+     * - 1 baris tabel = 1 LOP PT2 (bukan 1 Project spt punya Regular),
+     *   krn 1 Project PT2 bisa punya lebih dari 1 LOP (unique key
+     *   pt2_project_id+id_ihld) -- konsisten dgn cara data PT2 diperlakukan
+     *   di modal detail Report Deployment PT2 & Matrix PT2 (per-LOP, bukan
+     *   per-Project).
+     * - View-nya SELALU pm.program.pt2 (list read-only sederhana, TANPA aksi
+     *   Assign/Edit/Delete/Import spt punya admin.pt2.index) -- kalau yang
+     *   akses role admin/superadmin/super_tif/officer (route ini sengaja
+     *   dibuka lintas role sama spt program lain di atas), dialihkan ke
+     *   admin.pt2.index yang sudah ada & lebih lengkap, DRPD dibuatkan view
+     *   admin.program.pt2 yang isinya cuma duplikat read-only percuma.
+     */
+    public function pt2(Request $request)
+    {
+        if (!in_array(auth()->user()?->role, ['tif', 'pm'], true)) {
+            return redirect()->route('admin.pt2.index');
+        }
+
+        $data = $this->getPt2ProgramData($request);
+
+        return view('pm.program.pt2', $data);
+    }
+
+    /**
+     * Engine data utk halaman Project ID > PT 2 (lihat pt2() di atas).
+     * 1 baris = 1 Pt2Lop (join ke Pt2Project via relasi project()).
+     */
+    private function getPt2ProgramData(Request $request): array
+    {
+        $search = $request->input('search');
+        $branch = $request->input('branch');
+        $region = $request->input('region');
+        $statusProgress = $request->input('status_progress', $request->input('status_project'));
+        $regions = $this->pidRegions();
+
+        $query = \App\Models\Pt2Lop::with(['project', 'assignment.teknisi', 'boqItems']);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('lop_name', 'like', "%{$search}%")
+                  ->orWhere('id_ihld', 'like', "%{$search}%")
+                  ->orWhere('sto', 'like', "%{$search}%")
+                  ->orWhere('branch', 'like', "%{$search}%")
+                  ->orWhere('mitra_name', 'like', "%{$search}%")
+                  ->orWhereHas('project', function ($qp) use ($search) {
+                      $qp->where('project_name', 'like', "%{$search}%")
+                         ->orWhere('pid', 'like', "%{$search}%")
+                         ->orWhere('pid_sap', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Region: sama pola dgn getProgramData() -- branch pakai fallback ke
+        // pt2_projects.branch kalau pt2_lops.branch kosong (pola yang sudah
+        // ada di DashboardPmController utk cube/matrix PT2).
+        if ($region) {
+            $regionKey = strtoupper(trim((string) $region));
+            if (isset($regions[$regionKey])) {
+                $query->whereRaw(
+                    "UPPER(TRIM(COALESCE(NULLIF(TRIM(branch), ''), (SELECT branch FROM pt2_projects WHERE pt2_projects.id_pt2_project = pt2_lops.pt2_project_id)))) IN (" .
+                    implode(',', array_fill(0, count($regions[$regionKey]), '?')) . ')',
+                    $regions[$regionKey]
+                );
+            }
+        }
+
+        if ($branch) {
+            $query->whereRaw(
+                "UPPER(TRIM(COALESCE(NULLIF(TRIM(branch), ''), (SELECT branch FROM pt2_projects WHERE pt2_projects.id_pt2_project = pt2_lops.pt2_project_id)))) = ?",
+                [strtoupper(trim((string) $branch))]
+            );
+        }
+
+        if ($statusProgress) {
+            $query->where('status_progress', $statusProgress);
+        }
+
+        $lops = $query->latest('updated_at')->paginate($request->input('per_page', 10))->withQueryString();
+
+        $branches = \App\Models\Pt2Lop::whereNotNull('branch')
+            ->where('branch', '!=', '')
+            ->distinct()
+            ->orderBy('branch')
+            ->pluck('branch');
+
+        return [
+            'lops' => $lops,
+            'branches' => $branches,
+            'regions' => $regions,
+            'statusOptions' => $this->pt2StatusProgressOptions(),
+            'programName' => 'PT 2',
+        ];
+    }
+
+    /**
+     * Opsi status_progress PT2 -- istilah BARU hasil Section BM
+     * ANALISA_REFACTOR_PERSIAPAN.md (inisiasi/survey/instalasi/finishing/
+     * fi_ogp_golive/golive/drop), BUKAN ProjectStage::active() (itu master
+     * stage Regular, tidak dipakai PT2).
+     */
+    private function pt2StatusProgressOptions(): array
+    {
+        return [
+            'inisiasi' => 'Inisiasi',
+            'survey' => 'Survey',
+            'instalasi' => 'Instalasi',
+            'finishing' => 'Finishing',
+            'fi_ogp_golive' => 'FI-OGP Golive',
+            'golive' => 'Golive',
+            'drop' => 'Drop',
+        ];
+    }
+
+    /**
+     * Export data LOP PT2 ke Excel -- mengikuti filter yang aktif, pola sama
+     * dgn exportProgramLop() (Regular) tapi query dari pt2_lops/pt2_projects.
+     */
+    public function exportPt2(Request $request)
+    {
+        $regions = $this->pidRegions();
+
+        $base = DB::table('pt2_lops as l')
+            ->join('pt2_projects as p', 'l.pt2_project_id', '=', 'p.id_pt2_project');
+
+        $search = trim((string) $request->input('search', ''));
+        if ($search !== '') {
+            $like = '%' . $search . '%';
+            $base->where(function ($q) use ($like) {
+                $q->where('l.lop_name', 'like', $like)
+                    ->orWhere('l.id_ihld', 'like', $like)
+                    ->orWhere('l.sto', 'like', $like)
+                    ->orWhere('l.branch', 'like', $like)
+                    ->orWhere('l.mitra_name', 'like', $like)
+                    ->orWhere('p.project_name', 'like', $like)
+                    ->orWhere('p.pid', 'like', $like)
+                    ->orWhere('p.pid_sap', 'like', $like);
+            });
+        }
+
+        if ($request->filled('region')) {
+            $region = strtoupper(trim((string) $request->region));
+            if (isset($regions[$region])) {
+                $branches = $regions[$region];
+                $base->whereRaw(
+                    "UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch))) IN (" .
+                    implode(',', array_fill(0, count($branches), '?')) . ')',
+                    $branches
+                );
+            }
+        }
+
+        if ($request->filled('branch')) {
+            $branch = strtoupper(trim((string) $request->branch));
+            $base->whereRaw(
+                "UPPER(TRIM(COALESCE(NULLIF(TRIM(l.branch), ''), p.branch))) = ?",
+                [$branch]
+            );
+        }
+
+        $statusProgress = $request->input('status_progress', $request->input('status_project'));
+        if ($statusProgress) {
+            $base->where('l.status_progress', $statusProgress);
+        }
+
+        $rows = (clone $base)
+            ->leftJoin('pt2_assignments as pa', 'pa.pt2_lop_id', '=', 'l.id_pt2_lop')
+            ->leftJoin('users as ut', 'ut.id_user', '=', 'pa.teknisi_id')
+            ->orderByDesc('l.id_pt2_lop')
+            ->get([
+                'p.pid',
+                'p.pid_sap',
+                'p.project_name',
+                DB::raw("'PT 2' as program"),
+                'l.status_progress',
+                'l.mitra_name',
+                'l.id_ihld',
+                'l.lop_name',
+                DB::raw("COALESCE(NULLIF(TRIM(l.branch), ''), p.branch) as branch"),
+                'l.sto',
+                'ut.name as teknisi_name',
+            ]);
+
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Data LOP PT 2');
+
+        $headers = [
+            'PID', 'PID SAP', 'Nama Project', 'Program', 'Status Progress',
+            'Mitra', 'ID IHLD', 'Nama LOP', 'Branch', 'STO', 'Teknisi',
+        ];
+
+        $sheet->fromArray($headers, null, 'A1');
+
+        $rowIndex = 2;
+        foreach ($rows as $row) {
+            $sheet->fromArray([
+                $row->pid ?? '-',
+                $row->pid_sap ?? '-',
+                $row->project_name ?? '-',
+                $row->program ?? '-',
+                $row->status_progress ?? '-',
+                $row->mitra_name ?? '-',
+                $row->id_ihld ?? '-',
+                $row->lop_name ?? '-',
+                $row->branch ?? '-',
+                $row->sto ?? '-',
+                $row->teknisi_name ?? '-',
+            ], null, 'A' . $rowIndex);
+            $rowIndex++;
+        }
+
+        $lastColumn = $sheet->getHighestColumn();
+        $lastRow = $sheet->getHighestRow();
+
+        $sheet->getStyle('A1:' . $lastColumn . '1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:' . $lastColumn . '1')->getFill()
+            ->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)
+            ->getStartColor()->setRGB('DBEAFE');
+
+        foreach (range('A', $lastColumn) as $columnId) {
+            $sheet->getColumnDimension($columnId)->setAutoSize(true);
+        }
+
+        $sheet->freezePane('A2');
+        $sheet->setAutoFilter('A1:' . $lastColumn . $lastRow);
+
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
+
+        $fileName = 'data-lop-pt2-' . now()->format('Y-m-d_His') . '.xlsx';
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
 }

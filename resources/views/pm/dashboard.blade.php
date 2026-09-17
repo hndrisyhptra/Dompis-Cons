@@ -125,6 +125,43 @@
         </div>
     </div>
 
+    {{-- DOWNLOAD SEMUA LOP (permintaan user 2026-09-17) -- 2 tombol
+         "Download PT 3" & "Download PT 2", download SELURUH LOP lintas
+         program/region (BEDA dgn "Download Semua Data LOP" yang sudah ada
+         di menu Project ID > OSP/dll, itu per-program). Reuse endpoint
+         ImportController::exportPid() (route program.download-lop, sama
+         persis dgn tombol "Download Excel" di halaman Data PID milik admin
+         -- permintaan user: "sesuaikan dengan button download di Data PID
+         download all data regular dan PT 2"). Role tif TIDAK melihat
+         program Konstruksi Eksternal di file PT3-nya (exclude di
+         ImportController::exportPid()). --}}
+    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h2 class="text-sm font-black uppercase tracking-wider text-gray-800 dark:text-gray-200">Download Semua LOP</h2>
+            <p class="text-xs text-gray-400 mt-1">Unduh seluruh data LOP (lintas program & region) dalam format Excel.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <a href="{{ route('program.download-lop', ['type' => 'regular']) }}"
+               class="h-11 px-5 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black inline-flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download PT 3
+            </a>
+            <a href="{{ route('program.download-lop', ['type' => 'pt2']) }}"
+               class="h-11 px-5 rounded-2xl bg-indigo-700 hover:bg-indigo-800 text-white text-sm font-black inline-flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                Download PT 2
+            </a>
+        </div>
+    </div>
+
     {{-- REPORTING DEPLOYMENT (DROP/HOLD/PREPARING/PERIZINAN/MATDEL/INSTALASI/
          FI-OGP GOLIVE/GOLIVE + GRAND TOTAL) PER REGION & BRANCH, FILTER
          REGION/BRANCH/PROGRAM --}}
@@ -337,87 +374,15 @@
         </div>
     </div>
 
-    {{-- MATRIX PROGRESS PROJECT REGULAR --}}
-    <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
-        <div class="px-6 py-5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-950/50">
-            <h2 class="text-sm font-black uppercase tracking-wider text-gray-800 dark:text-gray-200">Matriks Progress Project PT 3</h2>
-            <p class="text-xs text-gray-400 mt-1">Program PT 3: OSP, OLO, HEM, NODE B, EKSBIS.</p>
-        </div>
-        <div class="overflow-x-auto pb-4">
-            <table class="w-full text-xs border-collapse">
-                <thead class="bg-gray-100/60 dark:bg-gray-950/60 text-gray-400 font-bold uppercase tracking-wider text-[10px]">
-                    <tr>
-                        <th rowspan="2" class="px-6 py-3 text-left border-r border-gray-200/60 dark:border-gray-800 align-middle whitespace-nowrap sticky left-0 bg-gray-100/90 dark:bg-gray-950/90 backdrop-blur-sm z-10">
-                            Wilayah (Region / Branch)
-                        </th>
-                        @foreach($regularPrograms as $prog)
-                            <th colspan="4" class="px-3 py-2 text-center border-b border-r border-gray-200/60 dark:border-gray-800 whitespace-nowrap">{{ strtoupper(trim($prog)) === 'EKSBIS' ? 'Eksbis' : $prog }}</th>
-                        @endforeach
-                    </tr>
-                    <tr>
-                        @foreach($regularPrograms as $prog)
-                            <th class="px-3 py-2 text-center text-blue-600 bg-blue-50/50 dark:bg-blue-950/20">Prepare</th>
-                            <th class="px-3 py-2 text-center text-amber-600 bg-amber-50/50 dark:bg-amber-950/20">Progress</th>
-                            <th class="px-3 py-2 text-center text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20">Finish</th>
-                            <th class="px-3 py-2 text-center text-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/20 border-r border-gray-200/60 dark:border-gray-800">% Done</th>
-                        @endforeach
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                    @forelse($matrixData ?? [] as $i => $reg)
-                        <tr class="cursor-pointer bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition group" onclick="toggleRegion('pm-matrix-reg-{{ $i }}', 'pm-icon-matrix-{{ $i }}')">
-                            <td class="px-6 py-4 border-r border-gray-200/60 dark:border-gray-800 sticky left-0 bg-white dark:bg-gray-900 group-hover:bg-gray-50 dark:group-hover:bg-gray-800/50 z-10">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-5 h-5 flex items-center justify-center rounded bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
-                                        <svg id="pm-icon-matrix-{{ $i }}" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200"><path d="m9 18 6-6-6-6"/></svg>
-                                    </div>
-                                    <span class="font-black text-gray-800 dark:text-gray-200 text-sm whitespace-nowrap">{{ $reg['region'] }}</span>
-                                </div>
-                            </td>
-
-                            @foreach($regularPrograms as $prog)
-                                @php
-                                    $stats = $reg['programs'][$prog] ?? ['preparation' => 0, 'instalasi' => 0, 'finishing' => 0];
-                                    $totalProyek = $stats['preparation'] + $stats['instalasi'] + $stats['finishing'];
-                                    $persentase = $totalProyek > 0 ? round(($stats['finishing'] / $totalProyek) * 100) : 0;
-                                @endphp
-                                <td class="px-3 py-4 text-center font-bold text-gray-700 dark:text-gray-300 bg-blue-50/20 dark:bg-blue-950/10"><span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'', program:'{{ $prog }}', metric:'preparation'})">{{ $stats['preparation'] ?: '-' }}</span></td>
-                                <td class="px-3 py-4 text-center font-bold text-gray-700 dark:text-gray-300 bg-amber-50/20 dark:bg-amber-950/10"><span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'', program:'{{ $prog }}', metric:'instalasi'})">{{ $stats['instalasi'] ?: '-' }}</span></td>
-                                <td class="px-3 py-4 text-center font-bold text-gray-700 dark:text-gray-300 bg-emerald-50/20 dark:bg-emerald-950/10"><span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'', program:'{{ $prog }}', metric:'finishing'})">{{ $stats['finishing'] ?: '-' }}</span></td>
-                                <td class="px-3 py-4 text-center font-black text-indigo-700 dark:text-indigo-400 bg-indigo-50/20 dark:bg-indigo-950/10 border-r border-gray-200/60 dark:border-gray-800">{{ $persentase }}%</td>
-                            @endforeach
-                        </tr>
-
-                        @foreach($reg['branches'] as $br)
-                            <tr class="hidden bg-gray-50/50 dark:bg-gray-950/50 hover:bg-gray-100/50 transition pm-matrix-reg-{{ $i }}">
-                                <td class="px-6 py-3 pl-[3.25rem] border-r border-gray-200/60 dark:border-gray-800 sticky left-0 bg-gray-50/90 dark:bg-gray-950/90 z-10">
-                                    <span class="font-bold text-gray-600 dark:text-gray-400 whitespace-nowrap">&bull; {{ $br['name'] }}</span>
-                                </td>
-
-                                @foreach($regularPrograms as $prog)
-                                    @php
-                                        $stats = $br['programs'][$prog] ?? ['preparation' => 0, 'instalasi' => 0, 'finishing' => 0];
-                                        $totalProyek = $stats['preparation'] + $stats['instalasi'] + $stats['finishing'];
-                                        $persentase = $totalProyek > 0 ? round(($stats['finishing'] / $totalProyek) * 100) : 0;
-                                    @endphp
-                                    <td class="px-3 py-3 text-center text-blue-600 dark:text-blue-400 font-semibold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', program:'{{ $prog }}', metric:'preparation'})">{{ $stats['preparation'] ?: '-' }}</span></td>
-                                    <td class="px-3 py-3 text-center text-amber-600 dark:text-amber-400 font-semibold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', program:'{{ $prog }}', metric:'instalasi'})">{{ $stats['instalasi'] ?: '-' }}</span></td>
-                                    <td class="px-3 py-3 text-center text-emerald-600 dark:text-emerald-400 font-semibold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', program:'{{ $prog }}', metric:'finishing'})">{{ $stats['finishing'] ?: '-' }}</span></td>
-                                    <td class="px-3 py-3 text-center text-indigo-600 dark:text-indigo-400 font-black border-r border-gray-200/60 dark:border-gray-800">{{ $persentase }}%</td>
-                                @endforeach
-                            </tr>
-                        @endforeach
-                    @empty
-                        <tr>
-                            <td colspan="{{ 1 + ($regularPrograms->count() * 4) }}" class="px-6 py-10 text-center text-gray-400 font-medium">
-                                Tidak ada data project terdaftar.
-                            </td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
+    {{-- Revisi (permintaan user 2026-09-17): tabel "Matriks Progress Project
+         PT 3" (breakdown region/branch x program x Prepare/Progress/Finish)
+         DIHAPUS dari Dashboard PM/TIF -- sudah digantikan tabel "Reporting
+         Deployment" di atas (breakdown status lebih detail, 8 kolom) yang
+         mencakup data yang sama. Digantikan tabel "Report Deployment PT 2"
+         di bawah (partial yang sama dgn halaman Report Deployment terpisah,
+         partials.report-deployment-pt2, lihat DashboardPmController::
+         buildPt2StageCube()). --}}
+    @include('partials.report-deployment-pt2', ['pt2StageCube' => $pt2StageCube, 'matrixDetailRoute' => 'pm.dashboard.matrix-detail'])
 
     {{-- MATRIX PROGRESS PROJECT PT 2 --}}
     <div class="bg-white dark:bg-gray-900 border border-indigo-200 dark:border-indigo-900 rounded-2xl overflow-hidden shadow-sm">
