@@ -32,7 +32,7 @@
                     </div>
 
                     <span
-                        class="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300"
+                        class="px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300"
                     >
                         {{ count($items) }}
                     </span>
@@ -67,7 +67,7 @@
 
                             placeholder="Cari..."
 
-                            class="w-full rounded-xl border border-slate-200 dark:border-slate-700
+                            class="w-full rounded-lg border border-slate-200 dark:border-slate-700
                                    bg-white dark:bg-slate-800
                                    pl-10 pr-4 py-2.5
                                    text-sm
@@ -89,7 +89,7 @@
 
                         x-model="sort"
 
-                        class="rounded-xl border border-slate-200 dark:border-slate-700
+                        class="rounded-lg border border-slate-200 dark:border-slate-700
                                bg-white dark:bg-slate-800
                                text-sm"
 
@@ -125,7 +125,7 @@
 
                         @click="toggleCompact()"
 
-                        class="rounded-xl border border-slate-200 dark:border-slate-700
+                        class="rounded-lg border border-slate-200 dark:border-slate-700
                                bg-white dark:bg-slate-800
                                text-sm font-semibold
                                hover:bg-slate-50"
@@ -224,12 +224,12 @@
                             >
 
                                 <div
-                                    class="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden"
+                                    class="w-full h-2 rounded-lg bg-slate-200 dark:bg-slate-700 overflow-hidden"
                                 >
 
                                     <div
 
-                                        class="h-full rounded-full transition-all duration-700 {{ $bar }}"
+                                        class="h-full rounded-lg transition-all duration-700 {{ $bar }}"
 
                                         style="width:{{ min($percent,100) }}%"
 

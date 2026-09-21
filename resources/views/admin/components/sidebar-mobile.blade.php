@@ -17,7 +17,7 @@
         </div>
 
         <button @click="sidebarOpen = false"
-                class="w-9 h-9 rounded-xl border border-gray-200 dark:border-gray-700">
+                class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700">
             ×
         </button>
 
@@ -32,14 +32,14 @@
         </p>
 
          <a href="{{ route('dashboard') }}"
-            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
             {{ request()->routeIs('dashboard') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 @if(request()->routeIs('dashboard'))
                     <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
                 @endif
 
-               <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+               <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
             <!-- Lucide: Layout Dashboard -->
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard">
                     <rect width="7" height="9" x="3" y="3" rx="1"/>
@@ -63,7 +63,7 @@
 
             <button type="button"
                     @click="open = !open"
-                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
                     {{ $inboxOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 <div class="flex items-center gap-3">
@@ -71,7 +71,7 @@
                         <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
                     @endif
 
-                    <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/40 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/40 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg"
                             class="w-5 h-5"
                             viewBox="0 0 24 24"
@@ -110,7 +110,7 @@
                 {{ request()->routeIs('admin.inbox*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-blue-500"></span>
                         Active Project
                     </span>
                 </a>
@@ -120,7 +120,7 @@
                 {{ request()->routeIs('admin.history*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-emerald-500"></span>
                         History
                     </span>
                 </a>
@@ -139,7 +139,7 @@
 
             <button type="button"
                     @click="open = !open"
-                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
                     {{ $projectOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 <div class="flex items-center gap-3">
@@ -147,7 +147,7 @@
                         <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
                     @endif
 
-                    <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg"
                             class="w-5 h-5"
                             viewBox="0 0 24 24"
@@ -184,63 +184,63 @@
                 class="mt-2 ml-5 pl-3 border-l border-gray-200 dark:border-gray-700 space-y-1">
 
                 <a href="{{ route('projects.index', ['program' => 'OSP']) }}"
-                class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                class="group flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ $activeProgram == 'OSP' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-blue-500"></span>
                         OSP
                     </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">Fiber</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-lg bg-blue-100 text-blue-700">Fiber</span>
                 </a>
 
                 <a href="{{ route('projects.index', ['program' => 'NODE B']) }}"
-                class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                class="group flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ $activeProgram == 'NODE B' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-purple-500"></span>
                         NODE B
                     </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Site</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-lg bg-purple-100 text-purple-700">Site</span>
                 </a>
 
                 <a href="{{ route('projects.index', ['program' => 'HEM']) }}"
-                class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                class="group flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ $activeProgram == 'HEM' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-amber-500"></span>
                         HEM
                     </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Home</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-lg bg-amber-100 text-amber-700">Home</span>
                 </a>
 
                 <a href="{{ route('projects.index', ['program' => 'OLO']) }}"
-                class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                class="group flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ $activeProgram == 'OLO' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-green-500"></span>
                         OLO
                     </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">Partner</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-lg bg-green-100 text-green-700">Partner</span>
                 </a>
 
                 <a href="{{ route('projects.index', ['program' => 'Konstruksi Eksternal']) }}"
-                class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                class="group flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ $activeProgram == 'Konstruksi Eksternal' ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-red-500"></span>
                         Konstruksi Eksternal
                     </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700">External</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-lg bg-red-100 text-red-700">External</span>
                 </a>
 
                 <a href="{{ route('projects.index', ['program' => 'PT 2']) }}"
-                    class="group flex items-center justify-between px-3 py-2 rounded-xl text-sm font-semibold transition
+                    class="group flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold transition
                     {{ $activeProgram == 'PT 2' ? 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                         <span class="flex items-center gap-2">
-                            <span class="w-2 h-2 rounded-full bg-cyan-500"></span>
+                            <span class="w-2 h-2 rounded-lg bg-cyan-500"></span>
                             PT 2
                         </span>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">Swakelola</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-lg bg-cyan-100 text-cyan-700">Swakelola</span>
                     </a>
 
             </div>
@@ -266,7 +266,7 @@
 
             <button type="button"
                     @click="open = !open"
-                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
                     {{ $masterDesignatorOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 <div class="flex items-center gap-3">
@@ -274,7 +274,7 @@
                         <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
                     @endif
 
-                    <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg"
                         width="22" height="22" viewBox="0 0 24 24"
                         fill="none" stroke="currentColor" stroke-width="2"
@@ -308,7 +308,7 @@
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('designators.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                    <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-blue-500"></span>
                         Designator
                     </span>
                 </a>
@@ -317,7 +317,7 @@
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('packages.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-purple-500"></span>
                         Paket KHS
                     </span>
                 </a>
@@ -326,7 +326,7 @@
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('designator-prices.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                    <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-yellow-500"></span>
                         KHS
                     </span>
                 </a>
@@ -343,7 +343,7 @@
 
             <button type="button"
                     @click="open = !open"
-                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
                     {{ $masterAlurOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 <div class="flex items-center gap-3">
@@ -351,7 +351,7 @@
                         <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
                     @endif
 
-                    <div class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-600/40 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-600/40 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg"
                             width="20" height="20" viewBox="0 0 24 24"
                             fill="none" stroke="currentColor" stroke-width="2"
@@ -383,7 +383,7 @@
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('admin.project-stages.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                    <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-indigo-500"></span>
                         Tahapan Alur
                     </span>
                 </a>
@@ -392,7 +392,7 @@
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('admin.kendala-categories.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-red-500"></span>
                         Kategori Kendala
                     </span>
                 </a>
@@ -401,7 +401,7 @@
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('admin.permit-categories.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                    <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-amber-500"></span>
                         Kategori Perizinan
                     </span>
                 </a>
@@ -415,7 +415,7 @@
 
             <button type="button"
                     @click="open = !open"
-                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
                     {{ $importDataOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 <div class="flex items-center gap-3">
@@ -423,7 +423,7 @@
                         <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
                     @endif
                     
-                    <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg"
                             width="20" height="20" viewBox="0 0 24 24"
                             fill="none" stroke="currentColor" stroke-width="2"
@@ -455,7 +455,7 @@
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition
                 {{ request()->routeIs('admin.import.pid*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                    <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-blue-500"></span>
                        Bulk Import PID
                     </span>
                 </a>
@@ -477,7 +477,7 @@
                 {{ request()->routeIs('admin.import.boq*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                   
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-purple-500"></span>
                        Bulk Import BOQ
                     </span>
                 </a>
@@ -494,7 +494,7 @@
 
             <button type="button"
                     @click="open = !open"
-                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
                     {{ $masterDataOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 <div class="flex items-center gap-3">
@@ -502,7 +502,7 @@
                         <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
                     @endif
 
-                    <div class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-600/40 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-600/40 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg"
                             class="w-5 h-5"
                             viewBox="0 0 24 24"
@@ -541,7 +541,7 @@
                 {{ request()->routeIs('admin.data-pid*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-blue-500"></span>
                         Data PID
                     </span>
                 </a>
@@ -551,7 +551,7 @@
                 {{ request()->routeIs('admin.master-boq*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-purple-500"></span>
                         Data BOQ
                     </span>
                 </a>
@@ -564,7 +564,7 @@
                 {{ request()->routeIs('admin.download-lop*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-emerald-500"></span>
                         Download Semua LOP
                     </span>
                 </a>
@@ -574,14 +574,14 @@
         </div>
         
         <a href="{{ route('assign-waspang.index') }}"
-        class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+        class="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
         {{ request()->routeIs('assign-waspang.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
             @if(request()->routeIs('assign-waspang.*'))
                 <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
             @endif
 
-            <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+            <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-user-star-icon lucide-user-star">
                 <path d="M16.051 12.616a1 1 0 0 1 1.909.024l.737 1.452a1 1 0 0 0 .737.535l1.634.256a1 1 0 0 1 .588 1.806l-1.172 1.168a1 1 0 0 0-.282.866l.259 1.613a1 1 0 0 1-1.541 1.134l-1.465-.75a1 1 0 0 0-.912 0l-1.465.75a1 1 0 0 1-1.539-1.133l.258-1.613a1 1 0 0 0-.282-.866l-1.156-1.153a1 1 0 0 1 .572-1.822l1.633-.256a1 1 0 0 0 .737-.535z"/><path d="M8 15H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/>
                 </svg>    
@@ -596,14 +596,14 @@
         </p>
 
         <a href="{{ route('admin.map.monitoring') }}"
-            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
             {{ request()->routeIs('admin.map.monitoring') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 @if(request()->routeIs('admin.map.*'))
                     <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
                 @endif  
 
-            <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+            <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-map-pinned-icon lucide-map-pinned">
                     <path d="M18 8c0 3.613-3.869 7.429-5.393 8.795a1 1 0 0 1-1.214 0C9.87 15.429 6 11.613 6 8a6 6 0 0 1 12 0"/><circle cx="12" cy="8" r="2"/><path d="M8.714 14h-3.71a1 1 0 0 0-.948.683l-2.004 6A1 1 0 0 0 3 22h18a1 1 0 0 0 .948-1.316l-2-6a1 1 0 0 0-.949-.684h-3.712"/>
                 </svg> 
@@ -624,7 +624,7 @@
 
             <button type="button"
                     @click="open = !open"
-                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
                     {{ $surveyLapanganOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 <div class="flex items-center gap-3">
@@ -632,7 +632,7 @@
                         <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
                     @endif
 
-                    <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard-list-icon lucide-clipboard-list">
                             <rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>
                         </svg>
@@ -663,7 +663,7 @@
                 {{ request()->routeIs('admin.site-surveys.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-blue-500"></span>
                         Hasil Survey Lapangan
                     </span>
                 </a>
@@ -673,7 +673,7 @@
                 {{ request()->routeIs('admin.gis-cad.*') ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-indigo-500"></span>
                         Generate/Export CAD
                     </span>
                 </a>
@@ -690,7 +690,7 @@
 
             <button type="button"
                     @click="open = !open"
-                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
                     {{ $approvalOpen ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 <div class="flex items-center gap-3">
@@ -698,7 +698,7 @@
                         <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
                     @endif
 
-                    <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" 
                              class="w-5 h-5" 
                              viewBox="0 0 24 24" 
@@ -737,7 +737,7 @@
                 {{ request()->routeIs('admin.evidences.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-blue-500"></span>
                         Approval Konstruksi
                     </span>
                 </a>
@@ -747,7 +747,7 @@
                 {{ request()->routeIs('admin.pt2.approval*') ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-indigo-500"></span>
                         Approval PT2
                     </span>
                 </a>
@@ -765,7 +765,7 @@
 
             <button type="button"
                     @click="open = !open"
-                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+                    class="w-full relative flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
                     {{ $resultFileOpen ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                 <div class="flex items-center gap-3">
@@ -773,7 +773,7 @@
                         <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-indigo-600"></span>
                     @endif
 
-                    <div class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-600/60 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-600/60 flex items-center justify-center">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-handshake-icon lucide-handshake">
                             <path d="m11 17 2 2a1 1 0 1 0 3-3"/><path d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 1-3-3l2.81-2.81a5.79 5.79 0 0 1 7.06-.87l.47.28a2 2 0 0 0 1.42.25L21 4"/><path d="m21 3 1 11h-2"/><path d="M3 3 2 14l6.5 6.5a1 1 0 1 0 3-3"/><path d="M3 4h8"/>
                         </svg>
@@ -804,7 +804,7 @@
                 {{ request()->routeIs('admin.pt2.baut.*') ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-indigo-500"></span>
                         Berkas BAUT
                     </span>
                 </a>
@@ -814,7 +814,7 @@
                 {{ request()->routeIs('admin.pt2.lact.*') ? 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
                     <span class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-violet-500"></span>
+                        <span class="w-2 h-2 rounded-lg bg-violet-500"></span>
                         Berkas LACT
                     </span>
                 </a>
@@ -827,14 +827,14 @@
         </p>
 
         <a href="{{ route('admin.report_deployment') }}"
-            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
             {{ request()->routeIs('admin.report_deployment') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
             @if(request()->routeIs('admin.report_deployment'))
                 <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
             @endif
 
-            <div class="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-600/60 flex items-center justify-center">
+            <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-600/60 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-layout-dashboard">
                     <rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>
                 </svg>
@@ -846,14 +846,14 @@
         </a>
 
         <a href="{{ route('admin.stage_duration_report') }}"
-            class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+            class="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
             {{ request()->routeIs('admin.stage_duration_report') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
             @if(request()->routeIs('admin.stage_duration_report'))
                 <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
             @endif
 
-            <div class="w-8 h-8 rounded-xl bg-teal-100 dark:bg-teal-600/60 flex items-center justify-center">
+            <div class="w-8 h-8 rounded-lg bg-teal-100 dark:bg-teal-600/60 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-timer">
                     <line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/>
                 </svg>
@@ -865,9 +865,9 @@
         </a>
 
         <a href="#"
-           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition">
           
-           <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+           <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chart-no-axes-combined-icon lucide-chart-no-axes-combined">
                     <path d="M12 16v5"/><path d="M16 14.639V21"/><path d="M20 10.656V21"/><path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15"/><path d="M4 18.463V21"/><path d="M8 14.656V21"/>
                 </svg>
@@ -882,14 +882,14 @@
         {{-- User Management: hanya ditampilkan untuk role superadmin --}}
         @if(auth()->user()->role === 'superadmin')
         <a href="{{ route('admin.users.index') }}"
-           class="relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition
+           class="relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition
            {{ request()->routeIs('admin.users.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
 
            @if(request()->routeIs('admin.users.*'))
                 <span class="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-blue-600"></span>
             @endif
 
-            <div class="w-8 h-8 rounded-xl bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
+            <div class="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-600/60 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shield-user-icon lucide-shield-user">
                     <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M6.376 18.91a6 6 0 0 1 11.249.003"/><circle cx="12" cy="11" r="4"/>
                 </svg>

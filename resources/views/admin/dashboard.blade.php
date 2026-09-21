@@ -4,10 +4,7 @@
 
 @php
     $completionRate = $completionRate ?? 0;
-
-    // Program PT 3 yang SELALU ditampilkan di filter dan Matrix PT 3.
-    // Tetap muncul walaupun count pada database = 0.
-    // PT 2 sengaja tidak dimasukkan ke filter Program.
+ 
     $regularPrograms = collect([
         'OSP',
         'OLO',
@@ -21,16 +18,7 @@
         'JATIM' => ['SIDOARJO', 'SURABAYA', 'MADIUN', 'JEMBER', 'LAMONGAN', 'MALANG'],
         'JATENG DIY' => ['YOGYAKARTA', 'SEMARANG', 'PURWOKERTO', 'PEKALONGAN', 'SURAKARTA', 'MAGELANG'],
         'BALNUS' => ['DENPASAR', 'KUPANG', 'MATARAM', 'FLORES'],
-    ];
-
-    // Widget "Ringkasan & Alur Progress PT 3": BOQ Ready/Belum BOQ dan Sudah
-    // Assign/Belum Assign ditampilkan berpasangan dalam 1 card, ditambah On
-    // Progress dan Completed - total cuma 4 card ringkas (dari sebelumnya 9).
-    // Total LOP jadi angka acuan di header widget. SEMUA angka bisa diklik
-    // untuk membuka modal daftar LOP-nya (lihat matrixDetailModal() & metric
-    // yang dikirim harus sinkron dengan DashboardController::matrixDetail()).
-    // Semua otomatis ikut berubah saat filter region/branch/program/status
-    // diterapkan di halaman ini.
+    ]; 
     $totalForPercent = $totalLop ?? 0;
     $pctOf = fn ($value) => $totalForPercent > 0 ? round(($value / $totalForPercent) * 100) : 0;
 
@@ -81,95 +69,221 @@
 
 <div class="min-h-screen bg-slate-50 dark:bg-slate-950 -m-4 md:-m-6 p-4 md:p-6" x-data="matrixDetailModal()">
 
-    <div class="max-w-7xl mx-auto space-y-6">
-
+    <div class="max-w-7xl mx-auto space-y-6"> 
         {{-- HEADER --}}
-        <div class="rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+        <div class="rounded-[0.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
             <div>
                 <p class="text-xs font-black text-blue-700 uppercase tracking-widest">Analytics Dashboard</p>
                 <h1 class="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mt-1">Dashboard Monitoring</h1>
-            </div>
-
-            <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-4 min-w-[220px]">
+            </div> 
+            <div class="rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-4 min-w-[220px]">
                 <p class="text-xs text-slate-500 font-bold uppercase">Completion Rate</p>
                 <div class="flex items-end justify-between gap-3 mt-2">
                     <p class="text-3xl font-black text-emerald-700">{{ $completionRate }}%</p>
                     <span class="text-xs font-black text-slate-500">{{ number_format($completedApproval ?? 0) }}/{{ number_format($totalLop ?? 0) }}</span>
                 </div>
-                <div class="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-                    <div class="h-full rounded-full bg-emerald-500" style="width: {{ min($completionRate, 100) }}%"></div>
+                <div class="mt-3 h-2 rounded-lg bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                    <div class="h-full rounded-lg bg-emerald-500" style="width: {{ min($completionRate, 100) }}%"></div>
                 </div>
             </div>
-        </div>
-
+        </div> 
+        {{-- ============================================================= --}}
         {{-- FILTER PANEL --}}
-        <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
-            <form method="GET" action="{{ route('dashboard') }}" id="filterForm">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
-                    
-                    {{-- Region Filter --}}
+        {{-- ============================================================= --}}
+        <div
+            class="bg-white dark:bg-slate-900
+                   rounded-lg
+                   border border-slate-200 dark:border-slate-800
+                   p-5
+                   shadow-sm" > 
+            <form
+                method="GET"
+                action="{{ route('dashboard') }}"
+                id="filterForm" >
+
+                <div
+                    class="grid grid-cols-1
+                           sm:grid-cols-2
+                           lg:grid-cols-5
+                           gap-4
+                           items-end" >
+
+                    {{-- REGION --}}
                     <div class="space-y-1.5">
-                        <label class="block text-[11px] font-bold uppercase text-slate-500">Region</label>
-                        <select name="region" id="regionSelect" onchange="handleRegionChange()"
-                                class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition">
-                            <option value="">Semua Region</option>
+
+                        <label
+                            for="regionSelect"
+                            class="block text-[11px]
+                                   font-bold uppercase
+                                   text-slate-500 dark:text-slate-400" >
+                            Region
+                        </label>
+
+                        <select
+                            name="region"
+                            id="regionSelect"
+                            onchange="handleRegionChange()"
+                            class="w-full h-10 px-3
+                                   rounded-lg
+                                   bg-slate-50 dark:bg-slate-950
+                                   border border-slate-200 dark:border-slate-700
+                                   text-sm font-medium
+                                   text-slate-800 dark:text-slate-200
+                                   outline-none
+                                   focus:ring-2
+                                   focus:ring-blue-100 dark:focus:ring-blue-500/20
+                                   focus:border-blue-500 dark:focus:border-blue-500
+                                   transition" >
+
+                            <option value="">
+                                Semua Region
+                            </option>
+
                             @foreach(array_keys($regionMapping) as $region)
-                                <option value="{{ $region }}" {{ strtoupper(request('region', '')) === $region ? 'selected' : '' }}>
+
+                                <option
+                                    value="{{ $region }}"
+                                    {{ strtoupper(request('region', '')) === $region ? 'selected' : '' }}>
                                     {{ $region }}
+                                </option> 
+                            @endforeach 
+                        </select> 
+                    </div> 
+                    {{-- BRANCH --}}
+                    <div class="space-y-1.5"> 
+                        <label
+                            for="branchSelect"
+                            class="block text-[11px]
+                                   font-bold uppercase
+                                   text-slate-500 dark:text-slate-400" >
+                            Branch
+                        </label>
+
+                        <select
+                            name="branch"
+                            id="branchSelect"
+                            onchange="document.getElementById('filterForm').submit()"
+                            class="w-full h-10 px-3
+                                   rounded-lg
+                                   bg-slate-50 dark:bg-slate-950
+                                   border border-slate-200 dark:border-slate-700
+                                   text-sm font-medium
+                                   text-slate-800 dark:text-slate-200
+                                   outline-none
+                                   focus:ring-2
+                                   focus:ring-blue-100 dark:focus:ring-blue-500/20
+                                   focus:border-blue-500
+                                   transition" >
+                            <option value="">
+                                Semua Branch
+                            </option>
+                        </select> 
+                    </div> 
+                    {{-- PROGRAM --}}
+                    <div class="space-y-1.5"> 
+                        <label
+                            class="block text-[11px]
+                                   font-bold uppercase
+                                   text-slate-500 dark:text-slate-400" >
+                            Program PT 3
+                        </label>
+
+                        <select
+                            name="program"
+                            onchange="document.getElementById('filterForm').submit()"
+                            class="w-full h-10 px-3
+                                   rounded-lg
+                                   bg-slate-50 dark:bg-slate-950
+                                   border border-slate-200 dark:border-slate-700
+                                   text-sm font-medium
+                                   text-slate-800 dark:text-slate-200
+                                   outline-none
+                                   focus:ring-2
+                                   focus:ring-blue-100 dark:focus:ring-blue-500/20
+                                   focus:border-blue-500
+                                   transition" > 
+                            <option value="">
+                                Semua Program
+                            </option> 
+                            @foreach($regularPrograms as $program) 
+                                <option
+                                    value="{{ $program }}"
+                                    {{ request('program') == $program ? 'selected' : '' }}>
+                                    {{ $program }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
-
-                    {{-- Branch Filter --}}
+                    {{-- STATUS --}}
                     <div class="space-y-1.5">
-                        <label class="block text-[11px] font-bold uppercase text-slate-500">Branch</label>
-                        <select name="branch" id="branchSelect" onchange="document.getElementById('filterForm').submit()"
-                                class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition">
-                            <option value="">Semua Branch</option>
-                            {{-- Diisi via JS --}}
-                        </select>
-                    </div>
+                        <label
+                            class="block text-[11px]
+                                   font-bold uppercase
+                                   text-slate-500 dark:text-slate-400">
+                            Status LOP
+                        </label>
 
-                    {{-- Program PT 3 Filter --}}
-                    <div class="space-y-1.5">
-                        <label class="block text-[11px] font-bold uppercase text-slate-500">Program PT 3</label>
-                        <select name="program" onchange="document.getElementById('filterForm').submit()"
-                                class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition">
-                            <option value="">Semua Program</option>
-                            @foreach($regularPrograms as $program)
-                                <option value="{{ $program }}" {{ request('program') == $program ? 'selected' : '' }}>{{ $program }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                        <select
+                            name="status"
+                            onchange="document.getElementById('filterForm').submit()"
+                            class="w-full h-10 px-3
+                                   rounded-lg
+                                   bg-slate-50 dark:bg-slate-950
+                                   border border-slate-200 dark:border-slate-700
+                                   text-sm font-medium
+                                   text-slate-800 dark:text-slate-200
+                                   outline-none
+                                   focus:ring-2
+                                   focus:ring-blue-100 dark:focus:ring-blue-500/20
+                                   focus:border-blue-500
+                                   transition">
 
-                    {{-- Status Filter --}}
-                    <div class="space-y-1.5">
-                        <label class="block text-[11px] font-bold uppercase text-slate-500">Status LOP</label>
-                        <select name="status" onchange="document.getElementById('filterForm').submit()"
-                                class="w-full h-10 px-3 rounded-xl bg-slate-50 border border-slate-200 text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition">
-                            <option value="">Semua Status</option>
+                            <option value="">
+                                Semua Status
+                            </option> 
                             @foreach($statusOptions as $statusCode => $statusLabel)
-                                <option value="{{ $statusCode }}" @selected(request('status') === $statusCode)>{{ $statusLabel }}</option>
+
+                                <option
+                                    value="{{ $statusCode }}"
+                                    @selected(request('status') === $statusCode)>
+                                    {{ $statusLabel }}
+                                </option>
+
                             @endforeach
                         </select>
                     </div>
+                    {{-- RESET --}}
+                    @if(
+                        request('program') ||
+                        request('branch') ||
+                        request('region') ||
+                        request('status')
+                    )
 
-                    {{-- Reset Button --}}
-                    @if(request('program') || request('branch') || request('region') || request('status'))
                         <div>
-                            <a href="{{ route('dashboard') }}" 
-                               class="flex items-center justify-center h-10 px-4 rounded-xl border border-dashed border-red-300 text-xs font-bold text-red-600 hover:bg-red-50 transition w-full">
+                            <a
+                                href="{{ route('dashboard') }}"
+                                class="flex items-center justify-center
+                                       h-10 px-4
+                                       rounded-lg
+                                       border border-dashed
+                                       border-red-300 dark:border-red-500/40
+                                       text-xs font-bold
+                                       text-red-600 dark:text-red-400
+                                       hover:bg-red-50 dark:hover:bg-red-500/10
+                                       transition w-full">
                                 Reset Filter
                             </a>
                         </div>
+
                     @endif
+
                 </div>
             </form>
         </div>
 
         {{-- RINGKASAN & ALUR PROGRESS PT 3 (1 widget ringkas, klik angka = modal daftar LOP) --}}
-        <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
+        <div class="bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
 
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
                 <div>
@@ -179,8 +293,8 @@
 
                 <button type="button"
                         @click="show({type:'assignment', region:'', branch:'', metric:''})"
-                        class="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-2.5 self-start sm:self-auto hover:border-blue-300 dark:hover:border-blue-700 transition text-left">
-                    <div class="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0 text-blue-600 dark:text-blue-400">
+                        class="flex items-center gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2.5 self-start sm:self-auto hover:border-blue-300 dark:hover:border-blue-700 transition text-left">
+                    <div class="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0 text-blue-600 dark:text-blue-400">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 lucide lucide-file-spreadsheet"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
                     </div>
                     <div>
@@ -196,9 +310,9 @@
                         $percent = $pctOf($step['value']);
                         $subPercent = $step['sub'] ? $pctOf($step['sub']['value']) : null;
                     @endphp
-                    <div class="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                    <div class="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
                         <div class="flex items-center gap-2.5">
-                            <div class="w-9 h-9 rounded-xl {{ $step['icon_bg'] }} {{ $step['icon_text'] }} flex items-center justify-center shrink-0">
+                            <div class="w-9 h-9 rounded-lg {{ $step['icon_bg'] }} {{ $step['icon_text'] }} flex items-center justify-center shrink-0">
                                 {!! $step['icon'] !!}
                             </div>
                             <p class="text-xs font-black uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ $step['label'] }}</p>
@@ -220,8 +334,8 @@
                             @endif
                         </div>
 
-                        <div class="mt-3 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                            <div class="h-full rounded-full {{ $step['bar'] }}" style="width: {{ min($percent, 100) }}%"></div>
+                        <div class="mt-3 h-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                            <div class="h-full rounded-lg {{ $step['bar'] }}" style="width: {{ min($percent, 100) }}%"></div>
                         </div>
                     </div>
                 @endforeach
@@ -229,297 +343,977 @@
         </div>
 
         {{-- TABEL REKAP COLLAPSIBLE PER REGION --}}
-        <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-            <div class="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
-                <div>
-                    <h2 class="text-sm font-black uppercase tracking-wider text-slate-800">Rekap Assignment & Status Project PT 3</h2>
-                    <p class="text-xs text-slate-500 mt-1">Klik pada nama Region untuk melihat detail per Branch.</p>
+        <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+            <div class="px-5 md:px-6 py-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900">
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-sm font-black uppercase tracking-wider text-slate-800 dark:text-slate-100">
+                            Rekap Assignment & Status Project PT 3
+                        </h2>
+                    </div>
+                    <span class="hidden sm:inline-flex items-center px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 text-[10px] font-black uppercase tracking-wider">
+                        PT 3
+                    </span>
                 </div>
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-xs border-collapse">
-                    <thead class="bg-slate-100/60 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                        <tr>
-                            <th class="px-6 py-3 text-left">Breakdown (Region / Branch)</th>
-                            <th class="px-3 py-3 text-center">Total LOP</th>
-                            <th class="px-3 py-3 text-center">Assign</th>
-                            <th class="px-3 py-3 text-center">Blm Assign</th>
-                            <th class="px-3 py-3 text-center">In Review</th>
-                            <th class="px-3 py-3 text-center">Complete (Done)</th>
-                            <th class="px-6 py-3 text-right">Progress Rate</th>
+                <table class="w-full min-w-[950px] text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-slate-800/70 border-b border-slate-200 dark:border-slate-700">
+
+                            <th class="px-6 py-3.5 text-left text-[10px] font-black uppercase tracking-wider
+                                    text-slate-500 dark:text-slate-400">
+                                Region / Branch
+                            </th>
+
+                            <th class="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider
+                                    text-slate-500 dark:text-slate-400">
+                                Total LOP
+                            </th>
+
+                            <th class="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider
+                                    text-blue-600 dark:text-blue-400">
+                                Assign
+                            </th>
+
+                            <th class="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider
+                                    text-rose-600 dark:text-rose-400">
+                                Blm Assign
+                            </th>
+
+                            <th class="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider
+                                    text-amber-600 dark:text-amber-400">
+                                In Review
+                            </th>
+
+                            <th class="px-3 py-3.5 text-center text-[10px] font-black uppercase tracking-wider
+                                    text-emerald-600 dark:text-emerald-400">
+                                Complete
+                            </th>
+
+                            <th class="px-6 py-3.5 text-right text-[10px] font-black uppercase tracking-wider
+                                    text-slate-500 dark:text-slate-400">
+                                Progress Rate
+                            </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200/60">
+
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+
                         @forelse($statsByRegion ?? [] as $i => $reg)
-                            <tr class="cursor-pointer bg-white hover:bg-slate-50 transition" onclick="toggleRegion('region-{{ $i }}', 'icon-{{ $i }}')">
+
+                            {{-- REGION --}}
+                            <tr class="group cursor-pointer bg-white dark:bg-slate-900 hover:bg-blue-50/50 dark:hover:bg-blue-500/[0.06] transition-colors duration-200" onclick="toggleRegion('region-{{ $i }}', 'icon-{{ $i }}')">
                                 <td class="px-6 py-4">
                                     <div class="flex items-center gap-3">
-                                        <div class="w-5 h-5 flex items-center justify-center rounded bg-blue-100 text-blue-600">
-                                            <svg id="icon-{{ $i }}" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200"><path d="m9 18 6-6-6-6"/></svg>
-                                        </div>
-                                        <span class="font-black text-slate-800 text-sm">{{ $reg['region'] }}</span>
+                                        <div class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:bg-blue-100 dark:group-hover:bg-blue-500/20 transition-colors">
+                                            <svg id="icon-{{ $i }}" xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200" >
+                                                <path d="m9 18 6-6-6-6"/>
+                                            </svg>
+                                        </div> 
+                                        <div>
+                                            <p class="font-black text-sm text-slate-800 dark:text-slate-100">
+                                                {{ $reg['region'] }}
+                                            </p>
+                                        </div> 
                                     </div>
                                 </td>
-                                <td class="px-3 py-4 text-center font-black text-slate-700 text-sm">
-                                    <span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'total'})">{{ $reg['total'] }}</span>
+
+                                <td class="px-3 py-4 text-center">
+                                    <button type="button" class="min-w-[44px] px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-black hover:bg-slate-200 dark:hover:bg-slate-700 transition" @click.stop="show({ type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'total' })" >
+                                        {{ $reg['total'] }}
+                                    </button>
                                 </td>
-                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-blue-50 text-blue-700 font-black hover:bg-blue-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'assigned'})">{{ $reg['assigned'] }}</span></td>
-                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-rose-50 text-rose-700 font-black hover:bg-rose-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'unassigned'})">{{ $reg['total'] - $reg['assigned'] }}</span></td>
-                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-amber-50 text-amber-700 font-black hover:bg-amber-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'waiting'})">{{ $reg['waiting'] }}</span></td>
-                                <td class="px-3 py-4 text-center"><span class="cursor-pointer px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black hover:bg-emerald-100" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'completed'})">{{ $reg['completed'] }}</span></td>
-                                <td class="px-6 py-4 text-right">
+
+                                <td class="px-3 py-4 text-center">
+                                    <button type="button" class="min-w-[44px] px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400 font-black hover:bg-blue-100 dark:hover:bg-blue-500/20 transition" @click.stop="show({ type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'assigned' })" >
+                                        {{ $reg['assigned'] }}
+                                    </button>
+                                </td>
+
+                                <td class="px-3 py-4 text-center">
+                                    <button type="button" class="min-w-[44px] px-3 py-1.5 rounded-lg bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400
+                                            font-black hover:bg-rose-100 dark:hover:bg-rose-500/20 transition" @click.stop="show({ type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'unassigned' })" >
+                                        {{ $reg['total'] - $reg['assigned'] }}
+                                    </button>
+                                </td>
+
+                                <td class="px-3 py-4 text-center">
+                                    <button
+                                        type="button" class="min-w-[44px] px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400
+                                            font-black hover:bg-amber-100 dark:hover:bg-amber-500/20 transition" @click.stop="show({ type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'waiting' })" >
+                                        {{ $reg['waiting'] }}
+                                    </button>
+                                </td>
+
+                                <td class="px-3 py-4 text-center">
+                                    <button
+                                        type="button" class="min-w-[44px] px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-black hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition" @click.stop="show({ type:'assignment', region:'{{ $reg['region'] }}', branch:'', metric:'completed' })" >
+                                        {{ $reg['completed'] }}
+                                    </button>
+                                </td>
+
+                                <td class="px-6 py-4">
                                     <div class="flex items-center justify-end gap-3">
-                                        <div class="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                            <div class="h-full bg-emerald-500 rounded-full" style="width: {{ $reg['percent'] }}%"></div>
+
+                                        <div class="w-24 lg:w-28 h-2 rounded-lg
+                                                    bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                            <div
+                                                class="h-full rounded-lg bg-emerald-500 transition-all duration-500"
+                                                style="width: {{ min($reg['percent'], 100) }}%">
+                                            </div>
                                         </div>
-                                        <span class="font-black text-slate-800">{{ $reg['percent'] }}%</span>
+
+                                        <span class="min-w-[42px] text-right font-black
+                                                    text-slate-800 dark:text-slate-200">
+                                            {{ $reg['percent'] }}%
+                                        </span>
                                     </div>
                                 </td>
                             </tr>
-                            
+
+                            {{-- BRANCH --}}
                             @foreach($reg['branches'] as $br)
-                                <tr class="hidden bg-slate-50/50 hover:bg-slate-100/50 transition region-{{ $i }}">
-                                    <td class="px-6 py-3 pl-[3.25rem]">
-                                        <span class="font-bold text-slate-600"> • {{ $br['name'] }}</span>
+                                <tr
+                                    class="hidden region-{{ $i }}
+                                        bg-slate-50/70 dark:bg-slate-950/40
+                                        hover:bg-slate-100 dark:hover:bg-slate-800/70
+                                        transition-colors">
+                                    <td class="px-6 py-3 pl-[4.25rem]">
+                                        <div class="flex items-center gap-2">
+                                            <span class="w-1.5 h-1.5 rounded-lg bg-slate-300 dark:bg-slate-600"></span>
+
+                                            <span class="font-bold text-slate-600 dark:text-slate-300">
+                                                {{ $br['name'] }}
+                                            </span>
+                                        </div>
                                     </td>
-                                    <td class="px-3 py-3 text-center font-bold text-slate-600">
-                                        <span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'total'})">{{ $br['total'] }}</span>
+
+                                    <td class="px-3 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="font-black text-slate-600 dark:text-slate-300 hover:underline"
+                                            @click.stop="show({
+                                                type:'assignment',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'{{ $br['name'] }}',
+                                                metric:'total'
+                                            })">
+                                            {{ $br['total'] }}
+                                        </button>
                                     </td>
-                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-blue-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'assigned'})">{{ $br['assigned'] }}</span></td>
-                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-rose-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'unassigned'})">{{ $br['total'] - $br['assigned'] }}</span></td>
-                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-amber-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'waiting'})">{{ $br['waiting'] }}</span></td>
-                                    <td class="px-3 py-3 text-center"><span class="cursor-pointer text-emerald-600 font-bold hover:underline" @click.stop="show({type:'assignment', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', metric:'completed'})">{{ $br['completed'] }}</span></td>
-                                    <td class="px-6 py-3 text-right font-black text-slate-500">{{ $br['percent'] }}%</td>
+
+                                    <td class="px-3 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="font-black text-blue-600 dark:text-blue-400 hover:underline"
+                                            @click.stop="show({
+                                                type:'assignment',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'{{ $br['name'] }}',
+                                                metric:'assigned'
+                                            })" >
+                                            {{ $br['assigned'] }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-3 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="font-black text-rose-600 dark:text-rose-400 hover:underline"
+                                            @click.stop="show({
+                                                type:'assignment',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'{{ $br['name'] }}',
+                                                metric:'unassigned'
+                                            })" >
+                                            {{ $br['total'] - $br['assigned'] }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-3 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="font-black text-amber-600 dark:text-amber-400 hover:underline"
+                                            @click.stop="show({
+                                                type:'assignment',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'{{ $br['name'] }}',
+                                                metric:'waiting'
+                                            })" >
+                                            {{ $br['waiting'] }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-3 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="font-black text-emerald-600 dark:text-emerald-400 hover:underline"
+                                            @click.stop="show({
+                                                type:'assignment',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'{{ $br['name'] }}',
+                                                metric:'completed'
+                                            })" >
+                                            {{ $br['completed'] }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-6 py-3 text-right">
+                                        <span class="inline-flex min-w-[48px] justify-center px-2.5 py-1 rounded-lg
+                                                    bg-slate-100 dark:bg-slate-800
+                                                    text-slate-600 dark:text-slate-300
+                                                    font-black">
+                                            {{ $br['percent'] }}%
+                                        </span>
+                                    </td>
                                 </tr>
                             @endforeach
+
                         @empty
                             <tr>
-                                <td colspan="7" class="px-6 py-10 text-center text-slate-400 font-medium">Tidak ada data statistik tersedia berdasarkan filter.</td>
+                                <td colspan="7"
+                                    class="px-6 py-12 text-center text-slate-400 dark:text-slate-500 font-medium">
+                                    Tidak ada data statistik tersedia berdasarkan filter.
+                                </td>
                             </tr>
                         @endforelse
+
                     </tbody>
                 </table>
             </div>
         </div>
 
         {{-- MATRIX PROJECT REGULAR --}}
-        <div class="mt-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-            <div class="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50">
-                <div>
-                    <h2 class="text-sm font-black uppercase tracking-wider text-slate-800">Matriks Progress Project PT 3</h2>
-                    <p class="text-xs text-slate-500 mt-1">Program PT 3: OSP, OLO, HEM, NODE B, EKSBIS.</p>
+        <div class="mt-5 bg-white dark:bg-slate-900 rounded-lg
+                    border border-slate-200 dark:border-slate-800
+                    overflow-hidden shadow-sm">
+
+            <div class="px-5 md:px-6 py-5 border-b border-slate-200 dark:border-slate-800
+                        bg-slate-50/70 dark:bg-slate-900">
+
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-sm font-black uppercase tracking-wider
+                                text-slate-800 dark:text-slate-100">
+                            Matriks Progress Project PT 3
+                        </h2>
+
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Program PT 3: OSP, OLO, HEM, NODE B, EKSBIS.
+                        </p>
+                    </div>
+
+                    <span class="hidden sm:inline-flex px-3 py-1.5 rounded-lg
+                                bg-blue-50 dark:bg-blue-500/10
+                                text-blue-700 dark:text-blue-400
+                                text-[10px] font-black uppercase">
+                        PT 3
+                    </span>
                 </div>
             </div>
 
-            <div class="overflow-x-auto pb-4">
-                <table class="w-full text-xs border-collapse">
-                    <thead class="bg-slate-100/60 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                        <tr>
-                            <th rowspan="2" class="px-6 py-3 text-left border-r border-slate-200/60 align-middle whitespace-nowrap sticky left-0 bg-slate-100/90 backdrop-blur-sm z-10">
-                                Wilayah (Region / Branch)
+            <div class="overflow-x-auto pb-3">
+                <table class="w-full min-w-max text-xs border-collapse">
+
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-slate-800/70">
+
+                            <th
+                                rowspan="2"
+                                class="px-6 py-4 text-left
+                                    border-r border-slate-200 dark:border-slate-700
+                                    align-middle whitespace-nowrap
+                                    sticky left-0 z-30
+                                    bg-slate-50 dark:bg-slate-800
+                                    text-[10px] font-black uppercase tracking-wider
+                                    text-slate-500 dark:text-slate-400"
+                            >
+                                Region / Branch
                             </th>
+
                             @foreach($regularPrograms as $prog)
-                                <th colspan="4" class="px-3 py-2 text-center border-b border-r border-slate-200/60 whitespace-nowrap">{{ strtoupper(trim($prog)) === 'EKSBIS' ? 'Eksbis' : $prog }}</th>
+                                <th
+                                    colspan="4"
+                                    class="px-4 py-3 text-center
+                                        border-r border-b border-slate-200 dark:border-slate-700
+                                        whitespace-nowrap
+                                        text-[10px] font-black uppercase tracking-wider
+                                        text-slate-700 dark:text-slate-200" >
+                                    {{ strtoupper(trim($prog)) === 'EKSBIS' ? 'Eksbis' : $prog }}
+                                </th>
                             @endforeach
                         </tr>
-                        <tr>
+
+                        <tr class="border-b border-slate-200 dark:border-slate-700">
                             @foreach($regularPrograms as $prog)
-                                <th class="px-3 py-2 text-center text-blue-600 bg-blue-50/50">Prepare</th>
-                                <th class="px-3 py-2 text-center text-amber-600 bg-amber-50/50">Progress</th>
-                                <th class="px-3 py-2 text-center text-emerald-600 bg-emerald-50/50">Finish</th>
-                                <th class="px-3 py-2 text-center text-indigo-600 bg-indigo-50/50 border-r border-slate-200/60">% Done</th>
+
+                                <th class="px-3 py-3 text-center whitespace-nowrap
+                                        bg-blue-50/70 dark:bg-blue-500/10
+                                        text-blue-700 dark:text-blue-400
+                                        font-black text-[10px] uppercase">
+                                    Prepare
+                                </th>
+
+                                <th class="px-3 py-3 text-center whitespace-nowrap
+                                        bg-amber-50/70 dark:bg-amber-500/10
+                                        text-amber-700 dark:text-amber-400
+                                        font-black text-[10px] uppercase">
+                                    Progress
+                                </th>
+
+                                <th class="px-3 py-3 text-center whitespace-nowrap
+                                        bg-emerald-50/70 dark:bg-emerald-500/10
+                                        text-emerald-700 dark:text-emerald-400
+                                        font-black text-[10px] uppercase">
+                                    Finish
+                                </th>
+
+                                <th class="px-3 py-3 text-center whitespace-nowrap
+                                        border-r border-slate-200 dark:border-slate-700
+                                        bg-indigo-50/70 dark:bg-indigo-500/10
+                                        text-indigo-700 dark:text-indigo-400
+                                        font-black text-[10px] uppercase">
+                                    % Done
+                                </th>
+
                             @endforeach
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-200/60">
+
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+
                         @forelse($matrixData ?? [] as $i => $reg)
-                            <tr class="cursor-pointer bg-white hover:bg-slate-50 transition group" onclick="toggleRegion('matrix-reg-{{ $i }}', 'icon-matrix-{{ $i }}')">
-                                <td class="px-6 py-4 border-r border-slate-200/60 sticky left-0 bg-white group-hover:bg-slate-50 z-10">
+
+                            <tr
+                                class="cursor-pointer group
+                                    bg-white dark:bg-slate-900
+                                    hover:bg-blue-50/40 dark:hover:bg-blue-500/[0.06]
+                                    transition-colors"
+                                onclick="toggleRegion('matrix-reg-{{ $i }}', 'icon-matrix-{{ $i }}')" >
+
+                                <td class="px-6 py-4
+                                        border-r border-slate-200 dark:border-slate-700
+                                        sticky left-0 z-20
+                                        bg-white dark:bg-slate-900
+                                        group-hover:bg-blue-50 dark:group-hover:bg-slate-800">
+
                                     <div class="flex items-center gap-3">
-                                        <div class="w-5 h-5 flex items-center justify-center rounded bg-indigo-100 text-indigo-600">
-                                            <svg id="icon-matrix-{{ $i }}" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="transition-transform duration-200"><path d="m9 18 6-6-6-6"/></svg>
+
+                                        <div class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg
+                                                    bg-indigo-50 dark:bg-indigo-500/10
+                                                    text-indigo-600 dark:text-indigo-400">
+
+                                            <svg
+                                                id="icon-matrix-{{ $i }}"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="15"
+                                                height="15"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="3"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                class="transition-transform duration-200" >
+                                                <path d="m9 18 6-6-6-6"/>
+                                            </svg>
                                         </div>
-                                        <span class="font-black text-slate-800 text-sm whitespace-nowrap">{{ $reg['region'] }}</span>
+
+                                        <span class="font-black text-sm whitespace-nowrap
+                                                    text-slate-800 dark:text-slate-100">
+                                            {{ $reg['region'] }}
+                                        </span>
                                     </div>
                                 </td>
-                                
+
                                 @foreach($regularPrograms as $prog)
-                                    @php 
+
+                                    @php
                                         $stats = $reg['programs'][$prog] ?? [
                                             'preparation' => 0,
                                             'instalasi' => 0,
                                             'finishing' => 0,
-                                        ]; 
-                                        $totalProyek = $stats['preparation'] + $stats['instalasi'] + $stats['finishing'];
-                                        $persentase = $totalProyek > 0 ? round(($stats['finishing'] / $totalProyek) * 100) : 0;
+                                        ];
+
+                                        $totalProyek =
+                                            $stats['preparation'] +
+                                            $stats['instalasi'] +
+                                            $stats['finishing'];
+
+                                        $persentase = $totalProyek > 0
+                                            ? round(($stats['finishing'] / $totalProyek) * 100)
+                                            : 0;
                                     @endphp
-                                    <td class="px-3 py-4 text-center font-bold text-slate-700 bg-blue-50/20"><span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'', program:'{{ $prog }}', metric:'preparation'})">{{ $stats['preparation'] ?: '-' }}</span></td>
-                                    <td class="px-3 py-4 text-center font-bold text-slate-700 bg-amber-50/20"><span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'', program:'{{ $prog }}', metric:'instalasi'})">{{ $stats['instalasi'] ?: '-' }}</span></td>
-                                    <td class="px-3 py-4 text-center font-bold text-slate-700 bg-emerald-50/20"><span class="cursor-pointer hover:underline decoration-2 underline-offset-2" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'', program:'{{ $prog }}', metric:'finishing'})">{{ $stats['finishing'] ?: '-' }}</span></td>
-                                    <td class="px-3 py-4 text-center font-black text-indigo-700 bg-indigo-50/20 border-r border-slate-200/60">{{ $persentase }}%</td>
+
+                                    <td class="px-3 py-4 text-center
+                                            bg-blue-50/20 dark:bg-blue-500/[0.03]">
+
+                                        <button
+                                            type="button"
+                                            class="min-w-[40px] px-2.5 py-1.5 rounded-lg
+                                                font-black text-blue-700 dark:text-blue-400
+                                                hover:bg-blue-100 dark:hover:bg-blue-500/20 transition"
+                                            @click.stop="show({
+                                                type:'regular',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'',
+                                                program:'{{ $prog }}',
+                                                metric:'preparation'
+                                            })" >
+                                            {{ $stats['preparation'] ?: '-' }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-3 py-4 text-center
+                                            bg-amber-50/20 dark:bg-amber-500/[0.03]">
+
+                                        <button
+                                            type="button"
+                                            class="min-w-[40px] px-2.5 py-1.5 rounded-lg
+                                                font-black text-amber-700 dark:text-amber-400
+                                                hover:bg-amber-100 dark:hover:bg-amber-500/20 transition"
+                                            @click.stop="show({
+                                                type:'regular',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'',
+                                                program:'{{ $prog }}',
+                                                metric:'instalasi'
+                                            })" >
+                                            {{ $stats['instalasi'] ?: '-' }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-3 py-4 text-center
+                                            bg-emerald-50/20 dark:bg-emerald-500/[0.03]">
+
+                                        <button
+                                            type="button"
+                                            class="min-w-[40px] px-2.5 py-1.5 rounded-lg
+                                                font-black text-emerald-700 dark:text-emerald-400
+                                                hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition"
+                                            @click.stop="show({
+                                                type:'regular',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'',
+                                                program:'{{ $prog }}',
+                                                metric:'finishing'
+                                            })" >
+                                            {{ $stats['finishing'] ?: '-' }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-3 py-4 text-center
+                                            bg-indigo-50/20 dark:bg-indigo-500/[0.03]
+                                            border-r border-slate-200 dark:border-slate-700">
+
+                                        <span class="inline-flex justify-center min-w-[50px]
+                                                    px-2.5 py-1.5 rounded-lg
+                                                    bg-indigo-50 dark:bg-indigo-500/10
+                                                    text-indigo-700 dark:text-indigo-400
+                                                    font-black">
+                                            {{ $persentase }}%
+                                        </span>
+                                    </td>
+
                                 @endforeach
                             </tr>
-                            
+
                             @foreach($reg['branches'] as $br)
-                                <tr class="hidden bg-slate-50/50 hover:bg-slate-100/50 transition matrix-reg-{{ $i }} group-branch">
-                                    <td class="px-6 py-3 pl-[3.25rem] border-r border-slate-200/60 sticky left-0 bg-slate-50/90 z-10">
-                                        <span class="font-bold text-slate-600 whitespace-nowrap">• {{ $br['name'] }}</span>
+
+                                <tr
+                                    class="hidden matrix-reg-{{ $i }}
+                                        bg-slate-50/70 dark:bg-slate-950/40
+                                        hover:bg-slate-100 dark:hover:bg-slate-800/70
+                                        transition-colors" >
+
+                                    <td class="px-6 py-3 pl-[4.25rem]
+                                            border-r border-slate-200 dark:border-slate-700
+                                            sticky left-0 z-20
+                                            bg-slate-50 dark:bg-slate-950">
+
+                                        <div class="flex items-center gap-2">
+
+                                            <span class="w-1.5 h-1.5 rounded-lg
+                                                        bg-slate-300 dark:bg-slate-600">
+                                            </span>
+
+                                            <span class="font-bold whitespace-nowrap
+                                                        text-slate-600 dark:text-slate-300">
+                                                {{ $br['name'] }}
+                                            </span>
+                                        </div>
                                     </td>
-                                    
+
                                     @foreach($regularPrograms as $prog)
-                                        @php 
+
+                                        @php
                                             $stats = $br['programs'][$prog] ?? [
                                                 'preparation' => 0,
                                                 'instalasi' => 0,
                                                 'finishing' => 0,
-                                            ]; 
-                                            $totalProyek = $stats['preparation'] + $stats['instalasi'] + $stats['finishing'];
-                                            $persentase = $totalProyek > 0 ? round(($stats['finishing'] / $totalProyek) * 100) : 0;
+                                            ];
+
+                                            $totalProyek =
+                                                $stats['preparation'] +
+                                                $stats['instalasi'] +
+                                                $stats['finishing'];
+
+                                            $persentase = $totalProyek > 0
+                                                ? round(($stats['finishing'] / $totalProyek) * 100)
+                                                : 0;
                                         @endphp
-                                        <td class="px-3 py-3 text-center text-blue-600 font-semibold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', program:'{{ $prog }}', metric:'preparation'})">{{ $stats['preparation'] ?: '-' }}</span></td>
-                                        <td class="px-3 py-3 text-center text-amber-600 font-semibold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', program:'{{ $prog }}', metric:'instalasi'})">{{ $stats['instalasi'] ?: '-' }}</span></td>
-                                        <td class="px-3 py-3 text-center text-emerald-600 font-semibold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'regular', region:'{{ $reg['region'] }}', branch:'{{ $br['name'] }}', program:'{{ $prog }}', metric:'finishing'})">{{ $stats['finishing'] ?: '-' }}</span></td>
-                                        <td class="px-3 py-3 text-center text-indigo-600 font-black border-r border-slate-200/60">{{ $persentase }}%</td>
+
+                                        <td class="px-3 py-3 text-center">
+                                            <button
+                                                type="button"
+                                                class="text-blue-600 dark:text-blue-400
+                                                    font-black hover:underline"
+                                                @click.stop="show({
+                                                    type:'regular',
+                                                    region:'{{ $reg['region'] }}',
+                                                    branch:'{{ $br['name'] }}',
+                                                    program:'{{ $prog }}',
+                                                    metric:'preparation'
+                                                })" >
+                                                {{ $stats['preparation'] ?: '-' }}
+                                            </button>
+                                        </td>
+
+                                        <td class="px-3 py-3 text-center">
+                                            <button
+                                                type="button"
+                                                class="text-amber-600 dark:text-amber-400
+                                                    font-black hover:underline"
+                                                @click.stop="show({
+                                                    type:'regular',
+                                                    region:'{{ $reg['region'] }}',
+                                                    branch:'{{ $br['name'] }}',
+                                                    program:'{{ $prog }}',
+                                                    metric:'instalasi'
+                                                })" >
+                                                {{ $stats['instalasi'] ?: '-' }}
+                                            </button>
+                                        </td>
+
+                                        <td class="px-3 py-3 text-center">
+                                            <button
+                                                type="button"
+                                                class="text-emerald-600 dark:text-emerald-400
+                                                    font-black hover:underline"
+                                                @click.stop="show({
+                                                    type:'regular',
+                                                    region:'{{ $reg['region'] }}',
+                                                    branch:'{{ $br['name'] }}',
+                                                    program:'{{ $prog }}',
+                                                    metric:'finishing'
+                                                })" >
+                                                {{ $stats['finishing'] ?: '-' }}
+                                            </button>
+                                        </td>
+
+                                        <td class="px-3 py-3 text-center
+                                                border-r border-slate-200 dark:border-slate-700">
+
+                                            <span class="inline-flex min-w-[48px] justify-center
+                                                        px-2 py-1 rounded-lg
+                                                        bg-indigo-50 dark:bg-indigo-500/10
+                                                        text-indigo-600 dark:text-indigo-400
+                                                        font-black">
+                                                {{ $persentase }}%
+                                            </span>
+                                        </td>
+
                                     @endforeach
+
                                 </tr>
+
                             @endforeach
+
                         @empty
+
                             <tr>
-                                <td colspan="{{ 1 + ($regularPrograms->count() * 4) }}" class="px-6 py-10 text-center text-slate-400 font-medium">
+                                <td
+                                    colspan="{{ 1 + ($regularPrograms->count() * 4) }}"
+                                    class="px-6 py-12 text-center
+                                        text-slate-400 dark:text-slate-500 font-medium">
                                     Tidak ada data project terdaftar.
                                 </td>
                             </tr>
+
                         @endforelse
+
                     </tbody>
                 </table>
             </div>
         </div>
+        {{-- ============================================================= --}}
+        {{-- MATRIX PROJECT PT 2 --}}
+        {{-- ============================================================= --}}
 
+        <div class="mt-5 bg-white dark:bg-slate-900 rounded-lg
+                    border border-slate-200 dark:border-slate-800
+                    overflow-hidden shadow-sm">
 
-{{-- ============================================================= --}}
-{{-- MATRIX PROJECT PT 2 --}}
-{{-- ============================================================= --}}
-<div class="mt-5 bg-white dark:bg-slate-900 rounded-[2rem] border border-indigo-200 dark:border-indigo-900 overflow-hidden shadow-sm">
-    <div class="px-6 py-5 border-b border-indigo-100 dark:border-indigo-900 bg-indigo-50/50">
-        <div class="flex items-center justify-between gap-4">
-            <div>
-                <h2 class="text-sm font-black uppercase tracking-wider text-indigo-900 dark:text-indigo-300">
-                    Matriks Progress Project PT 2
-                </h2>
-                <p class="text-xs text-slate-500 mt-1">
-                    Sumber khusus PT 2. Tidak ter filter Program PT 3.
-                </p>
+            <div class="px-5 md:px-6 py-5
+                        border-b border-slate-200 dark:border-slate-800
+                        bg-slate-50/70 dark:bg-slate-900">
+
+                <div class="flex items-center justify-between gap-4">
+
+                    <div>
+                        <h2 class="text-sm font-black uppercase tracking-wider
+                                text-slate-800 dark:text-slate-100">
+                            Matriks Progress Project PT 2
+                        </h2>
+
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Sumber khusus PT 2. Tidak terfilter Program PT 3.
+                        </p>
+                    </div>
+
+                    <span class="px-3 py-1.5 rounded-lg
+                                bg-indigo-50 dark:bg-indigo-500/10
+                                text-indigo-700 dark:text-indigo-400
+                                text-[10px] font-black uppercase tracking-wider shrink-0">
+                        PT 2
+                    </span>
+
+                </div>
             </div>
 
-            <span class="px-3 py-1.5 rounded-xl bg-indigo-100 text-indigo-700 text-[10px] font-black shrink-0">
-                PT 2
-            </span>
-        </div>
-    </div>
+            <div class="overflow-x-auto pb-3">
+                <table class="w-full min-w-[850px] text-xs border-collapse">
 
-    <div class="overflow-x-auto pb-4">
-        <table class="w-full text-xs border-collapse">
-            <thead class="bg-indigo-50/50 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                <tr>
-                    <th class="px-6 py-4 text-left border-r border-indigo-100 whitespace-nowrap">Region / Branch</th>
-                    <th class="px-4 py-4 text-center text-blue-600">Preparation</th>
-                    <th class="px-4 py-4 text-center text-amber-600">Instalasi</th>
-                    <th class="px-4 py-4 text-center text-emerald-600">Finishing / Go-Live</th>
-                    <th class="px-4 py-4 text-center text-indigo-700">Total</th>
-                    <th class="px-6 py-4 text-right">% Finish</th>
-                </tr>
-            </thead>
+                    <thead>
+                        <tr class="bg-slate-50 dark:bg-slate-800/70
+                                border-b border-slate-200 dark:border-slate-700">
 
-            <tbody class="divide-y divide-indigo-100/70">
-                @forelse($matrixPt2Data ?? [] as $i => $reg)
-                    @php
-                        $regionStats = $reg['stats'] ?? [
-                            'preparation' => 0,
-                            'instalasi' => 0,
-                            'finishing' => 0,
-                            'total' => 0,
-                            'percent' => 0,
-                        ];
+                            <th class="px-6 py-4 text-left
+                                    border-r border-slate-200 dark:border-slate-700
+                                    text-[10px] font-black uppercase tracking-wider
+                                    text-slate-500 dark:text-slate-400">
+                                Region / Branch
+                            </th>
 
-                        $regionSlug = \Illuminate\Support\Str::slug($reg['region']);
-                    @endphp
+                            <th class="px-4 py-4 text-center
+                                    text-[10px] font-black uppercase tracking-wider
+                                    text-blue-600 dark:text-blue-400">
+                                Preparation
+                            </th>
 
-                    <tr class="cursor-pointer bg-white hover:bg-indigo-50/40 transition"
-                        onclick="toggleRegion('matrix-pt2-{{ $regionSlug }}', 'icon-pt2-{{ $regionSlug }}')">
-                        <td class="px-6 py-4 border-r border-indigo-100">
-                            <div class="flex items-center gap-3">
-                                <div class="w-5 h-5 flex items-center justify-center rounded bg-indigo-100 text-indigo-600">
-                                    <svg id="icon-pt2-{{ $regionSlug }}"
-                                         xmlns="http://www.w3.org/2000/svg"
-                                         width="16"
-                                         height="16"
-                                         viewBox="0 0 24 24"
-                                         fill="none"
-                                         stroke="currentColor"
-                                         stroke-width="3"
-                                         stroke-linecap="round"
-                                         stroke-linejoin="round"
-                                         class="transition-transform duration-200">
-                                        <path d="m9 18 6-6-6-6"/>
-                                    </svg>
-                                </div>
+                            <th class="px-4 py-4 text-center
+                                    text-[10px] font-black uppercase tracking-wider
+                                    text-amber-600 dark:text-amber-400">
+                                Instalasi
+                            </th>
 
-                                <span class="font-black text-slate-800">{{ $reg['region'] }}</span>
-                            </div>
-                        </td>
+                            <th class="px-4 py-4 text-center
+                                    text-[10px] font-black uppercase tracking-wider
+                                    text-emerald-600 dark:text-emerald-400">
+                                Finishing / Go-Live
+                            </th>
 
-                        <td class="px-4 py-4 text-center font-black text-blue-700"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'', metric:'preparation'})">{{ $regionStats['preparation'] ?? 0 }}</span></td>
-                        <td class="px-4 py-4 text-center font-black text-amber-700"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'', metric:'instalasi'})">{{ $regionStats['instalasi'] ?? 0 }}</span></td>
-                        <td class="px-4 py-4 text-center font-black text-emerald-700"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'', metric:'finishing'})">{{ $regionStats['finishing'] ?? 0 }}</span></td>
-                        <td class="px-4 py-4 text-center font-black text-indigo-700"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'', metric:'total'})">{{ $regionStats['total'] ?? 0 }}</span></td>
+                            <th class="px-4 py-4 text-center
+                                    text-[10px] font-black uppercase tracking-wider
+                                    text-indigo-600 dark:text-indigo-400">
+                                Total
+                            </th>
 
-                        <td class="px-6 py-4">
-                            <div class="flex items-center justify-end gap-3">
-                                <div class="w-24 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                    <div class="h-full bg-emerald-500 rounded-full"
-                                         style="width: {{ min($regionStats['percent'] ?? 0, 100) }}%"></div>
-                                </div>
-
-                                <span class="font-black text-indigo-700">{{ $regionStats['percent'] ?? 0 }}%</span>
-                            </div>
-                        </td>
-                    </tr>
-
-                    @foreach($reg['branches'] ?? [] as $branch)
-                        @php
-                            $branchStats = $branch['stats'] ?? [
-                                'preparation' => 0,
-                                'instalasi' => 0,
-                                'finishing' => 0,
-                                'total' => 0,
-                                'percent' => 0,
-                            ];
-                        @endphp
-
-                        <tr class="hidden bg-slate-50/70 matrix-pt2-{{ $regionSlug }}">
-                            <td class="px-6 py-3 pl-[3.25rem] border-r border-indigo-100">
-                                <span class="font-bold text-slate-600">• {{ $branch['name'] }}</span>
-                            </td>
-
-                            <td class="px-4 py-3 text-center text-blue-600 font-bold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'{{ $branch['name'] }}', metric:'preparation'})">{{ $branchStats['preparation'] ?? 0 }}</span></td>
-                            <td class="px-4 py-3 text-center text-amber-600 font-bold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'{{ $branch['name'] }}', metric:'instalasi'})">{{ $branchStats['instalasi'] ?? 0 }}</span></td>
-                            <td class="px-4 py-3 text-center text-emerald-600 font-bold"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'{{ $branch['name'] }}', metric:'finishing'})">{{ $branchStats['finishing'] ?? 0 }}</span></td>
-                            <td class="px-4 py-3 text-center text-indigo-600 font-black"><span class="cursor-pointer hover:underline" @click.stop="show({type:'pt2', region:'{{ $reg['region'] }}', branch:'{{ $branch['name'] }}', metric:'total'})">{{ $branchStats['total'] ?? 0 }}</span></td>
-                            <td class="px-6 py-3 text-right text-indigo-600 font-black">{{ $branchStats['percent'] ?? 0 }}%</td>
+                            <th class="px-6 py-4 text-right
+                                    text-[10px] font-black uppercase tracking-wider
+                                    text-slate-500 dark:text-slate-400">
+                                % Finish
+                            </th>
                         </tr>
-                    @endforeach
-                @empty
-                    <tr>
-                        <td colspan="6" class="px-6 py-10 text-center text-slate-400 font-medium">
-                            Tidak ada data PT 2 berdasarkan filter.
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
-</div>
+                    </thead>
+
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+
+                        @forelse($matrixPt2Data ?? [] as $i => $reg)
+
+                            @php
+                                $regionStats = $reg['stats'] ?? [
+                                    'preparation' => 0,
+                                    'instalasi' => 0,
+                                    'finishing' => 0,
+                                    'total' => 0,
+                                    'percent' => 0,
+                                ];
+
+                                $regionSlug = \Illuminate\Support\Str::slug($reg['region']);
+                            @endphp
+
+                            <tr
+                                class="group cursor-pointer
+                                    bg-white dark:bg-slate-900
+                                    hover:bg-indigo-50/40 dark:hover:bg-indigo-500/[0.06]
+                                    transition-colors"
+                                onclick="toggleRegion(
+                                    'matrix-pt2-{{ $regionSlug }}',
+                                    'icon-pt2-{{ $regionSlug }}'
+                                )"
+                            >
+
+                                <td class="px-6 py-4
+                                        border-r border-slate-200 dark:border-slate-700">
+
+                                    <div class="flex items-center gap-3">
+
+                                        <div class="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg
+                                                    bg-indigo-50 dark:bg-indigo-500/10
+                                                    text-indigo-600 dark:text-indigo-400">
+
+                                            <svg
+                                                id="icon-pt2-{{ $regionSlug }}"
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="15"
+                                                height="15"
+                                                viewBox="0 0 24 24"
+                                                fill="none"
+                                                stroke="currentColor"
+                                                stroke-width="3"
+                                                stroke-linecap="round"
+                                                stroke-linejoin="round"
+                                                class="transition-transform duration-200"
+                                            >
+                                                <path d="m9 18 6-6-6-6"/>
+                                            </svg>
+
+                                        </div>
+
+                                        <div>
+                                            <p class="font-black text-sm
+                                                    text-slate-800 dark:text-slate-100">
+                                                {{ $reg['region'] }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <td class="px-4 py-4 text-center">
+                                    <button
+                                        type="button"
+                                        class="min-w-[46px] px-3 py-1.5 rounded-lg
+                                            bg-blue-50 dark:bg-blue-500/10
+                                            text-blue-700 dark:text-blue-400
+                                            font-black
+                                            hover:bg-blue-100 dark:hover:bg-blue-500/20 transition"
+                                        @click.stop="show({
+                                            type:'pt2',
+                                            region:'{{ $reg['region'] }}',
+                                            branch:'',
+                                            metric:'preparation'
+                                        })"
+                                    >
+                                        {{ $regionStats['preparation'] ?? 0 }}
+                                    </button>
+                                </td>
+
+                                <td class="px-4 py-4 text-center">
+                                    <button
+                                        type="button"
+                                        class="min-w-[46px] px-3 py-1.5 rounded-lg
+                                            bg-amber-50 dark:bg-amber-500/10
+                                            text-amber-700 dark:text-amber-400
+                                            font-black
+                                            hover:bg-amber-100 dark:hover:bg-amber-500/20 transition"
+                                        @click.stop="show({
+                                            type:'pt2',
+                                            region:'{{ $reg['region'] }}',
+                                            branch:'',
+                                            metric:'instalasi'
+                                        })"
+                                    >
+                                        {{ $regionStats['instalasi'] ?? 0 }}
+                                    </button>
+                                </td>
+
+                                <td class="px-4 py-4 text-center">
+                                    <button
+                                        type="button"
+                                        class="min-w-[46px] px-3 py-1.5 rounded-lg
+                                            bg-emerald-50 dark:bg-emerald-500/10
+                                            text-emerald-700 dark:text-emerald-400
+                                            font-black
+                                            hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition"
+                                        @click.stop="show({
+                                            type:'pt2',
+                                            region:'{{ $reg['region'] }}',
+                                            branch:'',
+                                            metric:'finishing'
+                                        })"
+                                    >
+                                        {{ $regionStats['finishing'] ?? 0 }}
+                                    </button>
+                                </td>
+
+                                <td class="px-4 py-4 text-center">
+                                    <button
+                                        type="button"
+                                        class="min-w-[46px] px-3 py-1.5 rounded-lg
+                                            bg-indigo-50 dark:bg-indigo-500/10
+                                            text-indigo-700 dark:text-indigo-400
+                                            font-black
+                                            hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition"
+                                        @click.stop="show({
+                                            type:'pt2',
+                                            region:'{{ $reg['region'] }}',
+                                            branch:'',
+                                            metric:'total'
+                                        })"
+                                    >
+                                        {{ $regionStats['total'] ?? 0 }}
+                                    </button>
+                                </td>
+
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center justify-end gap-3">
+
+                                        <div class="w-24 lg:w-28 h-2 rounded-lg
+                                                    bg-slate-100 dark:bg-slate-800 overflow-hidden">
+
+                                            <div
+                                                class="h-full rounded-lg bg-emerald-500 transition-all duration-500"
+                                                style="width: {{ min($regionStats['percent'] ?? 0, 100) }}%">
+                                            </div>
+                                        </div>
+
+                                        <span class="min-w-[42px] text-right
+                                                    font-black text-indigo-700 dark:text-indigo-400">
+                                            {{ $regionStats['percent'] ?? 0 }}%
+                                        </span>
+
+                                    </div>
+                                </td>
+                            </tr>
+
+                            @foreach($reg['branches'] ?? [] as $branch)
+
+                                @php
+                                    $branchStats = $branch['stats'] ?? [
+                                        'preparation' => 0,
+                                        'instalasi' => 0,
+                                        'finishing' => 0,
+                                        'total' => 0,
+                                        'percent' => 0,
+                                    ];
+                                @endphp
+
+                                <tr
+                                    class="hidden matrix-pt2-{{ $regionSlug }}
+                                        bg-slate-50/70 dark:bg-slate-950/40
+                                        hover:bg-slate-100 dark:hover:bg-slate-800/70
+                                        transition-colors"
+                                >
+
+                                    <td class="px-6 py-3 pl-[4.25rem]
+                                            border-r border-slate-200 dark:border-slate-700">
+
+                                        <div class="flex items-center gap-2">
+
+                                            <span class="w-1.5 h-1.5 rounded-lg
+                                                        bg-slate-300 dark:bg-slate-600">
+                                            </span>
+
+                                            <span class="font-bold
+                                                        text-slate-600 dark:text-slate-300">
+                                                {{ $branch['name'] }}
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    <td class="px-4 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="font-black text-blue-600 dark:text-blue-400 hover:underline"
+                                            @click.stop="show({
+                                                type:'pt2',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'{{ $branch['name'] }}',
+                                                metric:'preparation'
+                                            })"
+                                        >
+                                            {{ $branchStats['preparation'] ?? 0 }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-4 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="font-black text-amber-600 dark:text-amber-400 hover:underline"
+                                            @click.stop="show({
+                                                type:'pt2',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'{{ $branch['name'] }}',
+                                                metric:'instalasi'
+                                            })"
+                                        >
+                                            {{ $branchStats['instalasi'] ?? 0 }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-4 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="font-black text-emerald-600 dark:text-emerald-400 hover:underline"
+                                            @click.stop="show({
+                                                type:'pt2',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'{{ $branch['name'] }}',
+                                                metric:'finishing'
+                                            })"
+                                        >
+                                            {{ $branchStats['finishing'] ?? 0 }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-4 py-3 text-center">
+                                        <button
+                                            type="button"
+                                            class="font-black text-indigo-600 dark:text-indigo-400 hover:underline"
+                                            @click.stop="show({
+                                                type:'pt2',
+                                                region:'{{ $reg['region'] }}',
+                                                branch:'{{ $branch['name'] }}',
+                                                metric:'total'
+                                            })"
+                                        >
+                                            {{ $branchStats['total'] ?? 0 }}
+                                        </button>
+                                    </td>
+
+                                    <td class="px-6 py-3 text-right">
+                                        <span class="inline-flex justify-center min-w-[50px]
+                                                    px-2.5 py-1 rounded-lg
+                                                    bg-indigo-50 dark:bg-indigo-500/10
+                                                    text-indigo-600 dark:text-indigo-400
+                                                    font-black">
+                                            {{ $branchStats['percent'] ?? 0 }}%
+                                        </span>
+                                    </td>
+
+                                </tr>
+
+                            @endforeach
+
+                        @empty
+
+                            <tr>
+                                <td colspan="6"
+                                    class="px-6 py-12 text-center
+                                        text-slate-400 dark:text-slate-500 font-medium">
+                                    Tidak ada data PT 2 berdasarkan filter.
+                                </td>
+                            </tr>
+
+                        @endforelse
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
     </div>
 
@@ -529,7 +1323,7 @@
          style="display: none;">
         <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="close()"></div>
 
-        <div class="relative bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[85vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden"
+        <div class="relative bg-white dark:bg-slate-900 w-full max-w-4xl max-h-[85vh] rounded-[0.5rem] shadow-2xl flex flex-col overflow-hidden"
              x-show="open" x-transition>
 
             <div class="px-6 py-5 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-4 bg-slate-50/50">
@@ -541,7 +1335,7 @@
                     </p>
                 </div>
                 <button type="button" @click="close()"
-                        class="w-9 h-9 shrink-0 rounded-xl bg-white border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 flex items-center justify-center transition">
+                        class="w-9 h-9 shrink-0 rounded-lg bg-white border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 flex items-center justify-center transition">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                 </button>
             </div>
@@ -549,7 +1343,7 @@
             <div class="overflow-y-auto flex-1">
                 <template x-if="loading">
                     <div class="flex items-center justify-center py-16">
-                        <div class="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                        <div class="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-lg animate-spin"></div>
                     </div>
                 </template>
 

@@ -28,17 +28,17 @@
                     name="search"
                     value="{{ $search ?? '' }}"
                     placeholder="Cari berdasarkan nama atau NIK waspang..."
-                    class="w-full h-11 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 text-sm focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-950 focus:border-blue-600 outline-none transition">
+                    class="w-full h-11 pl-10 pr-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/40 text-sm focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-950 focus:border-blue-600 outline-none transition">
             </div>
 
             <div class="flex gap-2">
-                <button class="h-11 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-xs transition shrink-0">
+                <button class="h-11 px-6 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-xs transition shrink-0">
                     Cari Data
                 </button>
 
                 @if (!empty($search))
                     <a href="{{ route('assign-waspang.index') }}"
-                    class="h-11 px-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-bold flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition shrink-0">
+                    class="h-11 px-5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-bold flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition shrink-0">
                         Reset
                     </a>
                 @endif
@@ -82,7 +82,7 @@
                             {{-- KOLOM 1: PROFILE IDENTIFICATION --}}
                             <td class="px-5 py-4">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black text-sm uppercase shadow-xs shrink-0">
+                                    <div class="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center font-black text-sm uppercase shadow-xs shrink-0">
                                         {{ substr($waspang->name, 0, 2) }}
                                     </div>
                                     <div class="min-w-0">
@@ -129,7 +129,7 @@
                                     <div class="flex flex-col gap-1.5 max-w-md" x-data="{ expanded: false }">
                                         @foreach($assignments->take(2) as $assignment)
                                             <div class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/40 px-2 py-1 rounded-md border border-gray-100 dark:border-gray-800 truncate font-medium">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                                                <span class="w-1.5 h-1.5 rounded-lg bg-blue-500 shrink-0"></span>
                                                 <span class="truncate">{{ $assignment->project->project_name ?? '-' }}</span>
                                             </div>
                                         @endforeach
@@ -139,7 +139,7 @@
                                             <div x-show="expanded" x-collapse class="flex flex-col gap-1.5 pt-0.5">
                                                 @foreach($assignments->slice(2) as $assignment)
                                                     <div class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/40 px-2 py-1 rounded-md border border-gray-100 dark:border-gray-800 truncate font-medium">
-                                                        <span class="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>
+                                                        <span class="w-1.5 h-1.5 rounded-lg bg-blue-400 shrink-0"></span>
                                                         <span class="truncate">{{ $assignment->project->project_name ?? '-' }}</span>
                                                     </div>
                                                 @endforeach
@@ -159,7 +159,7 @@
                             {{-- KOLOM 5: ACTION --}}
                             <td class="px-5 py-4 text-center whitespace-nowrap">
                                 <a href="{{ route('admin.assign-waspang.history', $waspang->id_user) }}"
-                                class="inline-flex items-center justify-center h-8 px-4 rounded-xl bg-blue-600 hover:bg-blue-800 dark:bg-blue-800 dark:hover:bg-blue-700 text-white text-xs font-black shadow-xs transition duration-150 tracking-wide">
+                                class="inline-flex items-center justify-center h-8 px-4 rounded-lg bg-blue-600 hover:bg-blue-800 dark:bg-blue-800 dark:hover:bg-blue-700 text-white text-xs font-black shadow-xs transition duration-150 tracking-wide">
                                    View History
                                 </a>
                             </td>

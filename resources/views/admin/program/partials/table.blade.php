@@ -1,11 +1,11 @@
-<div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
+<div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm overflow-hidden">
     <div class="px-5 py-4 border-b border-gray-200 dark:border-gray-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-base font-black text-gray-900 dark:text-white">Daftar Project {{ $programName }}</h2>
             <p class="text-xs text-gray-500 mt-1">Monitoring progress, assignment, evidence dan KML</p>
         </div>
         <div class="flex items-center gap-3 w-full sm:w-auto">
-            <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 rounded-md border border-gray-200 dark:border-gray-700">
                 <span class="font-medium">Tampilkan</span>
                 <select onchange="window.location.href=this.value" class="bg-transparent border-none text-gray-900 dark:text-white text-xs font-bold focus:ring-0 cursor-pointer p-0 pr-5">
                     @foreach([10, 20, 50, 100] as $val)
@@ -14,7 +14,7 @@
                 </select>
                 <span class="font-medium">Baris</span>
             </div>
-            <span class="px-3 py-1.5 rounded-lg bg-blue-100 text-blue-700 text-xs font-bold whitespace-nowrap">Total: {{ $projects->total() }} Data</span>
+            <span class="px-3 py-1.5 rounded-md bg-blue-100 text-blue-700 text-xs font-bold whitespace-nowrap">Total: {{ $projects->total() }} Data</span>
         </div>
     </div>
 
@@ -53,14 +53,6 @@
 
                         // Karena file ini untuk OSP, NODEB, dsb, label default adalah Waspang
                         $labelRole = 'Waspang';
-
-                        // Section AL: warna badge tahap diselaraskan ke skema standar
-                        // Project::stageColorClasses() (sama dgn admin/projects/index,
-                        // project-card, project-detail, evidences/approval) -- sebelumnya
-                        // if/elseif manual ini cuma kenal label 'Finishing'/'Pengukuran'/
-                        // 'Instalasi', tahap lain (termasuk Persiapan Instalasi & FI-OGP
-                        // Golive yg progress-nya sudah tinggi) selalu jatuh ke else -> badge
-                        // MERAH seolah bermasalah, padahal tidak.
                         $stageColors = \App\Models\Project::stageColorClasses($summary['effectiveStageColor'] ?? null);
                         $stageBadge = $stageColors['badge'];
                         $progressColor = $stageColors['progress'];
@@ -82,30 +74,30 @@
                                 <p class="font-bold text-gray-900 dark:text-white">{{ $assignedUser->name }}</p>
                                 <p class="text-xs text-green-600 font-bold">Assigned ({{ $assignedRoleBadge }})</p>
                             @else
-                                <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-bold">Belum diassign</span>
+                                <span class="px-3 py-1 rounded-lg bg-gray-100 text-gray-500 text-xs font-bold">Belum diassign</span>
                             @endif
                         </td>
                         <td class="px-5 py-4">
-                            <span class="px-3 py-1 rounded-full {{ $stageBadge }} text-xs font-black">{{ $stageLabel }}</span>
+                            <span class="px-3 py-1 rounded-md {{ $stageBadge }} text-xs font-black">{{ $stageLabel }}</span>
                         </td>
                         <td class="px-5 py-4 min-w-[150px]">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-xs font-bold text-gray-500">Progress</span>
                                 <span class="text-sm font-black text-gray-900 dark:text-white">{{ $progress }}%</span>
                             </div>
-                            <div class="h-2 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-                                <div class="h-full rounded-full {{ $progressColor }}" style="width: {{ $progress }}%"></div>
+                            <div class="h-2 rounded-lg bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                                <div class="h-full rounded-lg {{ $progressColor }}" style="width: {{ $progress }}%"></div>
                             </div>
                         </td>
                         
                         <td class="px-5 py-4 text-center">
                             <div class="action-menu-container inline-block text-left">
-                                <button type="button" onclick="toggleMenu(event, 'menu-{{ $project->id_project }}', this)" class="w-9 h-9 rounded-xl flex items-center justify-center transition-colors duration-200 text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:text-white dark:hover:bg-gray-700">
+                                <button type="button" onclick="toggleMenu(event, 'menu-{{ $project->id_project }}', this)" class="w-9 h-9 rounded-lg flex items-center justify-center transition-colors duration-200 text-gray-600 hover:bg-gray-200 hover:text-gray-900 dark:text-white dark:hover:bg-gray-700">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5h.01M12 12h.01M12 19h.01"/></svg>
                                 </button>
                                 
                                 {{-- MENU DROPDOWN LENGKAP --}}
-                                <div id="menu-{{ $project->id_project }}" class="action-menu-dropdown hidden fixed w-56 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl z-[9999] overflow-hidden">
+                                <div id="menu-{{ $project->id_project }}" class="action-menu-dropdown hidden fixed w-56 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl z-[9999] overflow-hidden">
                                       <div class="flex flex-col text-left py-2">
                                     <button type="button" onclick="openDetailModal('detail-modal-{{ $project->id_project }}')"
                                             class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-800 hover:text-blue-700 transition-colors">

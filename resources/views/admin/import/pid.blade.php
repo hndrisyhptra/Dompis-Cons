@@ -76,7 +76,7 @@
     <div class="max-w-7xl mx-auto space-y-6">
 
         {{-- HEADER --}}
-        <div class="rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+        <div class="rounded-[0.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
                 <div>
                     <p class="text-xs font-black text-blue-700 uppercase tracking-widest">Import Data</p>
@@ -88,39 +88,39 @@
 
                 <div class="flex flex-col sm:flex-row gap-3">
                     <a href="{{ route('admin.import.pid.template') }}"
-                       class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                       class="inline-flex items-center justify-center px-5 py-3 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700 transition">
                         Download Template
                     </a>
 
                     <a href="{{ route('admin.data-pid') }}"
-                       class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20 transition">
+                       class="inline-flex items-center justify-center px-5 py-3 rounded-lg bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20 transition">
                         Data PID
                     </a>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                <div class="rounded-3xl bg-blue-50 border border-blue-100 p-5">
-                    <p class="text-xs text-blue-700 font-bold uppercase">Regular</p>
-                    <p class="text-lg font-black text-blue-800 mt-1">1 PID = 1 LOP</p>
-                    <p class="text-xs text-blue-600 mt-1">PID yang sama di satu file dianggap duplikat.</p>
+                <div class="rounded-lg bg-gray-100 border border-black-100 p-5">
+                    <p class="text-xs text-black-700 font-bold uppercase">Program PT 3</p>
+                    <p class="text-lg font-black text-black-800 mt-1">1 PID = 1 LOP</p>
+                    <p class="text-xs text-black-600 mt-1">PID yang sama di satu file dianggap duplikat.</p>
                 </div>
 
-                <div class="rounded-3xl bg-emerald-50 border border-emerald-100 p-5">
-                    <p class="text-xs text-emerald-700 font-bold uppercase">Program PT 2</p>
-                    <p class="text-lg font-black text-emerald-800 mt-1">1 PID = Banyak LOP</p>
-                    <p class="text-xs text-emerald-600 mt-1">LOP dibedakan oleh kombinasi PID SAP + ID IHLD.</p>
+                <div class="rounded-lg bg-gray-100 border border-black-100 p-5">
+                    <p class="text-xs text-black-700 font-bold uppercase">Program PT 2</p>
+                    <p class="text-lg font-black text-black-800 mt-1">1 PID = Banyak LOP</p>
+                    <p class="text-xs text-black-600 mt-1">LOP dibedakan oleh kombinasi PID SAP + ID IHLD.</p>
                 </div>
 
                 @if($lastHistory?->uuid)
                     <a href="{{ route('admin.import.pid', ['import_uuid' => $lastHistory->uuid]) }}"
-                       class="group rounded-3xl bg-amber-50 border border-amber-100 p-5 hover:border-amber-300 hover:shadow-sm transition">
+                       class="group rounded-lg bg-gray-100 border border-black-100 p-5 hover:border-amber-300 hover:shadow-sm transition">
                 @else
-                    <div class="rounded-3xl bg-amber-50 border border-amber-100 p-5">
+                    <div class="rounded-lg bg-amber-50 border border-amber-100 p-5">
                 @endif
                         <div class="flex items-center justify-between gap-3">
                             <p class="text-xs text-amber-700 font-bold uppercase">Upload Terakhir</p>
-                            <span class="px-2.5 py-1 rounded-full text-[9px] font-black uppercase {{ $lastStatusClass }}">
+                            <span class="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase {{ $lastStatusClass }}">
                                 {{ $lastStatusLabel }}
                             </span>
                         </div>
@@ -130,7 +130,7 @@
                         </p>
 
                         <div class="flex items-center gap-2 mt-2 min-w-0">
-                            <div class="w-7 h-7 shrink-0 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center text-[9px] font-black">
+                            <div class="w-7 h-7 shrink-0 rounded-full bg-amber-300 text-amber-800 flex items-center justify-center text-[9px] font-black">
                                 {{ $lastUploaderInitials }}
                             </div>
                             <p class="text-[10px] text-amber-700 truncate">
@@ -163,26 +163,26 @@
 
         {{-- ALERT --}}
         @if(session('success'))
-            <div class="rounded-3xl bg-emerald-50 border border-emerald-200 text-emerald-700 px-5 py-4 text-sm font-bold">
+            <div class="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 px-5 py-4 text-sm font-bold">
                 {{ session('success') }}
             </div>
         @endif
 
         @if(session('error'))
-            <div class="rounded-3xl bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm font-bold">
+            <div class="rounded-lg bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm font-bold">
                 {{ session('error') }}
             </div>
         @endif
 
         @if($errors->any())
-            <div class="rounded-3xl bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm font-bold">
+            <div class="rounded-lg bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm font-bold">
                 {{ $errors->first() }}
             </div>
         @endif
 
         {{-- ACTIVE IMPORT: HANYA MUNCUL SETELAH UPLOAD / ADA UUID --}}
         <div id="progressCard"
-             class="{{ $activeImportUuid ? '' : 'hidden' }} bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
+             class="{{ $activeImportUuid ? '' : 'hidden' }} bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
 
             <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <div>
@@ -219,11 +219,11 @@
 
             {{-- FINAL COMPLETION SUMMARY --}}
             <div id="importCompletionSummary"
-                 class="hidden mt-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 md:p-5">
+                 class="hidden mt-5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 md:p-5">
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     <div class="flex items-start gap-3 min-w-0">
                         <div id="completionIcon"
-                             class="w-10 h-10 shrink-0 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
+                             class="w-10 h-10 shrink-0 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-black">
                             ✓
                         </div>
 
@@ -241,18 +241,18 @@
 
                     <div class="flex flex-wrap gap-2 shrink-0">
                         <a href="{{ route('admin.data-pid') }}"
-                           class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-black transition">
+                           class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-black transition">
                             Lihat Data PID
                         </a>
 
                         <a id="downloadErrorButton"
                            href="#"
-                           class="hidden inline-flex items-center justify-center px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black transition">
+                           class="hidden inline-flex items-center justify-center px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black transition">
                             Download Error CSV
                         </a>
 
                         <a href="{{ route('admin.import.pid') }}"
-                           class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                           class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition">
                             Import Baru
                         </a>
                     </div>
@@ -271,7 +271,7 @@
                     ['importUnchanged', 'Tidak Berubah', 'indigo'],
                     ['importSkipped', 'Skip', 'slate'],
                 ] as [$id, $label, $tone])
-                    <div class="rounded-2xl bg-slate-50 dark:bg-slate-800 p-4">
+                    <div class="rounded-lg bg-slate-50 dark:bg-slate-800 p-4">
                         <p class="text-[10px] font-black uppercase text-slate-500">{{ $label }}</p>
                         <p id="{{ $id }}" class="text-2xl font-black text-slate-900 dark:text-white mt-1">0</p>
                     </div>
@@ -279,19 +279,19 @@
             </div>
 
             {{-- DETAIL SUMMARY PID --}}
-            <div id="importSummaryBox" class="hidden mt-4 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-4">
+            <div id="importSummaryBox" class="hidden mt-4 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-4">
                 <p class="text-xs font-black text-slate-700 dark:text-slate-200 uppercase">Detail Hasil</p>
                 <div id="importSummaryDetail" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3"></div>
             </div>
 
             {{-- FATAL ERROR --}}
-            <div id="importFatalError" class="hidden mt-4 rounded-2xl bg-red-50 border border-red-200 p-4">
+            <div id="importFatalError" class="hidden mt-4 rounded-lg bg-red-50 border border-red-200 p-4">
                 <p class="text-xs font-black text-red-700 uppercase">Import Gagal</p>
                 <p id="importFatalErrorMessage" class="text-xs text-red-600 mt-1 break-words"></p>
             </div>
 
             {{-- INVALID ROW PREVIEW --}}
-            <div id="importErrorPreview" class="hidden mt-5 rounded-2xl border border-red-200 overflow-hidden">
+            <div id="importErrorPreview" class="hidden mt-5 rounded-lg border border-red-200 overflow-hidden">
                 <div class="px-4 py-3 bg-red-50 border-b border-red-200">
                     <p class="text-xs font-black text-red-700">Preview Data Invalid</p>
                     <p class="text-[10px] text-red-600 mt-1">Menampilkan maksimal 10 error pertama.</p>
@@ -317,7 +317,7 @@
         <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
             {{-- MAIN UPLOAD --}}
             <div class="xl:col-span-8">
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
+                <div class="bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
                     <h2 class="text-lg font-black text-slate-900 dark:text-white">Upload File PID</h2>
                     <p class="text-sm text-slate-500 mt-1">
                         File hanya dikirim melalui request web. Parsing, validasi, dan penyimpanan data dilakukan oleh background worker.
@@ -331,7 +331,7 @@
                         @csrf
 
                         <label for="file"
-                               class="flex flex-col items-center justify-center min-h-[180px] rounded-[2rem] border-2 border-dashed border-blue-200 dark:border-slate-700 bg-blue-50/50 dark:bg-slate-950 cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-800 transition">
+                               class="flex flex-col items-center justify-center min-h-[180px] rounded-[0.5rem] border-2 border-dashed border-blue-200 dark:border-slate-700 bg-blue-50/50 dark:bg-slate-950 cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-800 transition">
                             <p class="text-base font-black text-slate-900 dark:text-white">Klik untuk pilih file PID</p>
                             <p id="fileName" class="text-sm text-slate-500 mt-1">Belum ada file dipilih</p>
                             <p id="fileMeta" class="text-[11px] text-slate-400 mt-1">Maksimal 100 MB</p>
@@ -346,25 +346,25 @@
                             </label>
 
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <label class="flex items-center gap-2 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 cursor-pointer">
+                                <label class="flex items-center gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 cursor-pointer">
                                     <input type="radio" name="project_type" value="internal"
                                            {{ old('project_type', 'internal') === 'internal' ? 'checked' : '' }}
                                            onchange="toggleProjectType()">
                                     <span class="text-sm font-bold text-slate-700 dark:text-slate-200">PT 3</span>
                                 </label>
 
-                                <label class="flex items-center gap-2 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 cursor-pointer">
+                                <label class="flex items-center gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 cursor-pointer">
                                     <input type="radio" name="project_type" value="external"
                                            {{ old('project_type') === 'external' ? 'checked' : '' }}
                                            onchange="toggleProjectType()">
                                     <span class="text-sm font-bold text-slate-700 dark:text-slate-200">Exbis</span>
                                 </label>
 
-                                <label class="flex items-center gap-2 p-3 rounded-2xl border border-emerald-200 bg-emerald-50 cursor-pointer">
+                                <label class="flex items-center gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50 cursor-pointer">
                                     <input type="radio" name="project_type" value="pt2"
                                            {{ old('project_type') === 'pt2' ? 'checked' : '' }}
                                            onchange="toggleProjectType()">
-                                    <span class="text-sm font-bold text-emerald-700">Program PT 2</span>
+                                    <span class="text-sm font-bold text-slate-700">Program PT 2</span>
                                 </label>
                             </div>
                         </div>
@@ -376,7 +376,7 @@
 
                             <select id="customer_id_select"
                                     onchange="document.getElementById('hidden_customer_id').value = this.value"
-                                    class="w-full h-11 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm px-3">
+                                    class="w-full h-11 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm px-3">
                                 <option value="">-- Pilih Customer Exbis --</option>
                                 @foreach($customers as $customer)
                                     <option value="{{ $customer->id_customer }}"
@@ -388,9 +388,9 @@
                         </div>
 
                         {{-- INFO PT2 --}}
-                        <div id="pt2ImportInfo" class="hidden rounded-2xl bg-emerald-50 border border-emerald-200 p-4">
-                            <p class="text-xs font-black text-emerald-700 uppercase">Aturan Import PT 2</p>
-                            <div class="text-xs text-emerald-700 mt-2 space-y-1 leading-relaxed">
+                        <div id="pt2ImportInfo" class="hidden rounded-lg bg-slate-50 border border-slate-200 p-4">
+                            <p class="text-xs font-black text-slate-700 uppercase">Aturan Import PT 2</p>
+                            <div class="text-xs text-slate-700 mt-2 space-y-1 leading-relaxed">
                                 <p>• Satu PID dapat memiliki banyak LOP.</p>
                                 <p>• ID IHLD menjadi identitas LOP di dalam PID.</p>
                                 <p>• Upload data identik tidak mereset progress, BOQ, evidence, atau assignment.</p>
@@ -400,12 +400,12 @@
 
                         <button id="uploadButton"
                                 type="submit"
-                                class="w-full sm:w-auto h-12 px-7 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-lg shadow-blue-700/20 transition">
-                            Upload & Proses Background
+                                class="w-full sm:w-auto h-12 px-7 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-lg shadow-blue-700/20 transition">
+                            Upload
                         </button>
                     </form>
 
-                    <div id="uploadingInfo" class="hidden mt-5 rounded-2xl bg-blue-50 border border-blue-100 p-4 text-sm font-bold text-blue-700">
+                    <div id="uploadingInfo" class="hidden mt-5 rounded-lg bg-blue-50 border border-blue-100 p-4 text-sm font-bold text-blue-700">
                         File sedang dikirim ke server. Setelah upload selesai, proses akan dilanjutkan oleh background worker.
                     </div>
                 </div>
@@ -415,7 +415,7 @@
             <div class="xl:col-span-4 space-y-5">
 
                 {{-- BACKGROUND QUEUE HEALTH --}}
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <div class="bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">System Status</p>
@@ -433,21 +433,21 @@
                     </p>
 
                     <div class="grid grid-cols-3 gap-2 mt-4">
-                        <div class="rounded-xl bg-slate-50 dark:bg-slate-950 p-2.5">
+                        <div class="rounded-lg bg-slate-50 dark:bg-slate-950 p-2.5">
                             <p class="text-[9px] uppercase font-bold text-slate-400">Menunggu</p>
                             <p class="text-lg font-black text-amber-600 mt-0.5">
                                 {{ number_format($queueHealth['queued_count'] ?? 0) }}
                             </p>
                         </div>
 
-                        <div class="rounded-xl bg-slate-50 dark:bg-slate-950 p-2.5">
+                        <div class="rounded-lg bg-slate-50 dark:bg-slate-950 p-2.5">
                             <p class="text-[9px] uppercase font-bold text-slate-400">Diproses</p>
                             <p class="text-lg font-black text-blue-600 mt-0.5">
                                 {{ number_format($queueHealth['processing_count'] ?? 0) }}
                             </p>
                         </div>
 
-                        <div class="rounded-xl bg-slate-50 dark:bg-slate-950 p-2.5">
+                        <div class="rounded-lg bg-slate-50 dark:bg-slate-950 p-2.5">
                             <p class="text-[9px] uppercase font-bold text-slate-400">Driver</p>
                             <p class="text-[11px] font-black text-slate-700 dark:text-slate-200 mt-1.5 uppercase truncate">
                                 {{ $queueHealth['driver'] ?? '-' }}
@@ -456,7 +456,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <!-- <div class="bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
                     <h2 class="text-sm font-black text-slate-900 dark:text-white">Mandatory Field</h2>
                     <div class="mt-4 space-y-3">
                         @foreach([
@@ -464,7 +464,7 @@
                             ['ID IHLD', 'Identitas LOP. Wajib utk PT 2. Khusus PT 3: ikut aturan minimal 2 dari 3 field.'],
                             ['Nama LOP', 'Nama pekerjaan pada level LOP. Wajib utk PT 2 & Exbis. Khusus PT 3: ikut aturan minimal 2 dari 3 field.'],
                         ] as [$label, $desc])
-                            <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+                            <div class="rounded-lg bg-emerald-50 border border-emerald-100 p-4">
                                 <p class="text-sm font-black text-emerald-700">{{ $label }}</p>
                                 <p class="text-xs text-emerald-600 mt-1">{{ $desc }}</p>
                             </div>
@@ -472,7 +472,7 @@
                     </div>
                 </div>
 
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <div class="bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
                     <h2 class="text-sm font-black text-slate-900 dark:text-white">Format Header</h2>
                     <p class="text-xs text-slate-500 mt-3 leading-relaxed font-mono break-words">
                         pid, pid_sap, project_name, nama_lop, program, execution_type, status_progress, id_ihld, tematik, sto, branch, batch, no_sp, tgl_sp, tgl_toc, mitra_name
@@ -480,9 +480,9 @@
                     <p class="text-[10px] text-slate-400 mt-2">
                         project_name bersifat optional; untuk PT 2 digunakan sebagai nama parent project.
                     </p>
-                </div>
+                </div> -->
 
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <div class="bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <h2 class="text-sm font-black text-slate-900 dark:text-white">History Upload</h2>
@@ -522,7 +522,7 @@
                             @endphp
 
                             <a href="{{ route('admin.import.pid', ['import_uuid' => $log->uuid]) }}"
-                               class="block rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950 px-3 py-2.5 hover:border-blue-200 hover:bg-blue-50/40 dark:hover:bg-slate-900 transition">
+                               class="block rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950 px-3 py-2.5 hover:border-blue-200 hover:bg-blue-50/40 dark:hover:bg-slate-900 transition">
                                 <div class="flex items-start justify-between gap-2">
                                     <div class="flex items-start gap-2.5 min-w-0">
                                         <div class="w-7 h-7 shrink-0 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center justify-center text-[9px] font-black">
@@ -556,7 +556,7 @@
                                 </div>
                             </a>
                         @empty
-                            <div class="rounded-xl bg-slate-50 dark:bg-slate-950 px-3 py-4 text-center">
+                            <div class="rounded-lg bg-slate-50 dark:bg-slate-950 px-3 py-4 text-center">
                                 <p class="text-xs font-bold text-slate-500">Belum ada history upload PID.</p>
                             </div>
                         @endforelse
@@ -691,7 +691,7 @@
 
         box.classList.remove('hidden');
         detail.innerHTML = entries.map(([key, value]) => `
-            <div class="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3">
+            <div class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3">
                 <p class="text-[9px] uppercase font-black text-slate-500">
                     ${escapeHtml(String(key).replaceAll('_', ' '))}
                 </p>
@@ -769,7 +769,7 @@
         const skipped = formatNumber(data.skipped_count);
 
         if (data.status === 'completed') {
-            icon.className = 'w-10 h-10 shrink-0 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black';
+            icon.className = 'w-10 h-10 shrink-0 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-black';
             icon.innerText = '✓';
 
             title.innerText = Number(data.invalid_rows || 0) > 0
@@ -781,14 +781,14 @@
                 `${updated} diperbarui, ${unchanged} tidak berubah, ` +
                 `${skipped} dilewati, dan ${invalid} invalid.`;
         } else if (data.status === 'failed') {
-            icon.className = 'w-10 h-10 shrink-0 rounded-2xl bg-red-100 text-red-700 flex items-center justify-center font-black';
+            icon.className = 'w-10 h-10 shrink-0 rounded-lg bg-red-100 text-red-700 flex items-center justify-center font-black';
             icon.innerText = '!';
 
             title.innerText = 'Import gagal diproses';
             text.innerText = data.error_message
                 || `${processed} row sempat diproses sebelum proses dihentikan.`;
         } else {
-            icon.className = 'w-10 h-10 shrink-0 rounded-2xl bg-slate-200 text-slate-700 flex items-center justify-center font-black';
+            icon.className = 'w-10 h-10 shrink-0 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center font-black';
             icon.innerText = '×';
 
             title.innerText = 'Import dibatalkan';

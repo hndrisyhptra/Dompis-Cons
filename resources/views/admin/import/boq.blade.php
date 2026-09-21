@@ -139,7 +139,7 @@
     <div class="max-w-7xl mx-auto space-y-6">
 
         {{-- HEADER --}}
-        <div class="rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+        <div class="rounded-[0.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
 
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
 
@@ -160,12 +160,12 @@
                 <div class="flex flex-col sm:flex-row gap-3">
 
                     <a href="{{ route('admin.import.boq.template') }}"
-                       class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700">
+                       class="inline-flex items-center justify-center px-5 py-3 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm font-black hover:bg-slate-200 dark:hover:bg-slate-700">
                         Download Template
                     </a>
 
                     <a href="{{ route('admin.data-boq') }}"
-                       class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20">
+                       class="inline-flex items-center justify-center px-5 py-3 rounded-lg bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20">
                         Data BOQ
                     </a>
 
@@ -175,52 +175,51 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
 
-                <div class="rounded-3xl bg-blue-50 border border-blue-100 p-5">
-                    <p class="text-[10px] font-black uppercase tracking-wider text-blue-600">
+                <div class="rounded-lg bg-slate-50 border border-black-100 p-5">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-black-600">
                         Format File
                     </p>
 
-                    <p class="text-lg font-black text-blue-800 mt-1">
+                    <p class="text-lg font-black text-black-800 mt-1">
                         XLSX / XLS
                     </p>
 
-                    <p class="text-xs text-blue-600 mt-1">
+                    <p class="text-xs text-black-600 mt-1">
                         Matrix BOQ, maksimal 100 MB.
                     </p>
                 </div>
 
-                <div class="rounded-3xl bg-emerald-50 border border-emerald-100 p-5">
-                    <p class="text-[10px] font-black uppercase tracking-wider text-emerald-600">
+                <div class="rounded-lg bg-slate-50 border border-black-100 p-5">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-black-600">
                         Mapping LOP
                     </p>
 
-                    <p class="text-lg font-black text-emerald-800 mt-1">
+                    <p class="text-lg font-black text-black-800 mt-1">
                         ID IHLD / Nama LOP
                     </p>
 
-                    <p class="text-xs text-emerald-600 mt-1">
+                    <p class="text-xs text-black-600 mt-1">
                         Mapping PID tidak digunakan untuk PT 2.
                     </p>
                 </div>
 
-                <div class="rounded-3xl bg-indigo-50 border border-indigo-100 p-5">
-                    <p class="text-[10px] font-black uppercase tracking-wider text-indigo-600">
+                <div class="rounded-lg bg-slate-50 border border-black-100 p-5">
+                    <p class="text-[10px] font-black uppercase tracking-wider text-black-600">
                         Existing BOQ
                     </p>
 
-                    <p class="text-lg font-black text-indigo-800 mt-1">
+                    <p class="text-lg font-black text-black-800 mt-1">
                         Tidak Ditimpa
                     </p>
 
-                    <p class="text-xs text-indigo-600 mt-1">
+                    <p class="text-xs text-black-600 mt-1">
                         Re-import identik dihitung Tidak Berubah.
                     </p>
                 </div>
 
                 <a
                     href="{{ $lastHistory ? route('admin.import.boq', ['import_uuid' => $lastHistory->uuid]) : '#' }}"
-                    class="block rounded-3xl bg-amber-50 border border-amber-100 p-5 {{ $lastHistory ? 'hover:border-amber-300' : 'pointer-events-none' }}"
-                >
+                    class="block rounded-lg bg-slate-50 border border-black-100 p-5 {{ $lastHistory ? 'hover:border-blue-300' : 'pointer-events-none' }}">
                     <div class="flex items-start justify-between gap-3">
 
                         <div class="min-w-0">
@@ -270,19 +269,19 @@
 
         {{-- ALERT --}}
         @if(session('success'))
-            <div class="rounded-3xl bg-emerald-50 border border-emerald-200 text-emerald-700 px-5 py-4 text-sm font-bold">
+            <div class="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 px-5 py-4 text-sm font-bold">
                 {{ session('success') }}
             </div>
         @endif
 
         @if(session('error'))
-            <div class="rounded-3xl bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm font-bold">
+            <div class="rounded-lg bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm font-bold">
                 {{ session('error') }}
             </div>
         @endif
 
         @if($errors->any())
-            <div class="rounded-3xl bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm font-bold">
+            <div class="rounded-lg bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm font-bold">
                 {{ $errors->first() }}
             </div>
         @endif
@@ -291,7 +290,7 @@
         {{-- LIVE BACKGROUND RESULT --}}
         <div
             id="importStatusPanel"
-            class="hidden bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm"
+            class="hidden bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm"
         >
 
             <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -372,7 +371,7 @@
                 class="hidden grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3 mt-5"
             >
 
-                <div class="rounded-2xl bg-slate-50 dark:bg-slate-950 p-4">
+                <div class="rounded-lg bg-slate-50 dark:bg-slate-950 p-4">
                     <p class="text-[9px] uppercase font-bold text-slate-400">
                         Processed Row
                     </p>
@@ -381,7 +380,7 @@
                     </p>
                 </div>
 
-                <div class="rounded-2xl bg-emerald-50 p-4">
+                <div class="rounded-lg bg-emerald-50 p-4">
                     <p class="text-[9px] uppercase font-bold text-emerald-600">
                         Valid Volume
                     </p>
@@ -390,7 +389,7 @@
                     </p>
                 </div>
 
-                <div class="rounded-2xl bg-red-50 p-4">
+                <div class="rounded-lg bg-red-50 p-4">
                     <p class="text-[9px] uppercase font-bold text-red-600">
                         Invalid
                     </p>
@@ -399,7 +398,7 @@
                     </p>
                 </div>
 
-                <div class="rounded-2xl bg-blue-50 p-4">
+                <div class="rounded-lg bg-blue-50 p-4">
                     <p class="text-[9px] uppercase font-bold text-blue-600">
                         BOQ Baru
                     </p>
@@ -408,7 +407,7 @@
                     </p>
                 </div>
 
-                <div class="rounded-2xl bg-indigo-50 p-4">
+                <div class="rounded-lg bg-indigo-50 p-4">
                     <p class="text-[9px] uppercase font-bold text-indigo-600">
                         Tidak Berubah
                     </p>
@@ -417,7 +416,7 @@
                     </p>
                 </div>
 
-                <div class="rounded-2xl bg-slate-100 p-4">
+                <div class="rounded-lg bg-slate-100 p-4">
                     <p class="text-[9px] uppercase font-bold text-slate-500">
                         Dilewati
                     </p>
@@ -432,7 +431,7 @@
             {{-- BOQ SPECIFIC SUMMARY --}}
             <div
                 id="boqSummaryPanel"
-                class="hidden mt-5 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+                class="hidden mt-5 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden"
             >
 
                 <div class="px-4 py-3 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
@@ -499,7 +498,7 @@
             {{-- FATAL ERROR --}}
             <div
                 id="fatalErrorPanel"
-                class="hidden mt-5 rounded-2xl bg-red-50 border border-red-200 p-4"
+                class="hidden mt-5 rounded-lg bg-red-50 border border-red-200 p-4"
             >
                 <p class="text-xs font-black text-red-700">
                     Background import gagal
@@ -517,7 +516,7 @@
             {{-- INVALID PREVIEW --}}
             <div
                 id="importErrorPreview"
-                class="hidden mt-5 rounded-2xl border border-red-200 overflow-hidden"
+                class="hidden mt-5 rounded-lg border border-red-200 overflow-hidden"
             >
 
                 <div class="px-4 py-3 bg-red-50 border-b border-red-200">
@@ -560,7 +559,7 @@
             {{-- COMPLETION SUMMARY --}}
             <div
                 id="importCompletionSummary"
-                class="hidden mt-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 md:p-5"
+                class="hidden mt-5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 md:p-5"
             >
 
                 <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -569,7 +568,7 @@
 
                         <div
                             id="completionIcon"
-                            class="w-10 h-10 shrink-0 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black"
+                            class="w-10 h-10 shrink-0 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-black"
                         >
                             ✓
                         </div>
@@ -598,7 +597,7 @@
 
                         <a
                             href="{{ route('admin.data-boq') }}"
-                            class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-black transition"
+                            class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-black transition"
                         >
                             Lihat Data BOQ
                         </a>
@@ -606,14 +605,14 @@
                         <a
                             id="downloadErrorButton"
                             href="#"
-                            class="hidden inline-flex items-center justify-center px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black transition"
+                            class="hidden inline-flex items-center justify-center px-4 py-2 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 text-xs font-black transition"
                         >
                             Download Error CSV
                         </a>
 
                         <a
                             href="{{ route('admin.import.boq') }}"
-                            class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+                            class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-xs font-black hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                         >
                             Import Baru
                         </a>
@@ -632,7 +631,7 @@
             {{-- MAIN UPLOAD --}}
             <div class="xl:col-span-8">
 
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
+                <div class="bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 md:p-6 shadow-sm">
 
                     <h2 class="text-lg font-black text-slate-900 dark:text-white">
                         Upload File BOQ
@@ -655,7 +654,7 @@
 
                         <label
                             for="file"
-                            class="flex flex-col items-center justify-center min-h-[210px] rounded-[2rem] border-2 border-dashed border-blue-200 dark:border-slate-700 bg-blue-50/50 dark:bg-slate-950 cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-800 transition"
+                            class="flex flex-col items-center justify-center min-h-[210px] rounded-[0.5rem] border-2 border-dashed border-blue-200 dark:border-slate-700 bg-blue-50/50 dark:bg-slate-950 cursor-pointer hover:bg-blue-50 dark:hover:bg-slate-800 transition"
                         >
 
                             <p class="text-base font-black text-slate-900 dark:text-white">
@@ -703,7 +702,7 @@
 
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
-                                <label class="flex items-center gap-2 p-3 rounded-2xl border border-slate-200 bg-slate-50 dark:bg-slate-950 cursor-pointer">
+                                <label class="flex items-center gap-2 p-3 rounded-lg border border-slate-200 bg-slate-50 dark:bg-slate-950 cursor-pointer">
                                     <input
                                         type="radio"
                                         name="project_type"
@@ -712,30 +711,30 @@
                                         onchange="toggleCustomerType()"
                                     >
                                     <span class="text-sm font-bold">
-                                        PT 3
+                                        Program PT 3
                                     </span>
                                 </label>
 
-                                <label class="flex items-center gap-2 p-3 rounded-2xl border border-amber-200 bg-amber-50 cursor-pointer">
+                                <label class="flex items-center gap-2 p-3 rounded-lg border border-black-200 bg-slate-50 cursor-pointer">
                                     <input
                                         type="radio"
                                         name="project_type"
                                         value="external"
                                         onchange="toggleCustomerType()"
                                     >
-                                    <span class="text-sm font-bold text-amber-700">
+                                    <span class="text-sm font-bold text-black-700">
                                         Exbis
                                     </span>
                                 </label>
 
-                                <label class="flex items-center gap-2 p-3 rounded-2xl border border-emerald-200 bg-emerald-50 cursor-pointer">
+                                <label class="flex items-center gap-2 p-3 rounded-lg border border-black-200 bg-slate-50 cursor-pointer">
                                     <input
                                         type="radio"
                                         name="project_type"
                                         value="pt2"
                                         onchange="toggleCustomerType()"
                                     >
-                                    <span class="text-sm font-bold text-emerald-700">
+                                    <span class="text-sm font-bold text-black-700">
                                         Program PT 2
                                     </span>
                                 </label>
@@ -769,7 +768,7 @@
                                 <select
                                     id="select_customer_exbis"
                                     onchange="updateCustomerAndPackages()"
-                                    class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm"
+                                    class="w-full h-12 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm"
                                 >
                                     <option value="">
                                         -- Pilih Customer --
@@ -803,7 +802,7 @@
                                     name="package_id"
                                     id="package_id"
                                     required
-                                    class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm disabled:opacity-50"
+                                    class="w-full h-12 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm disabled:opacity-50"
                                 >
                                     <option value="">
                                         -- Pilih Package --
@@ -826,7 +825,7 @@
                             <select
                                 name="mapping_by"
                                 required
-                                class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm"
+                                class="w-full h-12 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm"
                             >
                                 <option value="id_ihld">
                                     By ID IHLD
@@ -846,7 +845,7 @@
 
                         <div
                             id="pt2Info"
-                            class="hidden rounded-2xl bg-emerald-50 border border-emerald-200 p-4"
+                            class="hidden rounded-lg bg-emerald-50 border border-emerald-200 p-4"
                         >
                             <p class="text-xs font-black text-emerald-700 uppercase">
                                 Aturan PT 2
@@ -863,7 +862,7 @@
                         <button
                             id="uploadButton"
                             type="submit"
-                            class="w-full sm:w-auto h-12 px-7 rounded-2xl bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-lg shadow-blue-700/20"
+                            class="w-full sm:w-auto h-12 px-7 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-sm font-black shadow-lg shadow-blue-700/20"
                         >
                             Start Upload
                         </button>
@@ -873,7 +872,7 @@
 
                     <div
                         id="uploadingInfo"
-                        class="hidden mt-5 rounded-2xl bg-blue-50 border border-blue-100 p-4 text-sm font-bold text-blue-700"
+                        class="hidden mt-5 rounded-lg bg-blue-50 border border-blue-100 p-4 text-sm font-bold text-blue-700"
                     >
                         File sedang dikirim ke server. Setelah upload selesai, proses BOQ dilanjutkan oleh background worker.
                     </div>
@@ -887,7 +886,7 @@
             <div class="xl:col-span-4 space-y-5">
 
                 {{-- QUEUE HEALTH --}}
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <div class="bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
 
                     <div class="flex items-start justify-between gap-3">
 
@@ -914,7 +913,7 @@
 
                     <div class="grid grid-cols-3 gap-2 mt-4">
 
-                        <div class="rounded-xl bg-slate-50 dark:bg-slate-950 p-2.5">
+                        <div class="rounded-lg bg-slate-50 dark:bg-slate-950 p-2.5">
                             <p class="text-[9px] uppercase font-bold text-slate-400">
                                 Menunggu
                             </p>
@@ -924,7 +923,7 @@
                             </p>
                         </div>
 
-                        <div class="rounded-xl bg-slate-50 dark:bg-slate-950 p-2.5">
+                        <div class="rounded-lg bg-slate-50 dark:bg-slate-950 p-2.5">
                             <p class="text-[9px] uppercase font-bold text-slate-400">
                                 Diproses
                             </p>
@@ -934,7 +933,7 @@
                             </p>
                         </div>
 
-                        <div class="rounded-xl bg-slate-50 dark:bg-slate-950 p-2.5">
+                        <div class="rounded-lg bg-slate-50 dark:bg-slate-950 p-2.5">
                             <p class="text-[9px] uppercase font-bold text-slate-400">
                                 Driver
                             </p>
@@ -950,7 +949,7 @@
 
 
                 {{-- RULES --}}
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <!-- <div class="bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
 
                     <h2 class="text-sm font-black text-slate-900 dark:text-white">
                         Aturan BOQ
@@ -958,7 +957,7 @@
 
                     <div class="mt-4 space-y-3">
 
-                        <div class="rounded-2xl bg-blue-50 border border-blue-100 p-4">
+                        <div class="rounded-lg bg-blue-50 border border-blue-100 p-4">
                             <p class="text-xs font-black text-blue-700">
                                 Header LOP
                             </p>
@@ -968,7 +967,7 @@
                             </p>
                         </div>
 
-                        <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4">
+                        <div class="rounded-lg bg-emerald-50 border border-emerald-100 p-4">
                             <p class="text-xs font-black text-emerald-700">
                                 Existing BOQ Aman
                             </p>
@@ -978,7 +977,7 @@
                             </p>
                         </div>
 
-                        <div class="rounded-2xl bg-amber-50 border border-amber-100 p-4">
+                        <div class="rounded-lg bg-amber-50 border border-amber-100 p-4">
                             <p class="text-xs font-black text-amber-700">
                                 Package Conflict
                             </p>
@@ -990,11 +989,11 @@
 
                     </div>
 
-                </div>
+                </div> -->
 
 
                 {{-- HISTORY --}}
-                <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <div class="bg-white dark:bg-slate-900 rounded-[0.5rem] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
 
                     <div class="flex items-center justify-between gap-3">
 
@@ -1067,7 +1066,7 @@
 
                             <a
                                 href="{{ route('admin.import.boq', ['import_uuid' => $log->uuid]) }}"
-                                class="block rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-3 hover:border-blue-200 transition"
+                                class="block rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 p-3 hover:border-blue-200 transition"
                             >
 
                                 <div class="flex items-start justify-between gap-2">
@@ -1136,7 +1135,7 @@
 
                         @empty
 
-                            <div class="rounded-2xl bg-slate-50 dark:bg-slate-950 p-5 text-center">
+                            <div class="rounded-lg bg-slate-50 dark:bg-slate-950 p-5 text-center">
                                 <p class="text-sm text-slate-500">
                                     Belum ada history import BOQ.
                                 </p>
@@ -1756,7 +1755,7 @@ document.addEventListener('DOMContentLoaded', function () {
             === 'completed'
         ) {
             icon.className =
-                'w-10 h-10 shrink-0 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black';
+                'w-10 h-10 shrink-0 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-black';
 
             icon.innerText =
                 '✓';
@@ -1782,7 +1781,7 @@ document.addEventListener('DOMContentLoaded', function () {
             === 'failed'
         ) {
             icon.className =
-                'w-10 h-10 shrink-0 rounded-2xl bg-red-100 text-red-700 flex items-center justify-center font-black';
+                'w-10 h-10 shrink-0 rounded-lg bg-red-100 text-red-700 flex items-center justify-center font-black';
 
             icon.innerText =
                 '!';
@@ -1796,7 +1795,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         } else {
             icon.className =
-                'w-10 h-10 shrink-0 rounded-2xl bg-slate-200 text-slate-700 flex items-center justify-center font-black';
+                'w-10 h-10 shrink-0 rounded-lg bg-slate-200 text-slate-700 flex items-center justify-center font-black';
 
             icon.innerText =
                 '×';

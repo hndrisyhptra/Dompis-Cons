@@ -16,7 +16,7 @@
         </div>
 
         <a href="{{ route('assign-waspang.index') }}"
-           class="h-10 px-4 rounded-xl border border-gray-300 text-sm font-bold inline-flex items-center">
+           class="h-10 px-4 rounded-lg border border-gray-300 text-sm font-bold inline-flex items-center">
             Kembali
         </a>
     </div>
@@ -31,16 +31,16 @@
                 name="search"
                 value="{{ $search ?? '' }}"
                 placeholder="Cari Nama Project, PID, STO, Branch..."
-                class="flex-1 h-11 rounded-xl border-gray-300 text-sm">
+                class="flex-1 h-11 rounded-lg border-gray-300 text-sm">
 
             <div class="flex gap-2">
-                <button class="h-11 px-5 rounded-xl bg-gray-900 text-white text-sm font-bold">
+                <button class="h-11 px-5 rounded-lg bg-gray-900 text-white text-sm font-bold">
                     Cari
                 </button>
 
                 @if (!empty($search))
                     <a href="{{ route('admin.assign-waspang.history', $waspang->id_user) }}"
-                    class="h-11 px-5 rounded-xl border border-gray-300 text-sm font-bold flex items-center">
+                    class="h-11 px-5 rounded-lg border border-gray-300 text-sm font-bold flex items-center">
                         Reset
                     </a>
                 @endif
