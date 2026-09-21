@@ -12,6 +12,7 @@ use App\Models\BoqItem;
 use App\Models\Designator;
 use App\Models\ProjectActivityLog;
 use App\Models\ProjectStage;
+use App\Services\DeploymentMovementSummaryService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -1029,8 +1030,27 @@ class DashboardController extends Controller
      * (dipanggil lewat app(), bukan diduplikasi -- lihat catatan di
      * matrixDetail() type 'stage_breakdown' di atas).
      */
-    public function reportDeployment()
+    public function reportDeployment(Request $request, DeploymentMovementSummaryService $movementSummary)
     {
+        $activeTab = $request->query('tab') === 'summary' ? 'summary' : 'report';
+        $pmController = app(\App\Http\Controllers\DashboardPmController::class);
+        $summaryDate = $pmController->deploymentSummaryDate($request);
+        $stageCube = [];
+        $pt2StageCube = [];
+        $summaryData = null;
+
+        if ($activeTab === 'summary') {
+            $summaryData = $movementSummary->build($summaryDate, $pmController->regionBranchMap());
+
+            return view('admin.report_deployment', compact(
+                'activeTab',
+                'stageCube',
+                'pt2StageCube',
+                'summaryData',
+                'summaryDate',
+            ));
+        }
+
         // Cache key SENGAJA disamakan dgn DashboardPmController::reportDeployment()
         // -- buildStageCube() hasilnya identik utk semua role (tidak
         // dipengaruhi role pemanggil), jadi 1 cache key yang sama dipakai
@@ -1043,7 +1063,13 @@ class DashboardController extends Controller
             return app(\App\Http\Controllers\DashboardPmController::class)->buildPt2StageCube();
         });
 
-        return view('admin.report_deployment', compact('stageCube', 'pt2StageCube'));
+        return view('admin.report_deployment', compact(
+            'activeTab',
+            'stageCube',
+            'pt2StageCube',
+            'summaryData',
+            'summaryDate',
+        ));
     }
 
     /**

@@ -12,6 +12,8 @@ use App\Models\Lop;
 use App\Models\BoqItem;
 use App\Models\Designator;
 use App\Models\ProjectActivityLog;
+use App\Services\DeploymentMovementSummaryService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -69,17 +71,47 @@ class DashboardPmController extends Controller
      *   exclude Konstruksi Eksternal di sini sama sekali (beda dgn index()
      *   di atas yang exclude utk tif).
      */
-    public function reportDeployment()
+    public function reportDeployment(Request $request, DeploymentMovementSummaryService $movementSummary)
     {
-        $stageCube = Cache::remember('pm_report_deployment_cube_v1', 90, function () {
-            return $this->buildStageCube();
-        });
+        $activeTab = $request->query('tab') === 'summary' ? 'summary' : 'report';
+        $summaryDate = $this->deploymentSummaryDate($request);
 
-        $pt2StageCube = Cache::remember('pm_report_deployment_pt2_cube_v1', 90, function () {
-            return $this->buildPt2StageCube();
-        });
+        $stageCube = [];
+        $pt2StageCube = [];
+        $summaryData = null;
 
-        return view('pm.report_deployment', compact('stageCube', 'pt2StageCube'));
+        if ($activeTab === 'summary') {
+            $summaryData = $movementSummary->build($summaryDate, $this->regionBranchMap());
+        } else {
+            $stageCube = Cache::remember('pm_report_deployment_cube_v1', 90, function () {
+                return $this->buildStageCube();
+            });
+
+            $pt2StageCube = Cache::remember('pm_report_deployment_pt2_cube_v1', 90, function () {
+                return $this->buildPt2StageCube();
+            });
+        }
+
+        return view('pm.report_deployment', compact(
+            'activeTab',
+            'stageCube',
+            'pt2StageCube',
+            'summaryData',
+            'summaryDate',
+        ));
+    }
+
+    public function deploymentSummaryDate(Request $request): CarbonImmutable
+    {
+        $validated = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+        ]);
+
+        return CarbonImmutable::createFromFormat(
+            'Y-m-d',
+            $validated['date'] ?? now()->toDateString(),
+            config('app.timezone'),
+        )->startOfDay();
     }
 
     /**

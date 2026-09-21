@@ -2834,5 +2834,56 @@ Ditemukan juga sekalian: `storeStep3Eviden()` (Finish/Redaman) sudah lama menyim
 ### Verifikasi
 - Balance-check (`{`/`}`, `(`/`)`) pada `ImportController.php` -- balance (selisih 0/0). `routes/web.php` sempat menunjukkan selisih paren 2 tapi itu false-positive dari tanda kurung di dalam teks komentar Indonesia (bukan kode) -- dikonfirmasi via `php -l`.
 - `php -l` via `device_stage_files` + cloud `Bash` -- "No syntax errors detected" utk `ImportController.php` & `routes/web.php`.
-- Sweep stray-`@`-directive pada `admin/download_lop.blade.php`, `admin/components/sidebar.blade.php`, `admin/components/sidebar-mobile.blade.php`, `pm/dashboard.blade.php` -- semua directive yang muncul valid & disengaja.
+- Sweep stray-`@`-directivbantu e pada `admin/download_lop.blade.php`, `admin/components/sidebar.blade.php`, `admin/components/sidebar-mobile.blade.php`, `pm/dashboard.blade.php` -- semua directive yang muncul valid & disengaja.
 - **BELUM diverifikasi end-to-end di browser** (klik tombol Download PT3/PT2 di Dashboard PM & TIF -- pastikan file Excel ke-download & datanya benar, exclude Konstruksi Eksternal utk tif; buka menu Download Semua LOP role superadmin -- pastikan angka total & tombol download jalan) -- perlu ditest oleh user.
+
+## Section BQ — Tab "Summary Deployment" untuk Pergerakan Harian per Branch (21 September 2026)
+
+### Permintaan user
+Pada menu Report Deployment ditambahkan dua tab yang berpindah halaman melalui query URL: **Report Deployment** (tampilan lama) dan **Summary Deployment**. Summary diperlukan untuk mengetahui Branch yang tidak memiliki pergerakan harian serta, untuk Branch yang bergerak, LOP mana yang diperbarui dan oleh siapa.
+
+### Audit dan keputusan sumber data
+- Sumber pergerakan memakai `project_activity_logs`, bukan membandingkan `updated_at` LOP/Project. Alasannya: activity log menyimpan jenis aktivitas, waktu, LOP, dan `user_id`, sehingga bisa menjawab "LOP mana" dan "oleh siapa" secara lebih akurat.
+- Scope pertama hanya **PT3/Reguler**. Log PT2 sengaja belum dicampur karena alur Survey/Dismantle/Mancore PT2 belum konsisten merekam actor; sistem tidak boleh menebak pelaku.
+- Activity type berakhiran `_pt2` serta `lop_golive_pt2`, `approve_evidence_pt2`, dan `reject_evidence_pt2` dikeluarkan untuk mencegah benturan ID numerik antara `lops` dan `pt2_lops`.
+- `sync_legacy_status_progress` juga dikeluarkan. Audit menemukan 307 log tipe ini pada 14 September 2026 dan seluruhnya tanpa actor; itu adalah backfill/rekonsiliasi sistem, bukan pergerakan pekerjaan lapangan.
+- Jika `project_id` ada pada log, pasangan Project-LOP harus cocok. Log orphan/mismatch tidak ikut summary.
+- Tidak ada migration atau perubahan skema database untuk fitur ini.
+
+### Implementasi backend
+- File baru `app/Services/DeploymentMovementSummaryService.php`:
+  - mengambil total LOP per Branch (Branch LOP, fallback Branch Project);
+  - menghitung LOP unik yang memiliki aktivitas pada tanggal terpilih;
+  - menghitung Branch bergerak/tidak bergerak, total aktivitas, actor aktif, jumlah hari sejak aktivitas terakhir, dan persentase pergerakan;
+  - menghasilkan drill-down Branch -> LOP -> timeline aktivitas/pelaku;
+  - Branch tanpa pergerakan diurutkan paling atas;
+  - query agregasi menggunakan derived table agar kompatibel dengan `ONLY_FULL_GROUP_BY` pada MySQL/MariaDB aktif.
+- `DashboardController::reportDeployment()` dan `DashboardPmController::reportDeployment()` sekarang menerima `?tab=report|summary&date=YYYY-MM-DD`.
+- Tanggal divalidasi dan tidak boleh melewati hari ini. Query cube PT3/PT2 lama hanya dijalankan pada tab Report; query summary hanya dijalankan pada tab Summary.
+
+### Implementasi UI
+- Partial baru `resources/views/partials/report-deployment-tabs.blade.php` dipakai bersama halaman Admin dan PM.
+- Partial baru `resources/views/partials/deployment-movement-summary.blade.php` berisi:
+  - navigasi tanggal (hari sebelumnya/berikutnya/kembali ke hari ini + date picker);
+  - KPI Total Branch, Branch Bergerak, Tanpa Pergerakan, LOP Bergerak, Total Aktivitas, dan Pelaku Aktif;
+  - filter Semua/Tidak Bergerak/Bergerak, filter Region, dan pencarian Branch/LOP/PID/pelaku;
+  - accordion Branch, lalu accordion LOP untuk melihat timeline aktivitas dan pelakunya;
+  - penanda merah untuk Branch tanpa pergerakan dan hijau untuk Branch bergerak;
+  - pemberitahuan eksplisit bahwa PT2 belum disertakan dan backfill otomatis tidak dihitung.
+- `resources/views/admin/report_deployment.blade.php` dan `resources/views/pm/report_deployment.blade.php` memakai partial yang sama; desain Report Deployment lama dipertahankan di tab pertama.
+
+### Verifikasi
+- `php -l` sukses untuk service baru serta kedua controller.
+- `php artisan route:list --name=report_deployment` sukses; route Admin dan PM tetap tersedia.
+- `php artisan view:cache` sukses; seluruh Blade dapat dikompilasi.
+- `npm run build` sukses, termasuk plugin Alpine Collapse untuk accordion.
+- Pemeriksaan browser lokal mencapai halaman login; sesi browser tidak sedang terautentikasi, sehingga smoke test visual setelah login (klik tab/filter/accordion pada layout penuh) masih perlu dilakukan tanpa memakai atau meminta kredensial user.
+- Verifikasi baca-saja terhadap database aktif:
+  - 14 September 2026 setelah log backfill disaring: 17 Branch, 4 Branch bergerak, 13 tidak bergerak, 11 LOP bergerak, 348 aktivitas, 8 actor aktif, dan 0 aktivitas tanpa actor;
+  - Branch Kupang pada tanggal tersebut benar-benar 0 LOP bergerak (29 log yang semula tampak sebagai pergerakan ternyata seluruhnya log backfill otomatis tanpa actor);
+  - 21 September 2026: 17 Branch belum bergerak dan 0 aktivitas, sesuai log terbaru yang tersedia di database saat audit.
+- Unit test existing: 17 lolos, 2 gagal pada masalah yang sudah ada di luar fitur ini (`DatabaseSchemaBaselineTest` belum mengenali migration pending terbaru dan ekspektasi `quantity_actual` lama pada `SurveyPreparationServiceTest`). Fitur Summary tidak mengubah kedua area tersebut.
+
+### Batasan lanjutan
+Supaya PT2 dapat masuk ke Summary dengan standar "oleh siapa" yang sama, semua titik perubahan PT2 perlu lebih dulu menulis `project_activity_logs.user_id` dan identitas LOP PT2 secara tidak ambigu. Setelah kontrak log PT2 dibereskan, scope dapat ditambah tanpa mengubah desain UI.
+Summ
