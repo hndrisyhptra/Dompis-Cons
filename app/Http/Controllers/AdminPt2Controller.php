@@ -315,6 +315,7 @@ class AdminPt2Controller extends Controller
     public function sendToSdi($lop_id)
     {
         $lop = Pt2Lop::findOrFail($lop_id);
+        $previousStatus = $lop->sdi_approval_status;
 
         // Update status spesifik LOP untuk masuk antrean SDI.
         // Revisi (permintaan user, dibatalkan lagi di revisi lanjutan):
@@ -326,6 +327,17 @@ class AdminPt2Controller extends Controller
         $lop->update([
             'sdi_approval_status' => 'pending',
             'updated_at' => now(),
+        ]);
+
+        ProjectActivityService::log([
+            'project_id' => $lop->pt2_project_id,
+            'lop_id' => $lop->id_pt2_lop,
+            'activity_type' => 'send_to_sdi_pt2',
+            'title' => 'LOP PT 2 Dikirim ke SDI',
+            'description' => 'Admin mengirim LOP PT 2 untuk proses verifikasi Golive oleh SDI.',
+            'stage' => 'fi_ogp_golive',
+            'status_before' => $previousStatus,
+            'status_after' => 'pending',
         ]);
 
         return back()->with('success', 'LOP berhasil dikirim ke SDI untuk proses Go-Live.');

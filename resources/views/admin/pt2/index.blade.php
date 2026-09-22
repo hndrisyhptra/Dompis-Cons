@@ -220,6 +220,12 @@
                                                                         <span class="font-semibold">Tracking Progress</span>
                                                                     </a>
 
+                                                                    <a href="{{ route('pt2.timeline', $lop->id_pt2_lop) }}"
+                                                                    class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-indigo-50 dark:hover:bg-gray-800 hover:text-indigo-700 transition-colors">
+                                                                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+                                                                        <span class="font-semibold">Timeline</span>
+                                                                    </a>
+
                                                                     {{-- Assign --}}
                                                                     <button type="button" onclick="openAssignModalPt2({{ $project->id_pt2_project }}, {{ $lop->id_pt2_lop }}, '{{ addslashes($lop->lop_name) }}')"
                                                                             class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-gray-800 hover:text-amber-700 transition-colors">

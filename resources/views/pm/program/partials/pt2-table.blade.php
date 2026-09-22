@@ -4,9 +4,8 @@
     (Regular), tapi:
     - 1 baris = 1 Pt2Lop (bukan 1 Project spt Regular, krn 1 project PT2 bisa
       punya banyak LOP -- lihat catatan ProgramController::pt2()).
-    - TIDAK ada tombol Tracking Progress/Timeline/Review BOQ (rute-rute itu
-      belum ada versi PT2-nya yang aman diakses pm/tif) -- cuma tombol
-      "Detail" (modal read-only, pt2-detail-modal.blade.php).
+    - Tombol Timeline memakai route read-only lintas-role `pt2.timeline`.
+      Detail LOP tetap memakai modal read-only pt2-detail-modal.blade.php.
     - Progress & label tahap dari Pt2Lop::progressSummary() (Section BM).
 --}}
 <style>
@@ -154,6 +153,13 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                             </button>
+                            <a href="{{ route('pt2.timeline', $lop->id_pt2_lop) }}"
+                               class="w-8 h-8 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition inline-flex items-center justify-center pm-tooltip"
+                               data-tooltip="Timeline">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/>
+                                </svg>
+                            </a>
                         </td>
                     </tr>
                 @empty

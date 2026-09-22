@@ -236,6 +236,16 @@ Route::middleware(['auth', 'role:superadmin,admin,tif,super_tif,officer,pm'])->g
 
 /*
 |--------------------------------------------------------------------------
+| TIMELINE PROJECT PT 2 -- satu LOP per timeline karena satu PID PT 2 dapat
+| memiliki lebih dari satu LOP. Read-only untuk role monitoring/manajemen.
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:admin,superadmin,super_tif,officer,pm,tif'])
+    ->get('/pt2/timeline/{lop}', [\App\Http\Controllers\Pt2TimelineController::class, 'show'])
+    ->name('pt2.timeline');
+
+/*
+|--------------------------------------------------------------------------
 | REPORT DEPLOYMENT -- role admin, superadmin, officer, PM, dan TIF.
 | Route admin/superadmin/officer memakai DashboardController, sedangkan PM
 | dan TIF memakai DashboardPmController. Semua role melihat tab Report,

@@ -155,14 +155,14 @@
                             <td class="px-5 py-4 text-center">
                                 @if(!$isGoLive)
                                     {{-- TOMBOL PROSES GO-LIVE PER LOP MENGGUNAKAN DATA ATTRIBUTE --}}
-                                    <button type="button" 
-                                            onclick="openGoLiveModal('{{ route('sdi.eksekusi.golive', $lop->id_pt2_lop) }}', '{{ $lop->lop_name }}', '{{ $project->pid }}')" 
+                                    <button type="button"
+                                            onclick="openGoLiveModal('{{ route('sdi.eksekusi.golive', $lop->id_pt2_lop) }}', '{{ $lop->lop_name }}', '{{ $project->pid }}')"
                                             class="h-9 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-sm inline-flex items-center gap-2">
                                         Proses Go-Live 🚀
                                     </button>
                                 @else
                                     {{-- TOMBOL LIHAT EVIDEN UIM --}}
-                                    <a href="{{ Storage::url($lop->golive_evidence_path) }}" target="_blank" 
+                                    <a href="{{ Storage::url($lop->golive_evidence_path) }}" target="_blank"
                                     class="h-9 px-4 rounded-xl bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-bold transition shadow-sm inline-flex items-center gap-2">
                                         Lihat Eviden 🖼️
                                     </a>

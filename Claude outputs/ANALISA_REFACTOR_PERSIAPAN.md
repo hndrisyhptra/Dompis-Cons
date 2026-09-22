@@ -3063,3 +3063,41 @@ Mengganti accordion Branch/Step/Sub-step dengan tabel matrix yang lebih cepat di
 - Seluruh Blade berhasil dikompilasi dan `git diff --check` sukses.
 - Ditambahkan unit test untuk menjaga akses PM/TIF dan memastikan kedua route Durasi per Tahap tidak muncul kembali.
 - Smoke test browser lokal tidak dijalankan karena izin akses localhost pada browser tidak diberikan; validasi dilanjutkan melalui route, kompilasi Blade, dan unit test tanpa mencoba jalur browser lain.
+
+## Section BW — Timeline Project PT 2 Lintas Role (22 September 2026)
+
+### Audit sumber data
+- PT 2 belum memiliki tabel histori perpindahan tahap seperti `lop_stage_histories` pada PT 3.
+- Activity log PT 2 lama hanya mencakup assignment, review evidence, dan Golive. Upload evidence Teknisi, survey, dismantle, dan mancore tidak selalu menulis activity log.
+- ID project/LOP PT 2 dapat sama dengan ID pada tabel reguler karena berada pada namespace tabel berbeda. Karena `project_activity_logs` belum mempunyai discriminator project type, timeline hanya mengambil activity type yang mengandung suffix `pt2` agar log reguler tidak tercampur.
+
+### Implementasi
+- Ditambahkan route read-only `pt2.timeline` berdasarkan LOP PT 2. Satu timeline mewakili satu LOP karena satu PID PT 2 dapat mempunyai beberapa LOP.
+- Route hanya dapat diakses role monitoring/manajemen yang ditetapkan: Admin, Superadmin, Super TIF, Officer, PM, dan TIF. Teknisi, Waspang, SDI, dan SDI Surveyor ditolak oleh middleware route.
+- Seluruh role yang diizinkan memakai layout Admin yang sudah role-aware; PM/TIF tetap memperoleh sidebar miliknya sendiri melalui pemilihan sidebar pada layout tersebut.
+- Timeline menggabungkan project/LOP dibuat, assignment, survey, upload evidence, approval/rejection, dismantle, mancore, pengiriman ke SDI, dan Golive. Evidence foto serta Capture UIM dapat dibuka dari detail kronologi.
+- Tampilan mengikuti Timeline PT 3: header identitas dan progress, tabel durasi, timeline horizontal, serta timeline vertikal berbentuk accordion dengan tombol buka/tutup semua.
+- Karena histori tahap PT 2 tidak tersedia, bagian durasi diberi label **Durasi Antar-Milestone** dan dihitung dari timestamp data yang benar-benar tersedia. Timestamp yang tidak ada tetap ditampilkan `-`, tidak direkonstruksi secara spekulatif.
+- Aksi pengiriman LOP PT 2 ke SDI sekarang menulis activity `send_to_sdi_pt2` agar kejadian berikutnya tercatat eksplisit pada timeline.
+
+### Entry point UI
+- Daftar PT 2 Admin/Superadmin/Super TIF/Officer: menu aksi LOP.
+- Project ID PT 2 PM/TIF: tombol Timeline di kolom Aksi.
+- Tombol Timeline di Inbox Teknisi PT 2 dan Approval Golive SDI telah dihapus. Waspang serta SDI Surveyor juga tidak mempunyai akses URL langsung.
+
+### Database dan keamanan
+- Tidak ada migration atau perubahan struktur database.
+- Tidak ada data historis yang diubah atau dihapus.
+- Route menggunakan `auth` dan allow-list seluruh role, bukan route publik.
+
+### Verifikasi
+- PHP syntax check sukses untuk service dan controller baru.
+- Laravel Pint sukses untuk service, controller, dan unit test baru.
+- Seluruh Blade berhasil dikompilasi.
+- Unit test mencakup allow-list enam role, route GET read-only, rekonstruksi event dari sumber PT 2, evidence, dan perhitungan milestone tanpa mengarang tanggal yang hilang.
+
+### Koreksi runtime
+- Error `Call to a member function diffInSeconds() on string` ditemukan saat data aktual mengembalikan hasil agregasi timestamp sebagai string.
+- Seluruh milestone sekarang dinormalisasi melalui `CarbonImmutable` sebelum dibandingkan dan dihitung. Test regresi memakai timestamp mentah berbentuk string untuk memastikan kasus produksi tersebut tidak berulang.
+- Error Blade `Undefined variable $color` ditemukan saat detail event Timeline PT 2 dirender. Variabel lokal tersebut dihilangkan; class warna kini diambil langsung dari palet berdasarkan tipe event dengan fallback `gray`, sehingga tidak bergantung pada scope variabel sementara di dalam loop Blade. Sintaks pendek `@php(...)` yang tidak kompatibel dengan compiler Blade proyek juga diganti menjadi blok `@php ... @endphp` standar.
+- Ditambahkan test render halaman penuh Timeline PT 2 untuk memastikan header, identitas LOP, dan class warna event dapat dirender tanpa error runtime Blade.
