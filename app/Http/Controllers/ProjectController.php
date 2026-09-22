@@ -8,12 +8,13 @@ use App\Models\Designator;
 use App\Models\Evidence;
 use App\Models\EvidenceRevisionHistory;
 use App\Models\Lop;
+use App\Models\LopGoliveSubmission;
 use App\Models\LopMeasurementCheck;
 use App\Models\Notification;
 use App\Models\Project;
-use App\Models\ProjectStage;
 use App\Models\ProjectActivityLog;
 use App\Models\ProjectAssignment;
+use App\Models\ProjectStage;
 use App\Models\User;
 use App\Services\ProjectActivityService;
 use App\Services\TelegramWebhookEventService;
@@ -821,7 +822,7 @@ class ProjectController extends Controller
                         && ($summary['persiapanDone'] ?? false)
                         && $currentSequence <= 6 // masih di fase Persiapan / Persiapan Instalasi (seq 1-6)
                     ) {
-                   
+
                         $lop->advanceStage('instalasi', auth()->id());
 
                     } elseif (
@@ -839,7 +840,7 @@ class ProjectController extends Controller
                         $lop->advanceStage('finishing', auth()->id());
                     }
                 }
-            } 
+            }
             $alreadyCompleteLogged = ProjectActivityLog::where('project_id', $project->id_project)
                 ->where('activity_type', 'project_completed')
                 ->exists();
@@ -1186,18 +1187,20 @@ class ProjectController extends Controller
         return view('admin.evidences.review-golive', compact('project'));
     }
 
-    // Section AF: upload/perbarui 4 dokumen FI-OGP Golive (capture valins,
-    // PDF ABD & Valid4, KML, Mancore -- foto ATAU excel, lihat
-    // LopGoliveSubmission::mancore_input_type). Field dikirim satu-satu,
-    // upload parsial diperbolehkan (form bisa disubmit berkali-kali sampai
-    // lengkap) -- makanya validasi semuanya 'nullable', bukan 'required'.
-    public function submitGoliveDocuments(Request $request, $id)
+    // Upload parsial FI-OGP disimpan sebagai draft. Selama draft, Admin
+    // masih boleh menambah dan menghapus file. Draft tidak mengubah stage
+    // LOP dan belum muncul sebagai antrean verifikasi SDI.
+    public function saveGoliveDraft(Request $request, $id)
     {
-        $project = Project::with(['lop.stage'])->where('id_project', $id)->firstOrFail();
+        $project = Project::with(['lop.stage', 'lop.goliveSubmission'])->where('id_project', $id)->firstOrFail();
         $lop = $project->lop;
 
         if (! $lop) {
             return back()->with('error', 'LOP untuk project ini belum ada.');
+        }
+
+        if ($lop->goliveSubmission?->isLocked()) {
+            return back()->with('error', 'Dokumen sudah disubmit dan dikunci. Upload ulang tidak diperbolehkan.');
         }
 
         $request->validate([
@@ -1212,10 +1215,12 @@ class ProjectController extends Controller
             'mancore.*' => 'file|mimes:jpeg,png,jpg,webp,xls,xlsx|max:10240',
         ]);
 
-        $submission = \App\Models\LopGoliveSubmission::firstOrNew(['lop_id' => $lop->id_lop]);
+        $submission = $lop->goliveSubmission
+            ?? new LopGoliveSubmission(['lop_id' => $lop->id_lop]);
         $submission->lop_id = $lop->id_lop;
 
         $folder = 'evidences/golive/'.$lop->id_lop;
+        $uploadedCategories = [];
 
         // Revisi (permintaan user): tiap kategori sekarang boleh MULTIPLE
         // file -- file baru DITAMBAHKAN ke daftar yg sudah ada (bukan
@@ -1223,7 +1228,7 @@ class ProjectController extends Controller
         // tanpa menghilangkan file yg sudah tersimpan. Kolom *_path lama
         // ikut disinkron ke file TERAKHIR (kompatibilitas mundur, dibaca
         // di tempat lain yg belum diupdate ke *_paths).
-        $appendFiles = function (string $key, string $prefix) use ($request, $folder, $submission) {
+        $appendFiles = function (string $key, string $prefix) use ($request, $folder, $submission, &$uploadedCategories): void {
             if (! $request->hasFile($key)) {
                 return;
             }
@@ -1241,6 +1246,7 @@ class ProjectController extends Controller
 
             $submission->{$key.'_paths'} = $existing;
             $submission->{$key.'_path'} = end($existing) ?: null;
+            $uploadedCategories[] = $key;
         };
 
         $appendFiles('capture_valins', 'capture_valins');
@@ -1260,18 +1266,48 @@ class ProjectController extends Controller
             $submission->fi_completed_at = now();
         }
 
-        $submission->submitted_by = auth()->id();
-        $submission->submitted_at = now();
+        $submission->submission_status = LopGoliveSubmission::STATUS_DRAFT;
+        $submission->draft_saved_by = auth()->id();
+        $submission->draft_saved_at = now();
         $submission->save();
 
-        ProjectActivityService::log([
-            'project_id' => $project->id_project,
-            'lop_id' => $lop->id_lop,
-            'activity_type' => 'golive_submission_upload',
-            'title' => 'Dokumen FI-OGP Golive Diunggah',
-            'description' => 'Admin mengunggah/memperbarui dokumen FI-OGP Golive untuk LOP: '.$lop->lop_name,
-            'status_after' => $submission->isComplete() ? 'complete' : 'partial',
-        ]);
+        if (count($uploadedCategories) > 0) {
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'golive_submission_draft_upload',
+                'title' => 'Draft Dokumen FI-OGP Golive Diunggah',
+                'description' => 'Admin mengunggah '.count($uploadedCategories).' kategori dokumen FI-OGP Golive untuk LOP: '.$lop->lop_name,
+                'stage' => 'fi_ogp_golive',
+                'status_after' => $submission->isComplete() ? 'draft_complete' : 'draft_partial',
+                'meta' => ['uploaded_categories' => array_values(array_unique($uploadedCategories))],
+            ]);
+        }
+
+        return back()->with('success', $submission->isComplete()
+            ? 'Draft tersimpan. Empat syarat sudah lengkap dan siap disubmit.'
+            : 'Draft dokumen FI-OGP Golive berhasil disimpan.');
+    }
+
+    // Final submit hanya mengubah status draft menjadi submitted. Setelah
+    // titik ini dokumen dikunci dan LOP masuk antrean verifikasi SDI.
+    public function submitGoliveDocuments(Request $request, $id)
+    {
+        $project = Project::with(['lop.stage', 'lop.goliveSubmission'])->where('id_project', $id)->firstOrFail();
+        $lop = $project->lop;
+        $submission = $lop?->goliveSubmission;
+
+        if (! $lop || ! $submission) {
+            return back()->with('error', 'Draft dokumen FI-OGP Golive belum tersedia.');
+        }
+
+        if ($submission->isSubmitted()) {
+            return back()->with('error', 'Dokumen sudah disubmit dan sedang menunggu verifikasi SDI.');
+        }
+
+        if (! $submission->isComplete()) {
+            return back()->with('error', 'Submit belum tersedia. Lengkapi Capture Valins, PDF ABD & Valid4, File KML, dan Mancore.');
+        }
 
         /*
         |--------------------------------------------------------------------------
@@ -1287,33 +1323,51 @@ class ProjectController extends Controller
         $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
         $isAlreadyClosed = in_array($lop->status_progress, ['drop', 'golive'], true) || (bool) $lop->is_golive;
 
-        $project = $project->fresh(['lop.stage']);
         $summary = $project->progressSummary();
-        $currentStage = $project->lop?->stage;
+        $currentStage = $lop->stage;
         $currentSequence = $currentStage?->sequence;
         $isPausedOrDropped = (bool) ($currentStage?->is_pause_type || $currentStage?->is_terminal);
 
-        if (
-            ! $isPt2 && ! $isAlreadyClosed
-            && $project->lop && $currentSequence !== null && ! $isPausedOrDropped
-            && ($summary['finishingDone'] ?? false)
-            && $currentSequence === 9
-            && $submission->isComplete()
-        ) {
+        if ($isPt2 || $isAlreadyClosed || $currentSequence === null || $isPausedOrDropped) {
+            return back()->with('error', 'LOP tidak dapat disubmit pada status saat ini.');
+        }
+
+        if (! ($summary['finishingDone'] ?? false) || $currentSequence !== 9) {
+            return back()->with('error', 'Finalisasi eviden Finishing harus selesai sebelum dokumen FI-OGP disubmit.');
+        }
+
+        DB::transaction(function () use ($lop, $project, $submission): void {
+            $submission->submission_status = LopGoliveSubmission::STATUS_SUBMITTED;
+            $submission->submitted_by = auth()->id();
+            $submission->submitted_at = now();
+            $submission->save();
+
             $lop->advanceStage('fi_ogp_golive', auth()->id());
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'golive_submission_submitted',
+                'title' => 'Dokumen FI-OGP Golive Disubmit',
+                'description' => 'Empat syarat FI-OGP Golive dikunci dan dikirim untuk verifikasi SDI.',
+                'stage' => 'fi_ogp_golive',
+                'status_before' => 'finishing',
+                'status_after' => 'fi_ogp_golive',
+            ]);
 
             ProjectActivityService::log([
                 'project_id' => $project->id_project,
                 'lop_id' => $lop->id_lop,
                 'activity_type' => 'lop_stage_advance',
                 'title' => 'LOP Maju ke FI-OGP Golive',
-                'description' => 'Seluruh dokumen FI-OGP Golive lengkap, LOP maju otomatis ke tahap FI-OGP Golive.',
+                'description' => 'Dokumen FI-OGP Golive telah disubmit, LOP maju ke tahap FI-OGP Golive.',
+                'stage' => 'fi_ogp_golive',
                 'status_before' => 'finishing',
                 'status_after' => 'fi_ogp_golive',
             ]);
-        }
+        });
 
-        return back()->with('success', 'Dokumen FI-OGP Golive berhasil disimpan.');
+        return back()->with('success', 'Dokumen berhasil disubmit, dikunci, dan sekarang menunggu verifikasi SDI.');
     }
 
     // Revisi (permintaan user): hapus 1 file yg sudah tersimpan dari salah
@@ -1336,6 +1390,10 @@ class ProjectController extends Controller
             return back()->with('error', 'Belum ada dokumen FI-OGP Golive untuk LOP ini.');
         }
 
+        if ($submission->isLocked()) {
+            return back()->with('error', 'Dokumen sudah disubmit dan dikunci. File tidak dapat dihapus.');
+        }
+
         $key = $request->input('key');
         $path = $request->input('path');
         $existing = $submission->filesFor($key);
@@ -1347,6 +1405,8 @@ class ProjectController extends Controller
         $existing = array_values(array_filter($existing, fn ($p) => $p !== $path));
         $submission->{$key.'_paths'} = $existing;
         $submission->{$key.'_path'} = end($existing) ?: null;
+        $submission->draft_saved_by = auth()->id();
+        $submission->draft_saved_at = now();
         $submission->save();
 
         Storage::disk('public')->delete($path);
@@ -1357,6 +1417,7 @@ class ProjectController extends Controller
             'activity_type' => 'golive_submission_delete',
             'title' => 'File Dokumen FI-OGP Golive Dihapus',
             'description' => 'Admin menghapus 1 file kategori '.$key.' pada dokumen FI-OGP Golive LOP: '.$lop->lop_name,
+            'stage' => 'fi_ogp_golive',
         ]);
 
         return back()->with('success', 'File berhasil dihapus.');

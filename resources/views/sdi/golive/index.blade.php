@@ -132,7 +132,7 @@
                                 'File KML' => $submission?->kmlFiles() ?? [],
                                 'Mancore' => $submission?->mancoreFiles() ?? [],
                             ];
-                            $docsComplete = $submission?->isComplete() ?? false;
+                            $docsComplete = ($submission?->isSubmitted() ?? false) && ($submission?->isComplete() ?? false);
                         @endphp
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/60 transition">
                             <td class="px-5 py-4 min-w-[220px]">

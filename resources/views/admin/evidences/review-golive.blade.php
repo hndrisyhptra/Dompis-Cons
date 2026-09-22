@@ -25,6 +25,8 @@
         ['key' => 'mancore', 'label' => 'Mancore', 'files' => $submission?->mancoreFiles() ?? [], 'accept' => 'image/*,.xls,.xlsx', 'hint' => 'Foto ATAU Excel, maks 10MB per file, boleh pilih beberapa sekaligus'],
     ];
     $docsComplete = $submission?->isComplete() ?? false;
+    $isSubmitted = $submission?->isSubmitted() ?? false;
+    $isLocked = $submission?->isLocked() ?? false;
 @endphp
 
 <div class="max-w-4xl mx-auto space-y-4">
@@ -58,15 +60,25 @@
 
         <div class="flex items-center justify-between gap-3 mb-1">
             <h2 class="text-lg font-black text-gray-900 dark:text-white">Step 6 · FI-OGP Golive</h2>
-            <span class="px-3 py-1 rounded-full text-xs font-bold {{ $docsComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">
-                {{ $docsComplete ? '✓ Dokumen Lengkap, Menunggu Approval SDI' : 'Belum Lengkap' }}
+            <span class="px-3 py-1 rounded-full text-xs font-bold {{ $isSubmitted ? 'bg-blue-100 text-blue-700' : ($docsComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700') }}">
+                {{ $isSubmitted ? 'Terkunci · Menunggu Verifikasi SDI' : ($docsComplete ? 'Draft Lengkap · Siap Submit' : 'Draft Belum Lengkap') }}
             </span>
         </div>
         <p class="text-xs text-gray-500 mb-5">
-            Upload keempat kategori dokumen ini -- tiap kategori boleh lebih dari 1 file. Boleh diunggah bertahap satu per satu -- begitu keempatnya lengkap (minimal 1 file per kategori) dan seluruh eviden Finishing sudah disetujui, LOP otomatis maju ke tahap FI-OGP Golive dan menunggu approval/verifikasi tim SDI.
+            Upload dapat dilakukan bertahap melalui Save Draft. Tombol Submit aktif setelah keempat kategori memiliki minimal satu file. Setelah Submit, dokumen dikunci dan dikirim untuk verifikasi tim SDI.
         </p>
 
-        <form method="POST" action="{{ route('admin.evidences.golive.submit', $project->id_project) }}" enctype="multipart/form-data" class="space-y-5">
+        @if($isLocked)
+            <div class="mb-5 flex items-start gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mt-0.5 shrink-0"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <div>
+                    <p class="text-xs font-black">Dokumen sudah disubmit dan dikunci</p>
+                    <p class="mt-1 text-[11px] leading-5">File masih dapat direview, tetapi upload ulang dan penghapusan tidak diperbolehkan selama menunggu verifikasi SDI.</p>
+                </div>
+            </div>
+        @endif
+
+        <form id="golive-draft-form" method="POST" action="{{ route('admin.evidences.golive.draft', $project->id_project) }}" enctype="multipart/form-data" class="space-y-5">
             @csrf
 
             @foreach($docs as $doc)
@@ -83,17 +95,14 @@
                     dihapus satu-satu (Revisi: kategori sekarang multi-file). --}}
                     @if(count($doc['files']) > 0)
                         <ul class="mb-3 space-y-1.5">
-                            @foreach($doc['files'] as $path)
+                            @foreach($doc['files'] as $fileIndex => $path)
                                 <li class="flex items-center justify-between gap-2 bg-slate-50 dark:bg-gray-800 border border-slate-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs">
                                     <a href="{{ Storage::url($path) }}" target="_blank" class="font-bold text-blue-600 hover:underline truncate">
                                         {{ basename($path) }} ↗
                                     </a>
-                                    <form method="POST" action="{{ route('admin.evidences.golive.remove', $project->id_project) }}" onsubmit="return confirm('Hapus file ini?');" class="shrink-0">
-                                        @csrf
-                                        <input type="hidden" name="key" value="{{ $doc['key'] }}">
-                                        <input type="hidden" name="path" value="{{ $path }}">
-                                        <button type="submit" class="font-bold text-red-600 hover:underline">✕ Hapus</button>
-                                    </form>
+                                    @unless($isLocked)
+                                        <button type="submit" form="remove-golive-{{ $doc['key'] }}-{{ $fileIndex }}" class="shrink-0 font-bold text-red-600 hover:underline">✕ Hapus</button>
+                                    @endunless
                                 </li>
                             @endforeach
                         </ul>
@@ -103,7 +112,8 @@
 
                     <input type="file" id="file-{{ $doc['key'] }}" name="{{ $doc['key'] }}[]" accept="{{ $doc['accept'] }}" multiple
                         onchange="golivePreviewFiles('{{ $doc['key'] }}', this)"
-                        class="block w-full text-xs text-gray-600 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        {{ $isLocked ? 'disabled' : '' }}
+                        class="block w-full text-xs text-gray-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-300 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
                     <p class="text-[10px] text-gray-400 mt-1">{{ $doc['hint'] }}</p>
 
                     {{-- Preview file yg BARU dipilih (belum di-submit), + tombol hapus
@@ -114,11 +124,11 @@
                         <div class="mt-3 flex items-center gap-4 text-xs font-bold text-gray-600 dark:text-gray-300">
                             <span>Jenis input Mancore:</span>
                             <label class="inline-flex items-center gap-1">
-                                <input type="radio" name="mancore_input_type" value="photo" {{ ($submission?->mancore_input_type ?? 'photo') === 'photo' ? 'checked' : '' }}>
+                                <input type="radio" name="mancore_input_type" value="photo" {{ ($submission?->mancore_input_type ?? 'photo') === 'photo' ? 'checked' : '' }} {{ $isLocked ? 'disabled' : '' }}>
                                 Foto
                             </label>
                             <label class="inline-flex items-center gap-1">
-                                <input type="radio" name="mancore_input_type" value="excel" {{ $submission?->mancore_input_type === 'excel' ? 'checked' : '' }}>
+                                <input type="radio" name="mancore_input_type" value="excel" {{ $submission?->mancore_input_type === 'excel' ? 'checked' : '' }} {{ $isLocked ? 'disabled' : '' }}>
                                 Excel
                             </label>
                         </div>
@@ -126,17 +136,50 @@
                 </div>
             @endforeach
 
-            <button type="submit" class="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition">
-                Simpan Dokumen FI-OGP Golive
-            </button>
+            @unless($isLocked)
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <button type="submit" class="h-11 rounded-xl border border-blue-200 bg-blue-50 text-sm font-bold text-blue-700 transition hover:bg-blue-100 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-300">
+                        Save Draft
+                    </button>
+                    <button type="submit" form="golive-submit-form" {{ $docsComplete ? '' : 'disabled' }}
+                            class="h-11 rounded-xl bg-blue-600 text-sm font-bold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 dark:disabled:bg-gray-700 dark:disabled:text-gray-400">
+                        Submit
+                    </button>
+                </div>
+                @unless($docsComplete)
+                    <p class="text-center text-[11px] font-semibold text-amber-600">Submit akan aktif setelah Capture Valins, PDF ABD & Valid4, File KML, dan Mancore lengkap.</p>
+                @endunless
+            @endunless
         </form>
 
-        @if($submission?->submitted_at)
+        @if($submission?->draft_saved_at)
             <p class="text-[11px] text-gray-400 mt-3">
-                Terakhir diunggah: {{ $submission->submitted_at->format('d M Y H:i') }}
+                Draft terakhir disimpan: {{ $submission->draft_saved_at->format('d M Y H:i') }}
+                oleh {{ $submission->draftSavedBy?->name ?? $submission->draftSavedBy?->username ?? '-' }}
+            </p>
+        @endif
+        @if($submission?->submitted_at)
+            <p class="mt-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
+                Disubmit: {{ $submission->submitted_at->format('d M Y H:i') }}
                 oleh {{ $submission->submittedBy?->name ?? $submission->submittedBy?->username ?? '-' }}
             </p>
         @endif
+
+        @unless($isLocked)
+            <form id="golive-submit-form" method="POST" action="{{ route('admin.evidences.golive.submit', $project->id_project) }}" class="hidden">
+                @csrf
+            </form>
+
+            @foreach($docs as $doc)
+                @foreach($doc['files'] as $fileIndex => $path)
+                    <form id="remove-golive-{{ $doc['key'] }}-{{ $fileIndex }}" method="POST" action="{{ route('admin.evidences.golive.remove', $project->id_project) }}" onsubmit="return confirm('Hapus file ini?');" class="hidden">
+                        @csrf
+                        <input type="hidden" name="key" value="{{ $doc['key'] }}">
+                        <input type="hidden" name="path" value="{{ $path }}">
+                    </form>
+                @endforeach
+            @endforeach
+        @endunless
     </div>
 
     {{-- STEP 6: GOLIVE -- status verifikasi SDI (read-only di sisi Admin) --}}
@@ -144,8 +187,8 @@
 
         <div class="flex items-center justify-between gap-3 mb-1">
             <h2 class="text-lg font-black text-gray-900 dark:text-white">Step 7 · Golive (Verifikasi SDI)</h2>
-            <span class="px-3 py-1 rounded-full text-xs font-bold {{ $verification?->capture_uim_path ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500' }}">
-                {{ $verification?->capture_uim_path ? 'Sudah Golive' : 'Menunggu SDI' }}
+            <span class="px-3 py-1 rounded-full text-xs font-bold {{ $verification?->capture_uim_path ? 'bg-emerald-100 text-emerald-700' : ($isSubmitted ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500') }}">
+                {{ $verification?->capture_uim_path ? 'Sudah Golive' : ($isSubmitted ? 'Menunggu SDI' : 'Belum Disubmit') }}
             </span>
         </div>
 
@@ -155,9 +198,12 @@
                 pada {{ optional($verification->verified_at)->format('d M Y H:i') }}.
             </p>
             <a href="{{ Storage::url($verification->capture_uim_path) }}" target="_blank" class="text-xs font-bold text-blue-600 hover:underline">Lihat Capture UIM ↗</a>
-        @else
+        @elseif($isSubmitted)
             <p class="text-xs text-gray-500">
-                Tahap ini diselesaikan oleh tim SDI setelah dokumen FI-OGP Golive di atas lengkap. Admin tidak perlu melakukan apa-apa di sini -- LOP akan otomatis Golive begitu SDI mengunggah capture UIM.
+                Dokumen sudah dikirim dan dikunci. LOP akan tercatat bergerak pada tahap Golive setelah SDI mengunggah dan memverifikasi Capture UIM.
+            </p>
+        @else
+            <p class="text-xs text-gray-500">Draft FI-OGP belum disubmit sehingga belum masuk antrean verifikasi SDI.</p>
         @endif
     </div>
 

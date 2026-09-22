@@ -19,6 +19,10 @@ use Illuminate\Database\Eloquent\Model;
  */
 class LopGoliveSubmission extends Model
 {
+    public const STATUS_DRAFT = 'draft';
+
+    public const STATUS_SUBMITTED = 'submitted';
+
     protected $fillable = [
         'lop_id',
         'capture_valins_path',
@@ -31,12 +35,16 @@ class LopGoliveSubmission extends Model
         'mancore_paths',
         'mancore_input_type',
         'fi_completed_at',
+        'submission_status',
+        'draft_saved_by',
+        'draft_saved_at',
         'submitted_by',
         'submitted_at',
     ];
 
     protected $casts = [
         'submitted_at' => 'datetime',
+        'draft_saved_at' => 'datetime',
         'fi_completed_at' => 'datetime',
         'capture_valins_paths' => 'array',
         'abd_valid4_paths' => 'array',
@@ -52,6 +60,21 @@ class LopGoliveSubmission extends Model
     public function submittedBy()
     {
         return $this->belongsTo(User::class, 'submitted_by', 'id_user');
+    }
+
+    public function draftSavedBy()
+    {
+        return $this->belongsTo(User::class, 'draft_saved_by', 'id_user');
+    }
+
+    public function isSubmitted(): bool
+    {
+        return $this->submission_status === self::STATUS_SUBMITTED;
+    }
+
+    public function isLocked(): bool
+    {
+        return $this->isSubmitted();
     }
 
     /**

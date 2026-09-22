@@ -2802,9 +2802,10 @@ class WaspangController extends Controller
             'activity_type' => 'update_kendala',
             'title' => 'Update Kendala',
             'description' => 'Waspang melaporkan kendala: '.$request->description,
+            'stage' => $request->stage_code,
             'status_after' => 'kendala',
             'meta' => [
-                'issue_id' => $issue->id,
+                'issue_id' => $issue->id_project_issues,
                 'issue_type' => $issue->issue_type,
                 'photo_paths' => $photoPaths,
             ],
@@ -2851,6 +2852,7 @@ class WaspangController extends Controller
             'activity_type' => 'resume_project',
             'title' => 'Project Resume',
             'description' => 'Waspang melanjutkan project setelah update kendala.',
+            'stage' => $issue->stage_code,
             'status_before' => 'kendala',
             'status_after' => 'open',
             'meta' => [

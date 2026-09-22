@@ -11,6 +11,7 @@ class DeploymentMovementSummaryService
 {
     private const NON_OPERATIONAL_ACTIVITY_TYPES = [
         'sync_legacy_status_progress',
+        'golive_submission_delete',
     ];
 
     /**
@@ -43,6 +44,24 @@ class DeploymentMovementSummaryService
             ->groupBy('branch')
             ->get();
 
+        $allLopsByBranch = DB::table('lops as l')
+            ->leftJoin('projects as p', 'p.id_project', '=', 'l.project_id')
+            ->leftJoin('project_stages as ps', 'ps.code', '=', 'l.status_progress')
+            ->select([
+                'l.id_lop',
+                'l.project_id',
+                'l.pid_sap',
+                'l.lop_name',
+                'l.sto',
+                'l.status_progress',
+                'p.project_name',
+                'p.program',
+                'ps.label as status_label',
+            ])
+            ->selectRaw("{$branchExpression} as branch")
+            ->get()
+            ->groupBy(fn ($row) => strtoupper(trim((string) $row->branch)));
+
         $activityScope = $this->regularActivityQuery()
             ->where('pal.created_at', '<', $end->toDateTimeString())
             ->selectRaw("{$branchExpression} as branch, pal.created_at");
@@ -71,6 +90,7 @@ class DeploymentMovementSummaryService
                 'pal.stage',
                 'pal.status_before',
                 'pal.status_after',
+                'pal.meta',
                 'pal.created_at',
                 'l.lop_name',
                 'l.pid_sap',
@@ -85,12 +105,24 @@ class DeploymentMovementSummaryService
                 'ps.label as status_label',
             ]);
 
+        $stageDefinitions = $this->stageDefinitions();
+        $issueStages = $this->issueStageMap($dailyLogs);
+
+        $dailyLogs->each(function ($log) use ($issueStages, $stageDefinitions): void {
+            $stageCode = $this->activityStageCode($log, $issueStages, $stageDefinitions);
+            $stage = $stageDefinitions->get($stageCode);
+
+            $log->activity_stage_code = $stageCode;
+            $log->activity_stage_label = $stage['label'] ?? 'Aktivitas Lainnya';
+        });
+
         $logsByBranch = $dailyLogs->groupBy(fn ($row) => $this->branchName($row));
         $branches = $lopTotals
-            ->map(function ($row) use ($branchToRegion, $date, $lastActivities, $logsByBranch): array {
+            ->map(function ($row) use ($allLopsByBranch, $branchToRegion, $date, $lastActivities, $logsByBranch): array {
                 $branch = strtoupper(trim((string) $row->branch));
                 $logs = $logsByBranch->get($branch, collect());
                 $lopDetails = $this->lopDetails($logs);
+                $allLops = $this->lopPositionDetails($allLopsByBranch->get($branch, collect()), $lopDetails);
                 $lastActivity = $lastActivities->get($branch);
                 $lastActivityAt = $lastActivity
                     ? CarbonImmutable::parse($lastActivity, config('app.timezone'))
@@ -122,6 +154,7 @@ class DeploymentMovementSummaryService
                         ? (int) $lastActivityAt->startOfDay()->diffInDays($date)
                         : null,
                     'lops' => $lopDetails->values()->all(),
+                    'all_lops' => $allLops->all(),
                 ];
             })
             // Prioritaskan area tanpa pergerakan, lalu nama Region/Branch.
@@ -159,6 +192,7 @@ class DeploymentMovementSummaryService
                 ? $latestRecordedActivity->locale('id')->translatedFormat('d M Y H:i')
                 : 'Belum ada aktivitas tercatat',
             'branches' => $branches->all(),
+            'stage_groups' => $this->stageGroups($dailyLogs, $stageDefinitions),
             'data_quality' => [
                 'activities_without_actor' => $dailyLogs->whereNull('user_id')->count(),
                 'pt2_included' => false,
@@ -222,6 +256,8 @@ class DeploymentMovementSummaryService
                         'description' => $log->description,
                         'type' => $log->activity_type,
                         'category' => $this->activityCategory($log->activity_type),
+                        'stage_code' => $log->activity_stage_code ?? 'activity_other',
+                        'stage_label' => $log->activity_stage_label ?? 'Aktivitas Lainnya',
                         'actor' => $this->actorName($log),
                     ])
                     ->values();
@@ -248,6 +284,49 @@ class DeploymentMovementSummaryService
             ->values();
     }
 
+    /**
+     * Seluruh LOP untuk matrix posisi. LOP yang bergerak memakai rincian log
+     * harian lengkap; LOP tanpa aktivitas tetap dikirim dengan identitas dan
+     * posisi terkini agar angka "tidak bergerak" dapat dibuka oleh pengguna.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function lopPositionDetails(Collection $allLops, Collection $movedLops): Collection
+    {
+        $movedById = $movedLops->keyBy('lop_id');
+
+        return $allLops
+            ->map(function ($lop) use ($movedById): array {
+                $lopId = (int) $lop->id_lop;
+                $moved = $movedById->get($lopId);
+
+                if ($moved) {
+                    return $moved + ['movement_status' => 'active'];
+                }
+
+                return [
+                    'lop_id' => $lopId,
+                    'project_id' => $lop->project_id ? (int) $lop->project_id : null,
+                    'pid_sap' => $lop->pid_sap ?: '-',
+                    'lop_name' => $lop->lop_name ?: '-',
+                    'project_name' => $lop->project_name ?: '-',
+                    'program' => $lop->program ?: '-',
+                    'sto' => $lop->sto ?: '-',
+                    'status_progress' => $lop->status_progress ?: '-',
+                    'status_label' => $lop->status_label ?: $lop->status_progress ?: '-',
+                    'movement_status' => 'inactive',
+                    'activity_count' => 0,
+                    'last_activity_time' => null,
+                    'last_activity_title' => null,
+                    'last_actor' => null,
+                    'actors' => [],
+                    'activities' => [],
+                ];
+            })
+            ->sortBy(fn (array $lop) => sprintf('%d|%s', $lop['movement_status'] === 'active' ? 0 : 1, $lop['lop_name']))
+            ->values();
+    }
+
     private function activityCategory(string $type): string
     {
         return match (true) {
@@ -265,5 +344,218 @@ class DeploymentMovementSummaryService
     private function actorName(object $log): string
     {
         return $log->actor_name ?: $log->actor_username ?: 'Sistem/tidak tercatat';
+    }
+
+    /**
+     * Master staging aktif yang dipakai untuk laporan harian. DRM dikeluarkan
+     * karena sudah tidak menjadi bagian flow aktif; histori DRM dibaca sebagai
+     * Perizinan, konsisten dengan pembacaan status di Project::progressSummary().
+     *
+     * @return Collection<string, array<string, mixed>>
+     */
+    private function stageDefinitions(): Collection
+    {
+        $stages = DB::table('project_stages')
+            ->where('is_active', true)
+            ->where('code', '!=', 'drm')
+            ->orderByRaw('CASE WHEN sequence IS NULL THEN 1 ELSE 0 END')
+            ->orderBy('sequence')
+            ->orderBy('id')
+            ->get(['code', 'label', 'phase_group', 'sequence', 'color'])
+            ->mapWithKeys(fn ($stage) => [
+                $stage->code => [
+                    'code' => $stage->code,
+                    'label' => $stage->label,
+                    'phase_group' => $stage->phase_group ?: $stage->code,
+                    'sequence' => $stage->sequence !== null ? (int) $stage->sequence : null,
+                    'color' => $stage->color ?: 'slate',
+                ],
+            ]);
+
+        $stages->put('activity_other', [
+            'code' => 'activity_other',
+            'label' => 'Aktivitas Lainnya',
+            'phase_group' => 'other',
+            'sequence' => null,
+            'color' => 'slate',
+        ]);
+
+        return $stages;
+    }
+
+    /**
+     * Ambil stage kendala lama dari project_issues. Log baru sudah menulis
+     * kolom stage secara langsung, tetapi fallback ini menjaga histori resume.
+     *
+     * @return Collection<int, string|null>
+     */
+    private function issueStageMap(Collection $logs): Collection
+    {
+        $issueIds = $logs
+            ->map(fn ($log) => $this->activityMeta($log)['issue_id'] ?? null)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($issueIds->isEmpty()) {
+            return collect();
+        }
+
+        return DB::table('project_issues')
+            ->whereIn('id_project_issues', $issueIds->all())
+            ->pluck('stage_code', 'id_project_issues');
+    }
+
+    /**
+     * Tentukan stage tempat aktivitas benar-benar terjadi. Kolom stage pada
+     * activity log adalah sumber utama; fallback tidak memakai status LOP
+     * saat ini sampai pilihan terakhir agar laporan tanggal lampau tidak mudah
+     * bergeser ketika LOP sudah maju ke tahap berikutnya.
+     */
+    private function activityStageCode(object $log, Collection $issueStages, Collection $stageDefinitions): string
+    {
+        $validCodes = $stageDefinitions->keys()->all();
+        $stage = strtolower(trim((string) ($log->stage ?? '')));
+
+        // Data sebelum refactor mencatat dua eviden Step 2 sebagai
+        // stage="persiapan". Dalam flow sekarang keduanya berada di
+        // Persiapan Instalasi, bukan sub-step Persiapan yang baru.
+        if ($stage === 'persiapan') {
+            return 'persiapan_instalasi';
+        }
+
+        if ($stage === 'drm') {
+            return 'perizinan';
+        }
+
+        if (in_array($stage, $validCodes, true)) {
+            return $stage;
+        }
+
+        $meta = $this->activityMeta($log);
+        $issueId = isset($meta['issue_id']) && is_numeric($meta['issue_id'])
+            ? (int) $meta['issue_id']
+            : null;
+        $issueStage = $issueId ? strtolower(trim((string) $issueStages->get($issueId))) : '';
+
+        if ($issueStage === 'drm') {
+            return 'perizinan';
+        }
+
+        if (in_array($issueStage, $validCodes, true)) {
+            return $issueStage;
+        }
+
+        $statusAfter = strtolower(trim((string) ($log->status_after ?? '')));
+        if ($statusAfter === 'drm') {
+            return 'perizinan';
+        }
+
+        if (in_array($statusAfter, $validCodes, true)) {
+            return $statusAfter;
+        }
+
+        $type = strtolower((string) $log->activity_type);
+        $mappedStage = match (true) {
+            str_contains($type, 'survey') => 'survey',
+            str_contains($type, 'assign') => 'inisiasi',
+            str_contains($type, 'golive_submission') => 'fi_ogp_golive',
+            str_contains($type, 'golive_verification') => 'golive',
+            $type === 'lop_golive', $type === 'project_golive' => 'golive',
+            $type === 'project_completed' => 'finishing',
+            default => null,
+        };
+
+        if ($mappedStage && in_array($mappedStage, $validCodes, true)) {
+            return $mappedStage;
+        }
+
+        $currentStage = strtolower(trim((string) ($log->status_progress ?? '')));
+        if ($currentStage === 'drm') {
+            return 'perizinan';
+        }
+
+        return in_array($currentStage, $validCodes, true) ? $currentStage : 'activity_other';
+    }
+
+    /** @return array<string, mixed> */
+    private function activityMeta(object $log): array
+    {
+        if (is_array($log->meta ?? null)) {
+            return $log->meta;
+        }
+
+        if (! is_string($log->meta ?? null) || trim($log->meta) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($log->meta, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Katalog Step dan Sub-step untuk membentuk distribusi posisi LOP pada UI.
+     * Daftar Branch/LOP tidak disalin ke sini karena sudah tersedia pada key
+     * branches; ini menjaga payload tetap ringkas setelah tampilan diubah
+     * menjadi Branch -> Step -> Sub-step -> LOP.
+     *
+     * @param  Collection<string, array<string, mixed>>  $stageDefinitions
+     * @return array<int, array<string, mixed>>
+     */
+    private function stageGroups(Collection $logs, Collection $stageDefinitions): array
+    {
+        $definitions = $stageDefinitions
+            ->filter(fn (array $stage, string $code) => $code !== 'activity_other' || $logs->contains('activity_stage_code', $code));
+
+        return $definitions
+            ->groupBy('phase_group')
+            ->map(function (Collection $stages, string $phaseGroup) use ($logs): array {
+                $step = $this->stepDefinition($phaseGroup);
+                $stageCodes = $stages->pluck('code')->all();
+                $stepLogs = $logs->whereIn('activity_stage_code', $stageCodes);
+
+                $substeps = $stages
+                    ->sortBy(fn (array $stage) => sprintf('%05d|%s', $stage['sequence'] ?? 99999, $stage['label']))
+                    ->map(function (array $stage) use ($logs): array {
+                        $stageLogs = $logs->where('activity_stage_code', $stage['code']);
+
+                        return $stage + $this->movementMetrics($stageLogs);
+                    })
+                    ->values();
+
+                return $step + $this->movementMetrics($stepLogs) + [
+                    'substeps' => $substeps->all(),
+                ];
+            })
+            ->sortBy('order')
+            ->values()
+            ->all();
+    }
+
+    /** @return array<string, mixed> */
+    private function movementMetrics(Collection $logs): array
+    {
+        return [
+            'moved_lops' => $logs->pluck('lop_id')->unique()->count(),
+            'activity_count' => $logs->count(),
+            'actor_count' => $logs->whereNotNull('user_id')->pluck('user_id')->unique()->count(),
+        ];
+    }
+
+    /** @return array{code: string, label: string, description: string, order: int} */
+    private function stepDefinition(string $phaseGroup): array
+    {
+        return match ($phaseGroup) {
+            'persiapan' => ['code' => 'persiapan', 'label' => 'Step 1 · Persiapan', 'description' => 'Inisiasi, Survey, Perizinan, dan Material Delivery', 'order' => 1],
+            'persiapan_instalasi' => ['code' => 'persiapan_instalasi', 'label' => 'Step 2 · Persiapan Instalasi', 'description' => 'Kesiapan barang dan dokumen sebelum instalasi', 'order' => 2],
+            'instalasi' => ['code' => 'instalasi', 'label' => 'Step 3 · Instalasi', 'description' => 'Aktivitas pembangunan dan kuantitas aktual', 'order' => 3],
+            'pengukuran' => ['code' => 'pengukuran', 'label' => 'Step 4 · Pengukuran', 'description' => 'OTDR, OPM, kedalaman, dan hasil ukur lainnya', 'order' => 4],
+            'finishing' => ['code' => 'finishing', 'label' => 'Step 5 · Finishing', 'description' => 'Eviden penyelesaian dan review akhir', 'order' => 5],
+            'golive' => ['code' => 'golive', 'label' => 'Step 6 · FI-OGP & Golive', 'description' => 'Dokumen FI-OGP, verifikasi SDI, dan Golive', 'order' => 6],
+            'pause' => ['code' => 'pause', 'label' => 'Status Khusus', 'description' => 'Aktivitas pada LOP Hold atau Drop', 'order' => 7],
+            default => ['code' => 'other', 'label' => 'Aktivitas Lainnya', 'description' => 'Aktivitas yang belum memiliki konteks staging yang lengkap', 'order' => 8],
+        };
     }
 }

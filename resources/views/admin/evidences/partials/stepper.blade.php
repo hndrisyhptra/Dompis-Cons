@@ -45,14 +45,9 @@
     // dibaca dari posisi sequence LOP saat ini (effectiveStageSequence,
     // hold/drop-safe), konsisten dgn tracking.blade.php.
     //
-    // Revisi (permintaan user): Step 6 (FI-OGP) "Done" SEKARANG dibaca
-    // langsung dari LopGoliveSubmission::isComplete() -- begitu ke-4
-    // kategori dokumen sudah ada minimal 1 file, stepper langsung jadi
-    // checklist (centang), TIDAK perlu menunggu sequence resmi maju ke
-    // fi_ogp_golive (yg punya gate tambahan spt finishingDone & tidak
-    // hold/drop -- LOP tetap "menunggu approval SDI" walau gate itu blm
-    // terpenuhi, tapi dokumennya sendiri sudah lengkap).
-    $step6Done = (bool) ($project->lop?->goliveSubmission?->isComplete());
+    // Step 6 baru dianggap selesai setelah empat dokumen di-final-submit.
+    // Draft lengkap masih kuning karena belum dikunci/dikirim ke SDI.
+    $step6Done = (bool) ($project->lop?->goliveSubmission?->isSubmitted());
     $step7Done = (bool) ($project->lop?->is_golive) || ($seq !== null && $seq >= 11);
 
     // Helper kelas Tailwind: 2 warna murni (emerald/amber) + ring saat

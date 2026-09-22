@@ -8,7 +8,8 @@
         // MULTIPLE file -- SDI perlu melihat SEMUA file per kategori
         // (bukan cuma 1) sebelum verifikasi capture UIM.
         $submission = $lop->goliveSubmission;
-        $complete = $submission?->isComplete() ?? false;
+        $submitted = $submission?->isSubmitted() ?? false;
+        $complete = $submitted && ($submission?->isComplete() ?? false);
         $docs = [
             'Capture Valins' => $submission?->captureValinsFiles() ?? [],
             'PDF ABD & Valid4' => $submission?->abdValid4Files() ?? [],
@@ -46,7 +47,7 @@
         <div class="flex items-center justify-between mb-3">
             <h2 class="text-sm font-black text-gray-800 dark:text-gray-200">Dokumen FI-OGP Golive (dari Admin)</h2>
             <span class="px-2.5 py-1 rounded-lg text-xs font-bold {{ $complete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">
-                {{ $complete ? 'Lengkap' : 'Belum Lengkap' }}
+                {{ $complete ? 'Submitted & Terkunci' : ($submitted ? 'Submitted Tidak Lengkap' : 'Belum Disubmit') }}
             </span>
         </div>
         <ul class="space-y-2">
@@ -80,9 +81,13 @@
                 Sudah diverifikasi pada {{ optional($lop->goliveVerification->verified_at)->format('d M Y H:i') }}.
             </p>
             <a href="{{ Storage::url($lop->goliveVerification->capture_uim_path) }}" target="_blank" class="text-xs font-bold text-blue-600 hover:underline">Lihat Capture UIM ↗</a>
+        @elseif(! $submitted)
+            <p class="text-xs text-gray-500">
+                Dokumen FI-OGP Golive masih berstatus draft dan belum dikirim oleh Admin. Verifikasi belum bisa dilakukan.
+            </p>
         @elseif(! $complete)
             <p class="text-xs text-gray-500">
-                Dokumen FI-OGP Golive dari Admin belum lengkap. Verifikasi belum bisa dilakukan.
+                Submission tidak memenuhi empat syarat dokumen. Verifikasi belum bisa dilakukan.
             </p>
         @else
             <form method="POST" action="{{ route('sdi.golive.verify', $lop->id_lop) }}" enctype="multipart/form-data" class="space-y-4">

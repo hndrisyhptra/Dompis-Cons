@@ -306,11 +306,15 @@ Route::middleware(['auth', 'role:admin,superadmin,super_tif'])->group(function (
 
     // Section AF: Stage 5 (dulu "belum dikerjakan", lihat catatan di
     // approveEvidence()) -- Admin upload 4 dokumen FI-OGP Golive
-    // (capture valins, PDF ABD & Valid4, KML, Mancore) di sini. Begitu
-    // lengkap DAN finishingDone DAN persis di sequence 9, LOP otomatis
-    // maju ke status_progress 'fi_ogp_golive' (lihat submitGoliveDocuments()).
+    // (capture valins, PDF ABD & Valid4, KML, Mancore) di sini. Upload
+    // parsial disimpan sebagai draft. Setelah empat kategori lengkap,
+    // Admin melakukan final submit; submission lalu dikunci dan LOP maju
+    // ke status_progress 'fi_ogp_golive'.
     Route::get('/admin/evidences/review/{project}/golive', [ProjectController::class, 'reviewGolive'])
     ->name('admin.evidences.review.golive');
+
+    Route::post('/admin/evidences/review/{project}/golive/draft', [ProjectController::class, 'saveGoliveDraft'])
+    ->name('admin.evidences.golive.draft');
 
     Route::post('/admin/evidences/review/{project}/golive/submit', [ProjectController::class, 'submitGoliveDocuments'])
     ->name('admin.evidences.golive.submit');

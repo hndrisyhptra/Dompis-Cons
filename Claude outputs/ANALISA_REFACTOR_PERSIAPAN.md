@@ -2887,3 +2887,159 @@ Pada menu Report Deployment ditambahkan dua tab yang berpindah halaman melalui q
 ### Batasan lanjutan
 Supaya PT2 dapat masuk ke Summary dengan standar "oleh siapa" yang sama, semua titik perubahan PT2 perlu lebih dulu menulis `project_activity_logs.user_id` dan identitas LOP PT2 secara tidak ambigu. Setelah kontrak log PT2 dibereskan, scope dapat ditambah tanpa mengubah desain UI.
 Summ
+
+## Section BR — Detail Per Staging pada Summary Deployment (22 September 2026)
+
+### Permintaan user
+Tambahkan tab atau tombol pada Summary Deployment untuk melihat LOP per Branch yang bergerak berdasarkan staging, step, dan sub-step.
+
+### Keputusan desain
+- Detail Per Staging ditempatkan sebagai **mode tampilan di dalam Summary Deployment**, sejajar dengan tombol **Summary per Branch**. Tidak dibuat halaman/menu utama baru karena tanggal, KPI, filter Region, dan data dasarnya sama.
+- Mode Branch tetap dipakai untuk menemukan area yang tidak bergerak. Mode Staging dipakai untuk menjawab aktivitas terjadi di step apa, Branch mana, LOP mana, dan dilakukan oleh siapa.
+- Hierarki drill-down: **Step -> staging/sub-step -> Branch -> LOP -> timeline aktivitas/aktor**.
+- Pilihan mode disimpan pada query URL `view=branch|staging`, sehingga tetap terbawa saat pengguna mengganti tanggal.
+
+### Aturan klasifikasi staging
+- Acuan utama adalah `project_activity_logs.stage` pada saat aktivitas terjadi, bukan hanya `lops.status_progress` saat laporan dibuka. Ini mencegah laporan tanggal lampau ikut bergeser ketika LOP sudah maju tahap.
+- Fallback berurutan: stage log -> stage kendala dari `project_issues` -> `status_after` jika merupakan kode staging -> mapping jenis aktivitas -> status LOP saat ini -> `Aktivitas Lainnya`.
+- Histori `stage='drm'` ditampilkan sebagai Perizinan, konsisten dengan flow aktif yang sudah menghapus DRM.
+- Histori lama `stage='persiapan'` dipetakan ke **Step 2 Persiapan Instalasi**. Data tersebut berasal dari flow lama Barang Tiba/Perizinan dan tidak boleh tercampur dengan empat sub-step Persiapan yang baru.
+- Assignment dipetakan ke Inisiasi; dokumen/verifikasi FI-OGP ke FI-OGP Golive; Golive ke Golive; penyelesaian project ke Finishing.
+- Satu LOP dapat muncul pada beberapa staging jika memang bergerak lintas tahap pada hari yang sama. KPI global tetap menghitung LOP unik hanya satu kali.
+
+### Struktur step
+1. Step 1 Persiapan: Inisiasi, Survey, Perizinan, Material Delivery.
+2. Step 2 Persiapan Instalasi.
+3. Step 3 Instalasi.
+4. Step 4 Pengukuran.
+5. Step 5 Finishing.
+6. Step 6 FI-OGP & Golive: FI-OGP Golive dan Golive.
+7. Status Khusus: Hold dan Drop.
+
+### Implementasi
+- `app/Services/DeploymentMovementSummaryService.php` sekarang menghasilkan `stage_groups` beserta metrik LOP unik, aktivitas, aktor, Branch, daftar LOP, dan timeline per staging.
+- Partial baru `resources/views/partials/deployment-movement-by-stage.blade.php` merender drill-down staging dan memakai filter Region/pencarian yang sama dengan Summary Branch.
+- `resources/views/partials/deployment-movement-summary.blade.php` mendapat tombol mode, persistensi mode saat pindah tanggal, filter staging, dan auto-expand pada step pertama yang bergerak.
+- `WaspangController::storeIssue()` dan `resumeIssue()` sekarang ikut menulis `stage` pada activity log. `issue_id` pada metadata kendala juga diperbaiki memakai primary key sebenarnya (`id_project_issues`) agar histori kendala dapat dilacak secara konsisten.
+- Tidak ada migration atau perubahan skema database.
+
+### Verifikasi
+- `php -l` sukses untuk service dan `WaspangController`.
+- `php artisan view:cache` sukses.
+- `npm run build` sukses; class Tailwind baru dan Alpine Collapse terkompilasi.
+- Laravel Pint untuk service baru sukses.
+- Pemeriksaan browser lokal kembali diarahkan ke halaman login dan tidak tersedia browser lain dengan sesi aktif; interaksi visual setelah login tetap perlu smoke test manual tanpa meminta atau menggunakan kredensial user.
+- Verifikasi database tanggal 14 September 2026: total 348 aktivitas pada Summary sama persis dengan total seluruh staging. Distribusi: Persiapan Instalasi 28 aktivitas/6 LOP, Instalasi 168 aktivitas/7 LOP, Pengukuran 152 aktivitas/4 LOP; tidak ada aktivitas yang hilang dari klasifikasi.
+- Verifikasi 22 September 2026: belum ada aktivitas operasional, sehingga seluruh staging dan Summary hari ini bernilai 0 sesuai data sumber.
+
+## Section BS — Revisi Detail Per Staging Menjadi Branch-First (22 September 2026)
+
+### Tujuan revisi
+User perlu melihat posisi LOP per Branch terlebih dahulu, kemudian mengetahui LOP tersebut saat ini berada pada Step dan Sub-step apa. Revisi ini menggantikan hierarki tampilan pada Section BR; aturan klasifikasi histori aktivitas di backend tetap dipertahankan untuk timeline.
+
+### Keputusan desain
+- Hierarki tampilan diubah menjadi **Branch -> Step -> Sub-step -> LOP -> timeline aktivitas**.
+- Setiap kartu Branch menampilkan pipeline ringkas berupa chip Step yang terisi beserta jumlah LOP pada Step tersebut.
+- Hanya Step dan Sub-step yang berisi LOP bergerak yang ditampilkan saat Branch dibuka. Ini mengurangi baris kosong dan memudahkan pemindaian ketika jumlah Branch banyak.
+- Setiap LOP hanya ditempatkan satu kali berdasarkan `lops.status_progress` terkini. Dengan demikian, angka distribusi posisi tidak menggandakan LOP yang pada hari terpilih memiliki aktivitas di lebih dari satu staging.
+- Timeline LOP tetap memakai klasifikasi staging aktivitas pada tanggal terpilih. UI membedakan label **Posisi Saat Ini** dan **Update pada Tanggal Terpilih** agar laporan historis tidak menyesatkan.
+- Alias status lama tetap diamankan: `drm` dibaca sebagai `perizinan`, sedangkan `persiapan` dibaca sebagai `persiapan_instalasi`. Status yang tidak cocok dengan master ditempatkan pada **Posisi Belum Terpetakan** dan tidak dihilangkan.
+- Filter Semua/Bergerak/Tidak Bergerak, Region, pencarian Branch/LOP/PID/aktor/status, dan pilihan tanggal tetap tersedia.
+
+### Implementasi
+- `resources/views/partials/deployment-movement-by-stage.blade.php` direvisi penuh menjadi daftar Branch dengan ringkasan pipeline Step, accordion Step, accordion Sub-step, daftar LOP, dan timeline aktivitas.
+- `resources/views/partials/deployment-movement-summary.blade.php` membangun distribusi posisi terkini dari daftar LOP unik per Branch dan master `stage_groups`, termasuk fallback status yang belum terpetakan.
+- Payload `stage_groups` diringkas menjadi katalog Step/Sub-step dan metrik saja. Salinan Branch/LOP per staging dihapus karena sudah tersedia pada `branches`, sehingga data LOP dan timeline tidak dikirim dua kali ke browser.
+- Tidak ada migration, perubahan tabel, atau mutasi data.
+
+### Verifikasi
+- Kompilasi seluruh Blade melalui `php artisan view:cache` sukses.
+- Pemeriksaan sintaks JavaScript inline dengan Node sukses.
+- `npm run build` sukses dan seluruh class Tailwind baru masuk ke aset produksi.
+- `git diff --check` sukses.
+- Browser lokal berhasil mencapai aplikasi, tetapi diarahkan ke halaman login karena sesi tidak terautentikasi. Smoke test interaksi setelah login belum dilakukan dan tidak ada kredensial yang digunakan.
+- Pemeriksaan read-only tambahan ke database lokal tidak dijalankan karena izin akses di luar sandbox tidak diberikan. Validasi ini tidak mengubah database dan tidak memblokir pemeriksaan kompilasi/logika statis.
+
+## Section BT — Revisi Detail Per Staging Menjadi Matrix (22 September 2026)
+
+### Tujuan revisi
+Mengganti accordion Branch/Step/Sub-step dengan tabel matrix yang lebih cepat dipindai. User perlu membandingkan jumlah LOP bergerak dan tidak bergerak pada setiap posisi Step/Sub-step, lalu membuka angka tersebut untuk melihat LOP, aktivitas, dan pelakunya.
+
+### Definisi perhitungan
+- Baris matrix adalah Branch.
+- Header bertingkat: **Step -> Sub-step -> Bergerak/Tidak Bergerak**.
+- **Bergerak** berarti LOP mempunyai minimal satu activity log operasional pada tanggal terpilih.
+- **Tidak bergerak** berarti LOP tidak mempunyai activity log operasional pada tanggal terpilih.
+- Penempatan kolom Step/Sub-step memakai `lops.status_progress` terkini. Setiap LOP hanya masuk ke satu Sub-step, sehingga total bergerak + tidak bergerak seluruh posisi pada satu Branch sama dengan total LOP Branch tersebut.
+- Histori status lama tetap dinormalisasi: `drm` menjadi `perizinan`, `persiapan` menjadi `persiapan_instalasi`, sedangkan kode di luar master masuk kolom **Belum Terpetakan**.
+
+### Desain UI
+- Kolom Branch dibuat sticky agar nama Branch tetap terlihat saat matrix digeser horizontal.
+- Label Bergerak dan Tidak Bergerak diganti ikon SVG orang berlari dan orang berhenti agar header tetap ringkas.
+- Urutan setiap pasangan kolom distandarkan menjadi **Tidak Bergerak di kiri** dan **Bergerak di kanan**; legenda serta tombol filter memakai urutan yang sama.
+- Kelompok filter, pilihan Region, dan form pencarian disamakan tingginya dan ditampilkan sejajar pada layar desktop, dengan susunan responsif pada layar yang lebih kecil.
+- Angka nol tidak aktif. Angka di atas nol dapat diklik dan membuka modal rincian.
+- Modal menampilkan nama/PID LOP, posisi saat ini, aktivitas terakhir pada tanggal terpilih, aktor, serta accordion timeline aktivitas lengkap.
+- Untuk LOP tidak bergerak, modal menampilkan keterangan eksplisit bahwa tidak ada aktivitas dan pelaku pada tanggal terpilih.
+- Filter Branch Bergerak/Tidak Bergerak, Region, dan pencarian Branch/LOP/PID/aktor tetap tersedia.
+
+### Implementasi data
+- `DeploymentMovementSummaryService` sekarang menyertakan `all_lops` pada setiap Branch. LOP bergerak membawa timeline harian lengkap; LOP tidak bergerak membawa identitas dan posisi terkini dengan aktivitas kosong.
+- Data `all_lops` diperlukan agar angka Tidak Bergerak dapat dibuka sampai daftar LOP, bukan sekadar hasil pengurangan agregat.
+- Tidak ada migration, perubahan tabel, atau mutasi data.
+
+### Verifikasi
+- PHP syntax check dan Laravel Pint untuk service sukses.
+- Seluruh Blade berhasil dikompilasi dan partial Summary berhasil dirender menggunakan data kosong terkontrol.
+- Sintaks JavaScript inline sukses diperiksa dengan Node.
+- `npm run build` sukses; class matrix, modal, sticky column, dan warna ikon masuk ke aset produksi.
+- `git diff --check` sukses.
+- Smoke test visual setelah login belum dapat dilakukan karena sesi browser lokal masih berhenti di halaman login; tidak ada kredensial yang digunakan.
+
+## Section BU — Draft, Final Submit, dan Lock FI-OGP Golive (22 September 2026)
+
+### Audit perilaku lama
+- Form FI-OGP sebelumnya hanya memiliki satu tombol simpan. Setiap penyimpanan langsung mengisi `submitted_at`, sehingga upload parsial dan final submit tidak dapat dibedakan.
+- Begitu empat kategori lengkap, controller langsung mencoba memajukan `status_progress` ke `fi_ogp_golive`. Belum ada fase review draft.
+- Upload ulang dan hapus file masih dapat dilakukan setelah dokumen lengkap karena tidak ada status lock persisten.
+- Verifikasi SDI hanya memeriksa kelengkapan empat kategori, belum memeriksa apakah Admin sudah melakukan final submit.
+
+### Kontrak alur baru
+1. Admin mengunggah Capture Valins, PDF ABD & Valid4, File KML, dan/atau Mancore melalui **Save Draft**.
+2. Selama `submission_status=draft`, file dapat direview, ditambah, dan dihapus.
+3. Tombol **Submit** disabled sampai keempat kategori masing-masing memiliki minimal satu file.
+4. Final Submit juga divalidasi ulang di server, memerlukan eviden Finishing selesai, mengubah status menjadi `submitted`, mengisi submitter/waktu, memajukan LOP ke `fi_ogp_golive`, lalu mengunci submission.
+5. Setelah submit, Admin tetap dapat membuka file untuk review tetapi endpoint upload dan hapus menolak perubahan.
+6. SDI hanya dapat mengunggah Capture UIM jika submission sudah `submitted` dan tetap lengkap. Setelah UIM disimpan, LOP maju ke `golive` dan verifikasi dikunci.
+
+### Perubahan database
+- Migration baru `2026_09_22_090000_add_draft_state_to_lop_golive_submissions_table.php` menambahkan:
+  - `submission_status` (`draft`/`submitted`);
+  - `draft_saved_by`;
+  - `draft_saved_at`.
+- Backfill migration menandai submission historis sebagai submitted jika LOP sudah berada di FI-OGP/Golive atau sudah memiliki verifikasi SDI. Submission historis lainnya menjadi draft; timestamp dan user save lama dipindahkan ke metadata draft.
+- Migration dibuat tetapi **belum dieksekusi ke database lokal/live dalam sesi ini**.
+
+### Pergerakan Deployment
+- Upload minimal satu kategori draft oleh Admin menulis activity `golive_submission_draft_upload` dengan `stage=fi_ogp_golive`; LOP dihitung bergerak pada FI-OGP di tanggal upload.
+- Final submit menulis `golive_submission_submitted` dan stage advance dengan konteks FI-OGP.
+- Hapus file draft tetap diaudit tetapi dikeluarkan dari perhitungan pergerakan operasional.
+- Upload/verifikasi Capture UIM oleh SDI menulis `golive_verification_upload` dan `lop_golive` dengan `stage=golive`; tahap Golive baru dihitung bergerak setelah eviden UIM diunggah.
+- Tanpa verifikasi/upload UIM dari SDI, tidak ada aktivitas Golive yang dibuat.
+
+### File utama
+- `app/Http/Controllers/ProjectController.php`: Save Draft, Final Submit, validasi empat syarat, dan server-side lock upload/hapus.
+- `app/Http/Controllers/SdiGoliveController.php`: gate submitted+complete serta lock setelah verifikasi.
+- `app/Models/LopGoliveSubmission.php`: status constant dan helper `isSubmitted()`/`isLocked()`.
+- `resources/views/admin/evidences/review-golive.blade.php`: dua tombol, status draft/submitted, disabled submit, dan tampilan read-only setelah lock.
+- `resources/views/sdi/golive/show.blade.php`: membedakan draft, submitted, dan siap verifikasi.
+- `app/Services/DeploymentMovementSummaryService.php`: klasifikasi pergerakan FI-OGP/Golive.
+
+### Verifikasi
+- PHP syntax check sukses untuk controller, model, service, dan migration.
+- Laravel Pint sukses untuk seluruh file PHP yang berubah.
+- Route draft/submit/remove dan route verifikasi SDI tersedia.
+- Seluruh Blade berhasil dikompilasi.
+- 17 pengujian terkait sukses: 2 test status draft/lock dan kelengkapan dokumen, 3 test klasifikasi pergerakan FI-OGP/Golive, 1 test migration/backfill terisolasi, serta 11 test migration freeze guard.
+- Full test suite masih menghasilkan 24 passed dan 30 failed karena masalah existing di luar fitur: baseline schema belum memuat beberapa migration September (termasuk migration baru ini), rangkaian test auth gagal pada migration SQLite lama yang mengubah tabel `evidences` sebelum tabel tersedia, serta fixture Survey lama belum memiliki kolom/tabel refactor terbaru. Targeted test fitur ini seluruhnya lulus.
+- Smoke test visual setelah login belum dapat dilakukan karena sesi browser lokal tidak terautentikasi.

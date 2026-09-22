@@ -28,6 +28,7 @@ class SdiGoliveController extends Controller
         // hilang dari tabel ini).
         $query = Lop::with(['project', 'goliveSubmission', 'goliveVerification'])
             ->whereIn('status_progress', ['fi_ogp_golive', 'golive'])
+            ->whereHas('goliveSubmission', fn ($submission) => $submission->where('submission_status', 'submitted'))
             ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT2%'")
             ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT-2%'")
             ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT 2%'");
@@ -61,6 +62,7 @@ class SdiGoliveController extends Controller
         // ProjectController/SdiGoliveController::verify()), supaya "Total
         // LOP" tidak menyusut begitu LOP-nya sudah di-golive-kan.
         $summaryBase = Lop::whereIn('status_progress', ['fi_ogp_golive', 'golive'])
+            ->whereHas('goliveSubmission', fn ($submission) => $submission->where('submission_status', 'submitted'))
             ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT2%'")
             ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT-2%'")
             ->whereRaw("UPPER(COALESCE(program_sap, '')) NOT LIKE '%PT 2%'");
@@ -87,14 +89,18 @@ class SdiGoliveController extends Controller
 
     public function verify(Request $request, $id)
     {
-        $lop = Lop::with(['project', 'stage', 'goliveSubmission'])->findOrFail($id);
+        $lop = Lop::with(['project', 'stage', 'goliveSubmission', 'goliveVerification'])->findOrFail($id);
 
         $request->validate([
             'capture_uim' => 'required|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
-        if (! $lop->goliveSubmission || ! $lop->goliveSubmission->isComplete()) {
-            return back()->with('error', 'Dokumen FI-OGP Golive dari Admin belum lengkap. Verifikasi belum bisa dilakukan.');
+        if (! $lop->goliveSubmission || ! $lop->goliveSubmission->isSubmitted() || ! $lop->goliveSubmission->isComplete()) {
+            return back()->with('error', 'Dokumen FI-OGP Golive belum disubmit oleh Admin. Verifikasi belum bisa dilakukan.');
+        }
+
+        if ($lop->goliveVerification?->capture_uim_path || $lop->status_progress === 'golive' || $lop->is_golive) {
+            return back()->with('error', 'LOP sudah diverifikasi dan eviden UIM telah dikunci.');
         }
 
         $file = $request->file('capture_uim');
@@ -119,6 +125,7 @@ class SdiGoliveController extends Controller
             'activity_type' => 'golive_verification_upload',
             'title' => 'Capture UIM Diverifikasi SDI',
             'description' => 'Tim SDI mengunggah capture UIM untuk LOP: '.$lop->lop_name,
+            'stage' => 'golive',
         ]);
 
         /*
@@ -150,6 +157,7 @@ class SdiGoliveController extends Controller
                 'activity_type' => 'lop_golive',
                 'title' => 'LOP Golive',
                 'description' => 'LOP resmi Golive setelah verifikasi capture UIM oleh SDI.',
+                'stage' => 'golive',
                 'status_before' => 'fi_ogp_golive',
                 'status_after' => 'golive',
             ]);

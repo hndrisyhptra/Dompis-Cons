@@ -8,6 +8,7 @@
         'scope' => 'PT 3 / Reguler',
         'kpis' => [],
         'branches' => [],
+        'stage_groups' => [],
         'latest_recorded_activity_label' => '-',
         'data_quality' => [],
     ];
@@ -15,7 +16,7 @@
 
 <style>[x-cloak] { display: none !important; }</style>
 
-<div x-data="deploymentMovementSummary()" class="space-y-5">
+<div x-data="deploymentMovementSummary()" x-init="init()" class="space-y-5">
     <div class="rounded-lg border border-blue-200 dark:border-blue-900/70 bg-blue-50/70 dark:bg-blue-950/30 p-4">
         <div class="flex items-start gap-3">
             <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
@@ -44,14 +45,14 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <a href="{{ route($reportRouteName, ['tab' => 'summary', 'date' => $summary['previous_date']]) }}"
+                <a :href="summaryUrl('{{ $summary['previous_date'] }}')"
                    class="inline-flex h-10 items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
                     Hari sebelumnya
                 </a>
 
                 @if($summary['next_date'])
-                    <a href="{{ route($reportRouteName, ['tab' => 'summary', 'date' => $summary['next_date']]) }}"
+                    <a :href="summaryUrl('{{ $summary['next_date'] }}')"
                        class="inline-flex h-10 items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 px-3 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
                         Hari berikutnya
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
@@ -59,7 +60,7 @@
                 @endif
 
                 @unless($summary['is_today'])
-                    <a href="{{ route($reportRouteName, ['tab' => 'summary', 'date' => now()->toDateString()]) }}"
+                    <a :href="summaryUrl('{{ now()->toDateString() }}')"
                        class="inline-flex h-10 items-center rounded-lg bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700">
                         Kembali ke hari ini
                     </a>
@@ -67,6 +68,7 @@
 
                 <form method="GET" action="{{ route($reportRouteName) }}" class="flex items-center gap-2">
                     <input type="hidden" name="tab" value="summary">
+                    <input type="hidden" name="view" :value="detailMode">
                     <input type="date" name="date" value="{{ $summary['date'] }}" max="{{ now()->toDateString() }}"
                            class="h-10 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-xs font-semibold text-gray-700 dark:text-gray-200">
                     <button type="submit" class="h-10 rounded-lg bg-gray-900 dark:bg-gray-100 px-3 text-xs font-bold text-white dark:text-gray-900">Tampilkan</button>
@@ -102,7 +104,28 @@
         </div>
     </div>
 
-    <div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
+    <div class="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Mode Detail</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Gunakan tampilan Branch untuk mencari area pasif, atau Staging untuk melihat posisi Step dan Sub-step LOP per Branch.</p>
+        </div>
+        <div class="inline-flex rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+            <button type="button" @click="setDetailMode('branch')"
+                    :class="detailMode === 'branch' ? activeFilterClass : inactiveFilterClass"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-bold">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>
+                Summary per Branch
+            </button>
+            <button type="button" @click="setDetailMode('staging')"
+                    :class="detailMode === 'staging' ? activeFilterClass : inactiveFilterClass"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-bold">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="14" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg>
+                Detail per Staging
+            </button>
+        </div>
+    </div>
+
+    <div x-show="detailMode === 'branch'" x-cloak class="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
         <div class="border-b border-gray-200 dark:border-gray-800 p-5">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
@@ -223,6 +246,8 @@
         </div>
     </div>
 
+    @include('partials.deployment-movement-by-stage')
+
     @if(($summary['data_quality']['activities_without_actor'] ?? 0) > 0)
         <p class="text-xs text-amber-600 dark:text-amber-400">
             {{ number_format($summary['data_quality']['activities_without_actor']) }} aktivitas pada tanggal ini tidak memiliki actor dan ditampilkan sebagai “Sistem/tidak tercatat”.
@@ -234,16 +259,41 @@
     function deploymentMovementSummary() {
         return {
             branches: @json($summary['branches']),
+            stageGroups: @json($summary['stage_groups']),
+            summaryBaseUrl: @json(route($reportRouteName)),
+            detailMode: @json(request()->query('view') === 'staging' ? 'staging' : 'branch'),
             movementFilter: 'all',
             regionFilter: '',
             search: '',
             expandedBranches: {},
             expandedLops: {},
+            matrixDetail: null,
+            expandedMatrixLops: {},
             activeFilterClass: 'bg-white dark:bg-gray-700 text-blue-700 dark:text-blue-300 shadow-sm',
             inactiveFilterClass: 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200',
 
             regions() {
                 return [...new Set(this.branches.map((branch) => branch.region))].sort();
+            },
+
+            init() {},
+
+            setDetailMode(mode) {
+                this.detailMode = mode;
+                this.closeMatrixDetail();
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', 'summary');
+                url.searchParams.set('view', mode);
+                window.history.replaceState({}, '', url);
+            },
+
+            summaryUrl(date) {
+                const url = new URL(this.summaryBaseUrl, window.location.origin);
+                url.searchParams.set('tab', 'summary');
+                url.searchParams.set('date', date);
+                url.searchParams.set('view', this.detailMode);
+
+                return url.toString();
             },
 
             filteredBranches() {
@@ -268,6 +318,137 @@
             toggleLop(branch, lopId) {
                 const key = branch + '-' + lopId;
                 this.expandedLops[key] = !this.expandedLops[key];
+            },
+
+            matrixSteps() {
+                const steps = this.stageGroups.map((step) => ({
+                    code: step.code,
+                    label: step.label,
+                    short_label: step.label.replace(/^Step\s+\d+\s*·\s*/i, ''),
+                    substeps: step.substeps.map((substep) => ({
+                        code: substep.code,
+                        label: substep.label,
+                    })),
+                }));
+                const knownStageCodes = new Set(steps.flatMap((step) => step.substeps.map((substep) => substep.code)));
+                const allLops = this.branches.flatMap((branch) => branch.all_lops || branch.lops || []);
+                const hasUnmapped = allLops.some((lop) => this.normalizedCurrentStage(lop.status_progress, knownStageCodes) === 'activity_other');
+
+                if (hasUnmapped && !knownStageCodes.has('activity_other')) {
+                    steps.push({
+                        code: 'other',
+                        label: 'Posisi Belum Terpetakan',
+                        short_label: 'Belum Terpetakan',
+                        substeps: [{ code: 'activity_other', label: 'Status Lainnya' }],
+                    });
+                }
+
+                return steps;
+            },
+
+            matrixColumns() {
+                return this.matrixSteps().flatMap((step) => step.substeps.map((substep) => ({
+                    ...substep,
+                    step_code: step.code,
+                    step_label: step.label,
+                })));
+            },
+
+            filteredMatrixBranches() {
+                const needle = this.search.trim().toLowerCase();
+                const columns = this.matrixColumns();
+                const knownStageCodes = new Set(columns.map((column) => column.code));
+
+                return this.branches.map((branch) => {
+                    if (this.movementFilter !== 'all' && branch.movement_status !== this.movementFilter) {
+                        return null;
+                    }
+
+                    if (this.regionFilter && branch.region !== this.regionFilter) {
+                        return null;
+                    }
+
+                    const branchMatches = !needle || branch.branch.toLowerCase().includes(needle);
+                    const branchLops = branch.all_lops || branch.lops || [];
+                    const lops = branchMatches
+                        ? branchLops
+                        : branchLops.filter((lop) => [lop.lop_name, lop.pid_sap, lop.project_name, lop.program, lop.last_actor, lop.status_label]
+                            .concat((lop.actors || []).map((actor) => actor.name))
+                            .some((value) => String(value || '').toLowerCase().includes(needle)));
+
+                    if (needle && !branchMatches && lops.length === 0) {
+                        return null;
+                    }
+
+                    const cells = Object.fromEntries(columns.map((column) => [column.code, { active: [], inactive: [] }]));
+                    lops.forEach((lop) => {
+                        const stageCode = this.normalizedCurrentStage(lop.status_progress, knownStageCodes);
+                        const movement = lop.movement_status === 'active' ? 'active' : 'inactive';
+                        cells[stageCode]?.[movement].push(lop);
+                    });
+
+                    return {
+                        ...branch,
+                        all_lops: lops,
+                        total_lops: lops.length,
+                        moved_lops: lops.filter((lop) => lop.movement_status === 'active').length,
+                        matrix_cells: cells,
+                    };
+                }).filter(Boolean);
+            },
+
+            normalizedCurrentStage(status, knownStageCodes) {
+                const code = String(status || '').trim().toLowerCase();
+                const aliases = {
+                    drm: 'perizinan',
+                    persiapan: 'persiapan_instalasi',
+                };
+                const normalized = aliases[code] || code;
+
+                return knownStageCodes.has(normalized) ? normalized : 'activity_other';
+            },
+
+            matrixCell(branch, stageCode, movement) {
+                return branch.matrix_cells?.[stageCode]?.[movement] || [];
+            },
+
+            openMatrixDetail(branch, column, movement) {
+                const lops = this.matrixCell(branch, column.code, movement);
+                if (lops.length === 0) {
+                    return;
+                }
+
+                this.expandedMatrixLops = {};
+                this.matrixDetail = {
+                    branch: branch.branch,
+                    region: branch.region,
+                    step_label: column.step_label,
+                    substep_label: column.label,
+                    movement,
+                    lops,
+                };
+            },
+
+            closeMatrixDetail() {
+                this.matrixDetail = null;
+                this.expandedMatrixLops = {};
+            },
+
+            toggleMatrixLop(lopId) {
+                this.expandedMatrixLops[lopId] = !this.expandedMatrixLops[lopId];
+            },
+
+            stageHeaderClass(stepCode) {
+                return {
+                    persiapan: 'bg-slate-100 text-slate-700 dark:bg-slate-900/60 dark:text-slate-300',
+                    persiapan_instalasi: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300',
+                    instalasi: 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300',
+                    pengukuran: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300',
+                    finishing: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300',
+                    golive: 'bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300',
+                    pause: 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300',
+                    other: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+                }[stepCode] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
             },
         };
     }
