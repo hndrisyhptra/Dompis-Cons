@@ -236,27 +236,15 @@ Route::middleware(['auth', 'role:superadmin,admin,tif,super_tif,officer,pm'])->g
 
 /*
 |--------------------------------------------------------------------------
-| REPORT DEPLOYMENT (permintaan user) -- menu BARU khusus role admin,
-| superadmin, officer, PM (super_tif & tif SENGAJA TIDAK termasuk -- beda
-| dgn group Timeline di atas). Role-role ini melihat PROGRAM LENGKAP (tidak
-| ada exclude Konstruksi Eksternal, beda dgn tabel sejenis yang sudah ada
-| di Dashboard PM utk role tif). Route admin/superadmin/officer pakai
-| DashboardController, route PM pakai DashboardPmController (role:pm SAJA,
-| BUKAN nebeng group role:pm,tif di bawah, supaya tif tidak kebagian).
+| REPORT DEPLOYMENT -- role admin, superadmin, officer, PM, dan TIF.
+| Route admin/superadmin/officer memakai DashboardController, sedangkan PM
+| dan TIF memakai DashboardPmController. Semua role melihat tab Report,
+| Summary, dan Detail per Staging dengan sumber data yang sama.
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:admin,superadmin,officer'])->group(function () {
     Route::get('/admin/report-deployment', [DashboardController::class, 'reportDeployment'])
         ->name('admin.report_deployment');
-
-    // MENU BARU: "Durasi per Tahap" (agregat, permintaan user) -- rata-rata
-    // durasi tiap staging per Region/Branch/Program, lihat
-    // DashboardController::stageDurationReport() & Section BE
-    // ANALISA_REFACTOR_PERSIAPAN.md. Nebeng group role yang sama dgn
-    // Report Deployment (admin,superadmin,officer -- super_tif TIDAK
-    // termasuk, konsisten dgn menu Report Deployment di atas).
-    Route::get('/admin/stage-duration-report', [DashboardController::class, 'stageDurationReport'])
-        ->name('admin.stage_duration_report');
 });
 
 /*
@@ -795,22 +783,12 @@ Route::middleware(['auth', 'role:pm,tif'])->prefix('pm')->name('pm.')->group(fun
 
 /*
 |--------------------------------------------------------------------------
-| REPORT DEPLOYMENT (permintaan user) -- menu BARU khusus role PM (role:pm
-| SAJA, SENGAJA group middleware terpisah dari role:pm,tif di atas supaya
-| role tif TIDAK kebagian menu ini -- lihat juga
-| DashboardController::reportDeployment() utk role admin/superadmin/
-| officer). PM lihat PROGRAM LENGKAP (Konstruksi Eksternal tetap tampil).
+| REPORT DEPLOYMENT -- akses lengkap untuk role PM dan TIF.
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'role:pm'])->prefix('pm')->name('pm.')->group(function () {
+Route::middleware(['auth', 'role:pm,tif'])->prefix('pm')->name('pm.')->group(function () {
     Route::get('/report-deployment', [DashboardPmController::class, 'reportDeployment'])
         ->name('report_deployment');
-
-    // MENU BARU: "Durasi per Tahap" (agregat, permintaan user) -- role PM
-    // saja (role:pm SAJA, sama spt report-deployment di atas -- tif TIDAK
-    // kebagian menu ini).
-    Route::get('/stage-duration-report', [DashboardPmController::class, 'stageDurationReport'])
-        ->name('stage_duration_report');
 });
 
 /*

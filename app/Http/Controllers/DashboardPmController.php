@@ -59,17 +59,9 @@ class DashboardPmController extends Controller
     }
 
     /**
-     * MENU BARU: "Report Deployment" (permintaan user) -- halaman FULL PAGE
-     * berisi persis tabel "Reporting Deployment" yang sudah ada di Dashboard
-     * PM (region/branch breakdown 8 status + filter Region/Branch/Program +
-     * Grand Total), TAPI:
-     * - Route ini SENGAJA hanya utk role 'pm' (role:pm SAJA, bukan
-     *   role:pm,tif spt route dashboard/rekap yang lain) -- role tif TIDAK
-     *   dapat menu ini sama sekali (permintaan user: menu baru khusus
-     *   admin/superadmin/officer/PM).
-     * - "Untuk role tersebut tampilkan program lengkap" -- TIDAK ada
-     *   exclude Konstruksi Eksternal di sini sama sekali (beda dgn index()
-     *   di atas yang exclude utk tif).
+     * Halaman Report Deployment lengkap untuk role PM dan TIF: Report,
+     * Summary harian, serta matrix Detail per Staging. Halaman khusus ini
+     * memakai data program lengkap dan tidak mengikuti filter dashboard TIF.
      */
     public function reportDeployment(Request $request, DeploymentMovementSummaryService $movementSummary)
     {

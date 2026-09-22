@@ -3043,3 +3043,23 @@ Mengganti accordion Branch/Step/Sub-step dengan tabel matrix yang lebih cepat di
 - 17 pengujian terkait sukses: 2 test status draft/lock dan kelengkapan dokumen, 3 test klasifikasi pergerakan FI-OGP/Golive, 1 test migration/backfill terisolasi, serta 11 test migration freeze guard.
 - Full test suite masih menghasilkan 24 passed dan 30 failed karena masalah existing di luar fitur: baseline schema belum memuat beberapa migration September (termasuk migration baru ini), rangkaian test auth gagal pada migration SQLite lama yang mengubah tabel `evidences` sebelum tabel tersedia, serta fixture Survey lama belum memiliki kolom/tabel refactor terbaru. Targeted test fitur ini seluruhnya lulus.
 - Smoke test visual setelah login belum dapat dilakukan karena sesi browser lokal tidak terautentikasi.
+
+## Section BV — Report Deployment Lengkap untuk PM/TIF dan Hapus Menu Durasi (22 September 2026)
+
+### Perubahan akses
+- Route `pm.report_deployment` yang sebelumnya hanya menerima role PM sekarang menerima `role:pm,tif`.
+- Menu **Report Deployment** ditampilkan untuk PM dan TIF pada sidebar desktop dan mobile tanpa kondisi role tambahan.
+- Kedua role memakai halaman, controller, dan sumber data yang sama. Cakupannya tetap lengkap: tab Report Deployment PT 3/PT 2, Summary Deployment harian, serta matrix Detail per Staging berikut drill-down LOP dan aktivitas.
+- Halaman Report Deployment khusus ini menampilkan data program lengkap; filter khusus Dashboard TIF tidak diterapkan pada halaman report terpisah.
+
+### Penghapusan Durasi per Tahap
+- Link **Durasi per Tahap** dihapus dari sidebar desktop dan mobile milik Admin, Officer, PM, dan TIF.
+- Route lama `admin.stage_duration_report` dan `pm.stage_duration_report` dihapus agar halaman tidak tetap dapat diakses menggunakan URL langsung.
+- Data `lop_stage_histories` dan fungsi pencatatan historinya tidak dihapus karena masih dipakai Timeline dan audit histori. View/helper laporan agregat lama dibiarkan dormant tanpa route agar penghapusan menu tidak ikut menghapus data atau mengganggu alur histori.
+
+### Verifikasi
+- Route `pm.report_deployment` terdaftar dengan middleware `auth` dan `role:pm,tif`.
+- Route bernama `admin.stage_duration_report` dan `pm.stage_duration_report` sudah tidak terdaftar.
+- Seluruh Blade berhasil dikompilasi dan `git diff --check` sukses.
+- Ditambahkan unit test untuk menjaga akses PM/TIF dan memastikan kedua route Durasi per Tahap tidak muncul kembali.
+- Smoke test browser lokal tidak dijalankan karena izin akses localhost pada browser tidak diberikan; validasi dilanjutkan melalui route, kompilasi Blade, dan unit test tanpa mencoba jalur browser lain.

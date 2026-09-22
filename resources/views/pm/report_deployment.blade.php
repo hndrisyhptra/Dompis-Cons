@@ -1,11 +1,4 @@
-{{--
-    Halaman BARU "Report Deployment" (permintaan user) -- khusus role PM
-    (route pm.report_deployment, role:pm SAJA, TIDAK termasuk tif). Isinya
-    tabel "Report Deployment" yang sama persis dengan yang ada di Dashboard
-    PM, tapi PROGRAM LENGKAP (Konstruksi Eksternal tetap tampil, beda dgn
-    versi inline di pm/dashboard.blade.php yang exclude program itu utk
-    role tif).
---}}
+{{-- Report Deployment lengkap untuk role PM dan TIF. --}}
 @extends('layouts.pm')
 
 @section('content')
