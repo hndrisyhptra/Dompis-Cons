@@ -3160,3 +3160,35 @@ Mengganti accordion Branch/Step/Sub-step dengan tabel matrix yang lebih cepat di
 - Ditambahkan render test halaman lengkap untuk memastikan grafik, aturan Flores, dan ringkasan perhitungan tidak menimbulkan error Blade.
 - Targeted test Kurva-S: 14 test dengan 36 assertion, seluruhnya sukses.
 - Test terkait Survey, Timeline PT2, route Report Deployment, dan kategori designator: 12 test dengan 42 assertion, seluruhnya sukses setelah fixture Survey lama diselaraskan dari `quantity_actual` ke kolom kanonik `quantity_survey`.
+
+## Section BZ — Koreksi Approval Pengukuran, Finishing, dan Submit FI-OGP (24 September 2026)
+
+### Akar masalah
+- Mobile Waspang menyimpan File SOR dengan `evidence_type=file_sor` dan Eviden Pengukuran Lainnya dengan `evidence_type=eviden_lainnya`, sedangkan halaman Approval Konstruksi masih mencari nama lama `otdr_sor` dan `lainnya`. Akibatnya dua eviden ada di database dan tampil di mobile, tetapi tidak muncul pada halaman Admin.
+- Endpoint **Bulk Approval** sebelumnya melakukan update status langsung ke tabel `evidences`. Jalur ini melewati sinkronisasi `lop_measurement_checks`, activity log, notifikasi, serta perpindahan `status_progress`. Eviden dapat terlihat approved tetapi LOP tetap tertahan di Pengukuran.
+- Daftar item Finishing pada halaman Admin dibentuk langsung dari BOQ mentah, sedangkan `finishingDone` memakai `Project::materialProgressItems()` yang memprioritaskan snapshot BOQ Survey terbaru. Perbedaan sumber ini dapat membuat item yang terlihat di UI tidak sama dengan item yang diperiksa gate FI-OGP.
+- Untuk project tanpa designator yang mewajibkan eviden Final, indikator upload Finishing tetap kuning walaupun gate bisnis menganggap tidak ada item wajib.
+- Pesan error submit FI-OGP sebelumnya menggabungkan semua penyebab menjadi satu pesan “Finalisasi eviden Finishing harus selesai”, sehingga status LOP yang masih berada di Pengukuran terlihat seperti masalah Finishing.
+
+### Perbaikan
+- Alias evidence Pengukuran dipusatkan pada `LopMeasurementCheck::EVIDENCE_TYPE_ALIASES`. Nama kanonik dan data lama sama-sama dibaca:
+  - `file_sor` dan `otdr_sor` -> File SOR;
+  - `eviden_lainnya` dan `lainnya` -> Eviden Pengukuran Lainnya.
+- Halaman Approval Step 4 sekarang memakai nama kanonik, menampilkan kedua alias, serta menghitung item N/A sebagai selesai.
+- Approve satuan, Bulk Approval per kategori, dan bulk review project sekarang melewati workflow approval yang sama: update status, sinkronisasi measurement check, activity log, notifikasi, evaluasi progress, dan rekonsiliasi status LOP.
+- `pengukuranDone` sekarang memeriksa eviden approved aktual untuk kelima kategori serta status N/A. Baris check tetap dipertahankan sebagai audit, tetapi data approval lama yang belum sempat mengisi check tidak lagi membuat LOP macet.
+- Rekonsiliasi status hanya bergerak berurutan dan hanya bila gate tahap terpenuhi: Persiapan Instalasi -> Instalasi -> Pengukuran -> Finishing. Tidak ada tahap yang dilompati.
+- Submit FI-OGP menjalankan rekonsiliasi aman sebelum gate akhir. Ini memulihkan LOP lama yang evidennya sudah approved melalui Bulk Approval lama tetapi `status_progress` masih tertahan.
+- Pesan penolakan submit FI-OGP sekarang menyebut blocker sebenarnya: Instalasi, lima item Pengukuran, Final Finishing, atau posisi status LOP.
+- Halaman Admin dan mobile Waspang untuk Finishing memakai sumber item yang sama dengan gate: BOQ Survey ronde terbaru, fallback BOQ Plan, lalu hanya designator `requires_finishing_evidence`.
+- Jika tidak ada designator yang membutuhkan eviden Final, status Finishing ditampilkan selesai/hijau dengan label **Tidak Ada Item Wajib**.
+- Perhitungan Finishing hanya menerima `stage=finishing` dan `evidence_type=final_boq`, sehingga eviden finishing lain tidak dapat memenuhi gate secara tidak sengaja.
+
+### Database dan verifikasi
+- Tidak ada migration, perubahan tabel, penghapusan eviden, atau mutasi massal data historis.
+- Ditambahkan test regresi yang merender halaman Approval dan memastikan `file_sor` serta `eviden_lainnya` muncul.
+- Test Bulk Approval memastikan kedua eviden tersinkron ke `lop_measurement_checks` dan LOP maju ke Finishing.
+- Test submit FI-OGP memastikan data approved lama dapat direkonsiliasi dari Pengukuran sampai `fi_ogp_golive` tanpa melewati syarat.
+- Test project tanpa item Final wajib memastikan indikator upload dan `finishingDone` sama-sama selesai.
+- Targeted suite terkait: 25 test dengan 81 assertion sukses; test khusus koreksi ini: 4 test dengan 14 assertion sukses. Seluruh Blade berhasil dikompilasi dan `git diff --check` sukses.
+- Full unit suite tetap mempunyai satu kegagalan existing pada `DatabaseSchemaBaselineTest` karena daftar migration September yang pending belum direkonsiliasi; kegagalan tersebut tidak berasal dari koreksi alur Approval ini.

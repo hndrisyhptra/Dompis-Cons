@@ -22,6 +22,18 @@ class LopMeasurementCheck extends Model
         'eviden_lainnya' => 'Eviden Lainnya',
     ];
 
+    /**
+     * Nama evidence_type kanonik beserta alias data lama. Semua halaman
+     * upload, approval, dan gate progress wajib memakai mapping yang sama.
+     */
+    public const EVIDENCE_TYPE_ALIASES = [
+        'otdr' => ['otdr'],
+        'file_sor' => ['file_sor', 'otdr_sor'],
+        'opm' => ['opm'],
+        'kedalaman' => ['kedalaman'],
+        'eviden_lainnya' => ['eviden_lainnya', 'lainnya'],
+    ];
+
     protected $fillable = [
         'lop_id',
         'item_key',
@@ -53,5 +65,22 @@ class LopMeasurementCheck extends Model
     public function isDone(): bool
     {
         return $this->is_not_applicable || $this->evidence_id !== null;
+    }
+
+    /** @return list<string> */
+    public static function evidenceTypesFor(string $itemKey): array
+    {
+        return self::EVIDENCE_TYPE_ALIASES[$itemKey] ?? [$itemKey];
+    }
+
+    public static function itemKeyForEvidenceType(?string $evidenceType): ?string
+    {
+        foreach (self::EVIDENCE_TYPE_ALIASES as $itemKey => $types) {
+            if (in_array($evidenceType, $types, true)) {
+                return $itemKey;
+            }
+        }
+
+        return null;
     }
 }

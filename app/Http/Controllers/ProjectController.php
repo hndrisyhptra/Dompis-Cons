@@ -724,153 +724,165 @@ class ProjectController extends Controller
     {
         $evidence = Evidence::with(['project', 'boqItem'])->findOrFail($id);
 
-        $oldStatus = $evidence->status;
-        $evidenceLabel = $this->evidenceLabel($evidence);
+        $this->processEvidenceApproval($evidence);
 
-        $evidence->status = 'approved';
-        $evidence->review_note = null; // Kosongkan note saat di-approve
-        $evidence->save();
+        return back()->with('success', 'Eviden berhasil diapprove');
+    }
 
-        $lopId = Lop::where('project_id', $evidence->project_id)->value('id_lop');
-
-        /*
-        |--------------------------------------------------------------------------
-        | STAGE 4: sinkronisasi lop_measurement_checks saat eviden Pengukuran
-        | di-approve.
-        |--------------------------------------------------------------------------
-        | Project::progressSummary()'s pengukuranDone (gate nyata sejak Stage 2)
-        | hanya baca dari tabel ini, TAPI tidak ada satupun kode yang menulis ke
-        | sana untuk LOP yang baru berjalan (hanya backfill migration utk LOP
-        | lama yg sudah lewat Pengukuran) -- tanpa hook ini, LOP baru akan macet
-        | permanen di tahap Pengukuran meski semua eviden sudah di-approve.
-        | Alias nama lama (otdr_sor/lainnya, sebelum Stage 4) tetap dipetakan
-        | supaya eviden lama yang baru di-approve sekarang juga ikut tersinkron.
-        */
-        if ($lopId && $evidence->stage === 'pengukuran') {
-            $itemKey = match ($evidence->evidence_type) {
-                'otdr' => 'otdr',
-                'file_sor', 'otdr_sor' => 'file_sor',
-                'opm' => 'opm',
-                'kedalaman' => 'kedalaman',
-                'eviden_lainnya', 'lainnya' => 'eviden_lainnya',
-                default => null,
-            };
-
-            if ($itemKey) {
-                LopMeasurementCheck::updateOrCreate(
-                    ['lop_id' => $lopId, 'item_key' => $itemKey],
-                    ['evidence_id' => $evidence->id_evidence, 'is_not_applicable' => false]
-                );
-            }
+    private function processEvidenceApproval(Evidence $evidence): bool
+    {
+        if ($evidence->status === 'approved') {
+            return false;
         }
 
-        ProjectActivityService::log([
-            'project_id' => $evidence->project_id,
-            'lop_id' => $lopId,
-            'evidence_id' => $evidence->id_evidence,
-            'activity_type' => 'approve_evidence',
-            'title' => 'Eviden Disetujui',
-            'description' => 'Admin menyetujui eviden: '.$evidenceLabel,
-            'stage' => $evidence->stage,
-            'status_before' => $oldStatus,
-            'status_after' => 'approved',
-            'meta' => [
-                'evidence_type' => $evidence->evidence_type,
-                'boq_item_id' => $evidence->boq_item_id,
-                'boq_designator' => $evidence->boqItem?->designator,
-                'boq_item_name' => $evidence->boqItem?->item_name,
-            ],
-        ]);
+        return DB::transaction(function () use ($evidence): bool {
+            $evidence->loadMissing(['boqItem', 'project']);
+            $oldStatus = $evidence->status;
+            $evidenceLabel = $this->evidenceLabel($evidence);
+            $lopId = Lop::where('project_id', $evidence->project_id)->value('id_lop');
 
-        Notification::create([
-            'user_id' => $evidence->uploaded_by,
-            'project_id' => $evidence->project_id,
-            'type' => 'approved',
-            'title' => 'Eviden disetujui',
-            'message' => 'Eviden '.ucfirst($evidence->stage).' Project '.$evidence->project->project_name.' telah disetujui Admin.',
-            'redirect_url' => route('waspang.projects.show', $evidence->project_id),
-        ]);
+            $evidence->forceFill([
+                'status' => 'approved',
+                'review_note' => null,
+            ])->save();
 
-        $project = Project::with([
-            'evidences',
-            'boqItems.designatorData',
-            'boqItems.designatorDataByCode',
-            'lop.stage', // Pastikan LOP + tahapnya ter-load (cek program SAP & posisi status_progress)
-        ])->find($evidence->project_id);
+            if ($lopId && $evidence->stage === 'pengukuran') {
+                $itemKey = LopMeasurementCheck::itemKeyForEvidenceType($evidence->evidence_type);
 
-        if ($project) {
-
-            $summary = $project->progressSummary();
-
-            $programSap = strtoupper($project->lop->program_sap ?? '');
-            $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
-
-            $isAlreadyClosed = in_array($project->lop?->status_progress, ['drop', 'golive'], true)
-                || (bool) $project->lop?->is_golive;
-
-            if (! $isPt2 && ! $isAlreadyClosed) {
-
-                $lop = $project->lop;
-                $currentStage = $lop?->stage; // ProjectStage|null
-                $currentSequence = $currentStage?->sequence;
-                $isPausedOrDropped = (bool) ($currentStage?->is_pause_type || $currentStage?->is_terminal);
-
-                if ($lop && $currentSequence !== null && ! $isPausedOrDropped) {
-
-                    if (
-                        $evidence->stage == 'persiapan'
-                        && ($summary['persiapanDone'] ?? false)
-                        && $currentSequence <= 6 // masih di fase Persiapan / Persiapan Instalasi (seq 1-6)
-                    ) {
-
-                        $lop->advanceStage('instalasi', auth()->id());
-
-                    } elseif (
-                        $evidence->stage == 'instalasi'
-                        && ($summary['instalasiDone'] ?? false)
-                        && $currentSequence === 7 // persis di tahap Instalasi
-                    ) {
-                        $lop->advanceStage('pengukuran', auth()->id());
-
-                    } elseif (
-                        $evidence->stage == 'pengukuran'
-                        && ($summary['pengukuranDone'] ?? false)
-                        && $currentSequence === 8 // persis di tahap Pengukuran
-                    ) {
-                        $lop->advanceStage('finishing', auth()->id());
-                    }
+                if ($itemKey) {
+                    LopMeasurementCheck::updateOrCreate(
+                        ['lop_id' => $lopId, 'item_key' => $itemKey],
+                        ['evidence_id' => $evidence->id_evidence, 'is_not_applicable' => false]
+                    );
                 }
             }
-            $alreadyCompleteLogged = ProjectActivityLog::where('project_id', $project->id_project)
-                ->where('activity_type', 'project_completed')
-                ->exists();
 
-            if (! $isPt2 && ! $isAlreadyClosed && ($summary['finishingDone'] ?? false) && ! $alreadyCompleteLogged) {
+            ProjectActivityService::log([
+                'project_id' => $evidence->project_id,
+                'lop_id' => $lopId,
+                'evidence_id' => $evidence->id_evidence,
+                'activity_type' => 'approve_evidence',
+                'title' => 'Eviden Disetujui',
+                'description' => 'Admin menyetujui eviden: '.$evidenceLabel,
+                'stage' => $evidence->stage,
+                'status_before' => $oldStatus,
+                'status_after' => 'approved',
+                'meta' => [
+                    'evidence_type' => $evidence->evidence_type,
+                    'boq_item_id' => $evidence->boq_item_id,
+                    'boq_designator' => $evidence->boqItem?->designator,
+                    'boq_item_name' => $evidence->boqItem?->item_name,
+                ],
+            ]);
 
-                ProjectActivityService::log([
-                    'project_id' => $project->id_project,
-                    'lop_id' => $lopId,
-                    'activity_type' => 'project_completed',
-                    'title' => 'Project Complete',
-                    'description' => 'Seluruh eviden wajib telah disetujui.',
-                    'status_after' => 'completed',
-                    'meta' => [
-                        'progress' => $summary['progress'] ?? null,
-                    ],
-                ]);
-
+            if ($evidence->uploaded_by) {
                 Notification::create([
                     'user_id' => $evidence->uploaded_by,
                     'project_id' => $evidence->project_id,
-                    'type' => 'ready_ut',
-                    'title' => 'Project Ready UT',
-                    'message' => 'Project "'.$evidence->project->project_name.'" telah selesai dan siap UT.',
+                    'type' => 'approved',
+                    'title' => 'Eviden disetujui',
+                    'message' => 'Eviden '.ucfirst($evidence->stage).' Project '.($evidence->project?->project_name ?? '-').' telah disetujui Admin.',
                     'redirect_url' => route('waspang.projects.show', $evidence->project_id),
                 ]);
             }
+
+            $project = $this->reconcileProjectStageFromApprovedEvidence((int) $evidence->project_id);
+
+            if ($project) {
+                $summary = $project->progressSummary();
+                $programSap = strtoupper($project->lop?->program_sap ?? '');
+                $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
+                $isClosed = in_array($project->lop?->status_progress, ['drop', 'golive'], true)
+                    || (bool) $project->lop?->is_golive;
+                $alreadyCompleteLogged = ProjectActivityLog::where('project_id', $project->id_project)
+                    ->where('activity_type', 'project_completed')
+                    ->exists();
+
+                if (! $isPt2 && ! $isClosed && ($summary['finishingDone'] ?? false) && ! $alreadyCompleteLogged) {
+                    ProjectActivityService::log([
+                        'project_id' => $project->id_project,
+                        'lop_id' => $lopId,
+                        'activity_type' => 'project_completed',
+                        'title' => 'Project Complete',
+                        'description' => 'Seluruh eviden wajib telah disetujui.',
+                        'status_after' => 'completed',
+                        'meta' => ['progress' => $summary['progress'] ?? null],
+                    ]);
+
+                    if ($evidence->uploaded_by) {
+                        Notification::create([
+                            'user_id' => $evidence->uploaded_by,
+                            'project_id' => $evidence->project_id,
+                            'type' => 'ready_ut',
+                            'title' => 'Project Ready UT',
+                            'message' => 'Project "'.($evidence->project?->project_name ?? '-').'" telah selesai dan siap UT.',
+                            'redirect_url' => route('waspang.projects.show', $evidence->project_id),
+                        ]);
+                    }
+                }
+            }
+
+            return true;
+        });
+    }
+
+    private function reconcileProjectStageFromApprovedEvidence(int $projectId): ?Project
+    {
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            $project = Project::with([
+                'evidences',
+                'boqItems.designatorData',
+                'boqItems.designatorDataByCode',
+                'lop.stage',
+                'lop.goliveSubmission',
+            ])->find($projectId);
+
+            $lop = $project?->lop;
+
+            if (! $project || ! $lop) {
+                return $project;
+            }
+
+            $programSap = strtoupper($lop->program_sap ?? '');
+            $isPt2 = str_contains($programSap, 'PT2') || str_contains($programSap, 'PT-2') || str_contains($programSap, 'PT 2');
+            $stage = $lop->stage;
+            $sequence = $stage?->sequence;
+            $isClosed = in_array($lop->status_progress, ['drop', 'golive'], true) || (bool) $lop->is_golive;
+            $isPausedOrDropped = (bool) ($stage?->is_pause_type || $stage?->is_terminal);
+
+            if ($isPt2 || $isClosed || $isPausedOrDropped || $sequence === null) {
+                return $project;
+            }
+
+            $summary = $project->progressSummary();
+            $nextStage = match (true) {
+                $sequence === 6 && ($summary['persiapanDone'] ?? false) => 'instalasi',
+                $sequence === 7 && ($summary['instalasiDone'] ?? false) => 'pengukuran',
+                $sequence === 8 && ($summary['pengukuranDone'] ?? false) => 'finishing',
+                default => null,
+            };
+
+            if (! $nextStage) {
+                return $project;
+            }
+
+            $previousStage = $lop->status_progress;
+            $lop->advanceStage($nextStage, auth()->id());
+
+            ProjectActivityService::log([
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'activity_type' => 'lop_stage_advance_reconciled',
+                'title' => 'Status LOP Diselaraskan',
+                'description' => 'Status LOP diselaraskan setelah seluruh eviden wajib disetujui.',
+                'stage' => $nextStage,
+                'status_before' => $previousStage,
+                'status_after' => $nextStage,
+            ]);
         }
 
-        return back()->with('success', 'Eviden berhasil diapprove');
+        return Project::with(['evidences', 'boqItems.designatorData', 'boqItems.designatorDataByCode', 'lop.stage', 'lop.goliveSubmission'])
+            ->find($projectId);
     }
 
     public function rejectEvidence(Request $request, $id)
@@ -955,14 +967,19 @@ class ProjectController extends Controller
             'evidence_ids.*' => 'exists:evidences,id_evidence',
         ]);
 
-        // Update semua ID yang dikirim menjadi approved
-        Evidence::whereIn('id_evidence', $request->evidence_ids)
-            ->update([
-                'status' => 'approved',
-                'review_note' => null, // Hapus note reject jika sebelumnya ada
-            ]);
+        $evidences = Evidence::with(['project', 'boqItem'])
+            ->whereIn('id_evidence', $request->evidence_ids)
+            ->orderBy('id_evidence')
+            ->get();
+        $approvedCount = 0;
 
-        return back()->with('success', count($request->evidence_ids).' Eviden berhasil di-approve sekaligus.');
+        foreach ($evidences as $evidence) {
+            if ($this->processEvidenceApproval($evidence)) {
+                $approvedCount++;
+            }
+        }
+
+        return back()->with('success', $approvedCount.' Eviden berhasil di-approve sekaligus.');
     }
 
     public function bulkReviewEvidence(Request $request)
@@ -972,15 +989,18 @@ class ProjectController extends Controller
             'action' => 'required|in:approve,reject',
         ]);
 
-        $status = $request->action === 'approve'
-            ? 'approved'
-            : 'rejected';
-
-        Evidence::where('project_id', $request->project_id)
-            ->where('status', 'pending')
-            ->update([
-                'status' => $status,
-            ]);
+        if ($request->action === 'approve') {
+            Evidence::with(['project', 'boqItem'])
+                ->where('project_id', $request->project_id)
+                ->where('status', 'pending')
+                ->orderBy('id_evidence')
+                ->get()
+                ->each(fn (Evidence $evidence) => $this->processEvidenceApproval($evidence));
+        } else {
+            Evidence::where('project_id', $request->project_id)
+                ->where('status', 'pending')
+                ->update(['status' => 'rejected']);
+        }
 
         return back()->with('success', 'Bulk review eviden berhasil diproses');
     }
@@ -1149,19 +1169,20 @@ class ProjectController extends Controller
         return view('admin.evidences.review-instalasi', compact('project'));
     }
 
-    // STEP 3 - REVIEW PENGUKURAN
+    // STEP 4 - REVIEW PENGUKURAN
     public function reviewPengukuran($id)
     {
         $project = Project::with([
             'evidences',
             'boqItems',
             'assignment.waspang',
+            'lop.stage',
         ])->findOrFail($id);
 
         return view('admin.evidences.review-pengukuran', compact('project'));
     }
 
-    // STEP 4 - REVIEW FINISHING
+    // STEP 5 - REVIEW FINISHING
     public function reviewFinishing($id)
     {
         $project = Project::with([
@@ -1172,10 +1193,17 @@ class ProjectController extends Controller
             'lop',
         ])->where('id_project', $id)->firstOrFail();
 
-        return view('admin.evidences.review-finishing', compact('project'));
+        $materialSource = $project->materialProgressItems();
+        $materialBoqItems = $materialSource['items']->filter(function (BoqItem $boq) {
+            $designator = $boq->designatorData ?? $boq->designatorDataByCode;
+
+            return (bool) $designator?->requires_finishing_evidence;
+        })->values();
+
+        return view('admin.evidences.review-finishing', compact('materialBoqItems', 'materialSource', 'project'));
     }
 
-    // STEP 5 - REVIEW / UPLOAD DOKUMEN FI-OGP GOLIVE (Section AF)
+    // STEP 6 - REVIEW / UPLOAD DOKUMEN FI-OGP GOLIVE (Section AF)
     public function reviewGolive($id)
     {
         $project = Project::with([
@@ -1309,6 +1337,14 @@ class ProjectController extends Controller
             return back()->with('error', 'Submit belum tersedia. Lengkapi Capture Valins, PDF ABD & Valid4, File KML, dan Mancore.');
         }
 
+        // Self-heal untuk data yang pernah di-approve lewat jalur bulk lama:
+        // sinkronkan urutan tahap berdasarkan kondisi eviden aktual sebelum
+        // memeriksa gate FI-OGP. Tidak melompati tahap yang syaratnya belum
+        // benar-benar terpenuhi.
+        $project = $this->reconcileProjectStageFromApprovedEvidence((int) $project->id_project) ?? $project;
+        $lop = $project->lop;
+        $submission = $lop?->goliveSubmission;
+
         /*
         |--------------------------------------------------------------------------
         | AUTO-ADVANCE status_progress: finishing (9) -> fi_ogp_golive (10)
@@ -1333,7 +1369,28 @@ class ProjectController extends Controller
         }
 
         if (! ($summary['finishingDone'] ?? false) || $currentSequence !== 9) {
-            return back()->with('error', 'Finalisasi eviden Finishing harus selesai sebelum dokumen FI-OGP disubmit.');
+            $blockers = collect();
+
+            if (! ($summary['instalasiDone'] ?? false)) {
+                $blockers->push('approval eviden Instalasi belum lengkap');
+            }
+
+            if (! ($summary['pengukuranDone'] ?? false)) {
+                $blockers->push('approval lima item Pengukuran belum lengkap');
+            }
+
+            if (($summary['finishingApproved'] ?? 0) < ($summary['finishingTotal'] ?? 0)) {
+                $blockers->push('approval eviden Final Finishing belum lengkap');
+            }
+
+            if ($currentSequence !== 9) {
+                $blockers->push('status LOP masih berada di '.($currentStage?->label ?? $lop?->status_progress ?? 'tahap yang tidak dikenali'));
+            }
+
+            return back()->with(
+                'error',
+                'Submit FI-OGP belum dapat dilakukan: '.$blockers->unique()->implode('; ').'.'
+            );
         }
 
         DB::transaction(function () use ($lop, $project, $submission): void {

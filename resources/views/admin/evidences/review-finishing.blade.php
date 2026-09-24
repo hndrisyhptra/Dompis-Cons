@@ -5,12 +5,10 @@
 @php
     $evidences = $project->evidences ?? collect();
 
-    $materialBoqItems = ($project->boqItems ?? collect())->filter(function ($boq) {
-        $designator = $boq->designatorData ?? $boq->designatorDataByCode;
-
-        return optional($designator)->type === 'material'
-            && optional($designator)->requires_finishing_evidence == 1;
-    });
+    // Daftar ini disiapkan controller lewat Project::materialProgressItems(),
+    // sama persis dengan sumber gate finishingDone: BOQ Survey ronde terbaru
+    // jika tersedia, fallback ke BOQ Plan.
+    $materialBoqItems = $materialBoqItems ?? collect();
     
     $finalTotal = $materialBoqItems->count();
     $finalApproved = 0;
@@ -73,10 +71,10 @@
             </div>
 
             <span class="px-3 py-1 rounded-full text-xs font-bold shrink-0
-                {{ $finalApproved >= $finalTotal && $finalTotal > 0
+                {{ $finishingApproved
                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                     : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' }}">
-                {{ $finalApproved }}/{{ $finalTotal }} Approved
+                {{ $finalTotal === 0 ? 'Tidak Ada Item Wajib' : $finalApproved.'/'.$finalTotal.' Approved' }}
             </span>
         </div>
     </div>

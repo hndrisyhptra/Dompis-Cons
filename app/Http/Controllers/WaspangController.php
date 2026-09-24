@@ -721,15 +721,9 @@ class WaspangController extends Controller
 
         if ($wantsNotApplicable) {
             // Alias nama lama -> nama kanonik, lihat catatan di pengukuran().
-            $legacyAliases = [
-                'file_sor' => ['file_sor', 'otdr_sor'],
-                'eviden_lainnya' => ['eviden_lainnya', 'lainnya'],
-            ];
-            $typesToCheck = $legacyAliases[$itemKey] ?? [$itemKey];
-
             $hasAnyEvidence = Evidence::where('project_id', $project->id_project)
                 ->where('stage', 'pengukuran')
-                ->whereIn('evidence_type', $typesToCheck)
+                ->whereIn('evidence_type', LopMeasurementCheck::evidenceTypesFor($itemKey))
                 ->exists();
 
             if ($hasAnyEvidence) {

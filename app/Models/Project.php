@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 
 class Project extends Model
 {
@@ -143,7 +144,7 @@ class Project extends Model
      * "Plan" yang dibaca semua view Instalasi/Finishing otomatis ikut
      * angka Survey tanpa perlu ubah blade satu-satu.
      *
-     * @return array{items: \Illuminate\Support\Collection<int, BoqItem>, source: 'survey_round'|'plan', round: ?BoqSurveyRound}
+     * @return array{items: Collection<int, BoqItem>, source: 'survey_round'|'plan', round: ?BoqSurveyRound}
      */
     public function materialProgressItems(): array
     {
@@ -255,22 +256,16 @@ class Project extends Model
         // ditandai "Tidak Ada" (N/A) -- lihat WaspangController::
         // toggleMeasurementCheck(). Alias nama lama (otdr_sor/lainnya)
         // disamakan dgn pengukuran()/toggleMeasurementCheck().
-        $legacyAliases = [
-            'file_sor' => ['file_sor', 'otdr_sor'],
-            'eviden_lainnya' => ['eviden_lainnya', 'lainnya'],
-        ];
         $measurementChecks = $lop
             ? LopMeasurementCheck::where('lop_id', $lop->id_lop)->get()->keyBy('item_key')
             : collect();
-        $pengukuranUploadedComplete = collect(LopMeasurementCheck::ITEMS)->every(function (string $itemKey) use ($measurementChecks, $evidences, $legacyAliases) {
+        $pengukuranUploadedComplete = collect(LopMeasurementCheck::ITEMS)->every(function (string $itemKey) use ($measurementChecks, $evidences) {
             if ($measurementChecks->get($itemKey)?->is_not_applicable) {
                 return true;
             }
 
-            $typesToCheck = $legacyAliases[$itemKey] ?? [$itemKey];
-
             return $evidences->where('stage', 'pengukuran')
-                ->whereIn('evidence_type', $typesToCheck)
+                ->whereIn('evidence_type', LopMeasurementCheck::evidenceTypesFor($itemKey))
                 ->isNotEmpty();
         });
 
@@ -285,8 +280,7 @@ class Project extends Model
                 ->isNotEmpty();
         })->count();
         $finishingUploadedComplete = $finishingTotal === 0
-            ? $evidences->where('stage', 'finishing')->isNotEmpty()
-            : $finishingUploaded >= $finishingTotal;
+            || $finishingUploaded >= $finishingTotal;
 
         return [
             'persiapanUploaded' => $persiapanUploaded,
@@ -373,7 +367,7 @@ class Project extends Model
             }
 
             // Evidence finishing
-            if ($evidence->stage === 'finishing') {
+            if ($evidence->stage === 'finishing' && $evidence->evidence_type === 'final_boq') {
                 if (! isset($finishingStats[$boqKey])) {
                     $finishingStats[$boqKey] = [
                         'total' => 0,
@@ -520,12 +514,26 @@ class Project extends Model
             // berarti sudah pasti lewat Pengukuran.
             $pengukuranDone = true;
         } elseif ($lop) {
-            $doneItemKeys = LopMeasurementCheck::where('lop_id', $lop->id_lop)
+            $measurementChecks = LopMeasurementCheck::where('lop_id', $lop->id_lop)
                 ->get()
-                ->filter(fn (LopMeasurementCheck $check) => $check->isDone())
-                ->pluck('item_key');
+                ->keyBy('item_key');
 
-            $pengukuranDone = collect(LopMeasurementCheck::ITEMS)->diff($doneItemKeys)->isEmpty();
+            // Evidence approved adalah sumber kebenaran utama. Tabel check
+            // tetap dipakai untuk status N/A dan jejak evidence_id, tetapi
+            // approval lama/bulk yang belum sempat mengisi tabel check tidak
+            // boleh membuat LOP macet permanen di Pengukuran.
+            $pengukuranDone = collect(LopMeasurementCheck::ITEMS)->every(function (string $itemKey) use ($evidences, $measurementChecks) {
+                if ($measurementChecks->get($itemKey)?->is_not_applicable) {
+                    return true;
+                }
+
+                $items = $evidences
+                    ->where('stage', 'pengukuran')
+                    ->whereIn('evidence_type', LopMeasurementCheck::evidenceTypesFor($itemKey));
+
+                return $items->isNotEmpty()
+                    && $items->every(fn ($evidence) => $evidence->status === 'approved');
+            });
         } else {
             // Project belum punya baris LOP sama sekali (edge-case/data
             // yatim) -- fallback ke perilaku lama supaya tidak crash.

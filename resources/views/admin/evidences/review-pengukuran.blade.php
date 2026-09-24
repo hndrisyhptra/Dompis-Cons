@@ -13,7 +13,7 @@
         [
             'number' => 2,
             'title' => 'File (.SOR)',
-            'type' => 'otdr_sor',
+            'type' => 'file_sor',
             'description' => 'Review file mentah berformat .sor dari alat ukur.',
         ],
         [
@@ -31,37 +31,27 @@
         [
             'number' => 5,
             'title' => 'Eviden Pengukuran Lainnya',
-            'type' => 'lainnya',
+            'type' => 'eviden_lainnya',
             'description' => 'Review foto hasil pengukuran lainnya.',
         ],
     ];
 
     $approvedCount = 0;
 
-    // Section AG: baca tanda "Tidak Ada" (N/A) per item dari
-    // lop_measurement_checks -- item_key di tabel itu BEDA nama dgn
-    // evidence_type di $requirements utk 2 item (file_sor/otdr_sor,
-    // eviden_lainnya/lainnya), jadi dipetakan manual di sini. Dipakai
-    // supaya review-item.blade.php bisa tampilkan "Tidak Ada" alih-alih
-    // "Pending" utk item yang memang sudah ditandai N/A oleh Waspang.
+    // Sumber item memakai nama kanonik LopMeasurementCheck. Query eviden
+    // tetap menerima alias lama agar upload sebelum refactor tidak hilang.
     $measurementChecksByKey = $project->lop
         ? \App\Models\LopMeasurementCheck::where('lop_id', $project->lop->id_lop)->get()->keyBy('item_key')
         : collect();
 
-    $itemKeyMap = [
-        'otdr' => 'otdr',
-        'otdr_sor' => 'file_sor',
-        'opm' => 'opm',
-        'kedalaman' => 'kedalaman',
-        'lainnya' => 'eviden_lainnya',
-    ];
-
     foreach ($requirements as $req) {
         $items = $project->evidences
             ->where('stage', 'pengukuran')
-            ->where('evidence_type', $req['type']);
+            ->whereIn('evidence_type', \App\Models\LopMeasurementCheck::evidenceTypesFor($req['type']));
+        $isNotApplicable = (bool) ($measurementChecksByKey[$req['type']]->is_not_applicable ?? false);
 
-        if ($items->count() > 0 && $items->where('status', 'approved')->count() == $items->count()) {
+        if (($items->isNotEmpty() && $items->every(fn ($item) => $item->status === 'approved'))
+            || ($items->isEmpty() && $isNotApplicable)) {
             $approvedCount++;
         }
     }
@@ -91,7 +81,7 @@
         <div class="p-4 flex items-center justify-between gap-3">
             <div>
                 <h2 class="text-base font-bold text-gray-900 dark:text-white">
-                    Step 3 — Pengukuran
+                    Step 4 — Pengukuran
                 </h2>
                 <p class="text-xs text-gray-500 mt-1">
                     Review eviden OTDR, File SOR, OPM, Kedalaman Galian, dan Pengukuran Lainnya
@@ -102,7 +92,7 @@
                 {{ $pengukuranCompleted
                     ? 'bg-green-100 text-green-700'
                     : 'bg-yellow-100 text-yellow-700' }}">
-                {{ $approvedCount }}/{{ count($requirements) }} Approved
+                {{ $approvedCount }}/{{ count($requirements) }} Selesai
             </span>
         </div>
     </div>
@@ -113,11 +103,10 @@
             @php
                 $items = $project->evidences
                     ->where('stage', 'pengukuran')
-                    ->where('evidence_type', $req['type'])
+                    ->whereIn('evidence_type', \App\Models\LopMeasurementCheck::evidenceTypesFor($req['type']))
                     ->sortByDesc('created_at');
 
-                $checkKey = $itemKeyMap[$req['type']] ?? $req['type'];
-                $isNotApplicable = (bool) ($measurementChecksByKey[$checkKey]->is_not_applicable ?? false);
+                $isNotApplicable = (bool) ($measurementChecksByKey[$req['type']]->is_not_applicable ?? false);
             @endphp
 
             @include('admin.evidences.partials.review-item', [

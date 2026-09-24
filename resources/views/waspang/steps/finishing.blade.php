@@ -14,7 +14,11 @@
     // (quantity_plan selalu null) jadi ikut nyasar ke checklist Finishing.
     // Lihat Project::materialProgressItems().
     $materialSource = $project->materialProgressItems();
-    $materialBoqItems = $materialSource['items'];
+    $materialBoqItems = $materialSource['items']->filter(function ($boq) {
+        $designator = $boq->designatorData ?? $boq->designatorDataByCode;
+
+        return (bool) $designator?->requires_finishing_evidence;
+    })->values();
     $materialSourceType = $materialSource['source'];
     $materialSourceRound = $materialSource['round'];
     $finishingBoqItems = $materialBoqItems;
