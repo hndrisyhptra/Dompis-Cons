@@ -23,6 +23,7 @@ use App\Http\Controllers\GisCadController;
 use App\Http\Controllers\ProjectStageController;
 use App\Http\Controllers\KendalaCategoryController;
 use App\Http\Controllers\PermitCategoryController;
+use App\Http\Controllers\LopSCurveController;
 
 /*
 |--------------------------------------------------------------------------
@@ -222,9 +223,9 @@ Route::middleware(['auth', 'role:admin,superadmin,super_tif,officer'])->group(fu
 
 /*
 |--------------------------------------------------------------------------
-| TIMELINE PROJECT (permintaan user) -- role: superadmin, admin, tif,
-| super_tif, officer, pm. Fitur BARU, terpisah dari route tracking() di
-| atas -- sengaja pakai group middleware SENDIRI (bukan nebeng group
+| TIMELINE PROJECT & KURVA-S PT3 -- role: superadmin, admin, tif,
+| super_tif, officer, pm. Fitur read-only, terpisah dari route tracking()
+| di atas -- sengaja pakai group middleware SENDIRI (bukan nebeng group
 | role:admin,superadmin,super_tif,officer di atas) supaya tif & pm
 | eksplisit ikut kebagian akses, sesuai daftar role yg diminta user.
 |--------------------------------------------------------------------------
@@ -232,6 +233,9 @@ Route::middleware(['auth', 'role:admin,superadmin,super_tif,officer'])->group(fu
 Route::middleware(['auth', 'role:superadmin,admin,tif,super_tif,officer,pm'])->group(function () {
     Route::get('/admin/projects/{project}/timeline', [DashboardController::class, 'timeline'])
         ->name('admin.projects.timeline');
+
+    Route::get('/lops/{lop}/s-curve', [LopSCurveController::class, 'show'])
+        ->name('lops.s-curve');
 });
 
 /*

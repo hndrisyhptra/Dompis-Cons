@@ -20,7 +20,7 @@ class SurveyPreparationServiceTest extends TestCase
         $this->assertSame('M-ODP-001', $groups->first()['designator']);
         $this->assertSame([10, 11], $groups->first()['item_ids']);
         $this->assertSame(8, $groups->first()['quantity_plan']);
-        $this->assertSame(6, $groups->first()['quantity_actual']);
+        $this->assertSame(6, $groups->first()['quantity_survey']);
     }
 
     public function test_items_without_pair_code_remain_separate(): void
@@ -67,7 +67,7 @@ class SurveyPreparationServiceTest extends TestCase
             'item_name' => $code.' item',
             'unit' => 'UNIT',
             'quantity_plan' => $plan,
-            'quantity_actual' => $actual,
+            'quantity_survey' => $actual,
         ]);
         $boq->id_boq = $id;
         $boq->setRelation('designatorData', $designator);

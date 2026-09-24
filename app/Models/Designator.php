@@ -2,11 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class Designator extends Model
 {
+    public const PROGRESS_CATEGORIES = [
+        'KABEL',
+        'TIANG',
+        'GALIAN',
+        'OTHER',
+    ];
+
     protected $table = 'designators';
 
     protected $primaryKey = 'id_designator';
@@ -42,7 +49,6 @@ class Designator extends Model
 
         return $query->where('customer_id', $customerId);
     }
-    
 
     public function prices()
     {

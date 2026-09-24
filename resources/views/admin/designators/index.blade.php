@@ -178,7 +178,8 @@
                                                 unit: @js($item->unit),
                                                 type: @js($item->type),
                                                 pair_code: @js($item->pair_code),
-                                                progress_category: @js($item->progress_category)
+                                                progress_category: @js($item->progress_category),
+                                                update_url: @js(route('designators.update', $item->id_designator))
                                             })"
                                             class="h-9 px-3 rounded-xl border border-gray-300 dark:border-gray-700 text-sm font-semibold hover:bg-gray-100 dark:hover:bg-gray-800">
                                         Edit
@@ -545,7 +546,7 @@
         document.getElementById('designatorModal').classList.add('flex');
 
         document.getElementById('designatorModalTitle').innerText = 'Edit Designator';
-        document.getElementById('designatorForm').action = `/designators/${item.id}`; 
+        document.getElementById('designatorForm').action = item.update_url;
         document.getElementById('designatorMethod').value = 'PUT';
 
         document.getElementById('modal_customer_id').value = item.customer_id ?? '';

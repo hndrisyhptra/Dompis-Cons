@@ -283,6 +283,17 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 6.75v.008M10.5 12v.008M15 17.25v.008" />
                                     </svg>
                                 </a>
+
+                                @foreach($project->lops as $curveLop)
+                                    <a href="{{ route('lops.s-curve', $curveLop->id_lop) }}"
+                                       class="w-8 h-8 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition inline-flex items-center justify-center pm-tooltip"
+                                       data-tooltip="Kurva-S{{ $project->lops->count() > 1 ? ' · '.$curveLop->lop_name : '' }}">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 18l4.5-5 3.5 3 5-7 5 4" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5v15h18" />
+                                        </svg>
+                                    </a>
+                                @endforeach
                             </div>
                         </td>
                     </tr>

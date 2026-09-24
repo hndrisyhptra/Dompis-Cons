@@ -3101,3 +3101,62 @@ Mengganti accordion Branch/Step/Sub-step dengan tabel matrix yang lebih cepat di
 - Seluruh milestone sekarang dinormalisasi melalui `CarbonImmutable` sebelum dibandingkan dan dihitung. Test regresi memakai timestamp mentah berbentuk string untuk memastikan kasus produksi tersebut tidak berulang.
 - Error Blade `Undefined variable $color` ditemukan saat detail event Timeline PT 2 dirender. Variabel lokal tersebut dihilangkan; class warna kini diambil langsung dari palet berdasarkan tipe event dengan fallback `gray`, sehingga tidak bergantung pada scope variabel sementara di dalam loop Blade. Sintaks pendek `@php(...)` yang tidak kompatibel dengan compiler Blade proyek juga diganti menjadi blok `@php ... @endphp` standar.
 - Ditambahkan test render halaman penuh Timeline PT 2 untuk memastikan header, identitas LOP, dan class warna event dapat dirender tanpa error runtime Blade.
+
+## Section BX — Kategori GALIAN pada Master Designator (22 September 2026)
+
+### Perubahan
+- Kategori progress designator sekarang memiliki pilihan `KABEL`, `TIANG`, `GALIAN`, dan `OTHER` melalui satu konstanta pada model `Designator`.
+- Form tambah/edit Master Designator menampilkan `GALIAN` pada dropdown **Progress Category** dan nilai tersebut disimpan ke kolom `designators.progress_category`.
+- Alamat submit form edit diperbaiki agar memakai named route `designators.update`; sebelumnya JavaScript mengarah ke `/designators/{id}`, sedangkan route resmi berada di `/designators/update/{id}`.
+
+### Database dan verifikasi
+- Tidak ada migration karena `progress_category` sudah bertipe `varchar(50)` dan dapat menyimpan nilai `GALIAN`.
+- Ditambahkan test regresi untuk memastikan kategori `GALIAN` tersedia serta update designator benar-benar menyimpan nilai tersebut.
+
+## Section BY — Kurva-S Target dan Realisasi per LOP PT3/Reguler (22 September 2026)
+
+### Kontrak perhitungan yang disepakati
+- Tahap pertama hanya berlaku untuk LOP PT3/reguler. PT2 tidak memakai engine Kurva-S ini.
+- Seluruh durasi memakai **hari kalender** dan dihitung dari `lops.start_tgl`; sistem tidak membuat tanggal fallback jika `start_tgl` kosong.
+- Survey = 7 hari.
+- Perizinan = 21 hari untuk kategori `PERIZINAN PU NASIONAL`, `PERIZINAN PU PROVINSI`, `PERIZINAN PU KABUPATEN`, `PERIZINAN PU KOTA`, dan `PERIZINAN INSTANSI`; kategori lain = 7 hari.
+- Material Delivery:
+  - MATARAM 4 hari: GER, MBG, MTR, PRY, SEL, SGG, SWE;
+  - MATARAM 14 hari: ALA, BIM, DMP, EMP, KMP, MLK, SAP, SBW, SIL, TET, TLW;
+  - KUPANG 4 hari: ATB, BAA, BEN, KEF, KPN, NKN, OSP, SOE, TNA;
+  - KUPANG/FLORES 14 hari jika STO termasuk daftar outer: SEB, WGP, WKB, BJW, END, KLH, LBO, LRT, LWB, MAU, MMR, REO, RTE, WWR;
+  - seluruh STO pada Branch Jatim, Jateng/DIY (termasuk nama baru SURAKARTA), dan DENPASAR = 3 hari.
+- Kombinasi Branch/STO yang belum termasuk aturan tidak ditebak. Kurva ditahan dan UI menampilkan peringatan **Belum dipetakan**.
+- Instalasi memakai BOQ Survey jika sudah ada ronde Survey berstatus `completed`; jika belum, memakai BOQ Plan.
+- Durasi Instalasi = hari Kabel + hari Tiang + hari Galian:
+  - Kabel = volume/1.000;
+  - Tiang = volume/10;
+  - Galian = volume/100;
+  - setiap hasil dibulatkan half-up (`0,5` ke atas, di bawah `0,5` ke bawah), baru kemudian dijumlahkan.
+- Pasangan Material/Jasa dengan `pair_code` yang sama dihitung satu kali. Perhitungan dibatasi ke BOQ milik LOP yang sedang dibuka, bukan seluruh BOQ dalam PID/project.
+- Golive mempunyai bobot 3 hari. Tanggal target Golive baru dibentuk dari `lop_golive_submissions.fi_completed_at + 3 hari`, yaitu setelah empat syarat FI-OGP lengkap. Sebelum itu kurva target berhenti di milestone FI-OGP dan tidak mengarang tanggal Golive.
+- Bobot persentase setiap tahap adalah `durasi tahap / total seluruh hari × 100` dan ditampilkan secara kumulatif. Material Delivery digabung dalam Persiapan Instalasi; Instalasi, Pengukuran, Finishing, dan FI-OGP menjadi satu blok durasi Instalasi; Golive menjadi tahap akhir.
+
+### Kurva realisasi
+- Realisasi dibentuk dari tanggal penyelesaian Survey/Perizinan, histori perpindahan staging, upload/approval eviden, checklist Pengukuran, eviden Finishing, empat kategori dokumen FI-OGP, dan tanggal Golive.
+- Bobot Persiapan Instalasi dibagi antara Material Delivery dan penyelesaian Persiapan Instalasi. Bobot blok Instalasi dibagi ke Instalasi, Pengukuran, Finishing, dan FI-OGP; progress di dalamnya mengikuti item/checklist/eviden yang benar-benar tersedia.
+- Aktivitas sebelum `start_tgl` tidak dapat membuat garis realisasi mundur ke kiri; tanggal event dinormalisasi minimal ke tanggal mulai.
+- Pada project multi-LOP, eviden berbasis BOQ dipetakan melalui `boq_item_id`. Eviden lama tanpa referensi BOQ hanya dihitung jika activity log menunjuk LOP yang sedang dibuka. Ini mencegah progress LOP lain dalam PID yang sama tercampur, tetapi juga menegaskan utang data lama karena tabel `evidences` belum memiliki `lop_id` langsung.
+
+### UI, route, dan akses
+- Tidak dibuat menu sidebar baru. Tombol **Kurva-S** ditambahkan pada toggle/kolom Aksi daftar Project ID reguler milik Admin serta PM/TIF.
+- Jika satu project mempunyai beberapa LOP, satu tombol ditampilkan per LOP dan labelnya memuat nama LOP.
+- Halaman menampilkan grafik Target vs Realisasi, ringkasan input durasi, peringatan kualitas data, tabel target/realisasi/deviasi milestone, serta rincian volume Kabel/Tiang/Galian.
+- Route read-only `lops.s-curve` menggunakan `lop_id` dan dibatasi untuk role Admin, Superadmin, Super TIF, Officer, PM, dan TIF. Controller menolak project PT2.
+- Tidak ada migration atau perubahan struktur database untuk fitur ini.
+
+### Hasil audit data aktif sebelum aktivasi massal
+- Dari snapshot audit database sesi ini, seluruh 1.681 LOP reguler masih memiliki `start_tgl` kosong dan `permit_category_id` kosong. Karena itu halaman sengaja menampilkan status **Kurva-S belum dapat dihitung** sampai dua input tersebut direkonsiliasi; sistem tidak memakai `tgl_sp`, `tgl_toc`, atau tanggal lain sebagai fallback tersembunyi.
+- Kombinasi STO BALNUS yang ditemukan tetapi belum mempunyai aturan eksplisit: MATARAM/PYA, KUPANG/KPG, serta FLORES/KAI, LBJ, LWA, dan MME. Data tersebut tidak otomatis dipaksakan ke 4/14 hari dan perlu keputusan bisnis sebelum dimasukkan ke mapping.
+- Ditemukan anomali volume GALIAN yang sangat besar pada designator `J-BC-TR-A-0.4` (agregat plan sekitar 133 juta). Data tidak diubah otomatis karena koreksi volume merupakan keputusan pemilik data. LOP terkait dapat menghasilkan durasi sangat besar sampai BOQ dibersihkan.
+
+### Verifikasi
+- Ditambahkan unit test untuk route read-only/allow-list role, perhitungan durasi total, pembulatan, deduplikasi `pair_code`, kategori GALIAN pada pasangan designator, target Golive `FI lengkap + 3 hari`, guard `start_tgl`, dan seluruh variasi mapping MATARAM/KUPANG/FLORES/SURAKARTA/DENPASAR.
+- Ditambahkan render test halaman lengkap untuk memastikan grafik, aturan Flores, dan ringkasan perhitungan tidak menimbulkan error Blade.
+- Targeted test Kurva-S: 14 test dengan 36 assertion, seluruhnya sukses.
+- Test terkait Survey, Timeline PT2, route Report Deployment, dan kategori designator: 12 test dengan 42 assertion, seluruhnya sukses setelah fixture Survey lama diselaraskan dari `quantity_actual` ke kolom kanonik `quantity_survey`.

@@ -126,6 +126,17 @@
                                         <span class="font-semibold">Timeline</span>
                                     </a>
 
+                                    @foreach($project->lops as $curveLop)
+                                        <a href="{{ route('lops.s-curve', $curveLop->id_lop) }}"
+                                           class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-gray-800 hover:text-emerald-700 transition-colors">
+                                            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 18l4.5-5 3.5 3 5-7 5 4" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5v15h18" />
+                                            </svg>
+                                            <span class="font-semibold">Kurva-S{{ $project->lops->count() > 1 ? ' · '.$curveLop->lop_name : '' }}</span>
+                                        </a>
+                                    @endforeach
+
                                     <button type="button" onclick="openAssignModal('{{ $project->id_project }}', @js($project->project_name), @js($programName))"
                                             class="w-full px-4 py-2 text-left text-sm flex items-center gap-3 text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-gray-800 hover:text-amber-700 transition-colors">
                                         <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

@@ -68,7 +68,7 @@ class ProgramController extends Controller
         $regions = $this->pidRegions();
 
         // Gunakan 'lop' (tunggal) karena relasi Project biasa adalah 1-to-1
-        $query = Project::with(['lop', 'assignment.waspang', 'assignment.teknisi'])
+        $query = Project::with(['lop', 'lops', 'assignment.waspang', 'assignment.teknisi'])
             ->where('program', $programName);
 
         if ($search) {
