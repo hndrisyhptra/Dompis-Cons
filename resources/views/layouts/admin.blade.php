@@ -73,6 +73,8 @@
             
             <x-toast />
 
+            @include('approval-center.partials.login-alert')
+
             @yield('content')
         </main>
 

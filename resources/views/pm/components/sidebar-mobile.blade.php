@@ -49,6 +49,8 @@
             <span>Dashboard PM</span>
         </a>
 
+        @include('approval-center.partials.sidebar-link')
+
         <p class="px-3 pt-5 mb-2 text-xs font-bold uppercase text-gray-400 tracking-wider">
             Operational & Control
         </p>

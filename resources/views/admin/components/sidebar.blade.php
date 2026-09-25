@@ -42,6 +42,8 @@
             <span>Dashboard</span>
         </a>
 
+        @include('approval-center.partials.sidebar-link')
+
         @php
             $inboxOpen = request()->routeIs('admin.inbox*') || request()->routeIs('admin.history*');
         @endphp
@@ -96,7 +98,7 @@
                 {{ request()->routeIs('admin.inbox') ? 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800' }}">
                     <span class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-lg bg-blue-500"></span>
-                        Active Project
+                        Active PT 3
                     </span>
                 </a>
 
@@ -109,6 +111,17 @@
                         Active PT 2
                     </span>
                 </a>
+
+                @if(auth()->user()->role === 'admin')
+                    <a href="{{ route('approval-center.index', ['scope' => 'mine']) }}"
+                       class="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition
+                       {{ request()->routeIs('approval-center.*') && request('scope', 'mine') === 'mine' ? 'bg-slate-100 text-slate-950 dark:bg-slate-800 dark:text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800' }}">
+                        <span class="flex items-center gap-2"><span class="h-2 w-2 rounded-full bg-slate-600 dark:bg-slate-300"></span>Approval Saya</span>
+                        @if(($adminApprovalInboxCount ?? 0) > 0)
+                            <span class="rounded bg-red-600 px-2 py-0.5 text-[10px] font-black text-white dark:bg-slate-200 dark:text-slate-900">{{ $adminApprovalInboxCount > 99 ? '99+' : $adminApprovalInboxCount }}</span>
+                        @endif
+                    </a>
+                @endif
 
                 <a href="{{ route('admin.history') }}"
                 class="block px-3 py-2 rounded-lg text-sm font-semibold transition

@@ -1,7 +1,7 @@
 <div class="fixed bottom-0 left-0 right-0 z-40 max-w-md mx-auto">
     <div class="bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-100 dark:border-slate-800 shadow-[0_-8px_24px_-8px_rgba(30,27,75,0.12)] px-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
 
-        <div class="grid grid-cols-5 items-end text-center text-xs">
+        <div class="grid grid-cols-6 items-end text-center text-xs">
 
             <a href="{{ route('waspang.dashboard') }}"
                 class="flex flex-col items-center gap-1 py-1 rounded-xl transition {{ $active == 'home' ? 'text-[#1565D8] dark:text-blue-400' : 'text-slate-400 dark:text-slate-500' }}">
@@ -13,6 +13,12 @@
                 class="flex flex-col items-center gap-1 py-1 rounded-xl transition {{ $active == 'inbox' ? 'text-[#1565D8] dark:text-blue-400' : 'text-slate-400 dark:text-slate-500' }}">
                 <i class="fa-solid fa-inbox text-lg"></i>
                 <span class="text-[10px] font-bold">Inbox</span>
+            </a>
+
+            <a href="{{ route('approval-center.index') }}"
+                class="flex flex-col items-center gap-1 py-1 rounded-xl transition {{ $active == 'approval' ? 'text-[#1565D8] dark:text-blue-400' : 'text-slate-400 dark:text-slate-500' }}">
+                <i class="fa-solid fa-list-check text-lg"></i>
+                <span class="text-[10px] font-bold">Approval</span>
             </a>
 
             <a href="{{ route('surveyor.index') }}"

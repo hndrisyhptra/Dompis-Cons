@@ -48,6 +48,8 @@
             </div>
         </a>
 
+        @include('approval-center.partials.sidebar-link')
+
         {{-- Revisi (permintaan user): nama menu "Approval UIM" diganti jadi
         "Approval Golive" (badge tetap "PT 2"). --}}
         <a href="{{ route('sdi.index') }}"

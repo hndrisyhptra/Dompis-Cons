@@ -24,6 +24,7 @@ use App\Http\Controllers\ProjectStageController;
 use App\Http\Controllers\KendalaCategoryController;
 use App\Http\Controllers\PermitCategoryController;
 use App\Http\Controllers\LopSCurveController;
+use App\Http\Controllers\ApprovalCenterController;
 
 /*
 |--------------------------------------------------------------------------
@@ -77,6 +78,11 @@ Route::middleware(['auth'])->group(function () {
 
     Route::delete('/profile', [ProfileController::class, 'destroy'])
         ->name('profile.destroy');
+
+    // Pusat monitoring read-only tersedia untuk seluruh role. Hak review
+    // aktual tetap mengikuti route approval PT2/PT3 yang sudah role-gated.
+    Route::get('/approval-center', [ApprovalCenterController::class, 'index'])
+        ->name('approval-center.index');
 });
 
 /*

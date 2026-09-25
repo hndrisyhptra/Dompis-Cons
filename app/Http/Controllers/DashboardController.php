@@ -12,6 +12,7 @@ use App\Models\BoqItem;
 use App\Models\Designator;
 use App\Models\ProjectActivityLog;
 use App\Models\ProjectStage;
+use App\Models\Pt2Lop;
 use App\Services\DeploymentMovementSummaryService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -1401,6 +1402,67 @@ class DashboardController extends Controller
             );
 
         return view('admin.inbox.index', compact('assignments', 'search'));
+    }
+
+    /**
+     * Inbox LOP PT2 aktif yang dikawal oleh Admin saat ini. Ownership wajib
+     * berasal dari pt2_assignments.assigned_by agar assignment antar-Admin
+     * tidak tercampur.
+     */
+    public function adminInboxPt2(Request $request)
+    {
+        $search = trim((string) $request->input('search'));
+
+        $query = Pt2Lop::with([
+            'project',
+            'assignment.teknisi',
+            'evidences',
+            'surveys',
+            'mancores',
+            'dismantles',
+        ])
+            ->whereHas('project')
+            ->whereHas('assignment', function ($assignment) {
+                $assignment->where('assigned_by', auth()->user()->id_user);
+            })
+            // FI-OGP/menunggu SDI tetap aktif sampai Golive benar-benar
+            // disetujui. Hanya Golive final dan Drop yang dikeluarkan.
+            ->where(function ($active) {
+                $active->whereNull('is_golive')->orWhere('is_golive', 0);
+            })
+            ->where(function ($active) {
+                $active->whereNull('sdi_approval_status')
+                    ->orWhere('sdi_approval_status', '!=', 'approved');
+            })
+            ->where(function ($active) {
+                $active->whereNull('status_progress')
+                    ->orWhereNotIn('status_progress', ['golive', 'drop']);
+            });
+
+        if ($search !== '') {
+            $query->where(function ($filter) use ($search) {
+                $filter->where('lop_name', 'like', "%{$search}%")
+                    ->orWhere('id_ihld', 'like', "%{$search}%")
+                    ->orWhere('branch', 'like', "%{$search}%")
+                    ->orWhere('sto', 'like', "%{$search}%")
+                    ->orWhere('mitra_name', 'like', "%{$search}%")
+                    ->orWhereHas('project', function ($project) use ($search) {
+                        $project->where('project_name', 'like', "%{$search}%")
+                            ->orWhere('pid', 'like', "%{$search}%")
+                            ->orWhere('pid_sap', 'like', "%{$search}%");
+                    })
+                    ->orWhereHas('assignment.teknisi', function ($teknisi) use ($search) {
+                        $teknisi->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $pt2Lops = $query
+            ->orderByDesc('updated_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('admin.inbox.pt2', compact('pt2Lops', 'search'));
     }
 
     public function adminHistory(Request $request)

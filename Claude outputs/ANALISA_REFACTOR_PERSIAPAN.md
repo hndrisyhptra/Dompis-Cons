@@ -3192,3 +3192,49 @@ Mengganti accordion Branch/Step/Sub-step dengan tabel matrix yang lebih cepat di
 - Test project tanpa item Final wajib memastikan indikator upload dan `finishingDone` sama-sama selesai.
 - Targeted suite terkait: 25 test dengan 81 assertion sukses; test khusus koreksi ini: 4 test dengan 14 assertion sukses. Seluruh Blade berhasil dikompilasi dan `git diff --check` sukses.
 - Full unit suite tetap mempunyai satu kegagalan existing pada `DatabaseSchemaBaselineTest` karena daftar migration September yang pending belum direkonsiliasi; kegagalan tersebut tidak berasal dari koreksi alur Approval ini.
+
+## Section CA — Pusat Approval LOP, Inbox Admin, dan Popup Login (25 September 2026)
+
+### Konsep dan sumber data
+- Ditambahkan satu menu **Pusat Approval** sebagai monitoring gabungan eviden PT3/Reguler dan PT2 yang masih berstatus `pending`.
+- Satu baris tabel mewakili satu LOP (fallback ke project untuk eviden lama yang belum mempunyai relasi LOP langsung), bukan satu baris per file. Tabel menampilkan jumlah file pending, project/PID, Branch/STO, tahap, uploader, Admin pengawal, umur antrean, dan aksi review.
+- Sumber Admin pengawal tidak dibuat ulang: PT3 memakai `pro_assign.assigned_by`, sedangkan PT2 memakai `pt2_assignments.assigned_by`. Dengan demikian popup, badge Inbox, dan daftar monitoring memakai definisi assignment yang sama.
+- Antrean bersifat live. Setelah eviden disetujui/ditolak dan tidak lagi `pending`, angka badge serta item Inbox otomatis berubah tanpa perlu menandai notifikasi statis sebagai selesai.
+
+### UI dan akses
+- Pusat Approval dapat dibuka oleh seluruh role yang sudah login. Admin, Superadmin, dan Super TIF memperoleh tombol review PT3; Admin, Superadmin, Super TIF, dan Officer memperoleh tombol review PT2 sesuai role gate lama. Role lain melihat mode monitoring/read-only.
+- Menu ditambahkan ke sidebar desktop/mobile Admin, Super TIF, Officer, PM/TIF, dan SDI; bottom navigation Waspang, Teknisi, serta SDI Surveyor juga memperoleh shortcut Approval.
+- Halaman memakai ringkasan jumlah LOP, file pending, antrean lewat 48 jam, serta sebaran Branch. Filter tersedia untuk kata kunci, PT2/PT3, Branch, tahap, dan aging.
+- Aging dibagi menjadi `< 24 jam`, `24–48 jam`, dan `> 48 jam`. Daftar diprioritaskan dari antrean tertua.
+- Revisi UI 25 September 2026: gradient dan palet multiwarna dihapus. Halaman memakai clean white, border abu-abu, aksen slate tunggal, seluruh card/container utama `rounded-lg`, dan daftar LOP diubah dari card grid menjadi tabel compact delapan kolom. Popup login serta badge Inbox Admin diselaraskan ke palet netral dan sudut `rounded-lg`.
+- Untuk role Admin tersedia tab **Inbox Saya** dan **Semua Antrean**. Default Admin adalah Inbox Saya; role lain langsung melihat keseluruhan antrean.
+
+### Popup login dan Inbox khusus Admin
+- Setelah login berhasil, hanya user dengan role tepat `admin` yang memperoleh popup jika masih ada eviden pending pada project/LOP yang di-assign oleh dirinya.
+- Popup ditampilkan satu kali melalui flash session, berisi jumlah LOP, jumlah eviden, jumlah antrean lewat 48 jam, preview LOP tertua, dan tombol menuju Inbox Saya. Refresh biasa tidak memunculkan popup berulang.
+- Submenu **Approval Saya** ditambahkan pada kelompok Inbox Admin beserta badge jumlah eviden pending personal. Badge dan popup tidak ditampilkan kepada Admin lain yang bukan pengawal project tersebut.
+
+### Database dan verifikasi
+- Tidak ada migration, tabel baru, perubahan status, atau mutasi data historis. Fitur membaca tabel approval dan assignment yang sudah ada.
+- Ditambahkan `ApprovalCenterService` sebagai satu sumber perhitungan untuk halaman, popup, dan badge; service diregistrasikan singleton per request agar sidebar desktop/mobile tidak menghitung antrean berulang.
+- Test memastikan halaman dapat dirender pada seluruh sepuluh role aktif, non-reviewer hanya mendapat mode monitoring, Inbox Admin A tidak memuat assignment Admin B, snapshot menghitung pending saja, serta login PM tidak menghasilkan popup Admin.
+- Targeted test Pusat Approval: 6 test dengan 47 assertion sukses, termasuk guard desain tabel clean white tanpa gradient/rounded card besar. Seluruh Blade berhasil dikompilasi.
+- Pemeriksaan read-only pada database lokal aktual menemukan 181 LOP dengan total 5.274 file eviden pending. Perhitungan antrean gabungan selesai sekitar 0,299 detik dengan peak memory sekitar 46 MB pada CLI, sehingga volume aktif masih aman untuk implementasi koleksi per-request saat ini.
+
+## Section CB — Perbaikan Inbox Admin Active PT 2 (25 September 2026)
+
+### Akar masalah dan perbaikan
+- Route `admin.inbox.pt2` sudah tersedia, tetapi menunjuk ke `DashboardController::adminInboxPt2()` yang belum diimplementasikan. Kondisi ini menyebabkan halaman selalu gagal dibuka dengan error `Call to undefined method`.
+- Ditambahkan handler Inbox PT 2 yang mengambil LOP berdasarkan kepemilikan assignment aktual pada `pt2_assignments.assigned_by`. Assignment milik Admin lain tidak ikut tampil.
+- Pencarian mendukung nama LOP, ID IHLD, Branch, STO, mitra, nama project, PID/PID SAP, dan nama Teknisi.
+- Query memuat project, assignment/Teknisi, eviden, survey, mancore, dan dismantle di awal. `Pt2Lop::progressSummary()` disesuaikan memakai relasi yang sudah dimuat agar daftar tidak menjalankan query tambahan per LOP.
+
+### Definisi LOP PT 2 aktif
+- LOP tetap masuk Inbox selama belum Golive final: `is_golive` belum bernilai `1`, `sdi_approval_status` belum `approved`, dan `status_progress` bukan `golive` atau `drop`.
+- LOP pada FI-OGP atau menunggu verifikasi SDI tetap ditampilkan. LOP baru keluar setelah Golive benar-benar disetujui atau berstatus Drop.
+- Halaman menggunakan pagination 20 LOP dan mempertahankan parameter pencarian saat berpindah halaman.
+
+### Database dan verifikasi
+- Tidak ada migration, perubahan tabel, ataupun mutasi data. Perbaikan hanya menambahkan handler pembacaan data dan optimasi relasi.
+- Test regresi memastikan halaman dapat diakses, hanya menampilkan assignment milik Admin yang login, menyembunyikan LOP Golive, dan menjaga fungsi pencarian. Seluruh `ApprovalCenterTest` sukses: 7 test dengan 54 assertion.
+- Pemeriksaan read-only terhadap database lokal aktual berhasil merender empty state untuk Admin tanpa assignment dan merender daftar berisi data untuk assigner aktif. Pada data aktual ditemukan 41 LOP aktif; 20 baris halaman pertama menghasilkan HTML lengkap sekitar 196 KB dalam kurang lebih 98 ms tanpa exception.

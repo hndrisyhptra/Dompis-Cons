@@ -42,6 +42,8 @@
             <span>Dashboard</span>
         </a>
 
+        @include('approval-center.partials.sidebar-link')
+
         @php
             $inboxOpen = request()->routeIs('admin.inbox*') || request()->routeIs('admin.history*');
         @endphp

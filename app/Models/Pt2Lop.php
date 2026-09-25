@@ -107,27 +107,42 @@ class Pt2Lop extends Model
         // Step 5: Mancore -> tahap akhir Waspang, status "FI-OGP Golive" (verifikasi
         // Golive oleh SDI -- eviden UIM + toggle -- terpisah, sudah dicek di atas
         // lewat sdi_approval_status/is_golive, TIDAK diubah di sini).
-        if (\App\Models\MancorePt2::where('pt2_lop_id', $this->id_pt2_lop)->exists()) {
+        // Gunakan relasi eager-loaded dari Inbox PT2 jika tersedia agar
+        // progress tiap baris tidak menimbulkan query tambahan (N+1).
+        $hasMancore = $this->relationLoaded('mancores')
+            ? $this->mancores->isNotEmpty()
+            : \App\Models\MancorePt2::where('pt2_lop_id', $this->id_pt2_lop)->exists();
+        $hasDismantle = $this->relationLoaded('dismantles')
+            ? $this->dismantles->isNotEmpty()
+            : \App\Models\DismantlePt2::where('pt2_lop_id', $this->id_pt2_lop)->exists();
+        $evidences = $this->relationLoaded('evidences')
+            ? $this->evidences
+            : \App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->get();
+        $hasSurvey = $this->relationLoaded('surveys')
+            ? $this->surveys->isNotEmpty()
+            : \App\Models\SurveyPt2::where('pt2_lop_id', $this->id_pt2_lop)->exists();
+
+        if ($hasMancore) {
             $progress = 100; 
             $stageLabel = 'FI-OGP Golive';
         }
         // Step 4: Dismantle -> ikut label "Finishing" (digabung dgn Step 3, lihat Section BM)
-        elseif (\App\Models\DismantlePt2::where('pt2_lop_id', $this->id_pt2_lop)->exists() || \App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->whereRaw("LOWER(stage) = 'dismantle'")->exists()) {
+        elseif ($hasDismantle || $evidences->contains(fn ($evidence) => strtolower((string) $evidence->stage) === 'dismantle')) {
             $progress = 80; 
             $stageLabel = 'Finishing';
         }
         // Step 3: Finish/Redaman -> label "Finishing" (Section BM)
-        elseif (\App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->whereRaw("LOWER(stage) IN ('redaman', 'finish', 'finishing')")->exists()) {
+        elseif ($evidences->contains(fn ($evidence) => in_array(strtolower((string) $evidence->stage), ['redaman', 'finish', 'finishing'], true))) {
             $progress = 60; 
             $stageLabel = 'Finishing';
         }
         // Step 2: Progress/Instalasi -> label "Instalasi" (Section BM)
-        elseif (\App\Models\Pt2Evidence::where('pt2_lop_id', $this->id_pt2_lop)->whereRaw("LOWER(stage) IN ('instalasi', 'progress')")->exists()) {
+        elseif ($evidences->contains(fn ($evidence) => in_array(strtolower((string) $evidence->stage), ['instalasi', 'progress'], true))) {
             $progress = 40; 
             $stageLabel = 'Instalasi';
         }
         // Step 1: Survey
-        elseif (\App\Models\SurveyPt2::where('pt2_lop_id', $this->id_pt2_lop)->exists()) {
+        elseif ($hasSurvey) {
             $progress = 20; 
             $stageLabel = 'Survey';
         }

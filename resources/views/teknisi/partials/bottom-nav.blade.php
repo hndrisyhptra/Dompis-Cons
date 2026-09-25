@@ -1,7 +1,7 @@
 <div class="fixed bottom-0 left-0 right-0 z-40">
     <div class="max-w-md mx-auto bg-white border-t border-gray-200 px-4 py-2">
 
-        <div class="grid grid-cols-5 items-end text-center text-xs">
+        <div class="grid grid-cols-6 items-end text-center text-xs">
 
             <!-- HOME -->
             <a href="{{ route('teknisi.pt2.index') }}"
@@ -21,6 +21,14 @@
                     </svg>
                 </div>
                 <span class="text-xs font-medium">Inbox</span>
+            </a>
+
+            <a href="{{ route('approval-center.index') }}"
+                class="flex flex-col items-center gap-1 {{ $active == 'approval' ? 'text-blue-700' : 'text-gray-500' }}">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 11.25 11.25 13.5 15 9.75M6.75 4.5h10.5A2.25 2.25 0 0 1 19.5 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25H6.75a2.25 2.25 0 0 1-2.25-2.25V6.75A2.25 2.25 0 0 1 6.75 4.5Z" />
+                </svg>
+                <span class="text-xs font-medium">Approval</span>
             </a>
 
             <!-- LIST (TOMBOL TENGAH FLOATING) -->

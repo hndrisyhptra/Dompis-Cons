@@ -13,12 +13,18 @@
 
     <div class="fixed bottom-0 left-0 right-0 z-40 safe-bottom">
         <div class="max-w-md mx-auto glass border-t border-slate-200/70 px-4 pt-2 pb-2 shadow-[0_-8px_24px_-8px_rgba(15,23,42,.15)]">
-            <div class="grid grid-cols-3 items-end text-center text-xs">
+            <div class="grid grid-cols-4 items-end text-center text-xs">
 
                 <a href="{{ route('surveyor.index') }}"
                    class="flex flex-col items-center gap-1 py-1 {{ $active == 'home' ? 'text-blue-700' : 'text-slate-500' }}">
                     <i class="fa-solid fa-house text-lg"></i>
                     <span class="text-[11px] font-bold">Beranda</span>
+                </a>
+
+                <a href="{{ route('approval-center.index') }}"
+                   class="flex flex-col items-center gap-1 py-1 {{ $active == 'approval' ? 'text-blue-700' : 'text-slate-500' }}">
+                    <i class="fa-solid fa-list-check text-lg"></i>
+                    <span class="text-[11px] font-bold">Approval</span>
                 </a>
 
                 <a href="{{ route('surveyor.create') }}" class="flex flex-col items-center relative -mt-8">

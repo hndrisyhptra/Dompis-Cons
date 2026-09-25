@@ -50,7 +50,9 @@
             </div>
 
             <span>Dashboard</span>
-        </a>    
+        </a>
+
+        @include('approval-center.partials.sidebar-link')
 
         @php
             $inboxOpen = request()->routeIs('admin.inbox*')
