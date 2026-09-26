@@ -1,11 +1,42 @@
 @extends('layouts.admin')
 
 @section('content')
+<style>
+    .master-data-tooltip { position: relative; }
+    .master-data-tooltip::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 8px);
+        transform: translateX(-50%) translateY(4px);
+        z-index: 70;
+        padding: 6px 9px;
+        border-radius: 0.5rem;
+        background: #0f172a;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 150ms ease, transform 150ms ease;
+    }
+    .master-data-tooltip:hover::after,
+    .master-data-tooltip:focus-visible::after {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+    }
+    .dark .master-data-tooltip::after { background: #f8fafc; color: #0f172a; }
+</style>
+
 <div x-data="pidPage()" class="min-h-screen bg-slate-50 dark:bg-slate-950 -m-4 md:-m-6 p-4 md:p-6">
     <div class="max-w-7xl mx-auto space-y-6">
 
         {{-- HEADER --}}
-        <div class="rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+        <div class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
                 <div>
                     <p class="text-xs font-black text-blue-700 uppercase tracking-widest">PID Monitoring</p>
@@ -16,32 +47,32 @@
                 </div>
 
                 <a href="{{ route('admin.import.pid') }}"
-                   class="inline-flex items-center justify-center px-5 py-3 rounded-2xl bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20">
+                   class="inline-flex items-center justify-center px-5 py-3 rounded-lg bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20">
                     Bulk Import PID
                 </a>
             </div>
 
             {{-- DATA TYPE TAB --}}
-            <div class="mt-6 inline-flex p-1 rounded-2xl bg-slate-100 dark:bg-slate-800">
+            <div class="mt-6 inline-flex p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
                 <a href="{{ route('admin.data-pid', ['type' => 'regular']) }}"
-                   class="px-5 py-2.5 rounded-xl text-sm font-black transition {{ $dataType === 'regular' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500' }}">
+                   class="px-5 py-2.5 rounded-lg text-sm font-black transition {{ $dataType === 'regular' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500' }}">
                     Regular
                 </a>
                 <a href="{{ route('admin.data-pid', ['type' => 'pt2']) }}"
-                   class="px-5 py-2.5 rounded-xl text-sm font-black transition {{ $dataType === 'pt2' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500' }}">
+                   class="px-5 py-2.5 rounded-lg text-sm font-black transition {{ $dataType === 'pt2' ? 'bg-white text-emerald-700 shadow-sm' : 'text-slate-500' }}">
                     Program PT 2
                 </a>
             </div>
 
             {{-- KPI --}}
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
-                <div class="rounded-3xl bg-white border border-slate-200 p-5 shadow-sm">
+                <div class="rounded-lg bg-white border border-slate-200 p-5 shadow-sm">
                     <p class="text-xs text-slate-500 font-bold uppercase">Total PID</p>
                     <p class="text-3xl font-black text-slate-900 mt-2">{{ number_format($totalPid) }}</p>
                     <p class="text-[10px] text-slate-500 mt-1 uppercase font-semibold">Sesuai filter</p>
                 </div>
 
-                <div class="rounded-3xl bg-white border border-indigo-200 p-5 shadow-sm">
+                <div class="rounded-lg bg-white border border-indigo-200 p-5 shadow-sm">
                     @if($dataType === 'pt2')
                         <p class="text-xs text-indigo-700 font-bold uppercase">Total LOP PT 2</p>
                         <p class="text-3xl font-black text-indigo-700 mt-2">{{ number_format($totalLop) }}</p>
@@ -53,13 +84,13 @@
                     @endif
                 </div>
 
-                <div class="rounded-3xl bg-white border border-emerald-200 p-5 shadow-sm">
+                <div class="rounded-lg bg-white border border-emerald-200 p-5 shadow-sm">
                     <p class="text-xs text-emerald-700 font-bold uppercase">Project Active</p>
                     <p class="text-3xl font-black text-emerald-700 mt-2">{{ number_format($projectActive) }}</p>
                     <p class="text-[10px] text-emerald-600 mt-1 uppercase font-semibold">Status project active</p>
                 </div>
 
-                <div class="rounded-3xl bg-white border border-red-200 p-5 shadow-sm">
+                <div class="rounded-lg bg-white border border-red-200 p-5 shadow-sm">
                     <p class="text-xs text-red-700 font-bold uppercase">Project Drop</p>
                     <p class="text-3xl font-black text-red-700 mt-2">{{ number_format($projectDrop) }}</p>
                     <p class="text-[10px] text-red-600 mt-1 uppercase font-semibold">Project dibatalkan</p>
@@ -67,7 +98,7 @@
             </div>
 
             @if($dataType === 'pt2')
-                <div class="mt-4 rounded-2xl bg-emerald-50 border border-emerald-100 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div class="mt-4 rounded-lg bg-emerald-50 border border-emerald-100 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <p class="text-xs text-emerald-700">
                         <b>{{ number_format($pidMatchBoq) }}</b> dari {{ number_format($totalPid) }} PID PT 2 sudah memiliki BOQ.
                     </p>
@@ -79,7 +110,7 @@
         </div>
 
         {{-- FILTER --}}
-        <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+        <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
             <form method="GET" action="{{ route('admin.data-pid') }}" id="filterForm">
                 <input type="hidden" name="type" value="{{ $dataType }}">
 
@@ -89,14 +120,14 @@
                            name="search"
                            value="{{ request('search') }}"
                            placeholder="Cari PID, PID SAP, Project, Nama LOP, ID IHLD..."
-                           class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm px-4">
+                           class="w-full h-12 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm px-4">
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Region</label>
                         <select name="region" id="regionSelect" onchange="updateBranchDropdown(); this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Region</option>
                             @foreach($regions as $region => $branches)
                                 <option value="{{ $region }}" @selected(request('region') === $region)>{{ $region }}</option>
@@ -107,7 +138,7 @@
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Branch</label>
                         <select name="branch" id="branchSelect" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Branch</option>
                         </select>
                     </div>
@@ -115,7 +146,7 @@
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Program</label>
                         <select name="program" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Program</option>
                             @foreach($programs as $program)
                                 <option value="{{ $program }}" @selected(request('program') === $program)>{{ $program }}</option>
@@ -126,7 +157,7 @@
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Status Progress</label>
                         <select name="status_progress" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Status</option>
                             @foreach($statusOptions as $value => $label)
                                 <option value="{{ $value }}" @selected(request('status_progress') === $value)>{{ $label }}</option>
@@ -137,7 +168,7 @@
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Per Page</label>
                         <select name="per_page" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             @foreach([10,20,50] as $size)
                                 <option value="{{ $size }}" @selected((int) request('per_page', 10) === $size)>{{ $size }} data</option>
                             @endforeach
@@ -148,12 +179,12 @@
                 <div class="mt-5 flex flex-col sm:flex-row sm:justify-end gap-3">
                     @if(request('search') || request('region') || request('branch') || request('program') || request('status_progress'))
                         <a href="{{ route('admin.data-pid', ['type' => $dataType]) }}"
-                           class="h-11 px-5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold inline-flex items-center justify-center">
+                           class="h-11 px-5 rounded-lg bg-slate-100 text-slate-700 text-sm font-bold inline-flex items-center justify-center">
                             Reset
                         </a>
                     @endif
                     <a href="{{ route('admin.data-pid.export', array_merge(request()->query(), ['type' => $dataType])) }}"
-                       class="h-11 px-5 rounded-xl bg-emerald-600 text-white text-sm font-black hover:bg-emerald-700 inline-flex items-center justify-center gap-2">
+                       class="h-11 px-5 rounded-lg bg-emerald-600 text-white text-sm font-black hover:bg-emerald-700 inline-flex items-center justify-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
@@ -161,13 +192,13 @@
                         </svg>
                         Download Excel
                     </a>
-                    <button type="submit" class="h-11 px-7 rounded-xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700">Cari</button>
+                    <button type="submit" class="h-11 px-7 rounded-lg bg-blue-600 text-white text-sm font-black hover:bg-blue-700">Cari</button>
                 </div>
             </form>
         </div>
 
         {{-- TABLE --}}
-        <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+        <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
             <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
                 <div>
                     <h2 class="text-sm font-black text-slate-900 dark:text-white">
@@ -177,7 +208,7 @@
                         {{ $dataType === 'pt2' ? 'Klik jumlah LOP untuk membuka child LOP dalam PID.' : 'Regular menggunakan satu LOP untuk setiap PID.' }}
                     </p>
                 </div>
-                <span class="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-black">{{ number_format($projects->total()) }} PID</span>
+                <span class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-black">{{ number_format($projects->total()) }} PID</span>
             </div>
 
             <div class="overflow-x-auto">
@@ -238,7 +269,7 @@
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap">
-                                    <span class="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-black">{{ $project->pid_sap ?? '-' }}</span>
+                                    <span class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-black">{{ $project->pid_sap ?? '-' }}</span>
                                 </td>
 
                                 <td class="px-5 py-4 min-w-[240px]">
@@ -251,7 +282,7 @@
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap">
-                                    <span class="px-3 py-1.5 rounded-full {{ $dataType === 'pt2' ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700' }} text-xs font-black">
+                                    <span class="px-3 py-1.5 rounded-lg {{ $dataType === 'pt2' ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700' }} text-xs font-black">
                                         {{ $project->program ?? '-' }}
                                     </span>
                                 </td>
@@ -259,7 +290,7 @@
                                 <td class="px-5 py-4 min-w-[220px]">
                                     @if($dataType === 'pt2')
                                         <button type="button" @click="openLops = !openLops"
-                                                class="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-black hover:bg-emerald-100">
+                                                class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-black hover:bg-emerald-100">
                                             <span>{{ $projectLops->count() }} LOP</span>
                                             <span x-text="openLops ? '▲' : '▼'"></span>
                                         </button>
@@ -275,7 +306,7 @@
                                 </td>
 
                                 <td class="px-5 py-4 text-center whitespace-nowrap">
-                                    <span class="px-3 py-1.5 rounded-full text-xs font-black {{ $statusClass }}">
+                                    <span class="px-3 py-1.5 rounded-lg text-xs font-black {{ $statusClass }}">
                                         {{ $statusOptions[$status] ?? strtoupper(str_replace('_', ' ', $status)) }}
                                     </span>
                                 </td>
@@ -283,21 +314,52 @@
                                 <td class="px-5 py-4 text-center whitespace-nowrap">
                                     @if($dataType === 'regular')
                                         <div class="inline-flex gap-2">
-                                            <button type="button" @click="openDetail(@js($detailData))"
-                                                    class="px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-black hover:bg-blue-100">Detail</button>
-                                            <button type="button" @click="openEdit(@js($detailData))"
-                                                    class="px-3 py-2 rounded-xl bg-amber-50 text-amber-700 text-xs font-black hover:bg-amber-100">Edit</button>
+                                            <button type="button"
+                                                    @click="openDetail(@js($detailData))"
+                                                    class="master-data-tooltip inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300"
+                                                    data-tooltip="Lihat detail"
+                                                    title="Lihat detail"
+                                                    aria-label="Lihat detail PID">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <path d="M2.06 12.35a1 1 0 0 1 0-.7C3.56 7.6 7.44 5 12 5c4.56 0 8.44 2.6 9.94 6.65a1 1 0 0 1 0 .7C20.44 16.4 16.56 19 12 19c-4.56 0-8.44-2.6-9.94-6.65Z"/>
+                                                    <circle cx="12" cy="12" r="3"/>
+                                                </svg>
+                                            </button>
+                                            <button type="button"
+                                                    @click="openEdit(@js($detailData))"
+                                                    class="master-data-tooltip inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
+                                                    data-tooltip="Edit data"
+                                                    title="Edit data"
+                                                    aria-label="Edit data PID">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                    <path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                                                </svg>
+                                            </button>
                                             <form action="{{ route('admin.import.pid.delete', $project->id_project) }}" method="POST"
                                                   onsubmit="return confirm('Yakin hapus project Regular ini?')">
                                                 @csrf
                                                 @method('DELETE')
-                                                <button class="px-3 py-2 rounded-xl bg-red-50 text-red-700 text-xs font-black hover:bg-red-100">Delete</button>
+                                                <button type="submit"
+                                                        class="master-data-tooltip inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+                                                        data-tooltip="Hapus data"
+                                                        title="Hapus data"
+                                                        aria-label="Hapus data PID">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/>
+                                                    </svg>
+                                                </button>
                                             </form>
                                         </div>
                                     @else
-                                        <button type="button" @click="openLops = !openLops"
-                                                class="px-3 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-black hover:bg-slate-200">
-                                            Lihat LOP
+                                        <button type="button"
+                                                @click="openLops = !openLops"
+                                                class="master-data-tooltip inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                                                :data-tooltip="openLops ? 'Tutup daftar LOP' : 'Lihat daftar LOP'"
+                                                :title="openLops ? 'Tutup daftar LOP' : 'Lihat daftar LOP'"
+                                                :aria-label="openLops ? 'Tutup daftar LOP' : 'Lihat daftar LOP'">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                <path d="M3 7h18"/><path d="M3 12h18"/><path d="M3 17h18"/><path d="m18 9 3 3-3 3"/>
+                                            </svg>
                                         </button>
                                     @endif
                                 </td>
@@ -315,7 +377,7 @@
                                                 </div>
                                             </div>
 
-                                            <div class="overflow-x-auto rounded-2xl border border-emerald-100 bg-white">
+                                            <div class="overflow-x-auto rounded-lg border border-emerald-100 bg-white">
                                                 <table class="w-full text-xs">
                                                     <thead class="bg-emerald-50">
                                                         <tr>
@@ -339,17 +401,17 @@
                                                                 </td>
                                                                 <td class="px-4 py-3">{{ $lop->batch ?? '-' }}</td>
                                                                 <td class="px-4 py-3 text-center">
-                                                                    <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-bold">
+                                                                    <span class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-bold">
                                                                         {{ strtoupper($lop->status_progress ?? 'preparation') }}
                                                                     </span>
                                                                 </td>
                                                                 <td class="px-4 py-3 text-center">
                                                                     @if((int) $lop->assignment_count > 0)
-                                                                        <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-black">
+                                                                        <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-black">
                                                                             {{ $lop->assignment_count }} assignment
                                                                         </span>
                                                                     @else
-                                                                        <span class="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 font-black">Belum Assign</span>
+                                                                        <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-black">Belum Assign</span>
                                                                     @endif
                                                                 </td>
                                                                 <td class="px-4 py-3 text-center font-black text-indigo-700">{{ number_format($lop->boq_count) }} item</td>
@@ -384,7 +446,7 @@
 
         {{-- MATRIX REGULAR ONLY --}}
         @if($dataType === 'regular')
-            <div x-data="{ openMatrix: false }" class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div x-data="{ openMatrix: false }" class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 <button type="button" @click="openMatrix = !openMatrix"
                         class="w-full px-6 py-5 flex justify-between items-center bg-slate-50/50 hover:bg-slate-100/50">
                     <div class="text-left">

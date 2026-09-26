@@ -139,7 +139,7 @@
             <table class="w-full min-w-[1180px] border-collapse text-left">
                 <thead>
                     <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:border-slate-800 dark:bg-slate-950/60">
-                        <th class="px-4 py-3">LOP / Project</th><th class="px-4 py-3">Lokasi</th><th class="px-4 py-3">Tahap Menunggu</th><th class="px-4 py-3 text-center">Eviden</th><th class="px-4 py-3">Umur Antrean</th><th class="px-4 py-3">Uploader</th><th class="px-4 py-3">Admin Pengawal</th><th class="px-4 py-3 text-right">Aksi</th>
+                        <th class="px-4 py-3">LOP / Project</th><th class="px-4 py-3">Lokasi</th><th class="px-4 py-3">Tahap Menunggu</th><th class="px-4 py-3 text-center">Eviden</th><th class="px-4 py-3">Umur Antrean</th><th class="px-4 py-3">Uploader</th><th class="px-4 py-3">Admin Approval</th><th class="px-4 py-3 text-right">Aksi</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">

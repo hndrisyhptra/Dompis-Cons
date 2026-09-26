@@ -1,6 +1,36 @@
 @extends('layouts.admin')
 
 @section('content')
+<style>
+    .master-data-tooltip { position: relative; }
+    .master-data-tooltip::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 8px);
+        transform: translateX(-50%) translateY(4px);
+        z-index: 70;
+        padding: 6px 9px;
+        border-radius: 0.5rem;
+        background: #0f172a;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+        white-space: nowrap;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: opacity 150ms ease, transform 150ms ease;
+    }
+    .master-data-tooltip:hover::after,
+    .master-data-tooltip:focus-visible::after {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+    }
+    .dark .master-data-tooltip::after { background: #f8fafc; color: #0f172a; }
+</style>
 
 <div
     x-data="boqDetailModal()"
@@ -9,7 +39,7 @@
     <div class="max-w-7xl mx-auto space-y-6">
 
         {{-- HEADER --}}
-        <div class="rounded-[2rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+        <div class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
                 <div>
                     <p class="text-xs font-black text-blue-700 uppercase tracking-widest">BOQ Monitoring</p>
@@ -20,7 +50,7 @@
                 </div>
 
                 <a href="{{ route('admin.import.boq') }}"
-                   class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20">
+                   class="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-lg bg-blue-700 text-white text-sm font-black hover:bg-blue-800 shadow-lg shadow-blue-700/20">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 13v8"/>
                         <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/>
@@ -32,25 +62,25 @@
 
             {{-- SUMMARY --}}
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-6">
-                <div class="rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+                <div class="rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
                     <p class="text-xs text-slate-500 font-bold uppercase">LOP Dengan BOQ</p>
                     <p class="text-3xl font-black text-slate-900 dark:text-white mt-2">{{ number_format($totalLopBoq ?? 0) }}</p>
                     <p class="text-xs text-slate-500 mt-1">LOP memiliki item BOQ</p>
                 </div>
 
-                <div class="rounded-3xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900 p-5 shadow-sm">
+                <div class="rounded-lg bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-900 p-5 shadow-sm">
                     <p class="text-xs text-indigo-700 font-bold uppercase">Total Nilai BOQ</p>
                     <p class="text-xl md:text-2xl font-black text-indigo-700 mt-2">Rp {{ number_format($totalBoqValue ?? 0, 0, ',', '.') }}</p>
                     <p class="text-xs text-slate-500 mt-1">Total jasa + material</p>
                 </div>
 
-                <div class="rounded-3xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900 p-5 shadow-sm">
+                <div class="rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900 p-5 shadow-sm">
                     <p class="text-xs text-amber-700 font-bold uppercase">Total Jasa</p>
                     <p class="text-xl md:text-2xl font-black text-amber-700 mt-2">Rp {{ number_format($totalJasaValue ?? 0, 0, ',', '.') }}</p>
                     <p class="text-xs text-slate-500 mt-1">Designator type jasa</p>
                 </div>
 
-                <div class="rounded-3xl bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900 p-5 shadow-sm">
+                <div class="rounded-lg bg-white dark:bg-slate-900 border border-emerald-200 dark:border-emerald-900 p-5 shadow-sm">
                     <p class="text-xs text-emerald-700 font-bold uppercase">Total Material</p>
                     <p class="text-xl md:text-2xl font-black text-emerald-700 mt-2">Rp {{ number_format($totalMaterialValue ?? 0, 0, ',', '.') }}</p>
                     <p class="text-xs text-slate-500 mt-1">Designator type material</p>
@@ -59,7 +89,7 @@
         </div>
 
         {{-- FILTER --}}
-        <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+        <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
             <form method="GET" action="{{ route('admin.data-boq') }}" id="boqFilterForm">
                 <div class="mb-5">
                     <label class="block text-xs font-black text-slate-500 uppercase mb-2">Search</label>
@@ -67,14 +97,14 @@
                            name="search"
                            value="{{ $search ?? '' }}"
                            placeholder="Cari PID SAP, Nama LOP, ID IHLD, STO, Branch, Mitra..."
-                           class="w-full h-12 rounded-2xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm px-4">
+                           class="w-full h-12 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm px-4">
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Region</label>
                         <select name="region" id="regionSelect" onchange="updateBranchDropdown(); this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Region</option>
                             @foreach($regions ?? [] as $region => $branches)
                                 <option value="{{ $region }}" @selected(request('region') === $region)>{{ $region }}</option>
@@ -85,7 +115,7 @@
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Branch</label>
                         <select name="branch" id="branchSelect" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Branch</option>
                         </select>
                     </div>
@@ -93,7 +123,7 @@
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Program</label>
                         <select name="program" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Program</option>
                             @foreach($programs ?? [] as $program)
                                 <option value="{{ $program }}" @selected(request('program') === $program)>{{ $program }}</option>
@@ -104,7 +134,7 @@
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Status Progress</label>
                         <select name="status_progress" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Status</option>
                             @foreach($statusOptions as $value => $label)
                                 <option value="{{ $value }}" @selected(request('status_progress') === $value)>{{ $label }}</option>
@@ -115,7 +145,7 @@
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Package</label>
                         <select name="package" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             <option value="">Semua Package</option>
                             @foreach($packages ?? [] as $pkg)
                                 <option value="{{ $pkg->id_package }}"
@@ -129,7 +159,7 @@
                     <div>
                         <label class="block text-xs font-black text-slate-500 uppercase mb-2">Per Page</label>
                         <select name="per_page" onchange="this.form.submit()"
-                                class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
                             @foreach([10,20,50] as $size)
                                 <option value="{{ $size }}" @selected((int) request('per_page', 10) === $size)>{{ $size }} data</option>
                             @endforeach
@@ -140,12 +170,12 @@
                 <div class="mt-5 flex flex-col sm:flex-row sm:justify-end gap-3">
                     @if(request('search') || request('region') || request('branch') || request('program') || request('status_progress') || request('package'))
                         <a href="{{ route('admin.data-boq') }}"
-                           class="h-11 px-5 rounded-xl bg-slate-100 text-slate-700 text-sm font-bold inline-flex items-center justify-center">
+                           class="h-11 px-5 rounded-lg bg-slate-100 text-slate-700 text-sm font-bold inline-flex items-center justify-center">
                             Reset
                         </a>
                     @endif
                     <a href="{{ route('admin.data-boq.export', request()->query()) }}"
-                       class="h-11 px-5 rounded-xl bg-emerald-600 text-white text-sm font-black hover:bg-emerald-700 inline-flex items-center justify-center gap-2">
+                       class="h-11 px-5 rounded-lg bg-emerald-600 text-white text-sm font-black hover:bg-emerald-700 inline-flex items-center justify-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
@@ -153,20 +183,20 @@
                         </svg>
                         Download Excel
                     </a>
-                    <button type="submit" class="h-11 px-7 rounded-xl bg-blue-600 text-white text-sm font-black hover:bg-blue-700">Cari</button>
+                    <button type="submit" class="h-11 px-7 rounded-lg bg-blue-600 text-white text-sm font-black hover:bg-blue-700">Cari</button>
                 </div>
             </form>
         </div>
 
         {{-- TABLE --}}
-        <div class="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+        <div class="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
             <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
                 <div>
                     <h2 class="text-sm font-black text-slate-900 dark:text-white">List BOQ per LOP</h2>
                     <p class="text-xs text-slate-500 mt-1">Nilai dihitung ulang dari harga package terbaru × quantity plan.</p>
                 </div>
 
-                <span class="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-black">
+                <span class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-black">
                     {{ number_format($lops->total()) }} data
                 </span>
             </div>
@@ -251,13 +281,13 @@
                                 </td>
 
                                 <td class="px-5 py-4 text-center whitespace-nowrap">
-                                    <span class="px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-xs font-black">
+                                    <span class="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-black">
                                         {{ $lop->id_ihld ?? '-' }}
                                     </span>
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap">
-                                    <span class="px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-black">
+                                    <span class="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-black">
                                         {{ $lop->package_name ?? '-' }}
                                     </span>
                                 </td>
@@ -275,8 +305,14 @@
                                 <td class="px-5 py-4 text-center whitespace-nowrap">
                                     <button type="button"
                                             @click="open(@js($modalPayload))"
-                                            class="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-black hover:bg-blue-100">
-                                        Detail
+                                            class="master-data-tooltip inline-flex h-9 w-9 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300"
+                                            data-tooltip="Lihat detail BOQ"
+                                            title="Lihat detail BOQ"
+                                            aria-label="Lihat detail BOQ">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                            <path d="M2.06 12.35a1 1 0 0 1 0-.7C3.56 7.6 7.44 5 12 5c4.56 0 8.44 2.6 9.94 6.65a1 1 0 0 1 0 .7C20.44 16.4 16.56 19 12 19c-4.56 0-8.44-2.6-9.94-6.65Z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
                                     </button>
                                 </td>
                             </tr>
@@ -308,14 +344,14 @@
          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
 
         <div @click.outside="close()"
-             class="bg-white dark:bg-slate-900 w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl">
+             class="bg-white dark:bg-slate-900 w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 shadow-2xl">
 
-            <div class="bg-gradient-to-br from-blue-700 to-indigo-700 px-6 py-5 text-white">
+            <div class="border-b border-slate-200 bg-white px-6 py-5 text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white">
                 <div class="flex items-start justify-between gap-4">
                     <div class="min-w-0">
-                        <p class="text-xs font-bold opacity-80">Detail BOQ</p>
+                        <p class="text-xs font-bold text-slate-500 dark:text-slate-400">Detail BOQ</p>
                         <h2 class="text-lg md:text-xl font-black leading-snug break-words" x-text="selected.lopName"></h2>
-                        <p class="text-xs mt-1 opacity-90">
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                             <span x-text="selected.idIhld"></span> ·
                             <span x-text="selected.pidSap"></span> ·
                             <span x-text="selected.packageName"></span>
@@ -324,7 +360,8 @@
 
                     <button type="button"
                             @click="close()"
-                            class="w-10 h-10 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-xl shrink-0">
+                            class="h-10 w-10 shrink-0 rounded-lg border border-slate-200 bg-white text-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+                            aria-label="Tutup modal detail BOQ">
                         ×
                     </button>
                 </div>
@@ -333,30 +370,30 @@
             <div class="p-5 overflow-y-auto max-h-[72vh] space-y-5">
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800">
+                    <div class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                         <p class="text-xs text-slate-500 font-bold">Total Item</p>
                         <p class="text-2xl font-black text-slate-900 dark:text-white mt-1" x-text="selected.totalItem"></p>
                     </div>
 
-                    <div class="rounded-3xl bg-amber-50 p-4 border border-amber-100">
-                        <p class="text-xs text-amber-700 font-bold">Total Jasa</p>
-                        <p class="text-lg font-black text-amber-700 mt-1" x-text="formatRupiah(selected.totalJasa)"></p>
-                        <p class="text-[11px] text-amber-700/70 mt-1"><span x-text="selected.jasaCount"></span> item jasa</p>
+                    <div class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                        <p class="text-xs font-bold text-slate-500 dark:text-slate-400">Total Jasa</p>
+                        <p class="mt-1 text-lg font-black text-slate-900 dark:text-white" x-text="formatRupiah(selected.totalJasa)"></p>
+                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400"><span x-text="selected.jasaCount"></span> item jasa</p>
                     </div>
 
-                    <div class="rounded-3xl bg-emerald-50 p-4 border border-emerald-100">
-                        <p class="text-xs text-emerald-700 font-bold">Total Material</p>
-                        <p class="text-lg font-black text-emerald-700 mt-1" x-text="formatRupiah(selected.totalMaterial)"></p>
-                        <p class="text-[11px] text-emerald-700/70 mt-1"><span x-text="selected.materialCount"></span> item material</p>
+                    <div class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                        <p class="text-xs font-bold text-slate-500 dark:text-slate-400">Total Material</p>
+                        <p class="mt-1 text-lg font-black text-slate-900 dark:text-white" x-text="formatRupiah(selected.totalMaterial)"></p>
+                        <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400"><span x-text="selected.materialCount"></span> item material</p>
                     </div>
 
-                    <div class="rounded-3xl bg-blue-50 p-4 border border-blue-100">
-                        <p class="text-xs text-blue-700 font-bold">Total BOQ</p>
-                        <p class="text-lg font-black text-blue-700 mt-1" x-text="formatRupiah(selected.totalPlan)"></p>
+                    <div class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                        <p class="text-xs font-bold text-slate-500 dark:text-slate-400">Total BOQ</p>
+                        <p class="mt-1 text-lg font-black text-slate-900 dark:text-white" x-text="formatRupiah(selected.totalPlan)"></p>
                     </div>
                 </div>
 
-                <div class="rounded-3xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-4">
+                <div class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
                         <div>
                             <p class="text-xs text-slate-500 font-bold">ID IHLD</p>
@@ -381,7 +418,7 @@
                     </div>
                 </div>
 
-                <div class="rounded-[1.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div class="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
                     <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800">
                         <h3 class="text-sm font-black text-slate-900 dark:text-white">Detail Designator</h3>
                         <p class="text-xs text-slate-500 mt-1">Harga unit menggunakan designator package price terbaru.</p>
@@ -408,7 +445,7 @@
                                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/70">
                                         <td class="px-4 py-3 font-black text-slate-900 dark:text-white whitespace-nowrap" x-text="item.designator"></td>
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            <span class="px-2.5 py-1 rounded-full text-[11px] font-black"
+                                            <span class="px-2.5 py-1 rounded-lg text-[11px] font-black"
                                                   :class="String(item.type).toLowerCase() === 'material'
                                                       ? 'bg-emerald-50 text-emerald-700'
                                                       : 'bg-amber-50 text-amber-700'"
@@ -419,7 +456,7 @@
                                         <td class="px-4 py-3 text-right font-bold text-slate-900 dark:text-white" x-text="formatNumber(item.quantity_plan)"></td>
                                         <td class="px-4 py-3 text-right font-bold text-slate-900 dark:text-white" x-text="formatNumber(item.quantity_actual)"></td>
                                         <td class="px-4 py-3 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap" x-text="formatRupiah(item.unit_price)"></td>
-                                        <td class="px-4 py-3 text-right font-black text-blue-700 whitespace-nowrap" x-text="formatRupiah(item.total_price)"></td>
+                                        <td class="px-4 py-3 text-right font-black text-slate-900 dark:text-white whitespace-nowrap" x-text="formatRupiah(item.total_price)"></td>
                                         <td class="px-4 py-3 text-center whitespace-nowrap">
                                             <form method="POST" :action="boqDeleteUrl(item.id_boq)">
                                                 @csrf
@@ -427,8 +464,13 @@
                                                 <input type="hidden" name="reopen_lop" :value="selected.lopId">
                                                 <button type="submit"
                                                         @click="if (!confirm('Yakin hapus item designator \'' + item.designator + '\' dari LOP ini?')) $event.preventDefault()"
-                                                        class="px-3 py-1.5 rounded-xl bg-red-50 text-red-700 text-[11px] font-black hover:bg-red-100">
-                                                    Hapus
+                                                        class="master-data-tooltip inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-700 transition hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+                                                        data-tooltip="Hapus designator"
+                                                        title="Hapus designator"
+                                                        :aria-label="'Hapus designator ' + item.designator">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5"/><path d="M14 11v5"/>
+                                                    </svg>
                                                 </button>
                                             </form>
                                         </td>
@@ -445,7 +487,7 @@
                             <tfoot class="bg-slate-50 dark:bg-slate-800/70">
                                 <tr>
                                     <td colspan="7" class="px-4 py-3 text-right text-xs font-black text-slate-500 uppercase">Total BOQ</td>
-                                    <td class="px-4 py-3 text-right font-black text-blue-700 whitespace-nowrap" x-text="formatRupiah(selected.totalPlan)"></td>
+                                    <td class="px-4 py-3 text-right font-black text-slate-900 dark:text-white whitespace-nowrap" x-text="formatRupiah(selected.totalPlan)"></td>
                                     <td></td>
                                 </tr>
                             </tfoot>
@@ -454,9 +496,9 @@
                 </div>
 
                 {{-- TAMBAH ITEM DESIGNATOR --}}
-                <div class="rounded-[1.5rem] border border-emerald-200 dark:border-emerald-900 overflow-hidden">
-                    <div class="px-5 py-4 border-b border-emerald-100 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20">
-                        <h3 class="text-sm font-black text-emerald-700">Tambah Item Designator</h3>
+                <div class="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                    <div class="border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900">
+                        <h3 class="text-sm font-black text-slate-900 dark:text-white">Tambah Item Designator</h3>
                         <p class="text-xs text-slate-500 mt-1">Pilih designator dari katalog, quantity actual dimulai dari 0.</p>
                     </div>
 
@@ -475,7 +517,7 @@
                                            @input="designatorId = ''"
                                            autocomplete="off"
                                            placeholder="Cari designator / item pekerjaan..."
-                                           class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                           class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm">
 
                                     <input type="hidden" name="designator_id[]" :value="designatorId" required>
 
@@ -484,11 +526,11 @@
                                          bisa di-scroll normal seperti bagian lain di dalam modal. --}}
                                     <div x-show="designatorSearchOpen"
                                          style="display: none;"
-                                         class="mt-1 w-full max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl shadow-lg">
+                                         class="mt-1 w-full max-h-56 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg shadow-lg">
                                         <template x-for="d in filteredDesignators()" :key="d.id">
                                             <button type="button"
                                                     @click="designatorId = d.id; designatorSearch = d.label; designatorSearchOpen = false"
-                                                    class="w-full text-left px-3 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 border-b border-slate-50 dark:border-slate-800 last:border-0"
+                                                    class="w-full border-b border-slate-50 px-3 py-2.5 text-left text-xs font-medium text-slate-700 last:border-0 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800"
                                                     x-text="d.label">
                                             </button>
                                         </template>
@@ -502,12 +544,12 @@
                             <div class="sm:col-span-3">
                                 <label class="block text-xs font-black text-slate-500 uppercase mb-2">Qty Plan</label>
                                 <input type="number" step="0.01" min="0" name="boq_qty[]" required
-                                       class="w-full h-11 px-3 rounded-xl border-slate-300 dark:border-slate-700 dark:bg-slate-950 text-sm">
+                                       class="w-full h-11 px-3 rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:text-white text-sm">
                             </div>
 
                             <div class="sm:col-span-2">
                                 <button type="submit"
-                                        class="w-full h-11 rounded-xl bg-emerald-600 text-white text-sm font-black hover:bg-emerald-700">
+                                        class="h-11 w-full rounded-lg bg-slate-900 text-sm font-black text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
                                     + Tambah
                                 </button>
                             </div>
@@ -518,7 +560,7 @@
                 <div class="flex justify-end">
                     <button type="button"
                             @click="close()"
-                            class="h-11 px-5 rounded-2xl bg-slate-900 text-white text-sm font-black hover:bg-slate-800">
+                            class="h-11 rounded-lg bg-slate-900 px-5 text-sm font-black text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
                         Tutup
                     </button>
                 </div>

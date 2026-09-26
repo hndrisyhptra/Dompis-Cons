@@ -3238,3 +3238,20 @@ Mengganti accordion Branch/Step/Sub-step dengan tabel matrix yang lebih cepat di
 - Tidak ada migration, perubahan tabel, ataupun mutasi data. Perbaikan hanya menambahkan handler pembacaan data dan optimasi relasi.
 - Test regresi memastikan halaman dapat diakses, hanya menampilkan assignment milik Admin yang login, menyembunyikan LOP Golive, dan menjaga fungsi pencarian. Seluruh `ApprovalCenterTest` sukses: 7 test dengan 54 assertion.
 - Pemeriksaan read-only terhadap database lokal aktual berhasil merender empty state untuk Admin tanpa assignment dan merender daftar berisi data untuk assigner aktif. Pada data aktual ditemukan 41 LOP aktif; 20 baris halaman pertama menghasilkan HTML lengkap sekitar 196 KB dalam kurang lebih 98 ms tanpa exception.
+
+## Section CC — Standardisasi UI Data PID dan Data BOQ (26 September 2026)
+
+### Perubahan UI
+- Tombol pada kolom Aksi Data PID diubah menjadi ikon untuk Detail, Edit, Hapus, serta buka/tutup daftar child LOP PT 2. Setiap ikon mempunyai tooltip hover/focus, fallback `title`, dan `aria-label`.
+- Tombol pada kolom Aksi Data BOQ diubah menjadi ikon Detail. Aksi Hapus designator di dalam modal juga memakai ikon dan tooltip yang sama.
+- Seluruh radius komponen pada Data PID, Data BOQ, modal Detail/Edit PID, dan modal Detail BOQ diseragamkan menjadi `rounded-lg`; variasi `rounded-full`, `rounded-xl`, `rounded-2xl`, `rounded-3xl`, dan arbitrary radius dihapus dari ketiga view tersebut.
+- Modal PID dan BOQ diubah menjadi clean white tanpa gradient. Header, footer, kartu ringkasan, input, dan tombol tutup memiliki pasangan warna dark mode berbasis slate agar tetap terbaca.
+
+### Sidebar dan akses
+- Menu **Master Designator** pada sidebar Admin desktop dan mobile tidak lagi dirender untuk role `admin`.
+- Menu tersebut tetap tersedia untuk `superadmin`. Perubahan hanya pada visibilitas navigasi dan tidak mengubah route maupun kewenangan backend yang sudah ada.
+
+### Database dan verifikasi
+- Tidak ada migration, perubahan struktur database, atau mutasi data.
+- Data PID PT 2 dan Data BOQ berhasil dirender memakai akun Admin dan database lokal aktual; menu Master Designator terkonfirmasi tidak muncul pada HTML Admin.
+- Blade cache berhasil dikompilasi, `git diff --check` sukses, dan test UI khusus lulus 2 test dengan 15 assertion.

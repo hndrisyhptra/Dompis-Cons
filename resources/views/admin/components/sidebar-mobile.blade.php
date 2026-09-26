@@ -274,7 +274,8 @@
                 || request()->routeIs('admin.import.boq*');
         @endphp
 
-       {{-- MASTER DESIGNATOR --}}
+       {{-- MASTER DESIGNATOR: disembunyikan dari Admin, tetap tersedia untuk Superadmin. --}}
+        @if(auth()->user()->role === 'superadmin')
         <div x-data="{ open: {{ $masterDesignatorOpen ? 'true' : 'false' }} }">
 
             <button type="button"
@@ -346,6 +347,7 @@
 
             </div>
         </div>
+        @endif
 
         {{-- MASTER ALUR & KATEGORI (Stage 3 refactor): khusus superadmin,
              dikonfirmasi pemilik project 2026-09-08 -- admin biasa TIDAK
