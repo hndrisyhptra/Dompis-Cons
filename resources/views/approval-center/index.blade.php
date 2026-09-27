@@ -1,10 +1,10 @@
 @extends($layout)
 
-@section('title', 'Pusat Approval')
+@section('title', 'Main Monitoring')
 
 @section('content')
 @php
-    $isMobileLayout = in_array($layout, ['layouts.waspang', 'layouts.teknisi', 'layouts.surveyor'], true);
+    $isMobileLayout = false;
     $agingLabels = [
         'fresh' => '< 24 jam',
         'warning' => '24–48 jam',
@@ -18,32 +18,46 @@
             <div>
                 <div class="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">
                     <span class="h-2 w-2 rounded-full bg-slate-700 dark:bg-slate-300"></span>
-                    Monitoring Approval
+                    Operational Control
                 </div>
-                <h1 class="text-2xl font-bold tracking-tight text-slate-950 dark:text-white">Pusat Approval</h1>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-950 dark:text-white">Main Monitoring</h1>
                 <p class="mt-1 max-w-2xl text-xs leading-5 text-slate-500 sm:text-sm">
-                    Daftar terpusat LOP PT2 dan PT3 yang mempunyai eviden menunggu persetujuan Admin.
+                    Pantau antrean approval, umur proses, assignment pelaksana, dan bottleneck operasional PT2 maupun PT3.
                 </p>
             </div>
 
             <div class="flex flex-wrap gap-2">
-                @if($isAdmin)
-                    <a href="{{ route('approval-center.index', array_merge(request()->except(['scope', 'page']), ['scope' => 'mine'])) }}"
-                       class="inline-flex h-10 items-center justify-center rounded-lg border px-4 text-xs font-bold transition
-                       {{ $scope === 'mine' ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300' }}">
-                        Inbox Saya
-                    </a>
-                    <a href="{{ route('approval-center.index', array_merge(request()->except(['scope', 'page']), ['scope' => 'all'])) }}"
-                       class="inline-flex h-10 items-center justify-center rounded-lg border px-4 text-xs font-bold transition
-                       {{ $scope === 'all' ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300' }}">
-                        Semua Antrean
-                    </a>
-                @else
-                    <span class="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-slate-50 px-4 text-xs font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">Mode Monitoring</span>
-                @endif
+                <a href="{{ route('approval-center.index', ['tab' => 'approval']) }}"
+                   class="inline-flex h-10 items-center justify-center rounded-lg border px-4 text-xs font-bold transition
+                   {{ $tab === 'approval' ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300' }}">
+                    Monitoring Approval
+                </a>
+                <a href="{{ route('approval-center.index', ['tab' => 'operational']) }}"
+                   class="inline-flex h-10 items-center justify-center rounded-lg border px-4 text-xs font-bold transition
+                   {{ $tab === 'operational' ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300' }}">
+                    Monitoring Operational
+                </a>
             </div>
         </div>
     </section>
+
+    @if($tab === 'approval')
+        <section class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="text-sm font-bold text-slate-900 dark:text-white">Monitoring Approval</h2>
+                <p class="mt-1 text-xs text-slate-500">Daftar eviden yang masih membutuhkan keputusan Admin.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                @if($isAdmin)
+                    <a href="{{ route('approval-center.index', ['tab' => 'approval', 'scope' => 'mine']) }}"
+                       class="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-bold transition {{ $scope === 'mine' ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300' }}">Inbox Saya</a>
+                    <a href="{{ route('approval-center.index', ['tab' => 'approval', 'scope' => 'all']) }}"
+                       class="inline-flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-bold transition {{ $scope === 'all' ? 'border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-900' : 'border-slate-200 text-slate-600 dark:border-slate-700 dark:text-slate-300' }}">Semua Antrean</a>
+                @else
+                    <span class="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">Mode Monitoring</span>
+                @endif
+            </div>
+        </section>
 
     <section class="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <article class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -180,15 +194,8 @@
 
         @if($items->hasPages())<div class="border-t border-slate-200 px-4 py-3 dark:border-slate-800">{{ $items->links() }}</div>@endif
     </section>
+    @else
+        @include('approval-center.partials.operational')
+    @endif
 </div>
-
-@if($layout === 'layouts.waspang')
-    @include('waspang.partials.bottom-nav', ['active' => 'approval'])
-@elseif($layout === 'layouts.teknisi')
-    @include('teknisi.partials.bottom-nav', ['active' => 'approval'])
-@elseif($layout === 'layouts.surveyor')
-    @section('bottom-nav')
-        @include('surveyor.partials.bottom-nav', ['active' => 'approval'])
-    @endsection
-@endif
 @endsection

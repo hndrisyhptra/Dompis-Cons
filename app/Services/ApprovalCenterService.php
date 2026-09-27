@@ -14,7 +14,7 @@ class ApprovalCenterService
     private array $queueCache = [];
 
     /**
-     * Antrean hidup untuk Pusat Approval. Satu kartu mewakili satu LOP
+     * Antrean hidup untuk Monitoring Approval. Satu baris mewakili satu LOP
      * (fallback project untuk eviden lama yang belum mempunyai relasi LOP).
      */
     public function queue(?int $assignedAdminId = null): Collection

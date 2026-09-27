@@ -28,13 +28,15 @@ class ApprovalCenterTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_all_authenticated_roles_can_open_read_only_monitoring(): void
+    public function test_management_roles_can_open_main_monitoring(): void
     {
         $response = $this->actingAs(User::findOrFail(3))
             ->get(route('approval-center.index'));
 
         $response->assertOk()
-            ->assertSee('Pusat Approval')
+            ->assertSee('Main Monitoring')
+            ->assertSee('Monitoring Approval')
+            ->assertSee('Monitoring Operational')
             ->assertSee('LOP ADMIN A')
             ->assertSee('LOP ADMIN B')
             ->assertSee('LOP PT2 ADMIN A')
@@ -42,26 +44,87 @@ class ApprovalCenterTest extends TestCase
             ->assertDontSee('Inbox Saya');
     }
 
-    public function test_monitoring_page_renders_with_every_role_layout(): void
+    public function test_main_monitoring_is_limited_to_requested_roles(): void
     {
-        foreach ([1, 3, 5, 6, 7, 8, 9, 10, 11, 12] as $userId) {
+        foreach ([1, 3, 5, 6, 7, 8] as $userId) {
             $this->actingAs(User::findOrFail($userId))
                 ->get(route('approval-center.index', ['scope' => 'all']))
                 ->assertOk()
-                ->assertSee('Pusat Approval');
+                ->assertSee('Main Monitoring');
         }
+
+        foreach ([9, 10, 11, 12] as $userId) {
+            $this->actingAs(User::findOrFail($userId))
+                ->get(route('approval-center.index'))
+                ->assertForbidden();
+        }
+    }
+
+    public function test_operational_monitoring_summarizes_aging_assignment_and_approval(): void
+    {
+        DB::table('projects')->insert([
+            ['id_project' => 40, 'pid' => 'PID-FINAL', 'project_name' => 'Project Final Pending', 'program' => 'OSP', 'created_at' => now(), 'updated_at' => now()],
+            ['id_project' => 50, 'pid' => 'PID-ORPHAN', 'project_name' => 'Project Pending Tanpa Admin', 'program' => 'OSP', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        DB::table('lops')->insert([
+            ['id_lop' => 400, 'project_id' => 40, 'lop_name' => 'LOP FINAL PENDING', 'branch' => 'KUPANG', 'sto' => 'KPN', 'status_progress' => 'golive', 'sdi_approval_status' => 'approved', 'is_golive' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['id_lop' => 500, 'project_id' => 50, 'lop_name' => 'LOP PENDING TANPA ADMIN', 'branch' => 'KUPANG', 'sto' => 'KPN', 'status_progress' => 'golive', 'sdi_approval_status' => 'approved', 'is_golive' => 1, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        DB::table('pro_assign')->insert([
+            'project_id' => 40,
+            'assigned_by' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('evidences')->insert([
+            ['project_id' => 40, 'uploaded_by' => 4, 'stage' => 'fi_ogp_golive', 'evidence_type' => 'capture_valins', 'status' => 'pending', 'created_at' => now()->subHour(), 'updated_at' => now()],
+            ['project_id' => 50, 'uploaded_by' => 4, 'stage' => 'fi_ogp_golive', 'evidence_type' => 'capture_valins', 'status' => 'pending', 'created_at' => now()->subHour(), 'updated_at' => now()],
+        ]);
+        DB::table('lop_stage_histories')->insert([
+            'lop_id' => 100,
+            'stage_code' => 'pengukuran',
+            'entered_at' => now()->subDays(10),
+            'completed_at' => null,
+            'created_at' => now()->subDays(10),
+            'updated_at' => now()->subDays(10),
+        ]);
+
+        $response = $this->actingAs(User::findOrFail(3))
+            ->get(route('approval-center.index', ['tab' => 'operational', 'threshold' => 7]));
+
+        $response->assertOk()
+            ->assertSee('Monitoring Operational')
+            ->assertSee('Summary per Admin')
+            ->assertSee('Summary per Branch')
+            ->assertSee('Detail LOP & Transaksi Penyebab Aging', false)
+            ->assertSee('Detail Approval')
+            ->assertSee('file sor')
+            ->assertSee('LOP ADMIN A')
+            ->assertSee('Admin A')
+            ->assertSee('KUPANG');
+
+        $summary = $response->viewData('summary');
+        $this->assertSame(3, $summary['active_lop_count']);
+        $this->assertSame(1, $summary['bottleneck_count']);
+        $this->assertSame(3, $summary['unassigned_count']);
+        $this->assertSame(5, $summary['pending_count']);
+        $this->assertSame(2, $summary['pending_admin_count']);
+        $this->assertCount(2, $response->viewData('rows')->where('is_active', false));
     }
 
     public function test_approval_center_uses_clean_table_layout_without_gradient(): void
     {
         $page = file_get_contents(resource_path('views/approval-center/index.blade.php'));
         $popup = file_get_contents(resource_path('views/approval-center/partials/login-alert.blade.php'));
+        $operational = file_get_contents(resource_path('views/approval-center/partials/operational.blade.php'));
 
         $this->assertStringContainsString('<table', $page);
+        $this->assertStringContainsString('Summary per Admin', $operational);
+        $this->assertStringContainsString('Summary per Branch', $operational);
         $this->assertStringContainsString('rounded-lg', $page);
-        $this->assertStringNotContainsString('gradient', $page.$popup);
-        $this->assertStringNotContainsString('rounded-2xl', $page.$popup);
-        $this->assertStringNotContainsString('rounded-3xl', $page.$popup);
+        $this->assertStringNotContainsString('gradient', $page.$popup.$operational);
+        $this->assertStringNotContainsString('rounded-2xl', $page.$popup.$operational);
+        $this->assertStringNotContainsString('rounded-3xl', $page.$popup.$operational);
     }
 
     public function test_admin_inbox_is_limited_to_projects_assigned_by_that_admin(): void
@@ -130,7 +193,7 @@ class ApprovalCenterTest extends TestCase
 
     private function createSchema(): void
     {
-        foreach (['mancores_pt2', 'dismantles_pt2', 'surveys_pt2', 'pt2_evidences', 'pt2_assignments', 'pt2_lops', 'pt2_projects', 'evidences', 'boq_items', 'pro_assign', 'lops', 'projects', 'users', 'roles'] as $table) {
+        foreach (['mancores_pt2', 'dismantles_pt2', 'surveys_pt2', 'pt2_evidences', 'pt2_assignments', 'pt2_lops', 'pt2_projects', 'evidences', 'boq_items', 'lop_stage_histories', 'pro_assign', 'lops', 'projects', 'users', 'roles'] as $table) {
             Schema::dropIfExists($table);
         }
 
@@ -144,6 +207,7 @@ class ApprovalCenterTest extends TestCase
             $table->id('id_user');
             $table->string('name');
             $table->string('username')->unique();
+            $table->string('nik')->nullable();
             $table->string('password');
             $table->unsignedBigInteger('role_id')->nullable();
             $table->string('status')->default('active');
@@ -160,6 +224,7 @@ class ApprovalCenterTest extends TestCase
             $table->string('program')->nullable();
             $table->string('branch')->nullable();
             $table->string('sto')->nullable();
+            $table->string('mitra_name')->nullable();
             $table->timestamps();
         });
         Schema::create('lops', function (Blueprint $table): void {
@@ -169,6 +234,21 @@ class ApprovalCenterTest extends TestCase
             $table->string('program_sap')->nullable();
             $table->string('branch')->nullable();
             $table->string('sto')->nullable();
+            $table->string('id_ihld')->nullable();
+            $table->string('mitra_name')->nullable();
+            $table->string('nama_admin')->nullable();
+            $table->string('nik_admin')->nullable();
+            $table->string('status_progress')->nullable()->default('inisiasi');
+            $table->string('sdi_approval_status')->nullable();
+            $table->boolean('is_golive')->default(false);
+            $table->timestamps();
+        });
+        Schema::create('lop_stage_histories', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('lop_id');
+            $table->string('stage_code');
+            $table->timestamp('entered_at');
+            $table->timestamp('completed_at')->nullable();
             $table->timestamps();
         });
         Schema::create('pro_assign', function (Blueprint $table): void {
@@ -201,6 +281,10 @@ class ApprovalCenterTest extends TestCase
             $table->string('pid')->nullable();
             $table->string('pid_sap')->nullable();
             $table->string('project_name');
+            $table->string('program')->nullable();
+            $table->string('branch')->nullable();
+            $table->string('sto')->nullable();
+            $table->string('mitra_name')->nullable();
             $table->timestamps();
         });
         Schema::create('pt2_lops', function (Blueprint $table): void {

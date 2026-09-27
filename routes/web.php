@@ -79,9 +79,10 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])
         ->name('profile.destroy');
 
-    // Pusat monitoring read-only tersedia untuk seluruh role. Hak review
-    // aktual tetap mengikuti route approval PT2/PT3 yang sudah role-gated.
+    // Main Monitoring: approval + operational aging/bottleneck. Akses
+    // dibatasi untuk role monitoring/manajemen yang ditetapkan pemilik.
     Route::get('/approval-center', [ApprovalCenterController::class, 'index'])
+        ->middleware('role:superadmin,admin,tif,officer,super_tif,pm')
         ->name('approval-center.index');
 });
 

@@ -1,7 +1,9 @@
 @php
     $approvalCenterActive = request()->routeIs('approval-center.*');
     $approvalBadge = auth()->user()?->role === 'admin' ? ($adminApprovalInboxCount ?? 0) : 0;
+    $mainMonitoringAllowed = in_array(auth()->user()?->role, ['superadmin', 'admin', 'tif', 'officer', 'super_tif', 'pm'], true);
 @endphp
+@if($mainMonitoringAllowed)
 <a href="{{ route('approval-center.index') }}"
    class="relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition
    {{ $approvalCenterActive ? 'bg-slate-100 text-slate-950 dark:bg-slate-800 dark:text-white' : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800' }}">
@@ -13,8 +15,9 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
         </svg>
     </div>
-    <span class="min-w-0 flex-1">Approval Center</span>
+    <span class="min-w-0 flex-1">Main Monitoring</span>
     @if($approvalBadge > 0)
         <span class="rounded bg-red-600 px-2 py-0.5 text-[10px] font-black text-white dark:bg-red-400 dark:text-white-900">{{ $approvalBadge > 99 ? '99+' : $approvalBadge }}</span>
     @endif
 </a>
+@endif

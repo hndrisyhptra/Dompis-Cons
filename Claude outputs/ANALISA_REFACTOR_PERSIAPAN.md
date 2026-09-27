@@ -3255,3 +3255,38 @@ Mengganti accordion Branch/Step/Sub-step dengan tabel matrix yang lebih cepat di
 - Tidak ada migration, perubahan struktur database, atau mutasi data.
 - Data PID PT 2 dan Data BOQ berhasil dirender memakai akun Admin dan database lokal aktual; menu Master Designator terkonfirmasi tidak muncul pada HTML Admin.
 - Blade cache berhasil dikompilasi, `git diff --check` sukses, dan test UI khusus lulus 2 test dengan 15 assertion.
+
+## Section CD — Main Monitoring: Operational Aging & Bottleneck (26 September 2026)
+
+### Perubahan menu dan akses
+- Menu **Approval Center** diganti menjadi **Main Monitoring**. Di dalam satu halaman tersedia dua tab: **Monitoring Approval** untuk antrean eviden lama dan **Monitoring Operational** untuk aging/bottleneck baru.
+- Route tetap memakai nama `approval-center.index` dan URL `/approval-center` agar link Inbox/popup yang sudah ada tidak rusak.
+- Akses Main Monitoring dibatasi melalui middleware route hanya untuk `superadmin`, `admin`, `tif`, `officer`, `super_tif`, dan `pm`.
+- Shortcut Approval milik Waspang, Teknisi, dan SDI Surveyor dihapus. Include sidebar SDI tetap aman tetapi link Main Monitoring tidak dirender karena role tersebut tidak masuk allow-list.
+- Hak aksi review tidak diperluas: PT3 hanya Admin/Superadmin/Super TIF, sedangkan PT2 hanya Admin/Superadmin/Super TIF/Officer. PM dan TIF tetap monitoring/read-only.
+
+### Definisi operasional dan sumber data
+- LOP aktif adalah LOP PT2/PT3 yang belum `is_golive=1`, belum `sdi_approval_status=approved`, serta `status_progress` bukan `golive` atau `drop`.
+- Kepemilikan Admin PT3 memakai assignment terbaru pada `pro_assign.assigned_by`. Untuk data import yang belum mempunyai assignment, sistem melakukan fallback ke `lops.nik_admin`/`nama_admin`. PT2 memakai assignment terbaru pada `pt2_assignments.assigned_by`.
+- **Belum Assign Pelaksana** berarti LOP sudah mempunyai Admin pengawal tetapi assignment terbaru belum mempunyai Waspang/Teknisi untuk PT3 atau Teknisi untuk PT2. Nama mitra tetap ditampilkan sebagai informasi terpisah.
+- Aging PT3 dihitung sejak `entered_at` pada baris `lop_stage_histories` yang masih terbuka. Jika histori legacy tidak tersedia, fallback memakai timestamp LOP dan tidak membuat tanggal sintetis.
+- PT2 belum mempunyai tabel histori stage. Tanggal masuk tahap disimpulkan secara konservatif dari milestone assignment, survey, evidence, dismantle, dan mancore yang benar-benar tersedia; jika tidak ada milestone, fallback ke timestamp LOP.
+- **Tidak Bergerak** dihitung dari aktivitas terbaru di antara perubahan LOP, assignment, evidence, milestone PT2, dan `project_activity_logs`. Nilai ini dipisahkan dari umur tahap agar PIC dapat membedakan LOP lama yang masih aktif bergerak dengan LOP yang benar-benar idle.
+- Pending approval memakai `ApprovalCenterService` yang sudah ada, sehingga definisi pending, Admin pengawal, review URL, popup login, badge, dan Main Monitoring tetap konsisten.
+
+### Dashboard dan drill-down
+- Ambang bottleneck default adalah 7 hari kalender dan dapat dipilih 1, 3, 7, 14, atau 30 hari tanpa perubahan database.
+- Empat summary utama menampilkan LOP aktif, LOP bottleneck, LOP belum assign pelaksana, dan total transaksi pending approval beserta jumlah Admin yang memilikinya.
+- Tabel **Summary per Admin** dan **Summary per Branch** menampilkan total LOP, bottleneck, belum assign, approval pending, serta umur proses tertua.
+- Seluruh angka summary dapat diklik untuk drill-down langsung ke tabel detail penyebab. Filter tambahan tersedia untuk kata kunci, PT2/PT3, Branch, Admin, tahap, dan jenis kondisi.
+- Detail menampilkan LOP/PID/IHLD/program, Branch/STO, Admin, pelaksana dan mitra, tahap aktif, umur tahap, lama tidak bergerak, jumlah dan tipe eviden pending, update terakhir, serta Timeline. Tombol **Detail Approval** membawa seluruh role ke transaksi agregat terkait, sedangkan tombol Review hanya muncul bagi role yang memang berwenang.
+
+### UI dan database
+- Desain memakai clean white profesional, aksen slate netral, tabel compact, `rounded-lg`, dan pasangan warna dark mode. Tidak ada gradient pada halaman Main Monitoring.
+- Tidak ada migration, tabel baru, perubahan status, atau mutasi data historis. Seluruh fitur bersifat read-only dan mengagregasi struktur hasil refactor yang sudah tersedia.
+- Pemeriksaan read-only awal terhadap database aktif menghasilkan 1.858 baris detail monitoring, 5.274 transaksi pending, 38 kelompok Admin, dan 22 Branch pada ambang 7 hari. Angka LOP aktif dipisahkan dari transaksi pending pada LOP final/orphan agar summary tidak menggelembung; seluruh angka dashboard tetap live dan akan berubah mengikuti data operasional.
+
+### Verifikasi
+- Test mencakup allow-list enam role, penolakan empat role di luar cakupan, render dua tab, summary aging/assignment/pending, drill-down utama, Inbox personal Admin, isolasi Inbox PT2, popup login, dan guard UI clean white.
+- Targeted `ApprovalCenterTest` lulus 8 test dengan 70 assertion, termasuk guard agar pending pada LOP final tidak dihitung sebagai LOP aktif dan pending tanpa owner tidak dihitung sebagai Admin.
+- Route terkonfirmasi memakai middleware `web`, `auth`, dan `role:superadmin,admin,tif,officer,super_tif,pm`; seluruh Blade berhasil dikompilasi dan `git diff --check` sukses.
