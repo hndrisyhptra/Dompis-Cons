@@ -356,13 +356,17 @@ class DashboardController extends Controller
         |--------------------------------------------------------------------------
         | QUERY LOP FILTERED
         |--------------------------------------------------------------------------
-        | Hanya eager-load relasi yang benar-benar dipakai oleh index().
+        | Dashboard hanya membutuhkan keberadaan assignment/BOQ dan posisi stage.
+        | Jangan memuat seluruh evidence + seluruh baris BOQ (puluhan ribu row)
+        | hanya untuk menghitung KPI ringkas. withExists menghasilkan flag boolean
+        | langsung di query project dan stage dipakai untuk progress 11 tahap.
         */
         $query = Lop::query()->with([
-            'project.assignment',
-            'project.evidences',
-            'project.boqItems.designatorData',
-            'project.boqItems.designatorDataByCode',
+            'stage',
+            'project' => fn ($projectQuery) => $projectQuery->withExists([
+                'assignment',
+                'boqItems',
+            ]),
         ]);
 
         if ($isSuperTif) {
@@ -403,24 +407,30 @@ class DashboardController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | KPI + STATS - progressSummary dihitung 1x per project per request
+        | KPI + STATS - progress dihitung langsung dari stage yang sudah dimuat
         |--------------------------------------------------------------------------
         */
-        $progressCache = [];
+        $stagesByCode = ProjectStage::query()->get()->keyBy('code');
+        $getProgress = static function (Lop $lop) use ($stagesByCode): int {
+            $stage = $lop->stage;
 
-        $getProgress = function ($project) use (&$progressCache) {
-            if (!$project) {
-                return 0;
+            if ($stage && ($stage->is_pause_type || $stage->is_terminal) && $lop->status_progress_before_hold) {
+                $stage = $stagesByCode->get($lop->status_progress_before_hold) ?? $stage;
             }
 
-            $projectKey = (string) ($project->getKey() ?? spl_object_id($project));
-
-            if (!array_key_exists($projectKey, $progressCache)) {
-                $summary = $project->progressSummary();
-                $progressCache[$projectKey] = (int) ($summary['progress'] ?? 0);
+            if ($stage?->code === 'drm') {
+                $stage = $stagesByCode->get('perizinan') ?? $stage;
             }
 
-            return $progressCache[$projectKey];
+            if ($stage?->sequence !== null) {
+                return (int) round((($stage->sequence - 1) / 10) * 100);
+            }
+
+            // Data legacy dengan kode stage tidak dikenal tetap memakai engine
+            // lama agar hasil bisnis tidak berubah. Jalur ini seharusnya jarang.
+            $summary = $lop->project?->progressSummary();
+
+            return (int) ($summary['progress'] ?? 0);
         };
 
         $totalLop = $lops->count();
@@ -444,11 +454,11 @@ class DashboardController extends Controller
         foreach ($lops as $lop) {
             $project = $lop->project;
 
-            if ($project?->boqItems?->isNotEmpty()) {
+            if ((bool) ($project?->boq_items_exists ?? false)) {
                 $boqReady++;
             }
 
-            $isAssigned = (bool) $project?->assignment;
+            $isAssigned = (bool) ($project?->assignment_exists ?? false);
             if ($isAssigned) {
                 $assignedLop++;
             }
@@ -457,7 +467,7 @@ class DashboardController extends Controller
                 continue;
             }
 
-            $progress = $getProgress($project);
+            $progress = $getProgress($lop);
             $isGoLive = (int) $lop->is_golive === 1;
             $isCompleted = $isGoLive || $progress === 100;
             $isWaitingRegion = !$isGoLive && $progress > 0 && $progress < 100;
@@ -2642,7 +2652,6 @@ class DashboardController extends Controller
         )
     );
 }
-
     private function regularStatusBucket(?string $statusProgress, bool $isGoLive, ?string $statusBeforeHold = null): string
     {
         $status = strtolower(trim((string) $statusProgress));

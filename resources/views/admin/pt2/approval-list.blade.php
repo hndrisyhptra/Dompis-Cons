@@ -89,8 +89,8 @@
                             $project = $lop->project;
                             $evidences = $lop->evidences ?? collect();
                             $teknisi = optional($lop->assignment)->teknisi;
-                            $survey = $lop->surveys()->first();
-                            $mancore = \App\Models\MancorePt2::where('pt2_lop_id', $lop->id_pt2_lop)->first();
+                            $survey = $lop->surveys->first();
+                            $mancore = $lop->mancores->first();
 
                             // LOGIKA PENGECEKAN PER STEP PT2 (berdasarkan eviden yang SUDAH DI-APPROVE,
                             // bukan sekadar ada/tidaknya eviden, supaya progress approval akurat per step)
@@ -113,7 +113,7 @@
                             // STEP 4 (Dismantle) = OPSIONAL. Statusnya ditampilkan sebagai info,
                             // tapi TIDAK dihitung ke progress wajib supaya LOP tanpa dismantle
                             // tetap bisa mencapai 100% begitu step wajib lainnya selesai.
-                            $hasDismantle = \App\Models\DismantlePt2::where('pt2_lop_id', $lop->id_pt2_lop)->exists();
+                            $hasDismantle = $lop->dismantles->isNotEmpty();
                             $dismantleEv = $evidences->where('stage', 'dismantle');
                             $step4 = ($hasDismantle || $dismantleEv->count() > 0) ? 1 : 0;
 

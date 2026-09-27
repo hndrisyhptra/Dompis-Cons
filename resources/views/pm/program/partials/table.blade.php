@@ -61,7 +61,7 @@
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                 @forelse($projects as $project)
                     @php
-                        $summary = $project->progressSummary();
+                        $summary = $progressSummaries[$project->id_project] ?? $project->progressSummary();
                         $progress = $summary['progress'];
                         $stageLabel = $summary['stageLabel'];
 
@@ -71,10 +71,10 @@
 
                         if ($assignmentData) {
                             if ($assignmentData->waspang_id) {
-                                $assignedUser = $assignmentData->waspang ?? \App\Models\User::find($assignmentData->waspang_id);
+                                $assignedUser = $assignmentData->waspang;
                                 $assignedRoleBadge = 'Waspang';
                             } elseif ($assignmentData->teknisi_id) {
-                                $assignedUser = \App\Models\User::find($assignmentData->teknisi_id);
+                                $assignedUser = $assignmentData->teknisi;
                                 $assignedRoleBadge = 'Teknisi';
                             }
                         }
@@ -121,15 +121,15 @@
                         // -- kalau LOP belum pernah Survey/Re-Survey sama sekali,
                         // $roundNumbers kosong & modal cuma tampilkan Plan vs Actual.
                         $lopIdForBoq = $project->lop?->id_lop;
-                        $surveyRounds = $lopIdForBoq
-                            ? \App\Models\BoqSurveyRound::where('lop_id', $lopIdForBoq)->orderBy('round_number')->get()
+                        $surveyRounds = $isTifRole && $lopIdForBoq
+                            ? ($project->lop?->surveyRounds ?? collect())
                             : collect();
                         $roundNumbers = $surveyRounds->pluck('round_number')->values();
 
                         $roundItemsMap = [];
                         if ($surveyRounds->isNotEmpty()) {
                             $roundIdToNumber = $surveyRounds->pluck('round_number', 'id');
-                            $allRoundItems = \App\Models\BoqSurveyRoundItem::whereIn('boq_survey_round_id', $surveyRounds->pluck('id'))->get();
+                            $allRoundItems = $surveyRounds->flatMap->items;
                             foreach ($allRoundItems as $ri) {
                                 $rn = $roundIdToNumber[$ri->boq_survey_round_id] ?? null;
                                 if ($rn === null || !$ri->boq_item_id) {

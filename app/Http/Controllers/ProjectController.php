@@ -34,12 +34,9 @@ class ProjectController extends Controller
 
         $query = Project::with([
             'boqItems',
-            'assignments.waspang',
             'assignment.waspang',
-            'evidences',
-            'lop',
-            'boqItems.designatorData',
-            'boqItems.designatorDataByCode',
+            'assignment.teknisi',
+            'lops',
         ]);
 
         if ($isSuperTif) {
@@ -78,6 +75,40 @@ class ProjectController extends Controller
             ->onEachSide(1)      // <-- membatasi angka pagination
             ->withQueryString();
 
+        $projects->getCollection()->each(function (Project $project): void {
+            $project->setRelation('lop', $project->lops->first());
+        });
+
+        $stages = ProjectStage::query()->get();
+        $stagesByCode = $stages->keyBy('code');
+        $progressSummaries = $projects->getCollection()->mapWithKeys(function (Project $project) use ($stagesByCode): array {
+            $lop = $project->lop;
+            $stage = $lop ? $stagesByCode->get($lop->status_progress) : null;
+            $effectiveStage = $stage;
+
+            if ($stage && ($stage->is_pause_type || $stage->is_terminal) && $lop?->status_progress_before_hold) {
+                $effectiveStage = $stagesByCode->get($lop->status_progress_before_hold) ?? $stage;
+            }
+            if ($effectiveStage?->code === 'drm') {
+                $effectiveStage = $stagesByCode->get('perizinan') ?? $effectiveStage;
+            }
+            if ($lop && ! $stage) {
+                return [$project->id_project => $project->progressSummary()];
+            }
+
+            $sequence = $effectiveStage?->sequence;
+
+            return [$project->id_project => [
+                'progress' => $sequence !== null ? (int) round((($sequence - 1) / 10) * 100) : 0,
+                'stageLabel' => $effectiveStage?->label ?? 'Persiapan',
+                'effectiveStageLabel' => $effectiveStage?->label ?? 'Persiapan',
+                'effectiveStageColor' => $effectiveStage?->color,
+                'effectiveStageCode' => $effectiveStage?->code,
+                'isHold' => (bool) ($stage?->is_pause_type),
+                'isDrop' => (bool) ($stage?->is_terminal),
+            ]];
+        });
+
         $programsQuery = Project::whereNotNull('program')
             ->where('program', '!=', '');
         if ($isSuperTif) {
@@ -94,11 +125,27 @@ class ProjectController extends Controller
             ->orderBy('branch')
             ->pluck('branch');
 
-        $assignableUsers = User::roleCode(['waspang', 'teknisi'])->get();
+        $assignableUsers = User::roleCode(['waspang', 'teknisi'])
+            ->with('roleRef')->get(['id_user', 'name', 'role_id']);
+        $assignmentCounts = collect();
+        if ($assignableUsers->isNotEmpty()) {
+            $userIds = $assignableUsers->pluck('id_user');
+            $waspangAssignments = DB::table('pro_assign')
+                ->selectRaw('project_id, waspang_id AS user_id')
+                ->whereIn('waspang_id', $userIds);
+            $teknisiAssignments = DB::table('pro_assign')
+                ->selectRaw('project_id, teknisi_id AS user_id')
+                ->whereIn('teknisi_id', $userIds);
+            $assignmentCounts = DB::query()
+                ->fromSub($waspangAssignments->union($teknisiAssignments), 'assigned_projects')
+                ->selectRaw('user_id, COUNT(DISTINCT project_id) AS active_count')
+                ->groupBy('user_id')
+                ->pluck('active_count', 'user_id');
+        }
 
         $designators = Designator::forCustomer(Customer::defaultId())
             ->orderBy('designator')
-            ->get();
+            ->get(['id_designator', 'designator', 'item_name', 'unit']);
 
         $statBaseQuery = Project::query();
         if ($isSuperTif) {
@@ -120,7 +167,9 @@ class ProjectController extends Controller
             'programs',
             'branches',
             'assignableUsers',
+            'assignmentCounts',
             'designators',
+            'progressSummaries',
             'totalProject',
             'activeProject',
             'waitingUt',

@@ -1,3 +1,12 @@
+@once
+    @push('styles')
+        <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
+    @endpush
+    @push('head-scripts')
+        <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+    @endpush
+@endonce
+
 <script>
     // 1. FUNGSI MENU AKSI (TOGGLE MENU)
     function toggleMenu(event, menuId, btnElement) {
@@ -120,17 +129,10 @@
 
     // 5. FUNGSI MODAL ADD & EDIT PROJECT (GPS & DESIGNATOR)
     
-    // MEMBUAT STRING MASTER DESIGNATOR OPTION UNTUK DIGUNAKAN DI JS
-    const masterDesignatorOptions = `
-        @foreach($designators as $designator)
-            <option value="{{ $designator->id_designator }}"
-                    data-designator="{{ $designator->designator }}"
-                    data-item="{{ addslashes($designator->item_name) }}"
-                    data-unit="{{ $designator->unit }}">
-                {{ $designator->designator }} - {{ addslashes($designator->item_name) }}
-            </option>
-        @endforeach
-    `;
+    // Gunakan opsi dari select pertama sebagai template. Sebelumnya 1.100+
+    // designator dirender dua kali ke HTML sehingga payload halaman membengkak.
+    const masterDesignatorOptions = document.querySelector('.boq-designator-select')?.innerHTML
+        ?? '<option value="">Cari designator...</option>';
 
     function getProjectLocation() {
         if (!navigator.geolocation) { alert('Browser tidak mendukung GPS'); return; }

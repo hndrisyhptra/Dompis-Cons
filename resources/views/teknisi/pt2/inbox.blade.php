@@ -49,17 +49,16 @@
     <div class="px-4 mt-4 space-y-4">
         @forelse($assignedLops as $lop)
            @php
-                // MENGGUNAKAN QUERY LANGSUNG AGAR DATA TIDAK TUMPANG TINDIH ANTAR LOP
-                $survey = \App\Models\SurveyPt2::where('pt2_lop_id', $lop->id_pt2_lop)->first();
-                $mancore = \App\Models\MancorePt2::where('pt2_lop_id', $lop->id_pt2_lop)->first();
-                $evidences = \App\Models\Pt2Evidence::where('pt2_lop_id', $lop->id_pt2_lop)->get();
+                $survey = $lop->surveys->first();
+                $mancore = $lop->mancores->first();
+                $evidences = $lop->evidences;
                 $project = $lop->project;
 
                 // DETEKSI PROGRESS MURNI PER LOP
                 $step1Done = $survey ? true : false;
                 $step2Done = $evidences->where('stage', 'instalasi')->count() > 0; 
                 $step3Done = $evidences->where('stage', 'finishing')->where('evidence_type', 'redaman_port')->count() > 0;
-                $step4Done = \App\Models\DismantlePt2::where('pt2_lop_id', $lop->id_pt2_lop)->exists(); 
+                $step4Done = $lop->dismantles->isNotEmpty();
                 $step5Done = $mancore ? true : false;
 
                 // Cek kendala (hanya dianggap kendala jika PM belum approve)

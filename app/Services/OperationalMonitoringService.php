@@ -6,13 +6,15 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class OperationalMonitoringService
 {
     private ?Collection $rowsCache = null;
 
-    public function __construct(private readonly ApprovalCenterService $approvalCenter) {}
+    public function __construct(
+        private readonly ApprovalCenterService $approvalCenter,
+        private readonly DatabaseSchemaInspector $schema,
+    ) {}
 
     /** @return array<string, mixed> */
     public function dashboard(int $thresholdDays = 7): array
@@ -61,7 +63,7 @@ class OperationalMonitoringService
 
     private function regularRows(): Collection
     {
-        if (! Schema::hasTable('lops') || ! Schema::hasTable('projects') || ! Schema::hasTable('pro_assign')) {
+        if (! $this->schema->hasTables(['lops', 'projects', 'pro_assign'])) {
             return collect();
         }
 
@@ -77,13 +79,13 @@ class OperationalMonitoringService
             ->leftJoin('users as waspang_user', 'waspang_user.id_user', '=', 'pa.waspang_id')
             ->leftJoin('users as teknisi_user', 'teknisi_user.id_user', '=', 'pa.teknisi_id');
 
-        if (Schema::hasColumn('lops', 'is_golive')) {
+        if ($this->schema->hasColumn('lops', 'is_golive')) {
             $query->where(fn ($active) => $active->whereNull('l.is_golive')->orWhere('l.is_golive', 0));
         }
-        if (Schema::hasColumn('lops', 'sdi_approval_status')) {
+        if ($this->schema->hasColumn('lops', 'sdi_approval_status')) {
             $query->where(fn ($active) => $active->whereNull('l.sdi_approval_status')->orWhere('l.sdi_approval_status', '!=', 'approved'));
         }
-        if (Schema::hasColumn('lops', 'status_progress')) {
+        if ($this->schema->hasColumn('lops', 'status_progress')) {
             $query->where(fn ($active) => $active->whereNull('l.status_progress')
                 ->orWhereNotIn(DB::raw('LOWER(l.status_progress)'), ['golive', 'drop']));
         }
@@ -100,7 +102,7 @@ class OperationalMonitoringService
         ];
 
         foreach (['id_ihld', 'mitra_name', 'status_progress', 'nama_admin', 'nik_admin'] as $column) {
-            if (Schema::hasColumn('lops', $column)) {
+            if ($this->schema->hasColumn('lops', $column)) {
                 $select[] = 'l.'.$column;
             }
         }
@@ -168,7 +170,7 @@ class OperationalMonitoringService
 
     private function pt2Rows(): Collection
     {
-        if (! Schema::hasTable('pt2_lops') || ! Schema::hasTable('pt2_projects') || ! Schema::hasTable('pt2_assignments')) {
+        if (! $this->schema->hasTables(['pt2_lops', 'pt2_projects', 'pt2_assignments'])) {
             return collect();
         }
 
@@ -391,7 +393,7 @@ class OperationalMonitoringService
 
     private function openStageHistoryMap(Collection $lopIds): Collection
     {
-        if (! Schema::hasTable('lop_stage_histories')) {
+        if (! $this->schema->hasTable('lop_stage_histories')) {
             return collect();
         }
 
@@ -402,7 +404,7 @@ class OperationalMonitoringService
 
     private function latestTimestampMap(string $table, string $key, Collection $ids): Collection
     {
-        if (! Schema::hasTable($table) || $ids->isEmpty()) {
+        if (! $this->schema->hasTable($table) || $ids->isEmpty()) {
             return collect();
         }
 
@@ -413,7 +415,7 @@ class OperationalMonitoringService
 
     private function minMaxTimestampMap(string $table, string $key, Collection $ids): Collection
     {
-        if (! Schema::hasTable($table) || $ids->isEmpty()) {
+        if (! $this->schema->hasTable($table) || $ids->isEmpty()) {
             return collect();
         }
 
@@ -427,7 +429,7 @@ class OperationalMonitoringService
 
     private function activityTimestampMap(string $key, Collection $ids, bool $pt2): Collection
     {
-        if (! Schema::hasTable('project_activity_logs') || $ids->isEmpty()) {
+        if (! $this->schema->hasTable('project_activity_logs') || $ids->isEmpty()) {
             return collect();
         }
 
@@ -440,7 +442,7 @@ class OperationalMonitoringService
 
     private function pt2EvidenceStats(Collection $lopIds): Collection
     {
-        if (! Schema::hasTable('pt2_evidences') || $lopIds->isEmpty()) {
+        if (! $this->schema->hasTable('pt2_evidences') || $lopIds->isEmpty()) {
             return collect();
         }
 
@@ -456,7 +458,7 @@ class OperationalMonitoringService
 
     private function stageLabels(): Collection
     {
-        if (! Schema::hasTable('project_stages')) {
+        if (! $this->schema->hasTable('project_stages')) {
             return collect();
         }
 

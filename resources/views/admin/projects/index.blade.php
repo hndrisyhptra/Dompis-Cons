@@ -85,7 +85,7 @@
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                 @forelse($projects as $project)
                     @php
-                        $summary = $project->progressSummary();
+                        $summary = $progressSummaries[$project->id_project] ?? $project->progressSummary();
                         $progress = $summary['progress'];
                         $stageLabel = $summary['effectiveStageLabel'] ?? $summary['stageLabel'];
                         
@@ -95,10 +95,10 @@
 
                         if ($assignmentData) {
                             if ($assignmentData->waspang_id) {
-                                $assignedUser = $assignmentData->waspang ?? \App\Models\User::find($assignmentData->waspang_id);
+                                $assignedUser = $assignmentData->waspang;
                                 $assignedRoleBadge = 'Waspang';
                             } elseif ($assignmentData->teknisi_id) {
-                                $assignedUser = \App\Models\User::find($assignmentData->teknisi_id);
+                                $assignedUser = $assignmentData->teknisi;
                                 $assignedRoleBadge = 'Teknisi';
                             }
                         }

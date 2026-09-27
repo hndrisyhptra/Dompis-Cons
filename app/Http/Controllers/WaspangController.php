@@ -165,7 +165,7 @@ class WaspangController extends Controller
         $projects = Project::with([
             'lop.stage',
             'evidences',
-            'boqItems',
+            'boqItems.designatorData',
             'issues',
         ])
             ->whereHas('assignments', function ($q) {
@@ -198,7 +198,7 @@ class WaspangController extends Controller
 
         $projects = Project::with([
             'evidences',
-            'boqItems',
+            'boqItems.designatorData',
             'lop.stage',
         ])
             ->whereHas('assignments', function ($q) {

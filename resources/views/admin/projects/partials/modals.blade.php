@@ -1,20 +1,19 @@
 {{-- DETAIL MODAL LOOP --}}
 @foreach($projects as $project)
     @php
-        $summary = $project->progressSummary();
+        $summary = $progressSummaries[$project->id_project] ?? $project->progressSummary();
         $progress = $summary['progress'];
         $stageLabel = $summary['stageLabel'];
-        $evidences = $project->evidences ?? collect();
         $assignmentData = $project->assignment;
         $assignedUser = null;
         $assignedRoleBadge = '';
 
         if ($assignmentData) {
             if ($assignmentData->waspang_id) {
-                $assignedUser = $assignmentData->waspang ?? \App\Models\User::find($assignmentData->waspang_id);
+                $assignedUser = $assignmentData->waspang;
                 $assignedRoleBadge = 'Waspang';
             } elseif ($assignmentData->teknisi_id) {
-                $assignedUser = \App\Models\User::find($assignmentData->teknisi_id);
+                $assignedUser = $assignmentData->teknisi;
                 $assignedRoleBadge = 'Teknisi';
             }
         }
@@ -109,9 +108,7 @@
                 <input type="text" id="searchWaspangAssign" oninput="searchAssignUser(this.value)" placeholder="Cari nama pengguna..." class="w-full h-11 rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-950 dark:text-white px-4 mb-4 text-sm focus:ring-blue-600 outline-none">
                 <div class="space-y-3" id="assignUserList">
                     @foreach($assignableUsers as $user)
-                        @php
-                            $activeCount = \App\Models\ProjectAssignment::where('waspang_id', $user->id_user)->orWhere('teknisi_id', $user->id_user)->distinct('project_id')->count();
-                        @endphp
+                        @php $activeCount = (int) ($assignmentCounts[$user->id_user] ?? 0); @endphp
                         <label class="block cursor-pointer assign-user-item" data-name="{{ strtolower($user->name) }}" data-role="{{ $user->role }}">
                             <input type="radio" name="assigned_user_id" value="{{ $user->id_user }}" class="peer sr-only" required>
                             <div class="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 peer-checked:border-blue-500 peer-checked:bg-blue-50 dark:peer-checked:bg-blue-900/30 flex items-center gap-3">

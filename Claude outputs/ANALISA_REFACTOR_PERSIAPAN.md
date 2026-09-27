@@ -3290,3 +3290,45 @@ Mengganti accordion Branch/Step/Sub-step dengan tabel matrix yang lebih cepat di
 - Test mencakup allow-list enam role, penolakan empat role di luar cakupan, render dua tab, summary aging/assignment/pending, drill-down utama, Inbox personal Admin, isolasi Inbox PT2, popup login, dan guard UI clean white.
 - Targeted `ApprovalCenterTest` lulus 8 test dengan 70 assertion, termasuk guard agar pending pada LOP final tidak dihitung sebagai LOP aktif dan pending tanpa owner tidak dihitung sebagai Admin.
 - Route terkonfirmasi memakai middleware `web`, `auth`, dan `role:superadmin,admin,tif,officer,super_tif,pm`; seluruh Blade berhasil dikompilasi dan `git diff --check` sukses.
+
+## Section CE — Audit dan Optimasi Performa Aplikasi (27 September 2026)
+
+### Temuan utama audit
+- Dashboard Admin adalah bottleneck terbesar: satu akses sebelumnya menjalankan sekitar **4.279 query**, memerlukan sekitar **1,34 detik** pada proses controller, dan mencapai peak memory sekitar **108 MB**. Penyebabnya adalah pemuatan seluruh evidence dan puluhan ribu BOQ hanya untuk KPI ringkas, lalu pemanggilan `progressSummary()` berulang.
+- Monitoring Operational sebelumnya menjalankan **57 query** dan sekitar **675 ms** untuk 1.858 baris. Pengecekan metadata schema berulang dan antrean Approval berbasis banyak eager-load menjadi beban utama.
+- Halaman Program OSP PM dengan 10 project menjalankan **89 query**; versi Admin sempat terukur **702 query** karena query role serta hitung beban assignment dijalankan per user/per baris.
+- Halaman utama Project reguler menjalankan **384 query** untuk satu halaman karena progress dan data assignment dihitung di Blade.
+- Halaman Project PT2 merender 311 LOP dan 1.111 BOQ pada 10 PID sekaligus. Respons HTML mencapai sekitar **7,4 MB**, sehingga waktu parse/render browser menjadi masalah walaupun query database sudah relatif sedikit.
+- Tabel `sessions` pada database aktual tidak mempunyai primary key/index, dan sejumlah tabel transaksi belum mempunyai composite index sesuai pola query Approval, aging, assignment, histori stage, dan activity log.
+- Layout Admin menjalankan `@stack('scripts')` dua kali. Chart.js, jQuery, Select2, dan TomSelect juga dimuat global pada banyak halaman yang sama sekali tidak memakainya.
+
+### Optimasi backend yang diterapkan
+- Dashboard Admin sekarang hanya memuat stage serta flag keberadaan assignment/BOQ melalui subquery `withExists`; progress ringkas dihitung dari master `project_stages`. Hasil akhir: **4.279 -> 9 query**, **±1,34 detik -> ±102 ms**, dan **108 -> 38 MB peak memory** pada dataset lokal aktif.
+- `ApprovalCenterService` diubah dari graph Eloquent multi-query menjadi dua query join terukur untuk PT3 dan PT2, tetapi tetap mempertahankan grouping, fallback LOP/project, kepemilikan Admin, aging, serta URL review. Hasil: **20 -> 15 query** termasuk audit schema dan **±310 -> ±76 ms**.
+- Ditambahkan `DatabaseSchemaInspector` singleton per request. Daftar tabel/kolom yang sudah diperiksa tidak ditanyakan berulang ke `information_schema`; inspector dipakai bersama Monitoring Operational dan Approval Center.
+- Monitoring Operational turun dari **57 -> 34 query** dan **±675 -> ±329 ms** untuk 1.858 baris tanpa mengubah hasil summary/drill-down.
+- Halaman Program OSP PM turun dari **89 -> 15 query**. Halaman Program OSP Admin turun dari **702 -> 25 query**; hitung beban assignment 311 user digabung menjadi satu aggregate query dan relasi role dimuat sekali.
+- Halaman utama Project reguler turun dari **384 -> 31 query** dan sekitar **188 -> 118 ms**. Ringkasan stage dibuat in-memory dari status LOP; evidence/BOQ tidak lagi dimuat hanya untuk menghitung progress list.
+- Master designator pada modal Admin hanya mengambil empat kolom yang dipakai. Daftar option 1.133 designator tidak lagi dirender dua kali; payload halaman Program Admin turun sekitar **1,66 MB -> 1,21 MB**.
+- Inbox Teknisi PT2, Approval PT2, serta daftar PT2 sekarang eager-load evidence, survey, mancore, dan dismantle. Query langsung dari dalam loop Blade dihapus. Inbox Teknisi PT2 terukur **7 query / ±31 ms**.
+- Halaman Project PT2 hanya merender 10 LOP pertama per PID pada initial load, dengan tombol eksplisit untuk membuka seluruh LOP pada PID terpilih. Summary PID tetap memakai seluruh LOP. Payload awal turun dari sekitar **7,4 MB -> 2,6 MB**.
+
+### Indeks database dan migrasi
+- Ditambahkan migration idempoten `2026_09_27_090000_add_runtime_performance_indexes.php` dan **sudah diterapkan** secara spesifik sebagai batch 31; migrasi pending lama tidak ikut dijalankan.
+- Primary key `sessions.id` dipulihkan setelah audit memastikan 4 row sesi mempunyai ID unik dan tidak kosong. Index `sessions.user_id` serta `sessions.last_activity` juga ditambahkan.
+- Composite index ditambahkan untuk pola aktif/pending/latest pada `lops`, `pt2_lops`, `evidences`, `pt2_evidences`, `pro_assign`, `pt2_assignments`, `lop_stage_histories`, `project_activity_logs`, `projects`, dan `notifications`.
+- Migration memeriksa keberadaan tabel, kolom, dan susunan index terlebih dahulu sehingga tidak menduplikasi index lama dengan nama berbeda. Tidak ada isi transaksi yang diubah.
+
+### Optimasi frontend/server
+- Duplikasi `@stack('scripts')` pada layout Admin dihapus; pushed script tidak lagi dieksekusi dua kali.
+- Chart.js hanya dimuat pada halaman grafik/Rekap/Kurva-S. TomSelect hanya dimuat pada halaman project yang mempunyai picker designator. jQuery + Select2 hanya dimuat pada Mapping Import dan Harga Designator.
+- Layout PM dan SDI tidak lagi memuat Chart.js, jQuery, Select2, atau TomSelect secara global ketika tidak digunakan.
+- Apache `.htaccess` sekarang mengaktifkan kompresi untuk HTML/CSS/JS/JSON/SVG dan browser caching untuk CSS, JS, gambar, SVG, serta WOFF2 jika modul server tersedia.
+- Vite production build berhasil; bundle terukur sekitar **155,5 KB CSS (22,6 KB gzip)** dan **90,0 KB JS (33,2 KB gzip)**.
+
+### Verifikasi dan catatan operasional
+- `ApprovalCenterTest` dan `ConstructionApprovalFlowTest` lulus **12 test / 84 assertion** setelah query Approval dioptimasi dan dibuat toleran terhadap schema fixture minimal.
+- Suite fitur terkait Kurva-S, Timeline PT2, Report Deployment, Main Monitoring, Approval Konstruksi, kategori Designator, dan Master Data lulus **37 test / 169 assertion** pada targeted run terakhir.
+- Seluruh Blade berhasil dikompilasi, Vite production build berhasil, syntax PHP file yang diubah valid, serta `git diff --check` bersih.
+- Full default test suite masih mempunyai kegagalan lama pada bootstrap migration SQLite/generic Breeze tests dan baseline migration ledger yang belum sinkron. Error dimulai dari migration lama `add_updated_at_to_evidences` saat tabel `evidences` belum ada; ini bukan regresi runtime dari optimasi. Rekonsiliasi ledger/schema baseline tetap perlu ditangani sebagai pekerjaan database terpisah dan tidak boleh diselesaikan dengan menjalankan seluruh migration pending pada database aktif.
+- `.env` lokal masih memakai `APP_DEBUG=true` serta cache/session/queue database. Untuk production wajib gunakan `APP_DEBUG=false`, jalankan `php artisan optimize` saat deployment, aktifkan PHP OPcache, dan jalankan queue worker terkelola; jangan menyalin setting debug lokal ke server production.

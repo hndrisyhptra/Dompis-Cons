@@ -26,8 +26,14 @@ class AdminPt2Controller extends Controller
             'lops.boqItems',
             'lops.assignment.teknisi',
             'lops.evidences',
-            'lops.surveys'
+            'lops.surveys',
+            'lops.mancores',
+            'lops.dismantles',
         ]);
+
+        if ($request->filled('project_id')) {
+            $query->where('id_pt2_project', (int) $request->project_id);
+        }
 
         if ($request->filled('search')) {
             $search = $request->search;
@@ -68,9 +74,21 @@ class AdminPt2Controller extends Controller
 
         $perPage = $request->input('per_page', 10);
         $projects = $query->latest('updated_at')->paginate($perPage)->onEachSide(1)->withQueryString();
+        $showAllLops = $request->boolean('show_all_lops') && $request->filled('project_id');
+        $visibleLopsByProject = $projects->getCollection()->mapWithKeys(function (Pt2Project $project) use ($request, $showAllLops): array {
+            $showAllForProject = $showAllLops && (int) $request->project_id === (int) $project->id_pt2_project;
+
+            return [$project->id_pt2_project => $showAllForProject ? $project->lops : $project->lops->take(10)];
+        });
 
         $branches = Pt2Lop::whereNotNull('branch')->where('branch', '!=', '')->distinct()->orderBy('branch')->pluck('branch');
-        $assignableUsers = User::roleCode(['teknisi', 'waspang'])->get();
+        $assignableUsers = User::roleCode('teknisi')
+            ->with('roleRef')->get(['id_user', 'name', 'role_id']);
+        $pt2AssignmentCounts = DB::table('pt2_assignments')
+            ->whereIn('teknisi_id', $assignableUsers->pluck('id_user'))
+            ->selectRaw('teknisi_id, COUNT(*) AS assignment_count')
+            ->groupBy('teknisi_id')
+            ->pluck('assignment_count', 'teknisi_id');
 
         // Istilah disamakan dgn flow Reguler (Section BM) -- istilah lama
         // (preparation/progress/finish/dismantle/mancore/complete) tetap
@@ -86,7 +104,9 @@ class AdminPt2Controller extends Controller
             'drop' => 'Drop (Batal)',
         ];
 
-        return view('admin.pt2.index', compact('projects', 'branches', 'assignableUsers', 'statusOptions'));
+        return view('admin.pt2.index', compact(
+            'projects', 'branches', 'assignableUsers', 'pt2AssignmentCounts', 'statusOptions', 'visibleLopsByProject'
+        ));
     }
 
    /*
@@ -103,7 +123,9 @@ class AdminPt2Controller extends Controller
         $branch = $request->input('branch');
 
         // Menggunakan tabel Pt2Lop sebagai basis
-        $query = \App\Models\Pt2Lop::with(['project', 'assignment.teknisi', 'evidences', 'surveys']);
+        $query = \App\Models\Pt2Lop::with([
+            'project', 'assignment.teknisi', 'evidences', 'surveys', 'mancores', 'dismantles',
+        ]);
 
         if ($search) {
             $query->where(function ($q) use ($search) {

@@ -1,6 +1,6 @@
 {{-- DETAIL MODAL LOOP UNTUK LOP PT 2 --}}
 @foreach($projects as $project)
-    @foreach($project->lops as $lop)
+    @foreach(($visibleLopsByProject[$project->id_pt2_project] ?? $project->lops->take(10)) as $lop)
         @php
             $summary = $lop->progressSummary();
             $progress = $summary['progress'];
@@ -158,7 +158,7 @@
                 <div class="space-y-3" id="assignTeknisiList">
                     @foreach($assignableUsers->where('role', 'teknisi') as $user)
                         @php
-                            $activeCount = \App\Models\Pt2Assignment::where('teknisi_id', $user->id_user)->count();
+                            $activeCount = (int) ($pt2AssignmentCounts[$user->id_user] ?? 0);
                         @endphp
                         <label class="block cursor-pointer assign-teknisi-item" data-name="{{ strtolower($user->name) }}">
                             <input type="radio" name="assigned_user_id" value="{{ $user->id_user }}" class="peer sr-only" required>

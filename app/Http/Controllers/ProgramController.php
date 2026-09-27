@@ -31,13 +31,15 @@ class ProgramController extends Controller
     /**
      * Opsi status mengikuti master status_progress LOP.
      */
-    private function statusProgressOptions(): array
+    private function statusProgressOptions($stages = null): array
     {
-        return ProjectStage::active()
+        $stages ??= ProjectStage::query()
             ->orderByRaw('sequence IS NULL, sequence ASC')
             ->orderBy('label')
-            ->pluck('label', 'code')
-            ->all();
+            ->get();
+
+        return $stages->filter(fn ($stage) => (bool) $stage->is_active)
+            ->pluck('label', 'code')->all();
     }
 
     /**
@@ -67,8 +69,14 @@ class ProgramController extends Controller
         $statusProgress = $request->input('status_progress', $request->input('status_project'));
         $regions = $this->pidRegions();
 
-        // Gunakan 'lop' (tunggal) karena relasi Project biasa adalah 1-to-1
-        $query = Project::with(['lop', 'lops', 'assignment.waspang', 'assignment.teknisi'])
+        $canManage = ! in_array(auth()->user()?->role, ['tif', 'pm'], true);
+        $relations = ['lops', 'boqItems', 'assignment.waspang', 'assignment.teknisi'];
+        if (auth()->user()?->role === 'tif') {
+            $relations[] = 'boqItems.designatorData';
+            $relations[] = 'lops.surveyRounds.items';
+        }
+
+        $query = Project::with($relations)
             ->where('program', $programName);
 
         if ($search) {
@@ -112,6 +120,51 @@ class ProgramController extends Controller
         }
 
         $projects = $query->latest('updated_at')->paginate($request->input('per_page', 10))->withQueryString();
+        $projects->getCollection()->each(function (Project $project): void {
+            // `lop` adalah kompatibilitas 1-to-1 lama. Gunakan hasil relasi
+            // `lops` yang sudah dimuat agar tidak menjalankan query kedua.
+            $project->setRelation('lop', $project->lops->first());
+        });
+
+        $stages = ProjectStage::query()
+            ->orderByRaw('sequence IS NULL, sequence ASC')
+            ->orderBy('label')
+            ->get();
+        $stagesByCode = $stages->keyBy('code');
+        $progressSummaries = $projects->getCollection()->mapWithKeys(function (Project $project) use ($stagesByCode): array {
+            $lop = $project->lop;
+            $stage = $lop ? $stagesByCode->get($lop->status_progress) : null;
+            $effectiveStage = $stage;
+
+            if ($stage && ($stage->is_pause_type || $stage->is_terminal) && $lop?->status_progress_before_hold) {
+                $effectiveStage = $stagesByCode->get($lop->status_progress_before_hold) ?? $stage;
+            }
+
+            if ($effectiveStage?->code === 'drm') {
+                $effectiveStage = $stagesByCode->get('perizinan') ?? $effectiveStage;
+            }
+
+            // Kode legacy yang tidak ada di master tetap memakai engine lama.
+            // Pada data normal seluruh ringkasan ini murni in-memory.
+            if ($lop && ! $stage) {
+                return [$project->id_project => $project->progressSummary()];
+            }
+
+            $sequence = $effectiveStage?->sequence;
+            $progress = $sequence !== null
+                ? (int) round((($sequence - 1) / 10) * 100)
+                : 0;
+
+            return [$project->id_project => [
+                'progress' => $progress,
+                'stageLabel' => $effectiveStage?->label ?? 'Persiapan',
+                'effectiveStageLabel' => $effectiveStage?->label ?? 'Persiapan',
+                'effectiveStageColor' => $effectiveStage?->color,
+                'effectiveStageCode' => $effectiveStage?->code,
+                'isHold' => (bool) ($stage?->is_pause_type),
+                'isDrop' => (bool) ($stage?->is_terminal),
+            ]];
+        });
 
         // Ambil unique branch khusus untuk dropdown filter program ini
         $branches = Lop::whereHas('project', function($q) use ($programName) {
@@ -123,18 +176,42 @@ class ProgramController extends Controller
             ->orderBy('branch')
             ->pluck('branch');
 
-        $assignableUsers = User::roleCode(['teknisi', 'waspang'])->get();
+        // PM/TIF memakai halaman read-only dan tidak merender modal assign/BOQ.
+        // Hindari memuat seluruh master user + designator pada setiap halaman
+        // mereka karena datanya tidak pernah dipakai oleh view tersebut.
+        $assignableUsers = $canManage
+            ? User::roleCode(['teknisi', 'waspang'])->with('roleRef')->get(['id_user', 'name', 'role_id'])
+            : collect();
+        $assignmentCounts = collect();
+        if ($assignableUsers->isNotEmpty()) {
+            $userIds = $assignableUsers->pluck('id_user');
+            $waspangAssignments = DB::table('pro_assign')
+                ->selectRaw('project_id, waspang_id AS user_id')
+                ->whereIn('waspang_id', $userIds);
+            $teknisiAssignments = DB::table('pro_assign')
+                ->selectRaw('project_id, teknisi_id AS user_id')
+                ->whereIn('teknisi_id', $userIds);
 
-        // PERBAIKAN: Ambil data designator untuk dilempar ke modal BOQ
-        $designators = Designator::orderBy('designator', 'asc')->get();
+            $assignmentCounts = DB::query()
+                ->fromSub($waspangAssignments->union($teknisiAssignments), 'assigned_projects')
+                ->selectRaw('user_id, COUNT(DISTINCT project_id) AS active_count')
+                ->groupBy('user_id')
+                ->pluck('active_count', 'user_id');
+        }
+        $designators = $canManage
+            ? Designator::orderBy('designator', 'asc')
+                ->get(['id_designator', 'designator', 'item_name', 'unit'])
+            : collect();
 
         return [
             'projects' => $projects,
             'branches' => $branches,
             'assignableUsers' => $assignableUsers,
+            'assignmentCounts' => $assignmentCounts,
             'designators' => $designators, // <-- KIRIM VARIABELNYA KE BLADE
+            'progressSummaries' => $progressSummaries,
             'regions' => $regions,
-            'statusOptions' => $this->statusProgressOptions(),
+            'statusOptions' => $this->statusProgressOptions($stages),
             'programName' => $programName,
         ];
     }

@@ -154,7 +154,10 @@ class TeknisiPt2Controller extends Controller
         $query = Pt2Lop::with([
             'project',
             'surveys',
-            'assignment'
+            'assignment',
+            'evidences',
+            'mancores',
+            'dismantles',
         ])
         ->whereHas('assignment', function ($query) use ($user) {
             $query->where('teknisi_id', $user->id_user);

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Console\PreventFrozenMigrations;
 use App\Services\ApprovalCenterService;
+use App\Services\DatabaseSchemaInspector;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\URL;
@@ -17,6 +18,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(DatabaseSchemaInspector::class);
+
         // Satu instance per request menjaga perhitungan badge desktop/mobile
         // memakai cache antrean yang sama.
         $this->app->singleton(ApprovalCenterService::class);

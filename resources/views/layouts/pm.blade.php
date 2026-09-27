@@ -6,9 +6,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
-
     <link rel="icon" type="image/png" href="{{ asset('images/logo-dompis-cons.png') }}">
     
     <title>Dompis Cons - PM Module</title>
@@ -53,13 +50,6 @@
     </div>
 
 </div>
-
-<!-- Global Library Scripts -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
 @stack('scripts')
 

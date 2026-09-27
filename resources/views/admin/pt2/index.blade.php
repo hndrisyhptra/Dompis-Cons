@@ -111,6 +111,7 @@
                         
                         // Rata-rata progress parent PID agar lebih presisi (misal 1 LOP 0%, 1 LOP 100% = PID Progress 50%)
                         $pidProgress = $lopsCount > 0 ? round($sumProgress / $lopsCount) : 0;
+                        $visibleLops = $visibleLopsByProject[$project->id_pt2_project] ?? $project->lops->take(10);
                     @endphp
                     
                     {{-- BARIS UTAMA (PID WADAH) --}}
@@ -156,7 +157,7 @@
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                                            @foreach($project->lops as $lop)
+                                            @foreach($visibleLops as $lop)
                                                 @php
                                                     $assignedUser = $lop->assignment->teknisi ?? null;
                                                     
@@ -264,6 +265,14 @@
                                             @endforeach
                                         </tbody>
                                     </table>
+                                    @if($visibleLops->count() < $project->lops->count())
+                                        <div class="border-t border-gray-200 px-4 py-3 text-center dark:border-gray-700">
+                                            <a href="{{ route('admin.pt2.index', ['project_id' => $project->id_pt2_project, 'show_all_lops' => 1]) }}"
+                                               class="inline-flex h-9 items-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-xs font-bold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
+                                                Tampilkan seluruh {{ $project->lops->count() }} LOP pada PID ini
+                                            </a>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </td>
