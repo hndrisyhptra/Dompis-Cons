@@ -362,6 +362,19 @@ class AdminPt2Controller extends Controller
             'status_after' => 'pending',
         ]);
 
+        if ($previousStatus !== 'pending') {
+            $lop->loadMissing('project');
+            \App\Services\TelegramWebhookEventService::publishSdiVerificationRequested(
+                'PT2',
+                (int) $lop->pt2_project_id,
+                (int) $lop->id_pt2_lop,
+                (string) ($lop->project?->project_name ?? 'Project PT2'),
+                $lop->lop_name,
+                auth()->user(),
+                ['is_pt2' => true],
+            );
+        }
+
         return back()->with('success', 'LOP berhasil dikirim ke SDI untuk proses Go-Live.');
     }
 

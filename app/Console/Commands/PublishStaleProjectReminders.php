@@ -2,38 +2,31 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Evidence;
 use App\Models\ProjectActivityLog;
 use App\Models\ProjectAssignment;
-use App\Models\Pt2Assignment;
-use App\Models\Pt2Evidence;
 use App\Models\TelegramWebhookEvent;
+use App\Services\LopSCurveService;
 use App\Services\TelegramWebhookEventService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
 
 /**
- * Publish event pengingat (untuk role PM) ke tabel telegram_webhook_events,
- * untuk project (alur biasa & PT2) yang sudah di-assign ke waspang/teknisi
- * tapi tidak ada update progress (upload eviden / aktivitas) lebih dari N jam
- * (default 24 jam / 1 hari). Dijadwalkan otomatis lewat routes/console.php.
+ * Publish event pengingat ke tabel telegram_webhook_events untuk LOP PT3
+ * yang melewati due date milestone Kurva-S sesuai tahap aktif.
+ * Penerima: Admin assigner, Waspang, dan role PM.
  */
 class PublishStaleProjectReminders extends Command
 {
-    protected $signature = 'webhook:publish-stale-project-reminders {--hours=24}';
+    protected $signature = 'webhook:publish-stale-project-reminders {--grace-days=0 : Tambahan toleransi hari kalender setelah due date Kurva-S}';
 
-    protected $description = 'Publish event pengingat ke telegram_webhook_events untuk project yang di-assign tapi tidak ada update progress lebih dari N jam';
+    protected $description = 'Publish reminder PT3 yang melewati due date milestone Kurva-S ke Admin assigner, Waspang, dan PM';
 
-    public function handle(): int
+    public function handle(LopSCurveService $curve): int
     {
-        $thresholdHours = (int) $this->option('hours');
-        $threshold = now()->subHours($thresholdHours);
+        $graceDays = max(0, (int) $this->option('grace-days'));
 
-        $published = 0;
-        $published += $this->publishStaleMainProjects($threshold, $thresholdHours);
-        $published += $this->publishStalePt2Projects($threshold, $thresholdHours);
+        [$published, $skipped] = $this->publishOverduePt3Projects($curve, $graceDays);
 
-        $this->info("Selesai. {$published} event pengingat project stale dipublish ke telegram_webhook_events.");
+        $this->info("Selesai. {$published} event reminder due date PT3 dipublish; {$skipped} LOP dilewati karena Kurva-S belum dapat dihitung.");
 
         return self::SUCCESS;
     }
@@ -52,123 +45,102 @@ class PublishStaleProjectReminders extends Command
             ->exists();
     }
 
-    protected function publishStaleMainProjects(Carbon $threshold, int $thresholdHours): int
+    /** @return array{0: int, 1: int} jumlah event dan jumlah LOP tanpa due date */
+    protected function publishOverduePt3Projects(LopSCurveService $curve, int $graceDays): array
     {
-        $assignments = ProjectAssignment::with(['project.lop', 'waspang', 'teknisi'])
-            ->where(function ($q) {
-                $q->whereNotNull('waspang_id')->orWhereNotNull('teknisi_id');
-            })
+        $assignments = ProjectAssignment::with(['project.lop', 'admin', 'waspang'])
+            ->whereNotNull('waspang_id')
             ->get();
 
         $published = 0;
+        $skipped = 0;
 
         foreach ($assignments as $assignment) {
             $project = $assignment->project;
-
             $lop = $project?->lop;
 
-            if (! $project || ! $lop || in_array($lop->status_progress, ['golive', 'drop'], true)) {
+            if (! $project || ! $lop || in_array($lop->status_progress, ['golive', 'drop', 'hold'], true) || (bool) $lop->is_golive) {
                 continue;
             }
 
-            $lastEvidence = Evidence::where('project_id', $project->id_project)->max('created_at');
-            $lastActivity = ProjectActivityLog::where('project_id', $project->id_project)->max('created_at');
+            $lop->loadMissing([
+                'boqItems.designatorData',
+                'boqItems.designatorDataByCode',
+                'project.evidences.boqItem',
+                'project.lops',
+                'permitCategory',
+                'surveyRounds',
+                'stageHistories',
+                'measurementChecks',
+                'goliveSubmission',
+            ]);
+            $activityLogs = ProjectActivityLog::query()
+                ->where('project_id', $lop->project_id)
+                ->where('lop_id', $lop->id_lop)
+                ->oldest('created_at')
+                ->get();
+            $due = $curve->currentStageDue($lop, $activityLogs);
 
-            $lastUpdate = collect([$lastEvidence, $lastActivity, $assignment->created_at])
+            if (! $due['ready'] || ! $due['due_date']) {
+                $skipped++;
+
+                continue;
+            }
+
+            $dueDate = $due['due_date']->startOfDay();
+            $deadline = $dueDate->endOfDay()->addDays($graceDays);
+
+            if (now()->lessThanOrEqualTo($deadline) || $this->alreadyPublishedToday($project->id_project, $lop->id_lop)) {
+                continue;
+            }
+
+            $overdueDays = (int) $dueDate->diffInDays(now()->startOfDay());
+            $payload = [
+                'flow' => 'PT3',
+                'project_id' => $project->id_project,
+                'lop_id' => $lop->id_lop,
+                'project_name' => $project->project_name,
+                'lop_name' => $lop->lop_name,
+                'pid' => $project->pid,
+                'branch' => $lop->branch,
+                'sto' => $lop->sto,
+                'stage_code' => $due['stage_code'],
+                'target_label' => $due['target_label'],
+                'due_date' => $dueDate->format('Y-m-d'),
+                'overdue_days' => $overdueDays,
+                'grace_days' => $graceDays,
+                'due_source' => 's_curve',
+            ];
+            $title = 'LOP Melewati Due Date Kurva-S';
+            $message = "{$project->project_name} — LOP {$lop->lop_name} pada tahap {$due['target_label']} melewati due date Kurva-S {$dueDate->format('d-m-Y')} selama {$overdueDays} hari.";
+
+            $userRecipients = collect([$assignment->admin, $assignment->waspang])
                 ->filter()
-                ->map(fn ($d) => Carbon::parse($d))
-                ->sort()
-                ->last();
+                ->unique('id_user');
 
-            if ($lastUpdate && $lastUpdate->gt($threshold)) {
-                continue;
+            foreach ($userRecipients as $recipient) {
+                TelegramWebhookEventService::publishToUser(
+                    $recipient,
+                    'project_stale_reminder',
+                    $title,
+                    $message,
+                    $payload,
+                    ['project_id' => $project->id_project, 'lop_id' => $lop->id_lop],
+                );
+                $published++;
             }
-
-            if ($this->alreadyPublishedToday($project->id_project)) {
-                continue;
-            }
-
-            $assignee = $assignment->waspang_id ? $assignment->waspang : $assignment->teknisi;
-            $role = $assignment->waspang_id ? 'waspang' : 'teknisi';
 
             TelegramWebhookEventService::publishToRole(
                 'pm',
                 'project_stale_reminder',
-                'Project Belum Ada Update',
-                "Project {$project->project_name} (" . ($project->pid ?? '-') . ") yang di-assign ke {$role} " . ($assignee->name ?? '-') . " belum ada update progress lebih dari {$thresholdHours} jam.",
-                [
-                    'project_id' => $project->id_project,
-                    'project_name' => $project->project_name,
-                    'pid' => $project->pid,
-                    'assignee_name' => $assignee->name ?? null,
-                    'assignee_role' => $role,
-                    'last_update_at' => $lastUpdate?->toIso8601String(),
-                    'threshold_hours' => $thresholdHours,
-                ],
-                ['project_id' => $project->id_project]
+                $title,
+                $message,
+                $payload,
+                ['project_id' => $project->id_project, 'lop_id' => $lop->id_lop],
             );
-
             $published++;
         }
 
-        return $published;
-    }
-
-    protected function publishStalePt2Projects(Carbon $threshold, int $thresholdHours): int
-    {
-        $assignments = Pt2Assignment::with(['lop.project', 'teknisi'])
-            ->whereNotNull('teknisi_id')
-            ->get();
-
-        $published = 0;
-
-        foreach ($assignments as $assignment) {
-            $lop = $assignment->lop;
-
-            if (! $lop || (bool) ($lop->is_golive ?? false)) {
-                continue;
-            }
-
-            $lastEvidence = Pt2Evidence::where('pt2_lop_id', $lop->id_pt2_lop)->max('created_at');
-            $lastActivity = ProjectActivityLog::where('lop_id', $lop->id_pt2_lop)->max('created_at');
-
-            $lastUpdate = collect([$lastEvidence, $lastActivity, $assignment->created_at])
-                ->filter()
-                ->map(fn ($d) => Carbon::parse($d))
-                ->sort()
-                ->last();
-
-            if ($lastUpdate && $lastUpdate->gt($threshold)) {
-                continue;
-            }
-
-            if ($this->alreadyPublishedToday($assignment->pt2_project_id, $lop->id_pt2_lop)) {
-                continue;
-            }
-
-            $projectName = $lop->project->project_name ?? ('PT2 Project #' . $lop->pt2_project_id);
-
-            TelegramWebhookEventService::publishToRole(
-                'pm',
-                'project_stale_reminder',
-                'Project PT2 Belum Ada Update',
-                "Project PT2 {$projectName} — LOP " . ($lop->lop_name ?? $lop->id_pt2_lop) . ' yang di-assign ke teknisi ' . ($assignment->teknisi->name ?? '-') . " belum ada update progress lebih dari {$thresholdHours} jam.",
-                [
-                    'pt2_project_id' => $lop->pt2_project_id,
-                    'pt2_lop_id' => $lop->id_pt2_lop,
-                    'project_name' => $projectName,
-                    'lop_name' => $lop->lop_name,
-                    'assignee_name' => $assignment->teknisi->name ?? null,
-                    'assignee_role' => 'teknisi',
-                    'last_update_at' => $lastUpdate?->toIso8601String(),
-                    'threshold_hours' => $thresholdHours,
-                ],
-                ['project_id' => $assignment->pt2_project_id, 'lop_id' => $lop->id_pt2_lop]
-            );
-
-            $published++;
-        }
-
-        return $published;
+        return [$published, $skipped];
     }
 }

@@ -57,10 +57,10 @@
                     <p class="text-lg font-black text-emerald-700 dark:text-emerald-300 mt-0.5" x-text="formatNum(totalActual())"></p>
                 </div>
                 <div class="rounded-2xl p-3" :class="selected.rounds.length ? 'bg-purple-50 dark:bg-purple-900/20' : 'bg-slate-50 dark:bg-slate-800'">
-                    <p class="text-[10px] uppercase font-bold" :class="selected.rounds.length ? 'text-purple-600 dark:text-purple-300' : 'text-slate-400'">Ronde Survey</p>
+                    <p class="text-[10px] uppercase font-bold" :class="selected.rounds.length ? 'text-purple-600 dark:text-purple-300' : 'text-slate-400'">Tahap Survey</p>
                     <template x-if="selected.rounds.length">
                         <p class="text-lg font-black text-purple-700 dark:text-purple-300 mt-0.5">
-                            <span x-text="selected.rounds.length"></span> ronde
+                            <span x-text="selected.rounds.length"></span> tahap
                             <span class="text-xs font-bold" x-show="selected.deviationPercent !== null" x-text="'· deviasi ' + Number(selected.deviationPercent).toFixed(1) + '%'"></span>
                         </p>
                     </template>
@@ -85,7 +85,7 @@
                             <th class="text-left px-4 py-3 text-xs font-black uppercase text-slate-500">Satuan</th>
                             <th class="text-right px-4 py-3 text-xs font-black uppercase text-blue-600 dark:text-blue-300">Plan</th>
                             <template x-for="(rn, ri) in selected.rounds" :key="'th-round-'+rn">
-                                <th class="text-right px-4 py-3 text-xs font-black uppercase text-purple-600 dark:text-purple-300" x-text="'Survey R' + rn"></th>
+                                <th class="text-right px-4 py-3 text-xs font-black uppercase text-purple-600 dark:text-purple-300" x-text="'Survey Tahap ' + rn"></th>
                             </template>
                             <th class="text-right px-4 py-3 text-xs font-black uppercase text-emerald-600 dark:text-emerald-300">Actual</th>
                             <th class="text-center px-4 py-3 text-xs font-black uppercase text-slate-500 rounded-r-xl">Status</th>

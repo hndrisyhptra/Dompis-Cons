@@ -125,7 +125,7 @@
             </h2>
 
             <p class="text-gray-500 mb-6">
-                Referensi BOQ Plan di atas, dibandingkan dengan tiap ronde BOQ Survey (round 1 = Survey awal, round berikutnya = hasil Re Survey). Ronde lama tidak dihapus saat Re Survey dilakukan.
+                Referensi BOQ Plan di atas dibandingkan dengan setiap Tahap BOQ Survey (Tahap 1 = Survey awal, tahap berikutnya = hasil Re Survey). Tahap lama tidak dihapus saat Re Survey dilakukan.
             </p>
 
             <div class="space-y-4">
@@ -138,7 +138,7 @@
 
                             <div>
                                 <h3 class="text-xl font-bold">
-                                    Round {{ $round->round_number }}{{ $round->round_number === 1 ? ' — Survey Awal' : ' — Re Survey' }}
+                                    Tahap {{ $round->round_number }}{{ $round->round_number === 1 ? ' — Survey Awal' : ' — Re Survey' }}
                                 </h3>
                                 <p class="text-gray-500 text-sm mt-1">
                                     @if($round->status === 'completed')
@@ -169,7 +169,7 @@
                                             <th class="py-2 pr-4 font-semibold">Designator</th>
                                             <th class="py-2 pr-4 font-semibold">Item</th>
                                             <th class="py-2 pr-4 font-semibold text-right">Plan</th>
-                                            <th class="py-2 pr-4 font-semibold text-right">Survey (Round {{ $round->round_number }})</th>
+                                            <th class="py-2 pr-4 font-semibold text-right">Survey (Tahap {{ $round->round_number }})</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -185,7 +185,7 @@
                                 </table>
                             </div>
                         @else
-                            <p class="mt-3 text-sm text-gray-400">Ronde ini belum memiliki snapshot item (masih berjalan).</p>
+                            <p class="mt-3 text-sm text-gray-400">Tahap ini belum memiliki snapshot item (masih berjalan).</p>
                         @endif
 
                     </div>

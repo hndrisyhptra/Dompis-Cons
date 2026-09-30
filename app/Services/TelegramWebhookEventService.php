@@ -19,6 +19,10 @@ class TelegramWebhookEventService
 {
     public static function publish(array $data): TelegramWebhookEvent
     {
+        $payload = array_merge([
+            'event_version' => 1,
+        ], $data['payload'] ?? []);
+
         $event = TelegramWebhookEvent::create([
             'event_type' => $data['event_type'],
             'recipient_type' => $data['recipient_type'],
@@ -28,7 +32,7 @@ class TelegramWebhookEventService
             'lop_id' => $data['lop_id'] ?? null,
             'title' => $data['title'],
             'message' => $data['message'],
-            'payload' => $data['payload'] ?? null,
+            'payload' => $payload,
             'status' => 'pending',
         ]);
 
@@ -72,5 +76,100 @@ class TelegramWebhookEventService
             'message' => $message,
             'payload' => $payload,
         ], $extra));
+    }
+
+    /**
+     * Event standar saat satu tahap pekerjaan sudah siap direview oleh Admin
+     * yang melakukan assignment. PT3 dan PT2 memakai kontrak payload yang sama
+     * agar receiver tidak perlu menebak sumber ID project/LOP.
+     */
+    public static function publishStageReviewRequested(
+        User $admin,
+        string $flow,
+        string $stageCode,
+        string $stageLabel,
+        int $projectId,
+        ?int $lopId,
+        string $projectName,
+        ?string $lopName,
+        ?User $actor = null,
+        array $payload = [],
+    ): TelegramWebhookEvent {
+        $actorName = $actor?->name ?? 'Pelaksana';
+
+        return self::publishToUser(
+            $admin,
+            'stage_review_requested',
+            "Review {$stageLabel} {$flow}",
+            "{$actorName} telah menyelesaikan {$stageLabel} untuk {$projectName}"
+                .($lopName ? " — LOP {$lopName}" : '')
+                .'. Mohon lakukan review.',
+            array_merge([
+                'flow' => $flow,
+                'stage_code' => $stageCode,
+                'stage_label' => $stageLabel,
+                'project_name' => $projectName,
+                'lop_name' => $lopName,
+                'actor_id' => $actor?->id_user,
+                'actor_name' => $actor?->name,
+                'actor_role' => $actor?->role,
+            ], $payload),
+            ['project_id' => $projectId, 'lop_id' => $lopId],
+        );
+    }
+
+    /** Event standar ke role SDI setelah dokumen/data Golive dikunci oleh Admin. */
+    public static function publishSdiVerificationRequested(
+        string $flow,
+        int $projectId,
+        ?int $lopId,
+        string $projectName,
+        ?string $lopName,
+        ?User $actor = null,
+        array $payload = [],
+    ): TelegramWebhookEvent {
+        return self::publishToRole(
+            'sdi',
+            'sdi_verification_requested',
+            "Verifikasi Golive {$flow}",
+            "{$projectName}".($lopName ? " — LOP {$lopName}" : '').' sudah siap diverifikasi. Mohon upload eviden UIM agar project segera Golive.',
+            array_merge([
+                'flow' => $flow,
+                'stage_code' => 'fi_ogp_golive',
+                'stage_label' => 'FI OGP Golive',
+                'project_name' => $projectName,
+                'lop_name' => $lopName,
+                'requested_by_id' => $actor?->id_user,
+                'requested_by_name' => $actor?->name,
+            ], $payload),
+            ['project_id' => $projectId, 'lop_id' => $lopId],
+        );
+    }
+
+    /** Event pribadi kepada Waspang/Teknisi setelah SDI meresmikan Golive. */
+    public static function publishProjectGolive(
+        User $recipient,
+        string $flow,
+        int $projectId,
+        ?int $lopId,
+        string $projectName,
+        ?string $lopName,
+        array $payload = [],
+    ): TelegramWebhookEvent {
+        return self::publishToUser(
+            $recipient,
+            'project_golive',
+            "Project {$flow} Sudah Golive",
+            "{$projectName}".($lopName ? " — LOP {$lopName}" : '').' yang Anda kerjakan sudah berhasil Golive.',
+            array_merge([
+                'flow' => $flow,
+                'stage_code' => 'golive',
+                'stage_label' => 'Golive',
+                'project_name' => $projectName,
+                'lop_name' => $lopName,
+                'golive_at' => now()->toIso8601String(),
+            ], $payload),
+            ['project_id' => $projectId, 'lop_id' => $lopId],
+        );
     }
 }

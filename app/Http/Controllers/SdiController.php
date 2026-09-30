@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Pt2Lop;
 use App\Services\ProjectActivityService;
+use App\Services\TelegramWebhookEventService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -70,6 +71,7 @@ class SdiController extends Controller
         $lop = Pt2Lop::findOrFail($lop_id);
 
         if ($request->hasFile('golive_evidence')) {
+            $wasAlreadyGolive = (bool) $lop->is_golive;
             $file = $request->file('golive_evidence');
             $filename = 'UIM_PT2_LOP_' . time() . '_' . $lop->id_pt2_lop . '.' . $file->getClientOriginalExtension();
             $path = $file->storeAs('evidences/golive/pt2', $filename, 'public');
@@ -91,6 +93,21 @@ class SdiController extends Controller
                 'description' => 'Tim SDI telah mengunggah Eviden UIM dan meresmikan status Go-Live untuk LOP: ' . $lop->lop_name,
                 'status_after' => 'completed',
             ]);
+
+            $lop->loadMissing(['project', 'assignment.teknisi']);
+            $recipient = $lop->assignment?->teknisi;
+
+            if ($recipient && ! $wasAlreadyGolive) {
+                TelegramWebhookEventService::publishProjectGolive(
+                    $recipient,
+                    'PT2',
+                    (int) $lop->pt2_project_id,
+                    (int) $lop->id_pt2_lop,
+                    (string) ($lop->project?->project_name ?? 'Project PT2'),
+                    $lop->lop_name,
+                    ['is_pt2' => true],
+                );
+            }
 
             return back()->with('success', '🎉 Luar biasa! LOP PT 2 berhasil di-GoLive dan Eviden UIM telah tersimpan!');
         }

@@ -354,7 +354,7 @@ class TeknisiPt2Controller extends Controller
                 }
             }
             
-            $this->publishPt2StepUploadedEvent($lop, 'Persiapan/Survey (Step 1)');
+            $this->publishPt2StepUploadedEvent($lop, 'survey', 'Survey (Step 1)');
 
             return redirect()->route('teknisi.pt2.step2Eviden', $lop->id_pt2_lop)
                              ->with('success', 'Eviden Survey berhasil disimpan! Lanjut Step 2.');
@@ -371,7 +371,7 @@ class TeknisiPt2Controller extends Controller
      * tidak perlu derivasi "apakah stage sudah lengkap" -- cukup publish tiap
      * store berhasil.
      */
-    private function publishPt2StepUploadedEvent($lop, string $stepLabel): void
+    private function publishPt2StepUploadedEvent($lop, string $stageCode, string $stepLabel): void
     {
         $assignment = \App\Models\Pt2Assignment::where('pt2_lop_id', $lop->id_pt2_lop)->first();
         $admin = $assignment?->assigner;
@@ -383,21 +383,32 @@ class TeknisiPt2Controller extends Controller
         $lop->loadMissing('project');
         $projectName = $lop->project->project_name ?? ('PT2 Project #' . $lop->pt2_project_id);
 
-        \App\Services\TelegramWebhookEventService::publishToUser(
+        $event = \App\Services\TelegramWebhookEventService::publishStageReviewRequested(
             $admin,
-            'evidence_step_uploaded',
-            'Eviden PT2 Diupload',
-            'Teknisi ' . (Auth::user()->name ?? '-') . " telah menyelesaikan upload eviden {$stepLabel} untuk {$projectName} — LOP " . ($lop->lop_name ?? $lop->id_pt2_lop) . '. Eviden menunggu review Anda.',
+            'PT2',
+            $stageCode,
+            $stepLabel,
+            (int) $lop->pt2_project_id,
+            (int) $lop->id_pt2_lop,
+            $projectName,
+            $lop->lop_name,
+            Auth::user(),
             [
                 'step_label' => $stepLabel,
-                'project_name' => $projectName,
-                'lop_name' => $lop->lop_name,
-                'uploader_name' => Auth::user()->name ?? null,
-                'uploader_role' => 'teknisi',
                 'is_pt2' => true,
             ],
-            ['project_id' => $lop->pt2_project_id, 'lop_id' => $lop->id_pt2_lop]
         );
+
+        ProjectActivityService::log([
+            'project_id' => $lop->pt2_project_id,
+            'lop_id' => $lop->id_pt2_lop,
+            'target_user_id' => $admin->id_user,
+            'activity_type' => 'webhook_stage_review_requested',
+            'title' => "Webhook Review {$stepLabel} PT2",
+            'description' => "Permintaan review {$stepLabel} dikirim ke Admin assigner.",
+            'stage' => $stageCode,
+            'meta' => ['webhook_event_id' => $event->id_tele_webhook, 'is_pt2' => true],
+        ]);
     }
 
     /**
@@ -512,7 +523,7 @@ class TeknisiPt2Controller extends Controller
             // Eviden Instalasi terupload -> status_progress minimal "instalasi".
             $lop->advanceStatusProgress('instalasi');
 
-            $this->publishPt2StepUploadedEvent($lop, 'Instalasi (Step 2)');
+            $this->publishPt2StepUploadedEvent($lop, 'instalasi', 'Instalasi (Step 2)');
 
             return back()->with('success', 'Eviden Instalasi berhasil diupload!');
         }
@@ -592,7 +603,7 @@ class TeknisiPt2Controller extends Controller
             // Eviden Finish/Redaman terupload -> status_progress minimal "finishing".
             $lop->advanceStatusProgress('finishing');
 
-            $this->publishPt2StepUploadedEvent($lop, 'Redaman/Finishing (Step 3)');
+            $this->publishPt2StepUploadedEvent($lop, 'finishing', 'Finishing/Redaman (Step 3)');
 
             return redirect(url('teknisi/pt2/survey/'.$lop->id_pt2_lop.'/step4'))->with('success', 'Eviden Redaman berhasil disimpan! Lanjut ke Step 4.');
         }
@@ -668,13 +679,16 @@ class TeknisiPt2Controller extends Controller
                 }
             }
 
-            $this->publishPt2StepUploadedEvent($lop, 'Dismantle (Step 4)');
         }
 
         // Dismantle (data ODP/Splitter tersimpan) -> status_progress minimal "finishing"
         // (digabung dgn Step 3 Finish/Redaman, lihat Section BM). Berlaku walau
         // tidak ada eviden foto baru diupload di step ini.
         $lop->advanceStatusProgress('finishing');
+
+        // Step Dismantle tetap perlu direview walaupun kondisi lapangan
+        // menyatakan tidak ada material dan tidak ada foto baru.
+        $this->publishPt2StepUploadedEvent($lop, 'finishing', 'Finishing/Dismantle (Step 4)');
 
         return redirect(url('teknisi/pt2/survey/'.$lop->id_pt2_lop.'/step5'))->with('success', 'Data Dismantle & Eviden berhasil disimpan! Lanjut Step 5.');
     }
@@ -716,6 +730,8 @@ class TeknisiPt2Controller extends Controller
         // terpisah (sdi_approval_status/is_golive), TIDAK disentuh di sini.
         // Lihat ANALISA_REFACTOR_PERSIAPAN.md Section BM.
         $lop->advanceStatusProgress('fi_ogp_golive');
+
+        $this->publishPt2StepUploadedEvent($lop, 'fi_ogp_golive', 'FI OGP Golive/Mancore (Step 5)');
 
         return redirect()->route('teknisi.pt2.inbox')
                          ->with('success', '🎉 Luar biasa! Data LOP PT 2 berhasil di-submit dan sedang menunggu Approval Admin.');

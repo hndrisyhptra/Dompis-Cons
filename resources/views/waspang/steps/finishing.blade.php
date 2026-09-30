@@ -138,7 +138,7 @@
         </div>
         @if(($materialSourceType ?? 'plan') === 'survey_round')
             <span class="shrink-0 px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold">
-                BOQ Survey Ronde {{ $materialSourceRound->round_number ?? '-' }}
+                BOQ Survey Tahap {{ $materialSourceRound->round_number ?? '-' }}
             </span>
         @else
             <span class="shrink-0 px-2 py-1 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold">BOQ Plan</span>

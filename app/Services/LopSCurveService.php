@@ -119,6 +119,44 @@ class LopSCurveService
         ];
     }
 
+    /**
+     * Due date milestone yang relevan dengan posisi LOP saat ini. Dipakai
+     * webhook reminder agar sumber perhitungan target tetap sama dengan
+     * halaman Kurva-S PT3.
+     *
+     * @return array{ready: bool, stage_code: string, target_key: ?string, target_label: ?string, due_date: ?CarbonImmutable, warnings: Collection}
+     */
+    public function currentStageDue(Lop $lop, Collection $activityLogs): array
+    {
+        $curve = $this->build($lop, $activityLogs);
+        $stage = mb_strtolower(trim((string) $lop->status_progress));
+        $targetKey = match ($stage) {
+            'inisiasi', 'survey' => 'survey_end',
+            'drm', 'perizinan' => 'permit_end',
+            'material_delivery', 'persiapan_instalasi' => 'preparation_end',
+            'instalasi', 'pengukuran', 'finishing' => 'planned_fi_end',
+            'fi_ogp_golive' => $curve['target']['golive_target'] ? 'golive_target' : 'planned_fi_end',
+            default => null,
+        };
+        $targetLabel = match ($targetKey) {
+            'survey_end' => 'Survey',
+            'permit_end' => 'Perizinan',
+            'preparation_end' => 'Persiapan Instalasi',
+            'planned_fi_end' => $stage === 'fi_ogp_golive' ? 'FI OGP Golive' : 'Instalasi s.d. FI OGP',
+            'golive_target' => 'Golive',
+            default => null,
+        };
+
+        return [
+            'ready' => (bool) $curve['ready'] && $targetKey !== null,
+            'stage_code' => $stage,
+            'target_key' => $targetKey,
+            'target_label' => $targetLabel,
+            'due_date' => $targetKey ? $curve['target'][$targetKey] : null,
+            'warnings' => $curve['warnings'],
+        ];
+    }
+
     /** @return array{days: ?int, rule: string} */
     public function deliveryRule(?string $branch, ?string $sto): array
     {

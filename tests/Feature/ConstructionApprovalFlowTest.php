@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
@@ -18,6 +19,7 @@ class ConstructionApprovalFlowTest extends TestCase
     {
         parent::setUp();
 
+        Queue::fake();
         Schema::dropAllTables();
         $this->createSchema();
         $this->seedApprovalFlow();
@@ -89,6 +91,13 @@ class ConstructionApprovalFlowTest extends TestCase
         $this->assertDatabaseHas('lops', [
             'id_lop' => 20,
             'status_progress' => 'fi_ogp_golive',
+        ]);
+        $this->assertDatabaseHas('telegram_webhook_events', [
+            'event_type' => 'sdi_verification_requested',
+            'recipient_type' => 'role',
+            'recipient_role' => 'sdi',
+            'project_id' => 10,
+            'lop_id' => 20,
         ]);
     }
 
@@ -336,6 +345,21 @@ class ConstructionApprovalFlowTest extends TestCase
             $table->timestamp('draft_saved_at')->nullable();
             $table->unsignedBigInteger('submitted_by')->nullable();
             $table->timestamp('submitted_at')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('telegram_webhook_events', function (Blueprint $table): void {
+            $table->id('id_tele_webhook');
+            $table->string('event_type');
+            $table->string('recipient_type');
+            $table->unsignedBigInteger('recipient_user_id')->nullable();
+            $table->string('recipient_role')->nullable();
+            $table->unsignedBigInteger('project_id')->nullable();
+            $table->unsignedBigInteger('lop_id')->nullable();
+            $table->string('title');
+            $table->text('message');
+            $table->json('payload')->nullable();
+            $table->string('status')->default('pending');
+            $table->timestamp('delivered_at')->nullable();
             $table->timestamps();
         });
     }

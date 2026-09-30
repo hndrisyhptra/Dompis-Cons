@@ -35,7 +35,7 @@ class WaspangSurveyWorkflowTest extends TestCase
             ])
             ->assertRedirect();
 
-        $this->assertSame([7, 7], DB::table('boq_items')->orderBy('id_boq')->pluck('quantity_actual')->all());
+        $this->assertSame([7, 7], DB::table('boq_items')->orderBy('id_boq')->pluck('quantity_survey')->all());
         $this->assertSame([8, 8], DB::table('boq_items')->orderBy('id_boq')->pluck('quantity_plan')->all());
         $this->assertDatabaseHas('project_activity_logs', [
             'project_id' => 10,
@@ -78,14 +78,14 @@ class WaspangSurveyWorkflowTest extends TestCase
             'lop_id' => 20,
             'designator_id' => 32,
             'quantity_plan' => null,
-            'quantity_actual' => 4,
+            'quantity_survey' => 4,
         ]);
         $this->assertDatabaseHas('boq_items', [
             'project_id' => 10,
             'lop_id' => 20,
             'designator_id' => 33,
             'quantity_plan' => null,
-            'quantity_actual' => 4,
+            'quantity_survey' => 4,
         ]);
     }
 
@@ -97,7 +97,7 @@ class WaspangSurveyWorkflowTest extends TestCase
 
         $this->actingAs(User::findOrFail(1))
             ->post(route('waspang.survey.finish', 10), [
-                'volumes' => ['100' => 9],
+                'volumes' => ['100' => 8],
             ])
             ->assertRedirect();
 
@@ -105,7 +105,7 @@ class WaspangSurveyWorkflowTest extends TestCase
             'id_lop' => 20,
             'status_progress' => 'perizinan',
         ]);
-        $this->assertSame([9, 9], DB::table('boq_items')->orderBy('id_boq')->pluck('quantity_actual')->all());
+        $this->assertSame([8, 8], DB::table('boq_items')->orderBy('id_boq')->pluck('quantity_survey')->all());
         $this->assertDatabaseHas('project_activity_logs', [
             'project_id' => 10,
             'lop_id' => 20,
@@ -202,6 +202,7 @@ class WaspangSurveyWorkflowTest extends TestCase
             'project_id' => 10,
             'lop_name' => 'LOP A',
             'status_progress' => 'survey',
+            'package_id' => 1,
         ]);
         DB::table('designators')->insert([
             [
@@ -265,6 +266,10 @@ class WaspangSurveyWorkflowTest extends TestCase
                 'quantity_actual' => 0,
             ],
         ]);
+        DB::table('designator_package_prices')->insert([
+            ['id_price' => 1, 'designator_id' => 30, 'package_id' => 1, 'price' => 1000],
+            ['id_price' => 2, 'designator_id' => 31, 'package_id' => 1, 'price' => 500],
+        ]);
 
         Storage::disk('public')->put('kml/admin.kml', '<kml></kml>');
     }
@@ -311,6 +316,9 @@ class WaspangSurveyWorkflowTest extends TestCase
             $table->unsignedBigInteger('project_id');
             $table->string('lop_name');
             $table->string('status_progress');
+            $table->unsignedBigInteger('package_id')->nullable();
+            $table->decimal('survey_deviation_percent', 8, 2)->nullable();
+            $table->boolean('survey_redesign_required')->default(false);
             $table->timestamps();
         });
         Schema::create('designators', function (Blueprint $table) {
@@ -332,7 +340,54 @@ class WaspangSurveyWorkflowTest extends TestCase
             $table->text('item_name');
             $table->string('unit')->nullable();
             $table->integer('quantity_plan')->nullable();
+            $table->integer('quantity_survey')->nullable();
             $table->integer('quantity_actual')->nullable();
+        });
+        Schema::create('designator_package_prices', function (Blueprint $table) {
+            $table->id('id_price');
+            $table->unsignedBigInteger('designator_id');
+            $table->unsignedBigInteger('package_id');
+            $table->decimal('price', 18, 2);
+            $table->timestamps();
+        });
+        Schema::create('boq_survey_rounds', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('lop_id');
+            $table->unsignedInteger('round_number');
+            $table->string('status', 20)->default('in_progress');
+            $table->decimal('plan_total', 18, 2)->nullable();
+            $table->decimal('survey_total', 18, 2)->nullable();
+            $table->decimal('deviation_percent', 8, 2)->nullable();
+            $table->boolean('redesign_required')->default(false);
+            $table->unsignedBigInteger('started_by')->nullable();
+            $table->timestamp('started_at')->nullable();
+            $table->unsignedBigInteger('finished_by')->nullable();
+            $table->timestamp('finished_at')->nullable();
+            $table->text('note')->nullable();
+            $table->timestamps();
+            $table->unique(['lop_id', 'round_number']);
+        });
+        Schema::create('boq_survey_round_items', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('boq_survey_round_id');
+            $table->unsignedBigInteger('boq_item_id')->nullable();
+            $table->unsignedBigInteger('designator_id')->nullable();
+            $table->string('designator')->nullable();
+            $table->string('item_name')->nullable();
+            $table->string('unit', 30)->nullable();
+            $table->decimal('quantity_plan', 18, 2)->nullable();
+            $table->decimal('quantity_survey', 18, 2)->nullable();
+            $table->timestamps();
+        });
+        Schema::create('lop_stage_histories', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('lop_id');
+            $table->string('stage_code', 50);
+            $table->timestamp('entered_at')->nullable();
+            $table->timestamp('completed_at')->nullable();
+            $table->unsignedBigInteger('completed_by')->nullable();
+            $table->text('note')->nullable();
+            $table->timestamps();
         });
         Schema::create('evidences', function (Blueprint $table) {
             $table->id('id_evidence');

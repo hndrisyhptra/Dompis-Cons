@@ -763,6 +763,10 @@ class WaspangController extends Controller
             ],
         ]);
 
+        // Jika kombinasi eviden + pilihan N/A sudah melengkapi seluruh lima
+        // item Pengukuran, minta Admin assigner melakukan review.
+        $this->publishStageSubmittedEvent($project, 'pengukuran');
+
         return back()->with('success', $wantsNotApplicable ? 'Item ditandai Tidak Ada.' : 'Penanda Tidak Ada dibatalkan.');
     }
 
@@ -1340,14 +1344,20 @@ class WaspangController extends Controller
                 'activity_type' => $needsRedesignApproval ? 'survey_deviation_detected' : 'survey_finalized',
                 'title' => $needsRedesignApproval ? 'Deviasi BOQ Survey Terdeteksi' : 'Survey Selesai',
                 'description' => $needsRedesignApproval
-                    ? "Waspang memfinalisasi {$groups->count()} baris BOQ Survey (ronde {$round->round_number}) -- nilai nominal menyimpang {$deviationPercent}% dari Plan (>10%), menunggu upload bukti persetujuan Redesign."
-                    : "Waspang memfinalisasi {$groups->count()} baris BOQ Survey (ronde {$round->round_number}) dan melanjutkan ke Perizinan.",
+                    ? "Waspang memfinalisasi {$groups->count()} baris BOQ Survey (Tahap {$round->round_number}) -- nilai nominal menyimpang {$deviationPercent}% dari Plan (>10%), menunggu upload bukti persetujuan Redesign."
+                    : "Waspang memfinalisasi {$groups->count()} baris BOQ Survey (Tahap {$round->round_number}) dan melanjutkan ke Perizinan.",
                 'status_before' => 'survey',
                 'status_after' => $needsRedesignApproval ? 'survey' : 'perizinan',
                 'stage' => 'survey',
                 'meta' => ['volumes' => $volumes, 'deviation_percent' => $deviationPercent, 'round_number' => $round->round_number],
             ]);
         });
+
+        $this->publishPt3StageReviewRequested($project, 'survey', 'Survey', [
+            'deviation_percent' => $deviationPercent,
+            'redesign_required' => $needsRedesignApproval,
+            'review_state' => $needsRedesignApproval ? 'waiting_redesign_approval' : 'completed',
+        ]);
 
         if ($needsRedesignApproval) {
             return back()->with('warning', "Volume Survey tersimpan, namun nilai BOQ Survey menyimpang {$deviationPercent}% dari Plan (di atas ambang 10%). Upload bukti persetujuan Redesign untuk melanjutkan ke Perizinan.");
@@ -1417,13 +1427,19 @@ class WaspangController extends Controller
                 'lop_id' => $lop->id_lop,
                 'activity_type' => 'survey_redesign_approved',
                 'title' => 'Redesign Survey Disetujui',
-                'description' => "Waspang mengunggah bukti persetujuan deviasi BOQ Survey ({$deviationPercent}%, ronde {$round->round_number}) dan melanjutkan ke Perizinan.",
+                'description' => "Waspang mengunggah bukti persetujuan deviasi BOQ Survey ({$deviationPercent}%, Tahap {$round->round_number}) dan melanjutkan ke Perizinan.",
                 'status_before' => 'survey',
                 'status_after' => 'perizinan',
                 'stage' => 'survey',
                 'meta' => ['round_number' => $round->round_number],
             ]);
         });
+
+        $this->publishPt3StageReviewRequested($project, 'survey', 'Survey', [
+            'deviation_percent' => $deviationPercent,
+            'redesign_required' => false,
+            'review_state' => 'redesign_approval_uploaded',
+        ]);
 
         return back()->with('success', 'Bukti persetujuan tersimpan. Lanjut ke Perizinan.');
     }
@@ -1461,7 +1477,7 @@ class WaspangController extends Controller
             ->exists();
 
         if ($hasInProgressRound || $lop->survey_redesign_required) {
-            return back()->with('error', 'Masih ada ronde Survey yang berjalan/menunggu Approval Redesign. Selesaikan ronde tersebut terlebih dahulu.');
+            return back()->with('error', 'Masih ada Tahap Survey yang berjalan/menunggu Approval Redesign. Selesaikan tahap tersebut terlebih dahulu.');
         }
 
         $statusBefore = $lop->status_progress;
@@ -1487,7 +1503,7 @@ class WaspangController extends Controller
                 'lop_id' => $lop->id_lop,
                 'activity_type' => 're_survey_started',
                 'title' => 'Re Survey Dimulai',
-                'description' => "Waspang memulai Re Survey (ronde {$round->round_number}) untuk LOP {$lop->lop_name}. Status dikembalikan ke Survey dari '{$statusBefore}'.",
+                'description' => "Waspang memulai Re Survey (Tahap {$round->round_number}) untuk LOP {$lop->lop_name}. Status dikembalikan ke Survey dari '{$statusBefore}'.",
                 'status_before' => $statusBefore,
                 'status_after' => 'survey',
                 'stage' => 'survey',
@@ -1771,6 +1787,8 @@ class WaspangController extends Controller
             'stage' => 'perizinan',
         ]);
 
+        $this->publishPt3StageReviewRequested($project, 'perizinan', 'Perizinan');
+
         return back()->with('success', 'Perizinan selesai. Lanjut ke Material Delivery.');
     }
 
@@ -1811,6 +1829,8 @@ class WaspangController extends Controller
             'status_after' => 'persiapan_instalasi',
             'stage' => 'material_delivery',
         ]);
+
+        $this->publishPt3StageReviewRequested($project, 'material_delivery', 'Material Delivery');
 
         return back()->with('success', 'Material Delivery selesai. Persiapan tuntas, lanjut ke Instalasi.');
     }
@@ -1865,6 +1885,8 @@ class WaspangController extends Controller
             'status_after' => 'instalasi',
             'stage' => 'persiapan_instalasi',
         ]);
+
+        $this->publishPt3StageReviewRequested($project, 'persiapan_instalasi', 'Persiapan Instalasi');
 
         return redirect()->route('waspang.projects.instalasi', $project->id_project)
             ->with('success', 'Step 2 Persiapan Instalasi selesai. Lanjut ke Step 3 Instalasi.');
@@ -2433,7 +2455,7 @@ class WaspangController extends Controller
         }
 
         // WEBHOOK EVENT: kalau seluruh eviden wajib tahap ini sudah lengkap
-        // diunggah (menunggu review), publish event SEKALI ke admin yang meng-assign.
+        // diunggah, kirim permintaan review ke admin yang meng-assign.
         $this->publishStageSubmittedEvent($project, $stage);
 
         return back()->with('success', 'Eviden berhasil diunggah');
@@ -2442,20 +2464,16 @@ class WaspangController extends Controller
     /**
      * Setelah upload eviden pada suatu stage, cek apakah SEMUA jenis eviden wajib
      * untuk stage tsb sudah diunggah (status apapun selain rejected -- artinya
-     * sedang menunggu review admin), lalu publish event webhook SEKALI ke admin
-     * yang meng-assign waspang ini ke project tsb. Ini TIDAK menunggu approval
-     * admin -- itu urusan terpisah (lihat ProjectController::approveEvidence).
+     * sedang menunggu review admin), lalu publish event webhook ke admin yang
+     * meng-assign waspang ini. Submission yang sama tidak dikirim ulang, tetapi
+     * upload koreksi sesudah reject dapat memicu permintaan review baru.
      */
     private function publishStageSubmittedEvent($project, string $stage): void
     {
         $isComplete = match ($stage) {
-            'persiapan' => $this->stageHasSubmittedTypes($project->id_project, 'persiapan', ['barang_tiba', 'perizinan']),
-            'pengukuran' => $this->stageHasSubmittedTypes($project->id_project, 'pengukuran', ['opm', 'otdr']),
             'instalasi' => $this->instalasiSubmittedComplete($project),
-            'finishing' => Evidence::where('project_id', $project->id_project)
-                ->where('stage', 'finishing')
-                ->where('status', '!=', 'rejected')
-                ->exists(),
+            'pengukuran' => $this->measurementSubmittedComplete($project),
+            'finishing' => $this->finishingSubmittedComplete($project),
             default => false,
         };
 
@@ -2463,64 +2481,80 @@ class WaspangController extends Controller
             return;
         }
 
-        // Guard supaya tidak berulang kali publish event yang sama untuk stage yang sama.
-        $alreadyPublished = ProjectActivityLog::where('project_id', $project->id_project)
+        // Jangan kirim ulang untuk submission yang sama. Upload koreksi baru
+        // setelah Reject tetap boleh memicu event review baru.
+        $lastPublishedAt = ProjectActivityLog::where('project_id', $project->id_project)
             ->where('stage', $stage)
-            ->where('activity_type', 'webhook_stage_uploaded_published')
-            ->exists();
+            ->where('activity_type', 'webhook_stage_review_requested')
+            ->latest('created_at')
+            ->value('created_at');
+        $latestSubmissionAt = Evidence::where('project_id', $project->id_project)
+            ->where('stage', $stage)
+            ->where('status', '!=', 'rejected')
+            ->max('created_at');
 
-        if ($alreadyPublished) {
+        if ($stage === 'pengukuran' && $project->lop) {
+            $latestCheckAt = LopMeasurementCheck::where('lop_id', $project->lop->id_lop)->max('updated_at');
+            $latestSubmissionAt = collect([$latestSubmissionAt, $latestCheckAt])->filter()->sort()->last();
+        }
+
+        if ($lastPublishedAt && $latestSubmissionAt && $lastPublishedAt >= $latestSubmissionAt) {
             return;
         }
 
-        $assignment = ProjectAssignment::where('project_id', $project->id_project)->first();
-        $admin = $assignment?->admin;
+        $labels = [
+            'instalasi' => 'Instalasi',
+            'pengukuran' => 'Pengukuran',
+            'finishing' => 'Finishing',
+        ];
 
-        if ($admin) {
-            TelegramWebhookEventService::publishToUser(
-                $admin,
-                'evidence_step_uploaded',
-                'Eviden Tahap Selesai Diupload',
-                'Waspang '.(auth()->user()->name ?? '-')." telah menyelesaikan upload eviden tahap {$stage} untuk project {$project->project_name} (".($project->pid ?? '-').'). Eviden menunggu review Anda.',
-                [
-                    'stage' => $stage,
-                    'project_name' => $project->project_name,
-                    'pid' => $project->pid,
-                    'uploader_name' => auth()->user()->name ?? null,
-                    'uploader_role' => 'waspang',
-                ],
-                ['project_id' => $project->id_project]
-            );
-        }
-
-        ProjectActivityService::log([
-            'project_id' => $project->id_project,
-            'activity_type' => 'webhook_stage_uploaded_published',
-            'title' => 'Webhook Event: Eviden Tahap Lengkap',
-            'description' => "Event webhook dipublish utk admin: eviden tahap {$stage} sudah lengkap diupload.",
-            'stage' => $stage,
-        ]);
+        $this->publishPt3StageReviewRequested($project, $stage, $labels[$stage] ?? ucfirst($stage));
     }
 
     /**
      * Cek apakah SEMUA evidence_type wajib pada $requiredTypes sudah punya minimal
      * satu baris eviden (status apapun selain rejected) untuk project+stage tsb.
      */
-    private function stageHasSubmittedTypes(int $projectId, string $stage, array $requiredTypes): bool
+    private function measurementSubmittedComplete($project): bool
     {
-        $submittedTypes = Evidence::where('project_id', $projectId)
-            ->where('stage', $stage)
-            ->where('status', '!=', 'rejected')
-            ->pluck('evidence_type')
-            ->unique();
+        $lop = $project->lop;
 
-        foreach ($requiredTypes as $type) {
-            if (! $submittedTypes->contains($type)) {
-                return false;
-            }
+        if (! $lop) {
+            return false;
         }
 
-        return true;
+        $checks = LopMeasurementCheck::where('lop_id', $lop->id_lop)->get()->keyBy('item_key');
+
+        return collect(LopMeasurementCheck::ITEMS)->every(function (string $itemKey) use ($checks, $project): bool {
+            if ($checks->get($itemKey)?->is_not_applicable) {
+                return true;
+            }
+
+            return Evidence::where('project_id', $project->id_project)
+                ->where('stage', 'pengukuran')
+                ->whereIn('evidence_type', LopMeasurementCheck::evidenceTypesFor($itemKey))
+                ->where('status', '!=', 'rejected')
+                ->exists();
+        });
+    }
+
+    private function finishingSubmittedComplete($project): bool
+    {
+        $requiredItems = $project->materialProgressItems()['items']->filter(function (BoqItem $item): bool {
+            return (bool) ($item->designatorData?->requires_finishing_evidence
+                || $item->designatorDataByCode?->requires_finishing_evidence);
+        });
+
+        if ($requiredItems->isEmpty()) {
+            return true;
+        }
+
+        return $requiredItems->every(fn (BoqItem $item): bool => Evidence::where('project_id', $project->id_project)
+            ->where('stage', 'finishing')
+            ->where('evidence_type', 'final_boq')
+            ->where('boq_item_id', $item->id_boq)
+            ->where('status', '!=', 'rejected')
+            ->exists());
     }
 
     /**
@@ -2530,12 +2564,7 @@ class WaspangController extends Controller
      */
     private function instalasiSubmittedComplete($project): bool
     {
-        // quantity_plan !== null WAJIB (bag. AC): item tambahan BOQ Survey
-        // bukan bagian checklist progress Instalasi.
-        $materialIds = BoqItem::where('project_id', $project->id_project)
-            ->where('designator', 'like', 'M-%')
-            ->whereNotNull('quantity_plan')
-            ->pluck('id_boq');
+        $materialIds = $project->materialProgressItems()['items']->pluck('id_boq');
 
         if ($materialIds->isEmpty()) {
             return false;
@@ -2555,6 +2584,42 @@ class WaspangController extends Controller
         }
 
         return true;
+    }
+
+    /** Publish kontrak event review PT3 yang seragam ke Admin assigner. */
+    private function publishPt3StageReviewRequested($project, string $stageCode, string $stageLabel, array $payload = []): void
+    {
+        $lop = $project->lop ?? Lop::where('project_id', $project->id_project)->first();
+        $assignment = ProjectAssignment::with('admin')->where('project_id', $project->id_project)->first();
+        $admin = $assignment?->admin;
+
+        if (! $lop || ! $admin) {
+            return;
+        }
+
+        $event = TelegramWebhookEventService::publishStageReviewRequested(
+            $admin,
+            'PT3',
+            $stageCode,
+            $stageLabel,
+            (int) $project->id_project,
+            (int) $lop->id_lop,
+            (string) $project->project_name,
+            $lop->lop_name,
+            auth()->user(),
+            array_merge(['pid' => $project->pid], $payload),
+        );
+
+        ProjectActivityService::log([
+            'project_id' => $project->id_project,
+            'lop_id' => $lop->id_lop,
+            'target_user_id' => $admin->id_user,
+            'activity_type' => 'webhook_stage_review_requested',
+            'title' => "Webhook Review {$stageLabel}",
+            'description' => "Permintaan review tahap {$stageLabel} dikirim ke Admin assigner.",
+            'stage' => $stageCode,
+            'meta' => ['webhook_event_id' => $event->id_tele_webhook] + $payload,
+        ]);
     }
 
     /**

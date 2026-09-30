@@ -72,6 +72,34 @@ class LopSCurveServiceTest extends TestCase
         $this->assertSame(100.0, $curve['target']['series']->last()['progress']);
     }
 
+    public function test_current_stage_due_uses_the_same_s_curve_milestone(): void
+    {
+        $lop = $this->lopWithRelations('MATARAM', 'MTR', []);
+        $lop->status_progress = 'perizinan';
+
+        $due = app(LopSCurveService::class)->currentStageDue($lop, collect());
+
+        $this->assertTrue($due['ready']);
+        $this->assertSame('permit_end', $due['target_key']);
+        $this->assertSame('Perizinan', $due['target_label']);
+        $this->assertSame('2026-10-29', $due['due_date']->format('Y-m-d'));
+    }
+
+    public function test_fi_ogp_reminder_moves_to_golive_target_after_requirements_complete(): void
+    {
+        $lop = $this->lopWithRelations('MATARAM', 'MTR', []);
+        $lop->status_progress = 'fi_ogp_golive';
+        $lop->setRelation('goliveSubmission', new LopGoliveSubmission([
+            'fi_completed_at' => '2026-11-20 16:00:00',
+        ]));
+
+        $due = app(LopSCurveService::class)->currentStageDue($lop, collect());
+
+        $this->assertSame('golive_target', $due['target_key']);
+        $this->assertSame('Golive', $due['target_label']);
+        $this->assertSame('2026-11-23', $due['due_date']->format('Y-m-d'));
+    }
+
     public function test_curve_is_not_calculated_when_start_date_is_missing(): void
     {
         $lop = $this->lopWithRelations('MATARAM', 'MTR', []);

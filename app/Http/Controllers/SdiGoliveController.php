@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Lop;
 use App\Models\LopGoliveVerification;
+use App\Models\ProjectAssignment;
 use App\Services\ProjectActivityService;
+use App\Services\TelegramWebhookEventService;
 use Illuminate\Http\Request;
 
 /**
@@ -161,6 +163,26 @@ class SdiGoliveController extends Controller
                 'status_before' => 'fi_ogp_golive',
                 'status_after' => 'golive',
             ]);
+
+            $assignment = ProjectAssignment::with(['waspang', 'teknisi'])
+                ->where('project_id', $lop->project_id)
+                ->first();
+            $recipients = collect([$assignment?->waspang, $assignment?->teknisi])
+                ->filter()
+                ->unique('id_user');
+            $lop->loadMissing('project');
+
+            foreach ($recipients as $recipient) {
+                TelegramWebhookEventService::publishProjectGolive(
+                    $recipient,
+                    'PT3',
+                    (int) $lop->project_id,
+                    (int) $lop->id_lop,
+                    (string) ($lop->project?->project_name ?? 'Project PT3'),
+                    $lop->lop_name,
+                    ['pid' => $lop->project?->pid],
+                );
+            }
         }
 
         return redirect()->route('sdi.golive.index')->with('success', 'LOP berhasil diverifikasi dan di-Golive-kan.');

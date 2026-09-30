@@ -126,11 +126,24 @@
             </div>
 
             <div x-show="finalizeOpen" x-transition x-cloak class="space-y-3 rounded-2xl border border-blue-100 bg-blue-50/40 p-3">
-                <div>
-                    <p class="text-xs font-black text-slate-900">BOQ Plan & Volume Survey</p>
-                    <p class="mt-1 text-[10px] leading-relaxed text-slate-500">
-                        Volume Plan terkunci. Pasangan designator M/J dengan pair code sama ditampilkan satu kali.
-                    </p>
+                <div class="space-y-2">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-xs font-black text-slate-900">BOQ Plan & Volume Survey</p>
+                            <p class="mt-1 text-[10px] leading-relaxed text-slate-500">
+                                Volume Plan terkunci. Pasangan designator M/J dengan pair code sama ditampilkan satu kali.
+                            </p>
+                        </div>
+                        <button type="button" id="copySurveyPlanVolumesButton"
+                                class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-[#1565D8]/30 bg-white px-3 text-[10px] font-black text-[#1565D8] shadow-xs transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                                @disabled($surveyBoqGroups->whereNotNull('quantity_plan')->isEmpty())>
+                            <i class="fa-regular fa-copy mr-1.5"></i> Copy Volume
+                        </button>
+                    </div>
+                    <div class="rounded-lg border border-blue-100 bg-white px-3 py-2 text-[9.5px] leading-relaxed text-slate-500">
+                        Gunakan <span class="font-black text-slate-700">Copy Volume</span> jika Volume BOQ Survey sesuai dengan BOQ Plan. Nilai akan terisi otomatis, tetap dapat diedit, dan dapat disimpan sebagai draf.
+                    </div>
+                    <p id="copySurveyPlanVolumesStatus" class="hidden text-[9.5px] font-bold text-emerald-700" role="status" aria-live="polite"></p>
                 </div>
 
                 <div class="space-y-2">
@@ -177,6 +190,8 @@
                                     <div class="relative mt-1">
                                         <input id="survey-volume-{{ $field }}" form="surveyFinalizeForm" type="number" name="volumes[{{ $field }}]"
                                                min="0" step="1" value="{{ $draftValue }}" placeholder="0"
+                                               data-survey-volume-input
+                                               data-plan-volume="{{ $group['quantity_plan'] === null ? '' : $group['quantity_plan'] }}"
                                                class="h-9 w-full rounded-lg border border-slate-300 bg-white px-2.5 pr-9 text-[11px] font-black text-[#1565D8] outline-none focus:border-[#1565D8] focus:ring-2 focus:ring-blue-100">
                                         <span class="pointer-events-none absolute right-2 top-2.5 text-[8px] font-bold text-slate-400">{{ $group['unit'] }}</span>
                                     </div>
@@ -237,13 +252,13 @@
             <div class="rounded-2xl border border-slate-200 bg-white p-3 space-y-2">
                 <div class="flex items-center justify-between gap-2">
                     <p class="text-[11px] font-black text-slate-800">Riwayat BOQ Survey</p>
-                    <span class="text-[9px] font-bold text-slate-400">{{ $surveyRounds->count() }} ronde</span>
+                    <span class="text-[9px] font-bold text-slate-400">{{ $surveyRounds->count() }} tahap</span>
                 </div>
                 <div class="space-y-1.5">
                     @foreach($surveyRounds as $round)
                         <div class="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
                             <div class="min-w-0">
-                                <p class="text-[10.5px] font-black text-slate-700">Ronde {{ $round->round_number }}{{ $round->round_number === 1 ? ' (Survey Awal)' : '' }}</p>
+                                <p class="text-[10.5px] font-black text-slate-700">Tahap {{ $round->round_number }}{{ $round->round_number === 1 ? ' (Survey Awal)' : '' }}</p>
                                 <p class="text-[9px] text-slate-400">
                                     {{ $round->status === 'completed' ? 'Selesai · '.optional($round->finished_at)->format('d M Y H:i') : 'Sedang berjalan' }}
                                 </p>
@@ -261,7 +276,7 @@
 
         @if($canStartReSurvey)
             <form method="POST" action="{{ route('waspang.survey.re-survey.start', $project->id_project) }}"
-                  onsubmit="return confirm('Mulai Re Survey? Volume Survey akan diisi ulang dari awal untuk LOP ini, tetapi histori ronde sebelumnya tetap tersimpan.')">
+                  onsubmit="return confirm('Mulai Re Survey? Volume Survey akan diisi ulang dari awal untuk LOP ini, tetapi histori tahap sebelumnya tetap tersimpan.')">
                 @csrf
                 <button type="submit" class="h-11 w-full rounded-xl border border-[#1565D8] bg-white text-xs font-black text-[#1565D8]">
                     <i class="fa-solid fa-rotate-left mr-1"></i> Re Survey
@@ -272,6 +287,28 @@
 </div>
 
 <script>
+document.getElementById('copySurveyPlanVolumesButton')?.addEventListener('click', function () {
+    const inputs = Array.from(document.querySelectorAll('[data-survey-volume-input]'))
+        .filter(input => input.dataset.planVolume !== '');
+
+    inputs.forEach(input => {
+        input.value = input.dataset.planVolume;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.classList.add('border-emerald-400', 'bg-emerald-50');
+
+        window.setTimeout(() => {
+            input.classList.remove('border-emerald-400', 'bg-emerald-50');
+        }, 1200);
+    });
+
+    const status = document.getElementById('copySurveyPlanVolumesStatus');
+    if (status) {
+        status.textContent = `${inputs.length} Volume Survey berhasil disalin dari BOQ Plan. Silakan periksa atau edit sebelum disimpan.`;
+        status.classList.remove('hidden');
+    }
+});
+
 // Stage 4e: bukti persetujuan Redesign -- foto disimpan dulu di array JS
 // (bukan langsung di <input>) supaya waspang bisa BATALKAN/hapus satu-satu
 // SEBELUM submit. Begitu form berhasil terkirim ke server, evidence-nya

@@ -1473,6 +1473,19 @@ class ProjectController extends Controller
             ]);
         });
 
+        TelegramWebhookEventService::publishSdiVerificationRequested(
+            'PT3',
+            (int) $project->id_project,
+            (int) $lop->id_lop,
+            (string) $project->project_name,
+            $lop->lop_name,
+            auth()->user(),
+            [
+                'pid' => $project->pid,
+                'submitted_at' => optional($submission->submitted_at)->toIso8601String(),
+            ],
+        );
+
         return back()->with('success', 'Dokumen berhasil disubmit, dikunci, dan sekarang menunggu verifikasi SDI.');
     }
 

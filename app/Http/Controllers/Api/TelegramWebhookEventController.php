@@ -22,7 +22,8 @@ class TelegramWebhookEventController extends Controller
      * Query params:
      *   status   = pending (default) | delivered | all
      *   type     = filter event_type tertentu (opsional):
-     *              project_assigned | evidence_step_uploaded | evidence_rejected | project_stale_reminder
+     *              project_assigned | stage_review_requested | evidence_rejected |
+     *              sdi_verification_requested | project_golive | project_stale_reminder
      *   per_page = default 50, maksimum 200
      */
     public function index(Request $request)
