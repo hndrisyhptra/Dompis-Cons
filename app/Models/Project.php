@@ -204,7 +204,8 @@ class Project extends Model
         $items = ($this->boqItems ?? collect())->filter(function (BoqItem $boq) {
             return $boq->quantity_plan !== null
                 && (str_starts_with((string) $boq->designator, 'M-')
-                    || optional($boq->designatorData)->type === 'material');
+                    || optional($boq->designatorData)->type === 'material'
+                    || optional($boq->designatorDataByCode)->type === 'material');
         })->values();
 
         return [

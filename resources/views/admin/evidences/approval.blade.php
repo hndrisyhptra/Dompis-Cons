@@ -17,12 +17,10 @@
         {{-- FILTER KAWALAN ADM & SEARCH (BOX INTEGRASI) --}}
         <div class="w-full md:w-auto flex flex-col sm:flex-row gap-3">
             <form method="GET" action="{{ route('admin.evidences.approval') }}" class="w-full sm:w-80 relative">
-                @if(!request('search'))
-                    <input type="hidden" name="status_filter" value="{{ request('status_filter', 'pending') }}">
-                    <input type="hidden" name="branch" value="{{ request('branch') }}">
-                    <input type="hidden" name="program" value="{{ request('program') }}">
-                    <input type="hidden" name="my_kawal" value="{{ request('my_kawal', '0') }}">
-                @endif
+                <input type="hidden" name="status_filter" value="{{ request('status_filter', 'pending') }}">
+                <input type="hidden" name="branch" value="{{ request('branch') }}">
+                <input type="hidden" name="program" value="{{ request('program') }}">
+                <input type="hidden" name="my_kawal" value="{{ request('my_kawal', '0') }}">
                 
                 <input type="text"
                     name="search"
@@ -43,14 +41,14 @@
     </div>
 
     {{-- DROPDOWN FILTER BAR (BRANCH & PROGRAM SAP) --}}
-    <form method="GET" action="{{ route('admin.evidences.approval') }}" class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+    <form method="GET" action="{{ route('admin.evidences.approval') }}" class="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
         <input type="hidden" name="status_filter" value="{{ request('status_filter', 'pending') }}">
         <input type="hidden" name="my_kawal" value="{{ request('my_kawal', '0') }}">
         <input type="hidden" name="search" value="{{ request('search') }}">
 
         <div>
             <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Filter Branch</label>
-            <select name="branch" onchange="this.form.submit()" {{ request('search') ? 'disabled' : '' }} class="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs font-semibold outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300 disabled:bg-slate-100 disabled:opacity-50">
+            <select name="branch" onchange="this.form.submit()" class="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs font-semibold outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300">
                 <option value="">Semua Branch</option>
                 @foreach($availableBranches as $b)
                     <option value="{{ $b }}" {{ request('branch') == $b ? 'selected' : '' }}>{{ $b }}</option>
@@ -60,7 +58,7 @@
 
         <div>
             <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Filter Program (SAP)</label>
-            <select name="program" onchange="this.form.submit()" {{ request('search') ? 'disabled' : '' }} class="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs font-semibold outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300 disabled:bg-slate-100 disabled:opacity-50">
+            <select name="program" onchange="this.form.submit()" class="w-full h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 text-xs font-semibold outline-none focus:border-blue-500 text-slate-700 dark:text-slate-300">
                 <option value="">Semua Program</option>
                 @foreach($availablePrograms as $p)
                     <option value="{{ $p }}" {{ request('program') == $p ? 'selected' : '' }}>{{ $p }}</option>
@@ -79,7 +77,7 @@
     </form>
 
     {{-- SYSTEM TABS FILTER STATUS --}}
-    <div class="inline-flex flex-wrap items-center gap-1 p-1 rounded-2xl bg-slate-100 dark:bg-slate-800/60 w-full sm:w-auto">
+    <div class="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800/60 w-full sm:w-auto">
         @php $currentFilter = request('status_filter', 'pending'); @endphp
 
         <a href="{{ request()->fullUrlWithQuery(['status_filter' => 'pending']) }}"
@@ -117,7 +115,7 @@
     </div>
 
     {{-- LIST TABLE VIEW --}}
-    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-sm">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse min-w-[900px]">
                 <thead>

@@ -9,6 +9,11 @@
     // sama persis dengan sumber gate finishingDone: BOQ Survey ronde terbaru
     // jika tersedia, fallback ke BOQ Plan.
     $materialBoqItems = $materialBoqItems ?? collect();
+    $materialSource = $materialSource ?? ['source' => 'plan', 'round' => null];
+    $usesSurveyVolume = $materialSource['source'] === 'survey_round';
+    $referenceLabel = $usesSurveyVolume
+        ? 'Volume BOQ Survey Tahap '.($materialSource['round']?->round_number ?? '-')
+        : 'Volume BOQ Plan';
     
     $finalTotal = $materialBoqItems->count();
     $finalApproved = 0;
@@ -58,7 +63,7 @@
     @include('admin.evidences.partials.stepper')
 
     {{-- STEP TITLE CARD --}}
-    <div class="bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
         <div class="h-1.5 bg-green-600 w-full"></div>
         <div class="p-4 flex items-center justify-between gap-3">
             <div>
@@ -70,12 +75,17 @@
                 </p>
             </div>
 
-            <span class="px-3 py-1 rounded-full text-xs font-bold shrink-0
-                {{ $finishingApproved
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' }}">
-                {{ $finalTotal === 0 ? 'Tidak Ada Item Wajib' : $finalApproved.'/'.$finalTotal.' Approved' }}
-            </span>
+            <div class="flex flex-col items-end gap-1.5">
+                <span class="px-3 py-1 rounded-full text-xs font-bold {{ $usesSurveyVolume ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' }}">
+                    {{ $usesSurveyVolume ? 'BOQ Survey Tahap '.($materialSource['round']?->round_number ?? '-') : 'BOQ Plan' }}
+                </span>
+                <span class="px-3 py-1 rounded-full text-xs font-bold shrink-0
+                    {{ $finishingApproved
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' }}">
+                    {{ $finalTotal === 0 ? 'Tidak Ada Item Wajib' : $finalApproved.'/'.$finalTotal.' Approved' }}
+                </span>
+            </div>
         </div>
     </div>
 
@@ -93,7 +103,7 @@
                 $isReviewed = $total > 0 && $pending == 0 && $rejected == 0;
             @endphp
 
-            <a href="{{ $step['route'] }}" class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 hover:shadow-md transition-all">
+            <a href="{{ $step['route'] }}" class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-4 hover:shadow-md transition-all">
                 <div class="flex items-start justify-between gap-3">
                     <div>
                         <p class="text-xs text-gray-500">{{ $step['label'] }}</p>
@@ -169,7 +179,7 @@
                 }
             @endphp
 
-            <div x-data="{ open: false }" class="bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm transition-all">
+            <div x-data="{ open: false }" class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm transition-all">
                 
                 {{-- HEADER ACCORDION --}}
                 <button type="button" @click="open = !open" class="w-full p-5 flex items-center justify-between gap-4 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition">
@@ -207,7 +217,7 @@
                     <div class="p-5 space-y-5">
 
                         {{-- KOTAK INFORMASI DETAIL ITEM BOQ (PLAN VS AKTUAL & ITEM NAME) --}}
-                        <div class="bg-white dark:bg-gray-950 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/50 shadow-xs space-y-3">
+                        <div class="bg-white dark:bg-gray-950 p-4 rounded-lg border border-blue-100 dark:border-blue-900/50 shadow-xs space-y-3">
                             <div class="flex items-center gap-2">
                                 <span class="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded text-[10px] font-black uppercase tracking-wider">Detail</span>
                             </div>
@@ -220,11 +230,11 @@
                             </div>
 
                             <div class="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-                                <div class="bg-slate-50 dark:bg-gray-900 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
-                                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Target Plan</p>
+                                <div class="bg-slate-50 dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-800">
+                                    <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">{{ $referenceLabel }}</p>
                                     <p class="text-sm font-black text-blue-600 dark:text-blue-400 mt-0.5 font-mono">{{ $planVal }}</p>
                                 </div>
-                                <div class="bg-slate-50 dark:bg-gray-900 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
+                                <div class="bg-slate-50 dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-800">
                                     <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Aktual Waspang</p>
                                     <p class="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">{{ $actualVal }}</p>
                                 </div>
@@ -278,7 +288,7 @@
                         {{-- GRID FOTO EVIDEN FINAL (MENGGUNAKAN LOGIKA APPROVE/REJECT PER FOTO) --}}
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                             @forelse($items as $evidence)
-                                <div x-data="{ showReject: false }" class="bg-white dark:bg-gray-950 rounded-[1.5rem] border border-gray-200 dark:border-gray-800 p-2.5 shadow-sm flex flex-col transition-all hover:border-blue-300">
+                                <div x-data="{ showReject: false }" class="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-2.5 shadow-sm flex flex-col transition-all hover:border-blue-300">
                                     
                                     <div class="relative aspect-video rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 group">
                                         {{-- ID BADGE --}}
@@ -319,7 +329,7 @@
                                             </div>
                                         
                                         @elseif($evidence->status == 'rejected')
-                                            <div class="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 border border-red-100 dark:border-red-900/50 flex flex-col items-center text-center">
+                                            <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 border border-red-100 dark:border-red-900/50 flex flex-col items-center text-center">
                                                 <p class="text-[10px] font-black text-red-700 dark:text-red-400 uppercase tracking-wide mb-1">Reason Reject:</p>
                                                 <p class="text-xs text-red-900 dark:text-red-300 font-medium leading-snug mb-3">{{ $evidence->review_note }}</p>
                                                 
@@ -345,7 +355,7 @@
                                             </div>
 
                                             <div x-show="showReject" x-collapse x-cloak>
-                                                <form method="POST" action="{{ route('admin.evidences.reject', $evidence->id_evidence) }}" class="bg-slate-50 dark:bg-gray-900 rounded-xl p-2 border border-slate-200 dark:border-gray-700">
+                                                <form method="POST" action="{{ route('admin.evidences.reject', $evidence->id_evidence) }}" class="bg-slate-50 dark:bg-gray-900 rounded-lg p-2 border border-slate-200 dark:border-gray-700">
                                                     @csrf
                                                     <textarea name="review_note" rows="2" required placeholder="Tuliskan ID foto yang direject (Misal: ID-89 blur)..." class="w-full rounded-lg border-gray-300 dark:border-gray-700 text-xs p-2.5 focus:ring-red-500 focus:border-red-500 resize-none bg-white dark:bg-gray-950"></textarea>
                                                     <div class="flex items-center gap-2 mt-2">
@@ -370,7 +380,7 @@
             </div>
 
         @empty
-            <div class="bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-200 dark:border-gray-800 p-10 text-center">
+            <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-10 text-center">
                 <div class="w-16 h-16 mx-auto bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center text-2xl mb-4">📭</div>
                 <h3 class="text-sm font-black text-gray-900 dark:text-white">Tidak Ada Material Finishing</h3>
                 <p class="text-xs text-gray-500 mt-1">Tidak ada item BOQ material yang diwajibkan memiliki eviden finishing.</p>

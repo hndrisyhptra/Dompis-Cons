@@ -3,9 +3,14 @@
 @section('content')
 
 @php
-    $materialBoqItems = $project->boqItems->filter(function ($boq) {
-        return str_starts_with($boq->designator, 'M-') || optional($boq->designatorData)->type === 'material' || optional($boq->designatorDataByCode)->type === 'material';
-    });
+    // Satu sumber referensi dengan Waspang dan gate approval: snapshot BOQ
+    // Survey selesai terbaru, atau BOQ Plan jika Survey belum tersedia.
+    $materialBoqItems = $materialBoqItems ?? collect();
+    $materialSource = $materialSource ?? ['source' => 'plan', 'round' => null];
+    $usesSurveyVolume = $materialSource['source'] === 'survey_round';
+    $referenceLabel = $usesSurveyVolume
+        ? 'Volume BOQ Survey Tahap '.($materialSource['round']?->round_number ?? '-')
+        : 'Volume BOQ Plan';
 
     $boqTotal = $materialBoqItems->count();
     $boqApprovedCount = 0;
@@ -40,7 +45,7 @@
     @include('admin.evidences.partials.stepper')
 
     {{-- Step Title Card --}}
-    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
+    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm">
         <div class="h-1 bg-blue-500"></div>
 
         <div class="p-4 flex items-center justify-between">
@@ -49,16 +54,21 @@
                     Step 2 — Instalasi
                 </h2>
                 <p class="text-sm text-gray-500">
-                    Review eviden progress instalasi berdasarkan designator material
+                    Review eviden progress instalasi berdasarkan {{ $referenceLabel }}
                 </p>
             </div>
 
-            <span class="px-3 py-1 rounded-full text-xs font-bold
-                {{ $instalasiCompleted
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-yellow-100 text-yellow-700' }}">
-                {{ $boqApprovedCount }}/{{ $boqTotal }} Approved
-            </span>
+            <div class="flex flex-col items-end gap-1.5">
+                <span class="px-3 py-1 rounded-full text-xs font-bold {{ $usesSurveyVolume ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' }}">
+                    {{ $usesSurveyVolume ? 'BOQ Survey Tahap '.($materialSource['round']?->round_number ?? '-') : 'BOQ Plan' }}
+                </span>
+                <span class="px-3 py-1 rounded-full text-xs font-bold
+                    {{ $instalasiCompleted
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-yellow-100 text-yellow-700' }}">
+                    {{ $boqApprovedCount }}/{{ $boqTotal }} Approved
+                </span>
+            </div>
         </div>
     </div>
     {{-- BOQ ITEMS REVIEW LIST --}}
@@ -86,13 +96,14 @@
                 'title' => $designatorTitle,         // Tampil sebagai judul accordion (Designator)
                 'description' => 'ada',              // Trigger untuk memunculkan kotak detail item BOQ
                 'subtitle_item_name' => $itemName,   // Nama Item BOQ lengkap
-                'plan' => $planVal,                  // Target Plan yang jelas
+                'plan' => $planVal,
+                'plan_label' => $referenceLabel,
                 'actual' => $actualVal,              // Aktual Lapangan yang jelas
                 'items' => $items,
                 'type' => 'progress_boq',
             ])
         @empty
-            <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-8 text-center text-gray-500 text-sm">
+            <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-8 text-center text-gray-500 text-sm">
                 Tidak ada daftar item BOQ material terpetakan untuk project ini.
             </div>
         @endforelse

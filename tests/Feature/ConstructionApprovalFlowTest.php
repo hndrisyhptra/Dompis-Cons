@@ -113,6 +113,125 @@ class ConstructionApprovalFlowTest extends TestCase
         $this->assertTrue($project->progressSummary()['finishingDone']);
     }
 
+    public function test_instalasi_and_finishing_use_latest_completed_survey_volume_with_plan_fallback(): void
+    {
+        DB::table('boq_survey_rounds')->insert([
+            ['id' => 40, 'lop_id' => 20, 'round_number' => 1, 'status' => 'completed', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 41, 'lop_id' => 20, 'round_number' => 2, 'status' => 'completed', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+        DB::table('boq_survey_round_items')->insert([
+            [
+                'boq_survey_round_id' => 40,
+                'boq_item_id' => 100,
+                'designator_id' => 30,
+                'designator' => 'M-TEST',
+                'item_name' => 'Material Test',
+                'unit' => 'UNIT',
+                'quantity_plan' => 1,
+                'quantity_survey' => 7,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'boq_survey_round_id' => 41,
+                'boq_item_id' => 100,
+                'designator_id' => 30,
+                'designator' => 'M-TEST',
+                'item_name' => 'Material Test',
+                'unit' => 'UNIT',
+                'quantity_plan' => 1,
+                'quantity_survey' => 9,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
+
+        $instalasiView = app(ProjectController::class)->reviewInstalasi(10);
+        $instalasiSource = $instalasiView->getData()['materialSource'];
+        $instalasiItems = $instalasiView->getData()['materialBoqItems'];
+
+        $this->assertSame('survey_round', $instalasiSource['source']);
+        $this->assertSame(2, $instalasiSource['round']->round_number);
+        $this->assertSame(9.0, $instalasiItems->first()->quantity_plan);
+
+        $finishingView = app(ProjectController::class)->reviewFinishing(10);
+        $this->assertSame(9.0, $finishingView->getData()['materialBoqItems']->first()->quantity_plan);
+
+        DB::table('boq_survey_round_items')->delete();
+        DB::table('boq_survey_rounds')->delete();
+        $fallback = Project::findOrFail(10)->materialProgressItems();
+
+        $this->assertSame('plan', $fallback['source']);
+        $this->assertSame(1.0, $fallback['items']->first()->quantity_plan);
+    }
+
+    public function test_approval_tabs_follow_actual_admin_approval_and_golive_completion(): void
+    {
+        foreach ([11, 12, 13, 14, 15] as $projectId) {
+            DB::table('projects')->insert([
+                'id_project' => $projectId,
+                'project_name' => "Approval Project {$projectId}",
+                'program' => 'OSP',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        DB::table('lops')->insert([
+            ['id_lop' => 21, 'project_id' => 11, 'lop_name' => 'Pending', 'branch' => 'KUPANG', 'sto' => 'KPN', 'status_progress' => 'survey', 'is_golive' => 0, 'created_at' => now(), 'updated_at' => now()],
+            ['id_lop' => 22, 'project_id' => 12, 'lop_name' => 'Active', 'branch' => 'KUPANG', 'sto' => 'KPN', 'status_progress' => 'instalasi', 'is_golive' => 0, 'created_at' => now(), 'updated_at' => now()],
+            ['id_lop' => 23, 'project_id' => 13, 'lop_name' => 'Complete', 'branch' => 'KUPANG', 'sto' => 'KPN', 'status_progress' => 'golive', 'is_golive' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['id_lop' => 24, 'project_id' => 14, 'lop_name' => 'Waiting SDI', 'branch' => 'KUPANG', 'sto' => 'KPN', 'status_progress' => 'fi_ogp_golive', 'is_golive' => 0, 'created_at' => now(), 'updated_at' => now()],
+            ['id_lop' => 25, 'project_id' => 15, 'lop_name' => 'Mixed Golive', 'branch' => 'KUPANG', 'sto' => 'KPN', 'status_progress' => 'golive', 'is_golive' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['id_lop' => 26, 'project_id' => 15, 'lop_name' => 'Mixed Active', 'branch' => 'KUPANG', 'sto' => 'KPN', 'status_progress' => 'finishing', 'is_golive' => 0, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        $evidences = [
+            [401, 11, 'pending'],
+            [402, 12, 'approved'],
+            [403, 12, 'pending'],
+            [404, 13, 'approved'],
+            [405, 14, 'approved'],
+            [406, 15, 'approved'],
+        ];
+        foreach ($evidences as [$id, $projectId, $status]) {
+            DB::table('evidences')->insert([
+                'id_evidence' => $id,
+                'project_id' => $projectId,
+                'uploaded_by' => 1,
+                'stage' => 'instalasi',
+                'evidence_type' => 'progress_boq',
+                'file_path' => "approval/{$id}.jpg",
+                'status' => $status,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $pending = app(ProjectController::class)
+            ->approvalIndex(Request::create('/', 'GET', ['status_filter' => 'pending']))
+            ->getData()['projects']->pluck('id_project')->all();
+        $active = app(ProjectController::class)
+            ->approvalIndex(Request::create('/', 'GET', ['status_filter' => 'active']))
+            ->getData()['projects']->pluck('id_project')->sort()->values()->all();
+        $complete = app(ProjectController::class)
+            ->approvalIndex(Request::create('/', 'GET', ['status_filter' => 'complete']))
+            ->getData()['projects']->pluck('id_project')->all();
+
+        $this->assertSame([11], $pending);
+        $this->assertSame([12, 14, 15], $active);
+        $this->assertSame([13], $complete);
+
+        $searchWithinPending = app(ProjectController::class)
+            ->approvalIndex(Request::create('/', 'GET', [
+                'search' => 'Approval Project 13',
+                'status_filter' => 'pending',
+            ]))
+            ->getData()['projects']->pluck('id_project')->all();
+
+        $this->assertSame([], $searchWithinPending);
+    }
+
     private function seedApprovalFlow(): void
     {
         DB::table('users')->insert([
@@ -207,6 +326,7 @@ class ConstructionApprovalFlowTest extends TestCase
         Schema::create('projects', function (Blueprint $table): void {
             $table->id('id_project');
             $table->string('project_name');
+            $table->string('program')->nullable();
             $table->timestamps();
         });
         Schema::create('pro_assign', function (Blueprint $table): void {
@@ -230,6 +350,8 @@ class ConstructionApprovalFlowTest extends TestCase
             $table->id('id_lop');
             $table->unsignedBigInteger('project_id');
             $table->string('lop_name');
+            $table->string('branch')->nullable();
+            $table->string('sto')->nullable();
             $table->string('status_progress');
             $table->string('status_progress_before_hold')->nullable();
             $table->string('program_sap')->nullable();
@@ -263,6 +385,18 @@ class ConstructionApprovalFlowTest extends TestCase
             $table->unsignedBigInteger('lop_id');
             $table->unsignedInteger('round_number');
             $table->string('status');
+            $table->timestamps();
+        });
+        Schema::create('boq_survey_round_items', function (Blueprint $table): void {
+            $table->id();
+            $table->unsignedBigInteger('boq_survey_round_id');
+            $table->unsignedBigInteger('boq_item_id')->nullable();
+            $table->unsignedBigInteger('designator_id')->nullable();
+            $table->string('designator')->nullable();
+            $table->string('item_name')->nullable();
+            $table->string('unit')->nullable();
+            $table->float('quantity_plan')->nullable();
+            $table->float('quantity_survey')->nullable();
             $table->timestamps();
         });
         Schema::create('evidences', function (Blueprint $table): void {

@@ -149,7 +149,7 @@
 <div class="max-w-7xl mx-auto space-y-6">
 
     {{-- HEADER --}}
-    <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
+    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-black text-gray-900 dark:text-white">Timeline Project</h1>
@@ -164,19 +164,19 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-            <div class="rounded-2xl bg-gray-50 dark:bg-gray-800 p-4">
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
                 <p class="text-xs text-gray-500">PID</p>
                 <p class="font-black text-gray-900 dark:text-white mt-1">{{ $project->pid ?? '-' }}</p>
             </div>
-            <div class="rounded-2xl bg-gray-50 dark:bg-gray-800 p-4">
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
                 <p class="text-xs text-gray-500">PID SAP</p>
                 <p class="font-black text-gray-900 dark:text-white mt-1">{{ $project->pid_sap ?? '-' }}</p>
             </div>
-            <div class="rounded-2xl bg-gray-50 dark:bg-gray-800 p-4">
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
                 <p class="text-xs text-gray-500">Nama Project</p>
                 <p class="font-black text-gray-900 dark:text-white mt-1 truncate">{{ $project->project_name ?? '-' }}</p>
             </div>
-            <div class="rounded-2xl bg-blue-50 dark:bg-blue-900/20 p-4">
+            <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4">
                 <p class="text-xs text-blue-700 dark:text-blue-300">Progress</p>
                 <p class="font-black text-blue-700 dark:text-blue-300 mt-1">{{ $project->progressSummary()['progress'] ?? 0 }}%</p>
             </div>
@@ -200,7 +200,7 @@
         berjalan & seluruh transisi SETELAH fitur ini aktif akan tercatat
         lengkap.
     --}}
-    <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
+    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
         <div class="flex items-center justify-between mb-5">
             <div>
                 <h2 class="text-base font-black text-gray-900 dark:text-white">Durasi per Tahap</h2>
@@ -270,7 +270,7 @@
     </div>
 
     {{-- TIMELINE HORIZONTAL (RINGKASAN) --}}
-    <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
+    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
         <div class="flex items-center justify-between mb-5">
             <div>
                 <h2 class="text-base font-black text-gray-900 dark:text-white">Ringkasan Kronologi</h2>
@@ -283,16 +283,18 @@
         @else
             <div class="overflow-x-auto pb-3 -mx-2 px-2">
                 <div class="relative flex items-start" style="min-width: {{ max($events->count() * 168, 100) }}px;">
-                    <div class="absolute left-0 right-0 top-5 h-0.5 bg-gray-200 dark:bg-gray-700"></div>
+                    <div class="absolute left-0 right-0 top-3.5 h-px bg-gray-300 dark:bg-gray-600"></div>
                     @foreach($events as $i => $e)
                         <button type="button"
                                 onclick="jumpToEvent({{ $i }})"
                                 class="relative z-10 flex flex-col items-center text-center w-[168px] shrink-0 px-2 group">
-                            <span class="w-4 h-4 rounded-full {{ $e['style']['color'] ? $colorClasses[$e['style']['color']]['dot'] : $colorClasses['gray']['dot'] }} border-2 border-white dark:border-gray-900 shadow group-hover:scale-125 transition-transform"></span>
+                            <span class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gray-950 text-[10px] font-black text-white shadow-sm transition-transform group-hover:scale-110 dark:border-gray-900 dark:bg-white dark:text-gray-950">
+                                {{ $i + 1 }}
+                            </span>
                             <span class="mt-2 text-[10px] font-bold text-gray-400">{{ optional($e['dt'])->format('d M Y') }}</span>
                             <span class="text-[10px] text-gray-400">{{ optional($e['dt'])->format('H:i') }}</span>
-                            <span class="mt-1 text-xs font-bold text-gray-700 dark:text-gray-200 leading-snug line-clamp-2 group-hover:text-blue-600">
-                                {{ $e['style']['icon'] }} {{ $e['title'] }}
+                            <span class="mt-1 text-xs font-bold text-gray-700 dark:text-gray-200 leading-snug line-clamp-2 group-hover:text-gray-950 dark:group-hover:text-white">
+                                {{ $e['title'] }}
                             </span>
                         </button>
                     @endforeach
@@ -302,7 +304,7 @@
     </div>
 
     {{-- TIMELINE VERTICAL (DETAIL + EVIDEN FOTO) --}}
-    <div class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
+    <div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6 shadow-sm">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div>
                 <h2 class="text-base font-black text-gray-900 dark:text-white">Detail Kronologi &amp; Eviden</h2>
@@ -329,7 +331,7 @@
 
                         <button type="button"
                                 onclick="toggleEvent({{ $i }})"
-                                class="w-full text-left bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl px-4 py-3 transition flex items-start justify-between gap-3">
+                                class="w-full text-left bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg px-4 py-3 transition flex items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <div class="flex flex-wrap items-center gap-2 mb-1">
                                     <span class="text-xs font-bold text-gray-400">{{ optional($e['dt'])->format('d M Y · H:i') }} WIB</span>
@@ -350,7 +352,7 @@
                             </svg>
                         </button>
 
-                        <div id="event-body-{{ $i }}" class="hidden mt-2 px-4 py-4 rounded-2xl border border-gray-100 dark:border-gray-800">
+                        <div id="event-body-{{ $i }}" class="hidden mt-2 px-4 py-4 rounded-lg border border-gray-100 dark:border-gray-800">
                             @if($e['desc'])
                                 <p class="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line">{{ $e['desc'] }}</p>
                             @else
@@ -361,7 +363,7 @@
                                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-4">
                                     @foreach($e['photos'] as $photo)
                                         @if($photo->file_path)
-                                            <a href="{{ Storage::url($photo->file_path) }}" target="_blank" class="group block rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                                            <a href="{{ Storage::url($photo->file_path) }}" target="_blank" class="group block rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                                                 @php
                                                     $ext = strtolower(pathinfo($photo->file_path, PATHINFO_EXTENSION));
                                                     $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true);
@@ -420,9 +422,9 @@
         }
         if (target) {
             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            target.classList.add('ring-2', 'ring-blue-400', 'rounded-2xl');
+            target.classList.add('ring-2', 'ring-gray-400', 'rounded-lg');
             setTimeout(function () {
-                target.classList.remove('ring-2', 'ring-blue-400', 'rounded-2xl');
+                target.classList.remove('ring-2', 'ring-gray-400', 'rounded-lg');
             }, 1500);
         }
     }

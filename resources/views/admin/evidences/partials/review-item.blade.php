@@ -46,10 +46,11 @@
     // =========================================================================
     $isPt2 = $isPt2 ?? false; 
     $routePrefix = $isPt2 ? 'admin.pt2.evidence.' : 'admin.evidences.';
+    $planLabel = $plan_label ?? 'Target Plan';
 @endphp
 
 <div x-data="{ open: false }"
-     class="bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm transition-all">
+     class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden shadow-sm transition-all">
 
     {{-- HEADER KATEGORI / DESIGNATOR (JUDUL UTAMA) --}}
     <button type="button"
@@ -98,7 +99,7 @@
                 detail (dan Qty Plan/Actual) tidak pernah muncul di Step Instalasi.
             --}}
             @if(isset($description) && !empty($description))
-                <div class="bg-white dark:bg-gray-950 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/50 shadow-xs space-y-3">
+                <div class="bg-white dark:bg-gray-950 p-4 rounded-lg border border-blue-100 dark:border-blue-900/50 shadow-xs space-y-3">
                     <div class="flex items-center gap-2">
                         <span class="px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 rounded text-[10px] font-black uppercase tracking-wider">Detail</span>
                     </div>
@@ -112,11 +113,11 @@
 
                     @if(isset($plan) && isset($actual))
                         <div class="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-                            <div class="bg-slate-50 dark:bg-gray-900 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
-                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Target Plan</p>
+                            <div class="bg-slate-50 dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-800">
+                                <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">{{ $planLabel }}</p>
                                 <p class="text-sm font-black text-blue-600 dark:text-blue-400 mt-0.5 font-mono">{{ $plan }}</p>
                             </div>
-                            <div class="bg-slate-50 dark:bg-gray-900 p-3 rounded-xl border border-gray-200 dark:border-gray-800">
+                            <div class="bg-slate-50 dark:bg-gray-900 p-3 rounded-lg border border-gray-200 dark:border-gray-800">
                                 <p class="text-[10px] font-black text-gray-400 uppercase tracking-wider">Aktual Lapangan</p>
                                 <p class="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-0.5 font-mono">{{ $actual }}</p>
                             </div>
@@ -156,7 +157,7 @@
                         $evidenceId = $isPt2 ? $evidence->id_pt2_evidence : $evidence->id_evidence; 
                     @endphp
 
-                    <div class="bg-white dark:bg-gray-950 rounded-[1.5rem] border border-gray-200 dark:border-gray-800 p-2.5 shadow-sm flex flex-col transition-all hover:border-blue-300">
+                    <div class="bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 p-2.5 shadow-sm flex flex-col transition-all hover:border-blue-300">
                         
                         <div class="relative aspect-video rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 group flex items-center justify-center">
                             
@@ -204,7 +205,7 @@
                                     </form>
                                 </div>
                             @elseif($evidence->status == 'rejected')
-                                <div class="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 border border-red-100 dark:border-red-900/50 flex flex-col items-center text-center">
+                                <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 border border-red-100 dark:border-red-900/50 flex flex-col items-center text-center">
                                     <p class="text-[10px] font-black text-red-700 dark:text-red-400 uppercase tracking-wide mb-1">Reason Reject:</p>
                                     <p class="text-xs text-red-900 dark:text-red-300 font-medium leading-snug mb-3">{{ $evidence->review_note }}</p>
                                     <form method="POST" action="{{ route($routePrefix . 'reset', $evidenceId) }}">
@@ -227,7 +228,7 @@
                                     </form>
                                 </div>
                                 <div x-show="showReject" x-collapse x-cloak>
-                                    <form method="POST" action="{{ route($routePrefix . 'reject', $evidenceId) }}" class="bg-slate-50 dark:bg-gray-900 rounded-xl p-2 border border-slate-200 dark:border-gray-700">
+                                    <form method="POST" action="{{ route($routePrefix . 'reject', $evidenceId) }}" class="bg-slate-50 dark:bg-gray-900 rounded-lg p-2 border border-slate-200 dark:border-gray-700">
                                         @csrf
                                         <textarea name="review_note" rows="2" required placeholder="Tuliskan ID foto yang direject (Misal: Blur)..." class="w-full rounded-lg border-gray-300 dark:border-gray-700 text-xs p-2.5 focus:ring-red-500 focus:border-red-500 resize-none bg-white dark:bg-gray-950"></textarea>
                                         <div class="flex items-center gap-2 mt-2">

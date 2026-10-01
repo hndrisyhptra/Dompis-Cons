@@ -72,7 +72,7 @@
 @endphp
 
 <div class="max-w-7xl mx-auto space-y-6">
-    <section class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-5 sm:p-6 shadow-sm">
+    <section class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-5 sm:p-6 shadow-sm">
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2 mb-2">
@@ -91,30 +91,30 @@
         </div>
 
         <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 mt-6">
-            <div class="rounded-2xl bg-gray-50 dark:bg-gray-800 p-4">
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
                 <p class="text-xs text-gray-500">PID</p>
                 <p class="font-black text-gray-900 dark:text-white mt-1 break-words">{{ $project->pid ?? '-' }}</p>
             </div>
-            <div class="rounded-2xl bg-gray-50 dark:bg-gray-800 p-4">
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
                 <p class="text-xs text-gray-500">PID SAP</p>
                 <p class="font-black text-gray-900 dark:text-white mt-1 break-words">{{ $project->pid_sap ?? $lop->pid_sap ?? '-' }}</p>
             </div>
-            <div class="rounded-2xl bg-gray-50 dark:bg-gray-800 p-4 col-span-2 lg:col-span-1">
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4 col-span-2 lg:col-span-1">
                 <p class="text-xs text-gray-500">LOP</p>
                 <p class="font-black text-gray-900 dark:text-white mt-1 break-words">{{ $lop->lop_name ?? '-' }}</p>
             </div>
-            <div class="rounded-2xl bg-gray-50 dark:bg-gray-800 p-4">
+            <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
                 <p class="text-xs text-gray-500">Branch / STO</p>
                 <p class="font-black text-gray-900 dark:text-white mt-1">{{ $lop->branch ?: ($project->branch ?? '-') }} / {{ $lop->sto ?? '-' }}</p>
             </div>
-            <div class="rounded-2xl bg-blue-50 dark:bg-blue-900/20 p-4">
+            <div class="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-4">
                 <p class="text-xs text-blue-700 dark:text-blue-300">Progress</p>
                 <p class="font-black text-blue-700 dark:text-blue-300 mt-1">{{ $summary['progress'] ?? 0 }}%</p>
             </div>
         </div>
     </section>
 
-    <section class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-5 sm:p-6 shadow-sm">
+    <section class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-5 sm:p-6 shadow-sm">
         <div class="mb-5">
             <h2 class="text-base font-black text-gray-900 dark:text-white">Durasi Antar-Milestone</h2>
             <p class="text-xs text-gray-400 mt-0.5">Estimasi dari timestamp data PT 2 yang tersedia. Tahap tanpa timestamp historis ditampilkan “-”.</p>
@@ -154,7 +154,7 @@
         </div>
     </section>
 
-    <section class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-5 sm:p-6 shadow-sm">
+    <section class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-5 sm:p-6 shadow-sm">
         <div class="mb-5">
             <h2 class="text-base font-black text-gray-900 dark:text-white">Ringkasan Kronologi</h2>
             <p class="text-xs text-gray-400 mt-0.5">Geser ke samping dan klik titik untuk membuka aktivitas.</p>
@@ -162,18 +162,20 @@
 
         <div class="overflow-x-auto pb-3 -mx-2 px-2">
             <div class="relative flex items-start" style="min-width: {{ max($events->count() * 168, 168) }}px;">
-                <div class="absolute left-0 right-0 top-5 h-0.5 bg-gray-200 dark:bg-gray-700"></div>
+                <div class="absolute left-0 right-0 top-3.5 h-px bg-gray-300 dark:bg-gray-600"></div>
                 @foreach($events as $index => $event)
                     @php
                         $eventStyle = $styleFor($event['type']);
                     @endphp
                     <button type="button" onclick="jumpToPt2Event({{ $index }})"
                             class="relative z-10 flex flex-col items-center text-center w-[168px] shrink-0 px-2 group">
-                        <span class="w-4 h-4 rounded-full {{ $colors[$eventStyle['color']]['dot'] }} border-2 border-white dark:border-gray-900 shadow group-hover:scale-125 transition-transform"></span>
+                        <span class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gray-950 text-[10px] font-black text-white shadow-sm transition-transform group-hover:scale-110 dark:border-gray-900 dark:bg-white dark:text-gray-950">
+                            {{ $index + 1 }}
+                        </span>
                         <span class="mt-2 text-[10px] font-bold text-gray-400">{{ $event['dt']->format('d M Y') }}</span>
                         <span class="text-[10px] text-gray-400">{{ $event['dt']->format('H:i') }}</span>
-                        <span class="mt-1 text-xs font-bold text-gray-700 dark:text-gray-200 leading-snug line-clamp-2 group-hover:text-blue-600">
-                            {{ $eventStyle['icon'] }} {{ $event['title'] }}
+                        <span class="mt-1 text-xs font-bold text-gray-700 dark:text-gray-200 leading-snug line-clamp-2 group-hover:text-gray-950 dark:group-hover:text-white">
+                            {{ $event['title'] }}
                         </span>
                     </button>
                 @endforeach
@@ -181,7 +183,7 @@
         </div>
     </section>
 
-    <section class="bg-white dark:bg-gray-900 rounded-3xl border border-gray-200 dark:border-gray-800 p-5 sm:p-6 shadow-sm">
+    <section class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-5 sm:p-6 shadow-sm">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div>
                 <h2 class="text-base font-black text-gray-900 dark:text-white">Detail Kronologi &amp; Eviden</h2>
@@ -204,7 +206,7 @@
                     <span class="absolute -left-8 top-1.5 w-6 h-6 rounded-full {{ $colors[$eventStyle['color']]['icon'] ?? $colors['gray']['icon'] }} flex items-center justify-center text-xs ring-4 ring-white dark:ring-gray-900">{{ $eventStyle['icon'] }}</span>
 
                     <button type="button" onclick="togglePt2Event({{ $index }})"
-                            class="w-full text-left bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl px-4 py-3 transition flex items-start justify-between gap-3">
+                            class="w-full text-left bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg px-4 py-3 transition flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2 mb-1">
                                 <span class="text-xs font-bold text-gray-400">{{ $event['dt']->format('d M Y · H:i') }} WIB</span>
@@ -225,7 +227,7 @@
                         </svg>
                     </button>
 
-                    <div id="pt2-event-body-{{ $index }}" class="hidden mt-2 px-4 py-4 rounded-2xl border border-gray-100 dark:border-gray-800">
+                    <div id="pt2-event-body-{{ $index }}" class="hidden mt-2 px-4 py-4 rounded-lg border border-gray-100 dark:border-gray-800">
                         <p class="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line">{{ $event['desc'] ?: 'Tidak ada keterangan tambahan.' }}</p>
 
                         @if($event['photos']->isNotEmpty())
@@ -237,7 +239,7 @@
                                             $isImage = in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif'], true);
                                         @endphp
                                         <a href="{{ Storage::url($photo['path']) }}" target="_blank" rel="noopener"
-                                           class="group block rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                                           class="group block rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
                                             @if($isImage)
                                                 <img src="{{ Storage::url($photo['path']) }}" loading="lazy" alt="{{ $photo['label'] }}" class="w-full h-28 object-cover group-hover:scale-105 transition-transform duration-200">
                                             @else
@@ -285,9 +287,9 @@
         if (body && body.classList.contains('hidden')) togglePt2Event(index);
         if (!target) return;
         target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        target.classList.add('ring-2', 'ring-blue-400', 'rounded-2xl');
+        target.classList.add('ring-2', 'ring-gray-400', 'rounded-lg');
         setTimeout(function () {
-            target.classList.remove('ring-2', 'ring-blue-400', 'rounded-2xl');
+            target.classList.remove('ring-2', 'ring-gray-400', 'rounded-lg');
         }, 1500);
     }
 </script>

@@ -21,6 +21,9 @@
     })->values();
     $materialSourceType = $materialSource['source'];
     $materialSourceRound = $materialSource['round'];
+    $referenceLabel = $materialSourceType === 'survey_round'
+        ? 'Volume BOQ Survey Tahap '.($materialSourceRound?->round_number ?? '-')
+        : 'Volume BOQ Plan';
     $finishingBoqItems = $materialBoqItems;
 
     $totalEvidence = $evidences->count();
@@ -53,7 +56,7 @@
 
 {{-- Project Info --}}
 <div class="px-4 mt-4">
-    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+    <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-xs">
         <div class="mb-3">
             <p class="text-xs text-slate-400 font-medium">Nama LOP</p>
             <p class="text-sm font-bold text-slate-900 break-words mt-0.5">{{ $project->project_name }}</p>
@@ -77,7 +80,7 @@
 
 {{-- UT STATUS --}}
 <div class="px-4 mt-5">
-    <div class="rounded-2xl border p-4
+    <div class="rounded-lg border p-4
         {{ $readyForUt ? 'bg-green-50 border-green-200' : 'bg-yellow-50 border-yellow-200' }}">
 
         <div class="flex items-start gap-3">
@@ -105,23 +108,23 @@
 
 {{-- APPROVAL SUMMARY --}}
 <div class="px-4 mt-4">
-    <div class="bg-white rounded-2xl border border-slate-200 p-4">
+    <div class="bg-white rounded-lg border border-slate-200 p-4">
         <h3 class="text-sm font-bold text-slate-900 mb-3">
             Ringkasan Approval Eviden
         </h3>
 
         <div class="grid grid-cols-3 gap-2 text-center">
-            <div class="rounded-xl bg-green-50 p-3">
+            <div class="rounded-lg bg-green-50 p-3">
                 <p class="text-lg font-black text-green-700">{{ $approvedEvidence }}</p>
                 <p class="text-[11px] text-green-700 font-bold">Approved</p>
             </div>
 
-            <div class="rounded-xl bg-yellow-50 p-3">
+            <div class="rounded-lg bg-yellow-50 p-3">
                 <p class="text-lg font-black text-yellow-700">{{ $pendingEvidence }}</p>
                 <p class="text-[11px] text-yellow-700 font-bold">Pending</p>
             </div>
 
-            <div class="rounded-xl bg-red-50 p-3">
+            <div class="rounded-lg bg-red-50 p-3">
                 <p class="text-lg font-black text-red-700">{{ $rejectedEvidence }}</p>
                 <p class="text-[11px] text-red-700 font-bold">Rejected</p>
             </div>
@@ -175,7 +178,7 @@
             @endphp
 
             <div x-data="{ open: {{ $finalStatus == 'rejected' ? 'true' : 'false' }} }"
-                 class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                 class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs">
 
                 <button type="button"
                         @click="open = !open"
@@ -199,7 +202,7 @@
 
                                 <div class="flex items-center gap-3 text-[11px]">
                                     <span class="text-[#1565D8] font-semibold">
-                                        Plan: <span class="font-bold">{{ number_format($boq->quantity_plan) }}</span> {{ $boq->unit }}
+                                        {{ $materialSourceType === 'survey_round' ? 'Volume Survey' : 'Volume Plan' }}: <span class="font-bold">{{ number_format($boq->quantity_plan) }}</span> {{ $boq->unit }}
                                     </span>
                                     <span class="text-green-600 font-semibold">
                                         Actual: <span class="font-bold">{{ number_format($boq->quantity_actual ?? 0) }}</span> {{ $boq->unit }}
@@ -265,7 +268,7 @@
                         </p>
 
                         @if($finalStatus == 'rejected')
-                            <div class="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs text-red-700 leading-relaxed flex items-start gap-2 mb-3">
+                            <div class="rounded-lg border border-red-100 bg-red-50/50 p-3 text-xs text-red-700 leading-relaxed flex items-start gap-2 mb-3">
                                 <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
                                 <div>
                                     <p class="font-bold mb-0.5">Terdapat Eviden Ditolak</p>
@@ -348,7 +351,7 @@
 
         @empty
 
-            <div class="bg-white rounded-2xl border border-slate-200 p-4 text-center text-xs text-slate-500">
+            <div class="bg-white rounded-lg border border-slate-200 p-4 text-center text-xs text-slate-500">
                 Tidak ada item material pada BOQ.
             </div>
 
@@ -380,7 +383,7 @@
 
 {{-- MODAL UPLOAD OVERLAY --}}
 <div id="uploadModal" class="hidden fixed inset-0 z-[9999] bg-black/60 px-4 flex items-center justify-center backdrop-blur-xs animate-fade-in">
-    <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div class="bg-white rounded-lg w-full max-w-sm shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
         <div class="bg-[#1565D8] text-white px-5 py-4 flex items-start justify-between shrink-0">
             <div>
@@ -407,13 +410,13 @@
             <input type="hidden" name="latitude" id="latitude">
             <input type="hidden" name="longitude" id="longitude">
 
-            <div id="selectedBoqBox" class="hidden grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-xs shrink-0">
+            <div id="selectedBoqBox" class="hidden grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs shrink-0">
                 <div>
                     <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Designator</p>
                     <p id="selectedBoqDesignator" class="text-xs font-black text-slate-900 mt-0.5">-</p>
                 </div>
                 <div>
-                    <p class="text-[10px] font-bold text-blue-500 uppercase tracking-wide">Target Plan</p>
+                    <p class="text-[10px] font-bold text-blue-500 uppercase tracking-wide">{{ $referenceLabel }}</p>
                     <p class="text-xs font-black text-[#1565D8] mt-0.5">
                         <span id="selectedBoqPlan">0</span> <span class="selectedBoqUnit text-[10px] font-normal text-blue-400"></span>
                     </p>
@@ -431,7 +434,7 @@
                     Pilih/Ambil Eviden Final
                 </label>
 
-                <label class="flex flex-col items-center justify-center w-full min-h-[125px] border-2 border-dashed border-blue-300 rounded-2xl bg-blue-50/40 cursor-pointer hover:bg-blue-50 transition p-4">
+                <label class="flex flex-col items-center justify-center w-full min-h-[125px] border-2 border-dashed border-blue-300 rounded-lg bg-blue-50/40 cursor-pointer hover:bg-blue-50 transition p-4">
                     <div class="text-center">
                         <div class="mx-auto w-11 h-11 rounded-xl bg-[#1565D8] text-white flex items-center justify-center text-xl font-black shadow-sm">
                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-camera-icon lucide-camera">
@@ -528,7 +531,7 @@ function alertNoMetadata(fileName) {
         text: 'Foto "' + fileName + '" tidak memiliki metadata (EXIF) sehingga tidak bisa diunggah. Pastikan foto diambil langsung dari kamera HP, bukan hasil screenshot atau kiriman ulang WhatsApp/Telegram yang menghapus metadata.',
         icon: 'warning',
         confirmButtonColor: '#1565D8',
-        customClass: { popup: 'rounded-3xl' }
+        customClass: { popup: 'rounded-lg' }
     });
 }
 
@@ -686,7 +689,7 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
     if (selectedFiles.length === 0) {
-        Swal.fire({ title: 'Pilih Foto!', text: 'Mohon lampirkan minimal 1 foto fisik sebagai bukti progress finishing.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
+        Swal.fire({ title: 'Pilih Foto!', text: 'Mohon lampirkan minimal 1 foto fisik sebagai bukti progress finishing.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-lg' } });
         return;
     }
 
@@ -709,14 +712,14 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     .then(response => {
         if (response.ok) {
             closeUploadModal();
-            Swal.fire({ title: 'Berhasil Disimpan!', text: 'Eviden progress finishing berhasil diperbarui.', icon: 'success', showConfirmButton: false, timer: 1500, timerProgressBar: true, customClass: { popup: 'rounded-3xl' } })
+            Swal.fire({ title: 'Berhasil Disimpan!', text: 'Eviden progress finishing berhasil diperbarui.', icon: 'success', showConfirmButton: false, timer: 1500, timerProgressBar: true, customClass: { popup: 'rounded-lg' } })
             .then(() => window.location.reload());
         } else {
-            Swal.fire({ title: 'Gagal Memproses!', text: 'Terjadi kesalahan sistem atau kendala validasi data.', icon: 'error', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
+            Swal.fire({ title: 'Gagal Memproses!', text: 'Terjadi kesalahan sistem atau kendala validasi data.', icon: 'error', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-lg' } });
         }
     })
     .catch(() => {
-        Swal.fire({ title: 'Gangguan Jaringan!', text: 'Gagal menghubungi server. Pastikan koneksi internet di lapangan stabil.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
+        Swal.fire({ title: 'Gangguan Jaringan!', text: 'Gagal menghubungi server. Pastikan koneksi internet di lapangan stabil.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-lg' } });
     });
 });
 </script>

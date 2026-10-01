@@ -61,7 +61,7 @@
     $stepLabelClass = fn (bool $done) => $done ? 'text-emerald-600 dark:text-emerald-500' : 'text-amber-500';
 @endphp
 
-<div class="bg-white dark:bg-gray-900 rounded-[2rem] border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
+<div class="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-5 shadow-sm">
 
     {{-- PROJECT INFO & TOMBOL KEMBALI --}}
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

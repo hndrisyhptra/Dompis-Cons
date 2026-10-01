@@ -636,22 +636,11 @@ class ProjectController extends Controller
                     });
             });
 
-        // Section AI: definisi 3 tab diluruskan sesuai kondisi flow
-        // terbaru (permintaan user) --
-        // "Menunggu Review" = LOP yang BENAR-BENAR belum ada evidennya yang
-        // di-approve SAMA SEKALI (bukan sekadar "ada yang berstatus
-        // pending" seperti logika lama -- LOP yang sudah pernah di-approve
-        // tapi kebetulan ada foto baru yang masih pending itu SEHARUSNYA
-        // sudah dianggap "On Progress", karena admin sudah mulai
-        // mengerjakannya).
-        // "On Progress" = sudah ada MINIMAL 1 eviden approved, TAPI belum
-        // mencapai kriteria "Selesai" di bawah.
-        // "Selesai" = LOP sudah mencapai tahap FI-OGP Golive/Golive (baik
-        // langsung maupun via hold/drop SETELAH sempat mencapai tahap itu --
-        // hold/drop-safe, lihat Section AH) DAN tidak ada eviden yang masih
-        // nyangkut (pending/rejected).
-        $completedCodes = ['fi_ogp_golive', 'golive'];
-        $completedOrDropCodes = ['fi_ogp_golive', 'golive', 'drop'];
+        // Definisi tab Approval Konstruksi:
+        // - Menunggu Review: belum ada satu pun eviden yang di-approve Admin.
+        // - On Progress: sudah ada minimal satu approval, tetapi belum memenuhi
+        //   syarat Selesai (termasuk jika masih ada pending/rejected).
+        // - Selesai: seluruh eviden approved DAN LOP benar-benar Golive 100%.
 
         $applyPendingFilter = function ($q) {
             $q->whereDoesntHave('evidences', function ($sub) {
@@ -659,35 +648,43 @@ class ProjectController extends Controller
             });
         };
 
-        $applyActiveFilter = function ($q) use ($completedOrDropCodes) {
+        $applyNotGoliveFilter = function ($lopQuery) {
+            $lopQuery->where(function ($statusQuery) {
+                $statusQuery->where('status_progress', '!=', 'golive')
+                    ->orWhereNull('status_progress')
+                    ->orWhere('is_golive', '!=', true)
+                    ->orWhereNull('is_golive');
+            });
+        };
+
+        $applyActiveFilter = function ($q) use ($applyNotGoliveFilter) {
             $q->whereHas('evidences', function ($sub) {
                 $sub->where('status', 'approved');
-            })->whereHas('lops', function ($lopQuery) use ($completedOrDropCodes) {
-                $lopQuery->whereNotIn('status_progress', $completedOrDropCodes)
-                    ->where(function ($qq) use ($completedOrDropCodes) {
-                        $qq->whereNull('status_progress_before_hold')
-                            ->orWhereNotIn('status_progress_before_hold', $completedOrDropCodes);
+            })->where(function ($notComplete) use ($applyNotGoliveFilter) {
+                $notComplete
+                    ->whereHas('lops', $applyNotGoliveFilter)
+                    ->orWhereHas('evidences', function ($evidenceQuery) {
+                        $evidenceQuery->where(function ($statusQuery) {
+                            $statusQuery->where('status', '!=', 'approved')
+                                ->orWhereNull('status');
+                        });
                     });
             });
         };
 
-        $applyCompleteFilter = function ($q) use ($completedCodes) {
-            $q->whereHas('lops', function ($lopQuery) use ($completedCodes) {
-                $lopQuery->where('status_progress', '!=', 'drop')
-                    ->where(function ($qq) use ($completedCodes) {
-                        $qq->whereIn('status_progress', $completedCodes)
-                            ->orWhereIn('status_progress_before_hold', $completedCodes);
-                    });
-            })->whereDoesntHave('evidences', function ($ev) {
-                $ev->whereIn('status', ['pending', 'rejected']);
-            });
+        $applyCompleteFilter = function ($q) use ($applyNotGoliveFilter) {
+            $q->whereHas('lops')
+                ->whereDoesntHave('lops', $applyNotGoliveFilter)
+                ->whereDoesntHave('evidences', function ($ev) {
+                $ev->where(function ($statusQuery) {
+                    $statusQuery->where('status', '!=', 'approved')
+                        ->orWhereNull('status');
+                });
+                });
         };
-
-        $tabCounts = null;
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                // ... (Logika Search sama seperti sebelumnya) ...
                 $q->where('project_name', 'like', "%{$search}%")
                     ->orWhere('execution_type', 'like', "%{$search}%")
                     ->orWhereHas('lop', function ($lopQ) use ($search) {
@@ -701,58 +698,54 @@ class ProjectController extends Controller
                         $waspangQ->where('name', 'like', "%{$search}%");
                     });
             });
-            // Saat search aktif tab diabaikan (semua hasil ditampilkan
-            // terlepas dari tab) -- jadi badge angka per-tab tidak relevan.
-        } else {
-            // Filter Kawalanku, Program, Branch diterapkan DULU (independen
-            // dari tab) supaya angka counter di tiap tab (di bawah) ikut
-            // merefleksikan filter yang sedang aktif.
-            $query->when($myKawal == '1', function ($q) {
-                $q->whereHas('assignment', function ($sub) {
-                    $sub->where('assigned_by', auth()->user()->id_user);
-                });
+        }
+
+        // Semua filter, termasuk pencarian, tetap tunduk pada tab yang aktif.
+        // Dengan begitu hasil pencarian tidak mencampur status antar-tab.
+        $query->when($myKawal == '1', function ($q) {
+            $q->whereHas('assignment', function ($sub) {
+                $sub->where('assigned_by', auth()->user()->id_user);
             });
+        });
 
-            $query->when($programFilter, function ($q) use ($programFilter) {
-                $q->where(function ($subQ) use ($programFilter) {
-                    $subQ->where('program', $programFilter)
-                        ->orWhereHas('lop', function ($subLop) use ($programFilter) {
-                            $subLop->where('program_sap', $programFilter);
-                        });
-                });
+        $query->when($programFilter, function ($q) use ($programFilter) {
+            $q->where(function ($subQ) use ($programFilter) {
+                $subQ->where('program', $programFilter)
+                    ->orWhereHas('lop', function ($subLop) use ($programFilter) {
+                        $subLop->where('program_sap', $programFilter);
+                    });
             });
+        });
 
-            $query->when($branchFilter, function ($q) use ($branchFilter) {
-                $q->whereHas('lop', function ($sub) use ($branchFilter) {
-                    $sub->where('branch', $branchFilter);
-                });
+        $query->when($branchFilter, function ($q) use ($branchFilter) {
+            $q->whereHas('lop', function ($sub) use ($branchFilter) {
+                $sub->where('branch', $branchFilter);
             });
+        });
 
-            // Hitung jumlah LOP di tiap tab (dgn filter Kawalanku/Program/
-            // Branch yang sama) utk badge angka di UI tab, supaya admin
-            // tahu beban kerja tiap tab tanpa harus klik satu-satu.
-            $pendingCountQuery = clone $query;
-            $applyPendingFilter($pendingCountQuery);
+        // Hitung jumlah LOP di tiap tab dengan kombinasi pencarian/filter
+        // yang sama agar badge selalu merefleksikan data yang sedang dilihat.
+        $pendingCountQuery = clone $query;
+        $applyPendingFilter($pendingCountQuery);
 
-            $activeCountQuery = clone $query;
-            $applyActiveFilter($activeCountQuery);
+        $activeCountQuery = clone $query;
+        $applyActiveFilter($activeCountQuery);
 
-            $completeCountQuery = clone $query;
-            $applyCompleteFilter($completeCountQuery);
+        $completeCountQuery = clone $query;
+        $applyCompleteFilter($completeCountQuery);
 
-            $tabCounts = [
-                'pending' => $pendingCountQuery->count(),
-                'active' => $activeCountQuery->count(),
-                'complete' => $completeCountQuery->count(),
-            ];
+        $tabCounts = [
+            'pending' => $pendingCountQuery->count(),
+            'active' => $activeCountQuery->count(),
+            'complete' => $completeCountQuery->count(),
+        ];
 
-            if ($statusFilter === 'pending') {
-                $applyPendingFilter($query);
-            } elseif ($statusFilter === 'complete') {
-                $applyCompleteFilter($query);
-            } elseif ($statusFilter === 'active') {
-                $applyActiveFilter($query);
-            }
+        if ($statusFilter === 'pending') {
+            $applyPendingFilter($query);
+        } elseif ($statusFilter === 'complete') {
+            $applyCompleteFilter($query);
+        } elseif ($statusFilter === 'active') {
+            $applyActiveFilter($query);
         }
 
         $projects = $query->latest('updated_at')->paginate(10)->withQueryString();
@@ -1215,7 +1208,10 @@ class ProjectController extends Controller
             'lop',
         ])->where('id_project', $id)->firstOrFail();
 
-        return view('admin.evidences.review-instalasi', compact('project'));
+        $materialSource = $project->materialProgressItems();
+        $materialBoqItems = $materialSource['items'];
+
+        return view('admin.evidences.review-instalasi', compact('materialBoqItems', 'materialSource', 'project'));
     }
 
     // STEP 4 - REVIEW PENGUKURAN

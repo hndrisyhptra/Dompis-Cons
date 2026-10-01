@@ -17,6 +17,9 @@
         })->count();
 
         $instalasiUploadedComplete = $boqTotal > 0 && $boqUploaded == $boqTotal;
+        $referenceLabel = ($materialSourceType ?? 'plan') === 'survey_round'
+            ? 'Volume BOQ Survey Tahap '.($materialSourceRound?->round_number ?? '-')
+            : 'Volume BOQ Plan';
     @endphp
 
     {{-- HEADER & STEPPER --}}
@@ -24,7 +27,7 @@
 
     {{-- Project Info --}}
     <div class="px-4 mt-4">
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs">
+        <div class="bg-white rounded-lg border border-slate-200 p-4 shadow-xs">
             <div class="mb-3">
                 <p class="text-xs text-slate-400 font-medium">Nama LOP</p>
                 <p class="text-sm font-bold text-slate-900 break-words mt-0.5">{{ $project->project_name }}</p>
@@ -92,7 +95,7 @@
                     $reviewNote = optional($rejectedPhoto)->review_note;
                 @endphp
 
-                <div x-data="{ open: {{ $status == 'rejected' ? 'true' : 'false' }} }" class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                <div x-data="{ open: {{ $status == 'rejected' ? 'true' : 'false' }} }" class="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs">
                     {{-- CARD HEADER TRIGGER BUTTON --}}
                     <button type="button" @click="open = !open" class="w-full p-4 flex items-center justify-between gap-3 text-left">
                         <div class="flex items-center gap-3 min-w-0">
@@ -104,7 +107,7 @@
                                 <h3 class="text-xs font-bold text-slate-900 tracking-tight leading-snug">{{ $boq->item_name ?: $boq->designator }}</h3>
                                 <p class="text-[11px] text-slate-500 font-mono mt-0.5">{{ $boq->designator ?? '-' }}</p>
                                 <div class="text-[11px] text-slate-400 space-y-0.5 mt-0.5">
-                                    <p>Plan: <span class="font-semibold text-slate-700">{{ number_format($boq->quantity_plan, 0, ',', '.') }} {{ $boq->unit }}</span></p>
+                                    <p>{{ ($materialSourceType ?? 'plan') === 'survey_round' ? 'Volume Survey' : 'Volume Plan' }}: <span class="font-semibold text-slate-700">{{ number_format($boq->quantity_plan, 0, ',', '.') }} {{ $boq->unit }}</span></p>
                                     
                                    @php
                                         $designatorUpper = strtoupper($boq->designator);
@@ -149,7 +152,7 @@
                         
                         {{-- BLOK INFO REASON ACTUAL 0 --}}
                         @if($boq->actual_reason)
-                            <div class="rounded-xl border border-red-100 bg-red-50/80 p-3 text-xs text-red-700 leading-relaxed shadow-sm">
+                            <div class="rounded-lg border border-red-100 bg-red-50/80 p-3 text-xs text-red-700 leading-relaxed shadow-sm">
                                 <p class="font-black mb-0.5 flex items-center gap-1">
                                     <i class="fa-solid fa-triangle-exclamation"></i> Alasan Kuantitas Aktual (0):
                                 </p>
@@ -158,7 +161,7 @@
                         @endif
 
                         @if($status == 'rejected')
-                            <div class="rounded-xl border border-red-100 bg-red-50/50 p-3 text-xs text-red-700 leading-relaxed flex items-start gap-2">
+                            <div class="rounded-lg border border-red-100 bg-red-50/50 p-3 text-xs text-red-700 leading-relaxed flex items-start gap-2">
                                 <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
                                 <div>
                                     <p class="font-bold mb-0.5">Terdapat Eviden Ditolak</p>
@@ -236,7 +239,7 @@
                     </div>
                 </div>
             @empty
-                <div class="bg-white rounded-2xl border border-slate-200 p-6 text-center text-xs text-slate-400">Belum ada daftar item BOQ terpetakan.</div>
+                <div class="bg-white rounded-lg border border-slate-200 p-6 text-center text-xs text-slate-400">Belum ada daftar item BOQ terpetakan.</div>
             @endforelse
         </div>
     </div>
@@ -256,7 +259,7 @@
 
     {{-- MODAL UPLOAD OVERLAY --}}
     <div id="uploadModal" class="hidden fixed inset-0 z-[9999] bg-black/60 px-4 flex items-center justify-center backdrop-blur-xs animate-fade-in">
-        <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="bg-white rounded-lg w-full max-w-sm shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
             <div class="bg-[#1565D8] text-white px-5 py-4 flex items-start justify-between shrink-0">
                 <div>
@@ -275,9 +278,9 @@
                 <input type="hidden" name="longitude" id="longitude">
 
                 {{-- INFORMASI GRID TARGET DAN AKTUAL --}}
-                <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100 text-xs shrink-0">
+                <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs shrink-0">
                     <div>
-                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Target Plan</p>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{{ $referenceLabel }}</p>
                         <p class="text-sm font-black text-slate-900 mt-0.5"><span id="planQuantity">0</span> <span id="planUnit" class="text-[10px] font-normal text-slate-400"></span></p>
                     </div>
                     <div>
@@ -291,7 +294,7 @@
                 </div>
 
                 {{-- AREA INPUT REASON JIKA ACTUAL = 0 --}}
-                <div id="reasonBox" class="hidden text-xs bg-red-50 border border-red-100 rounded-2xl p-3 animate-fade-in shadow-inner">
+                <div id="reasonBox" class="hidden text-xs bg-red-50 border border-red-100 rounded-lg p-3 animate-fade-in shadow-inner">
                     <label class="text-xs font-black text-red-700 block mb-2">
                         <i class="fa-solid fa-triangle-exclamation mr-1"></i> Nilai Aktual 0. Pilih Alasan: <span class="text-red-500">*</span>
                     </label>
@@ -319,7 +322,7 @@
                 {{-- AREA DROPZONE SELECT/UPLOAD FOTO --}}
                 <div class="text-xs">
                     <label class="text-xs font-black text-slate-600 block mb-1.5">Pilih Eviden / Multiple Select</label>
-                    <label class="flex flex-col items-center justify-center w-full min-h-[125px] border-2 border-dashed border-blue-300 rounded-2xl bg-blue-50/40 cursor-pointer hover:bg-blue-50 transition p-4">
+                    <label class="flex flex-col items-center justify-center w-full min-h-[125px] border-2 border-dashed border-blue-300 rounded-lg bg-blue-50/40 cursor-pointer hover:bg-blue-50 transition p-4">
                         <div class="text-center">
                             <div class="mx-auto w-11 h-11 rounded-xl bg-[#1565D8] text-white flex items-center justify-center text-xl font-black shadow-sm">
                                 <i class="fa-solid fa-camera"></i>
@@ -394,7 +397,7 @@ function alertNoMetadata(fileName) {
         text: 'Foto "' + fileName + '" tidak memiliki metadata (EXIF) sehingga tidak bisa diunggah. Pastikan foto diambil langsung dari kamera HP, bukan hasil screenshot atau kiriman ulang WhatsApp/Telegram yang menghapus metadata.',
         icon: 'warning',
         confirmButtonColor: '#1565D8',
-        customClass: { popup: 'rounded-3xl' }
+        customClass: { popup: 'rounded-lg' }
     });
 }
 
@@ -550,7 +553,7 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
     if (selectedFiles.length === 0) {
-        Swal.fire({ title: 'Pilih Foto!', text: 'Mohon lampirkan minimal 1 foto fisik sebagai bukti progress lapangan.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
+        Swal.fire({ title: 'Pilih Foto!', text: 'Mohon lampirkan minimal 1 foto fisik sebagai bukti progress lapangan.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-lg' } });
         return;
     }
 
@@ -560,7 +563,7 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     if (qtyActualValue === '0') {
         const checkedOption = document.querySelector('input[name="reason_option"]:checked');
         if (!checkedOption) {
-            Swal.fire({ title: 'Alasan Kosong!', text: 'Karena Quantity Actual 0, Anda wajib memilih alasannya.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
+            Swal.fire({ title: 'Alasan Kosong!', text: 'Karena Quantity Actual 0, Anda wajib memilih alasannya.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-lg' } });
             return; 
         }
         
@@ -568,7 +571,7 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
         if (finalReason === 'Lainnya') {
             finalReason = textLainnya.value.trim();
             if (finalReason === '') {
-                Swal.fire({ title: 'Alasan Kosong!', text: 'Silakan ketik alasan spesifik pada kolom teks yang tersedia.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
+                Swal.fire({ title: 'Alasan Kosong!', text: 'Silakan ketik alasan spesifik pada kolom teks yang tersedia.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-lg' } });
                 return;
             }
         }
@@ -596,14 +599,14 @@ document.getElementById('uploadForm').addEventListener('submit', function(e) {
     .then(response => {
         if (response.ok) {
             closeUploadModal();
-            Swal.fire({ title: 'Berhasil Disimpan!', text: 'Eviden progress lapangan berhasil diperbarui.', icon: 'success', showConfirmButton: false, timer: 1500, timerProgressBar: true, customClass: { popup: 'rounded-3xl' } })
+            Swal.fire({ title: 'Berhasil Disimpan!', text: 'Eviden progress lapangan berhasil diperbarui.', icon: 'success', showConfirmButton: false, timer: 1500, timerProgressBar: true, customClass: { popup: 'rounded-lg' } })
             .then(() => window.location.reload());
         } else {
-            Swal.fire({ title: 'Gagal Memproses!', text: 'Terjadi kegagalan validasi atau status ditolak sistem.', icon: 'error', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
+            Swal.fire({ title: 'Gagal Memproses!', text: 'Terjadi kegagalan validasi atau status ditolak sistem.', icon: 'error', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-lg' } });
         }
     })
     .catch(() => {
-        Swal.fire({ title: 'Gangguan Jaringan!', text: 'Gagal menghubungi server. Periksa kembali koneksi internet di lapangan.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-3xl' } });
+        Swal.fire({ title: 'Gangguan Jaringan!', text: 'Gagal menghubungi server. Periksa kembali koneksi internet di lapangan.', icon: 'warning', confirmButtonColor: '#1565D8', customClass: { popup: 'rounded-lg' } });
     });
 });
 
